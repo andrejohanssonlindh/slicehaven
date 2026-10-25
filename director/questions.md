@@ -4,27 +4,15 @@ Newest on top. Answer in chat (just reference the number, e.g. "Q3: option B"). 
 
 ---
 
-### Q1 — Eon: borrow the world, or make an Eon-flavoured one of our own?
-The game will be public on GitHub Pages. Eon (Helmgast) is a copyrighted setting. Options:
-- **A. Use Mundana by name** (Asharien, Döda skogen, Daak, etc.) as a non-commercial fan project. Most authentic. Small risk if it ever grows, and we can't ever sell it.
-- **B. Our own world in Eon's spirit** — grey morality, grimy realism, ruins everywhere, living gods — with our own names. Fully ours, can grow freely.
-- **C. Start with A, keep names in one content file** so a rename later is cheap.
+### Q3 — How many dice per turn? *(partly answered)*
+You said some heroes can sometimes roll **3 dice** ("burning through your shit"), which suggests a normal turn is **2 dice**. My working assumption: **each hero rolls 2 dice per turn and uses both faces**. Some heroes or effects allow 3. *Disadvantage* (from your debuff notes) lowers it to 1. Shout if that's wrong.
 
-*My recommendation: C.* Whichever you pick, I write all text myself and never copy from the books.
+### Q5 — Story direction *(partly answered)*
+Your shepherd hook is in [your notes](vision/2026-10-25-director-notes.md). Still open: **which war killed the father?** I'll look through the books for a recent Asharian war that fits (the Cermirian attack on Jarla 25 years ago is a candidate) and propose one.
 
-### Q2 — Solo hero or a party?
-Gloomhaven is 2–4 heroes; Slice & Dice is a party of 5. On a phone, I suggest **a party of 2–3 heroes, controlled by you**, each with 4–5 dice. Alternative: one hero and hirelings.
+---
 
-### Q3 — How many dice per turn?
-Gloomhaven: play 2 cards per turn (top of one, bottom of the other). Dice analogue options:
-- **A.** Pick 2 ready dice per hero per turn, roll both, use both faces.
-- **B.** Roll 2, keep 1 face and spend both dice (more decisions, faster exhaustion).
-- **C.** Roll one at a time (current prototype; simple, maybe too thin).
-
-*Leaning A, with rerolls as a resource.* Details in [dice system](../design/dice-system.md).
-
-### Q4 — Language
-The game text in English or Swedish? Eon's flavour is very Swedish (jarladömen, frijarl, styver). I've started in English with Swedish place names.
-
-### Q5 — Story direction
-You said you'd come back on story. I've put some seeds in [story seeds](../story/story-seeds.md) set in northern Asharien, so you have something to react to.
+## Answered
+- **Q1 Eon names** → keep the names. *(2026-10-25)*
+- **Q2 Party size** → variable, max 4; early game 1, later usually 2. *(2026-10-25)*
+- **Q4 Language** → English. *(2026-10-25)*

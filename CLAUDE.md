@@ -12,6 +12,7 @@ Gloomhaven-style campaign game where Slice & Dice-style **dice replace cards**. 
   - Open questions for the user → `director/questions.md` (newest on top, mark answered ones).
   - Decisions the user made → `director/decisions.md` (date + decision + why).
   - What was done each session → `director/devlog.md`.
+  - The director's own vision notes → `director/vision/` (original text kept verbatim, plus an English digest). **Read these before designing anything.** They're ambitions to build on, not a checklist to do right away.
 - The Eon 5 PDFs in the project root are **copyrighted reference for the world only** (ignore the RPG rules). Never commit them, never paste their text into the repo. Write our own prose. See `director/world/eon-notes.md`.
 
 ## Tech

@@ -9,3 +9,7 @@
 | 2026-10-25 | Tech: Vite + TypeScript + Phaser 4 | See [devlog](devlog.md) for reasoning. |
 | 2026-10-25 | Phone-first portrait layout | Director plays and reviews on the phone. |
 | 2026-10-25 | Eon PDFs never committed | Copyrighted; the repo is public. |
+| 2026-10-25 | Use Eon/Mundana names directly (non-commercial fan project) | Director's call. Keep names in content files so they're easy to find. |
+| 2026-10-25 | Party size variable, max 4 (early 1, later usually 2) | Director's call. |
+| 2026-10-25 | Game text in English | Director's call. |
+| 2026-10-25 | Story starts with one hero, a shepherd; early village jobs recruit companions | Director's notes, see [vision notes](vision/2026-10-25-director-notes.md). |

@@ -7,6 +7,9 @@ This is the backstage area for Slicehaven: not part of the game, but where I (Cl
 - **[Devlog](devlog.md)** — what got done, session by session.
 - **[Decisions](decisions.md)** — what we've locked in, and why.
 
+## Your vision
+- [Director's notes 2026-10-25](vision/2026-10-25-director-notes.md) — movement, party traits, dice, progression, the shepherd story. *The foundation everything builds on.*
+
 ## Design
 - [Game design overview](design/game-design.md) — pillars, loops, structure.
 - [Dice system](design/dice-system.md) — how dice replace Gloomhaven's cards.

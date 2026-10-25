@@ -1,5 +1,7 @@
 # Story seeds
 
+> **Update 2026-10-25:** the director's shepherd hook ([notes](../vision/2026-10-25-director-notes.md)) is now the starting point. The seeds below are older material: possible later arcs or side content. Example: the Dead Forest could be where the "father is alive" letter leads.
+
 *Placeholders to react to. You said you'll come back with an overarching idea. These are just to give you something to push against.*
 
 ## Seed A — "The Dead Don't Rest" (main arc)
