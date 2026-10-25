@@ -13,3 +13,7 @@
 | 2026-10-25 | Party size variable, max 4 (early 1, later usually 2) | Director's call. |
 | 2026-10-25 | Game text in English | Director's call. |
 | 2026-10-25 | Story starts with one hero, a shepherd; early village jobs recruit companions | Director's notes, see [vision notes](vision/2026-10-25-director-notes.md). |
+| 2026-10-25 | Art direction #1 approved: forest tiles, hex size, red obstacle borders, dice cube → cross → detail | Director: "tiles are near perfect". |
+| 2026-10-25 | Reuse tiles with other palettes for other forest types (old-school recolouring) | Director's idea. Palette swap already works for characters (herbalist = recoloured shepherd). |
+| 2026-10-25 | Own canvas engine instead of Phaser | Art, lighting and weather are all per-pixel; our own renderer gives full control and saves ~1.3 MB. |
+| 2026-10-25 | Weather is a core system (clear/cloudy/rain/storm, day/dusk/night, wind) | Director: ties into Eon's magic, which draws power from the surroundings. |

@@ -11,8 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "marked": "^18.1.1",
-    "phaser": "^4.2.1"
+    "marked": "^18.1.1"
   },
   "devDependencies": {
     "typescript": "^7.0.2",

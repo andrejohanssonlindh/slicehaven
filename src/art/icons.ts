@@ -46,6 +46,51 @@ const ICONS: Record<string, { rows: string[]; key: Record<string, string> }> = {
     rows: ['..pp.....', '.pqqp....', '.pqyp.pp.', '..pp.pqqp', '.....pqyp', '..pp..pp.', '.pqqp....', '.pyqp....', '..pp.....'],
     key: { p: '#b48ad8', q: '#6a3a8a', y: '#c8d870' },
   },
+  // --- UI icons (engine toolbar) ---
+  fire: {
+    rows: ['....r....', '...rr....', '...ryr...', '..ryyr.r.', '.rryyyrr.', '.ryywyyr.', 'rryywwyrr', 'ryywwwyyr', '.ryyyyyr.'],
+    key: { r: '#c43a2e', y: '#f2a24a', w: '#fff2a0' },
+  },
+  bolt: {
+    rows: ['....yyy', '...yyw.', '..yyw..', '.yyyyyy', '....yw.', '...yw..', '..yw...', '.yw....', 'y......'],
+    key: { y: '#f2d75c', w: '#fffbe0' },
+  },
+  sun: {
+    rows: ['....y....', '.y..y..y.', '..yyyyy..', '..ywwwy..', 'yyywwwyyy', '..ywwwy..', '..yyyyy..', '.y..y..y.', '....y....'],
+    key: { y: '#f2c94c', w: '#fff2a0' },
+  },
+  cloud: {
+    rows: ['...www...', '..wwwww..', '.wwwwwwwg', 'wwwwwwwgg', 'gggggggg.'],
+    key: { w: '#e8eef2', g: '#9aa6b4' },
+  },
+  rain: {
+    rows: ['...www...', '..wwwww..', '.wwwwwwwg', 'gggggggg.', '.b..b..b.', 'b..b..b..', '.b..b..b.'],
+    key: { w: '#c8d0d8', g: '#7a8494', b: '#6fb3d6' },
+  },
+  storm: {
+    rows: ['...ggg...', '..ggggg..', '.ggggggdg', 'dddddddd.', '..b.yy.b.', '.b.yy..b.', '...yyyy..', '.b...y.b.', '....y....'],
+    key: { g: '#7a8494', d: '#4b4c5b', b: '#6fb3d6', y: '#f2d75c' },
+  },
+  moon: {
+    rows: ['..www..', '.ww....', 'ww.....', 'ww.....', 'ww.....', '.ww....', '..www..'],
+    key: { w: '#e6e8f6' },
+  },
+  dusk: {
+    rows: ['...ooo...', '..ooooo..', '.ooyyyoo.', 'ppppppppp', '.ppp.ppp.', '..p...p..'],
+    key: { o: '#ef8a48', y: '#f2c94c', p: '#8a5ab0' },
+  },
+  foe: {
+    rows: ['.bbbbb.', 'bbbbbbb', 'brbbrbb', 'bbbbbbb', '.bxbxb.', '.bbbbb.'],
+    key: { b: '#ece6cf', r: '#c43a2e', x: '#4a3e3a' },
+  },
+  friend: {
+    rows: ['..sss..', '..sss..', '...s...', '.ggggg.', 'g.ggg.g', '..ggg..', '..g.g..', '..g.g..'],
+    key: { s: '#f2cba2', g: '#79a85a' },
+  },
+  turn: {
+    rows: ['bbbbbbb', '.byyyb.', '..byb..', '...b...', '..b.b..', '.byyyb.', 'bbbbbbb'],
+    key: { b: '#c9a06a', y: '#f2d75c' },
+  },
   blank: {
     rows: ['a...a', '.a.a.', '..a..', '.a.a.', 'a...a'],
     key: { a: '#a89c88' },

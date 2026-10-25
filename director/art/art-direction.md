@@ -40,7 +40,15 @@ The art is made **by code**, so it lives in git and can be changed by describing
 
 Strengths: terrain, vegetation, water, dice: anything that can be generated. Weakest area: **characters**. They're placed pixel by pixel from text, and they'll need iteration, or later a hand-drawn sprite sheet we drop in.
 
-## Feedback wanted (see Q6 in [questions](../questions.md))
+## Director's feedback on test #1 (2026-10-25)
+- **Direction: yes.** Tiles are near perfect.
+- **Hex size: good**, but we need zoom. *(Done in the engine sandbox: pinch, wheel, +/− buttons.)*
+- **Colours:** a kind forest can look like this. Other forest types = the same tiles with other palettes (old-school recolouring).
+- **Red border:** fine.
+- **Mobs: 5/10.** Too blobby, they merge together and aren't distinct. The wolf looks like a cat, the rat like a ball. → *To do: a mob art pass with clearer silhouettes, more contrast between body parts, distinct heads/limbs, maybe a slightly bigger sprite size.*
+- **Dice: yes**, readable.
+
+## Original feedback questions (Q6)
 - Overall: is this the right direction?
 - Hex size: right, or bigger still?
 - Saturation / colours: too bright or too dark? (Eon is grim; this forest is quite friendly.)

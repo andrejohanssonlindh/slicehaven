@@ -12,7 +12,11 @@ export interface TileArt {
   pond?: boolean;
   /** Impassable: drawn with a red border. */
   obstacle?: boolean;
+  /** Burnt ground: ash and soot. */
+  scorched?: boolean;
 }
+
+const ASH = ['#141011', '#231c1c', '#352b29', '#4a3e3a', '#5e524c'];
 
 /** A water pixel, redrawn every frame for the flow animation. */
 export interface WaterPx {
@@ -139,6 +143,12 @@ export function paintTile(buf: Pix, ox: number, oy: number, art: TileArt, water:
           c = P.dirt[1];
         } else if (d < bank) {
           c = ramp(P.dirt.slice(2, 5), (bank - d) / 2.5 + (white(wx, wy, 14) - 0.5) * 0.4, wx, wy);
+        }
+      }
+      if (art.scorched && !art.river && !art.pond) {
+        const n = fbm(wx / 4, wy / 3, 30);
+        if (n > 0.3 || EDGE[y][x] > 4) {
+          c = white(wx, wy, 31) < 0.03 ? '#c43a2e' : ramp(ASH, n * 0.9 + (white(wx, wy, 32) - 0.5) * 0.3, wx, wy);
         }
       }
       buf.set(wx, wy, c);

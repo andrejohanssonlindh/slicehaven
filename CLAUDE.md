@@ -16,7 +16,7 @@ Gloomhaven-style campaign game where Slice & Dice-style **dice replace cards**. 
 - The Eon 5 PDFs in the project root are **copyrighted reference for the world only** (ignore the RPG rules). Never commit them, never paste their text into the repo. Write our own prose. See `director/world/eon-notes.md`.
 
 ## Tech
-- Vite + TypeScript (strict) + Phaser 4. Vitest for tests. `marked` for the Director's Room.
+- Vite + TypeScript (strict), **own canvas engine** (no Phaser: dropped 2026-10-25, our art and lighting are per-pixel anyway). Vitest for tests. `marked` for the Director's Room.
 - `npm run dev` (also on LAN with `--host`), `npm test`, `npm run build`.
 - Deploy: `.github/workflows/deploy.yml` builds and publishes `dist/` on every push to `main`.
 - Vite `base` is `/slicehaven/`. Static assets go in `public/` and are referenced as `import.meta.env.BASE_URL + 'assets/...'`.
@@ -26,15 +26,18 @@ Gloomhaven-style campaign game where Slice & Dice-style **dice replace cards**. 
 src/
   core/      Pure game rules. NO Phaser/DOM imports. Deterministic (all randomness via core/rng.ts). Unit tested.
   content/   Game data: heroes, dice, gear, monsters, scenarios, events, campaign graph. Plain TS objects.
-  scenes/    Phaser scenes (rendering + input only; ask core/ for rules).
+  art/       Art generators: pixel buffers, terrain, props, mobs, icons, dice faces. Everything is drawn by code.
+  engine/    Renderer, camera (zoom/pan), weather, lighting, effects, and the sandbox controller.
   ui/        DOM overlays (top bar, menus, long text, dialogs) - text reads better in HTML than canvas on phones.
   director/  Director's Room page script.
+  artlab/    Art Lab page script (art tests).
 director/    Markdown notes for the producer (design, world, art, story, questions, devlog).
 tests/       Vitest tests for core/.
 public/      Static assets (sprites, audio, fonts).
 ```
 Rules of thumb:
-- Keep rules in `core/` and data in `content/`; scenes should be thin.
+- Keep rules in `core/` and data in `content/`; the engine renders and animates, it doesn't decide rules.
+- Check visual work in a real browser (dev server + Chrome tools) before pushing.
 - Game state must be plain JSON-serialisable (it goes into the save).
 - Save format is versioned in `core/save.ts`; add a migration when changing it.
 - Phone-first: portrait 400×720 logical canvas, everything tappable, no hover-only UI.

@@ -49,13 +49,20 @@ const SHEPHERD_BODY = [
   '...oooo...oooo..',
 ];
 
-export function makeShepherd(): Sprite {
+/** Palette swaps of the villager body (old-school recolouring). */
+export const VILLAGER_COLORS: Record<string, Record<string, string>> = {
+  shepherd: {},
+  herbalist: { H: '#79a85a', h: '#4f7a3c', d: '#2f4f28', w: '#e2d4ac', W: '#b8a882', s: '#e8b88e', S: '#b88460' },
+};
+
+export function makeShepherd(variant = 'shepherd'): Sprite {
   const body = sprite(SHEPHERD_BODY, {
     o: OUTLINE,
     H: '#a7773f', h: '#7a532c', d: '#50351d',
     s: '#f2cba2', S: '#c99570', e: OUTLINE,
     w: '#eee6d4', W: '#bdb29c',
     b: '#3a2618', p: '#5c5248', P: '#3f3832',
+    ...VILLAGER_COLORS[variant],
   });
   // Crook (staff with a hook), drawn behind the right hand.
   const staff = new Pix(20, 27);

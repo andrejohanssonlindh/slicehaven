@@ -16,9 +16,18 @@ export function parseHexKey(key: string): Hex {
   return { q, r };
 }
 
-const DIRECTIONS: readonly Hex[] = [
+/** 0 E, 1 NE, 2 NW, 3 W, 4 SW, 5 SE */
+export const DIRECTIONS: readonly Hex[] = [
   hex(1, 0), hex(1, -1), hex(0, -1), hex(-1, 0), hex(-1, 1), hex(0, 1),
 ];
+
+/** Offset ("odd-r": odd rows shifted right) grid position -> axial hex. Maps are authored in offset coords. */
+export const offsetToHex = (col: number, row: number): Hex => hex(col - (row - (row & 1)) / 2, row);
+
+export const hexToOffset = (h: Hex): { col: number; row: number } => ({
+  col: h.q + (h.r - (h.r & 1)) / 2,
+  row: h.r,
+});
 
 export const hexEquals = (a: Hex, b: Hex): boolean => a.q === b.q && a.r === b.r;
 

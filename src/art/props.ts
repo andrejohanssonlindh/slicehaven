@@ -44,10 +44,35 @@ function clumpShade(blobs: Blob[], x: number, y: number, seed: number): number |
   return best.v + (fbm(x / 2.2, y / 2.2, seed) - 0.5) * 0.45 + (white(x, y, seed) - 0.5) * 0.12;
 }
 
-function swayShift(y: number, top: number, bottom: number, f: number, phase: number, amp: number): number {
-  const s = Math.sin((f / FRAMES) * Math.PI * 2 + phase) * amp;
+/**
+ * Horizontal shift for row y in frame f. `wind` 0..1: calm sway at 0; at 1 the
+ * plant leans downwind and sways harder.
+ */
+function swayShift(y: number, top: number, bottom: number, f: number, phase: number, amp: number, wind = 0): number {
+  const s = Math.sin((f / FRAMES) * Math.PI * 2 + phase) * amp * (1 + wind * 1.6) + wind * amp * 2;
   const k = Math.max(0, Math.min(1, (bottom - y) / (bottom - top)));
   return Math.round(s * k);
+}
+
+/** Burnt version of a sprite: charcoal colours, most of the foliage gone. */
+export function charred(s: Sprite, seed: number): Sprite {
+  const ash = ['#0e0b0c', '#211a1a', '#362c2a', '#4f4440'];
+  const frames = s.frames.map((f) => {
+    const out = new Pix(f.w, f.h);
+    for (let y = 0; y < f.h; y++) {
+      for (let x = 0; x < f.w; x++) {
+        const [r, g, b, a] = f.get(x, y);
+        if (!a) continue;
+        const leafy = g > r + 8 && g > b;
+        if (leafy && white(x, y, seed) < 0.8) continue;
+        const l = (r * 0.3 + g * 0.59 + b * 0.11) / 255;
+        const ember = leafy && white(x, y, seed + 1) < 0.15;
+        out.set(x, y, ember ? '#c43a2e' : ramp(ash, l * 1.6, x, y));
+      }
+    }
+    return out;
+  });
+  return { ...s, frames, shadow: Math.round(s.shadow * 0.6) };
 }
 
 function trunk(p: Pix, cx: number, top: number, bottom: number, half: number): void {
@@ -63,9 +88,9 @@ function trunk(p: Pix, cx: number, top: number, bottom: number, half: number): v
 }
 
 /** Broad-leaf tree. Takes the whole hex: use as an obstacle. */
-export function makeTree(seed: number): Sprite {
+export function makeTree(seed: number, wind = 0): Sprite {
   const rng = Rng.fromSeed(seed);
-  const W = 34;
+  const W = 42; // room to lean downwind
   const H = 44;
   const cx = 17;
   const blobs: Blob[] = [
@@ -84,7 +109,7 @@ export function makeTree(seed: number): Sprite {
     const leaves = new Pix(W, H);
     for (let y = 0; y < 31; y++) {
       for (let x = 0; x < W; x++) {
-        const sx = x - swayShift(y, 0, 30, f, phase, 1.2);
+        const sx = x - swayShift(y, 0, 30, f, phase, 1.2, wind);
         const v = clumpShade(blobs, sx, y, seed);
         if (v !== null) leaves.set(x, y, ramp(P.foliage.slice(1), v, sx, y));
       }
@@ -96,9 +121,9 @@ export function makeTree(seed: number): Sprite {
 }
 
 /** Conifer. Narrow and tall. */
-export function makePine(seed: number): Sprite {
+export function makePine(seed: number, wind = 0): Sprite {
   const rng = Rng.fromSeed(seed);
-  const W = 26;
+  const W = 32;
   const H = 46;
   const cx = 13;
   const phase = rng.next() * Math.PI * 2;
@@ -117,7 +142,7 @@ export function makePine(seed: number): Sprite {
         const k = (y - t.top) / (t.bottom - t.top);
         const jag = (white(0, y, seed) - 0.5) * 2;
         const half = Math.max(0.5, t.half * k + jag * 0.6);
-        const shift = swayShift(y, 0, 34, f, phase, 1.0);
+        const shift = swayShift(y, 0, 34, f, phase, 1.0, wind);
         for (let x = Math.floor(cx - half); x <= Math.ceil(cx + half); x++) {
           const u = (x + 0.5 - cx) / (half + 0.5);
           if (Math.abs(u) > 1) continue;
@@ -135,9 +160,9 @@ export function makePine(seed: number): Sprite {
 }
 
 /** Thorny thicket: an obstacle, low and wide, with red berries. */
-export function makeThicket(seed: number): Sprite {
+export function makeThicket(seed: number, wind = 0): Sprite {
   const rng = Rng.fromSeed(seed);
-  const W = 30;
+  const W = 34;
   const H = 22;
   const blobs: Blob[] = [
     { x: 9, y: 13, r: 7 }, { x: 18, y: 11, r: 8 }, { x: 23, y: 15, r: 6 }, { x: 14, y: 16, r: 6 },
@@ -148,7 +173,7 @@ export function makeThicket(seed: number): Sprite {
     const leaves = new Pix(W, H);
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
-        const sx = x - swayShift(y, 3, 18, f, phase, 0.7);
+        const sx = x - swayShift(y, 3, 18, f, phase, 0.7, wind);
         const v = clumpShade(blobs, sx, y, seed);
         if (v === null) continue;
         let c = ramp([...P.moss, P.foliage[4]], v * 0.9, sx, y);
@@ -196,9 +221,9 @@ export function makeRock(seed: number): Sprite {
 }
 
 /** Small swaying grass tuft. Decoration, not an obstacle. */
-export function makeTuft(seed: number): Sprite {
+export function makeTuft(seed: number, wind = 0): Sprite {
   const rng = Rng.fromSeed(seed);
-  const W = 11;
+  const W = 15;
   const H = 9;
   const blades = Array.from({ length: 5 + rng.int(3) }, () => ({
     x: 2 + rng.int(7),
@@ -210,7 +235,7 @@ export function makeTuft(seed: number): Sprite {
   const frames: Pix[] = [];
   for (let f = 0; f < FRAMES; f++) {
     const p = new Pix(W, H);
-    const s = Math.round(Math.sin((f / FRAMES) * Math.PI * 2 + phase) * 1.2);
+    const s = Math.round(Math.sin((f / FRAMES) * Math.PI * 2 + phase) * 1.2 * (1 + wind) + wind * 2.5);
     for (const b of blades) {
       for (let i = 0; i < b.h; i++) {
         const k = i / b.h;
@@ -221,6 +246,22 @@ export function makeTuft(seed: number): Sprite {
     frames.push(p);
   }
   return { frames, ax: 5, ay: H - 1, shadow: 0 };
+}
+
+/** Flat stepping stones across a ford. */
+export function makeStones(): Sprite {
+  const p = new Pix(24, 12);
+  const stones = [[3, 8, 3], [10, 5, 3], [17, 3, 3], [12, 9, 2]];
+  for (const [sx, sy, r] of stones) {
+    for (let y = -r; y <= r; y++) {
+      for (let x = -r - 1; x <= r + 1; x++) {
+        if ((x / (r + 1.2)) ** 2 + (y / (r * 0.7)) ** 2 > 1) continue;
+        p.set(sx + x, sy + y, y < 0 ? P.stone[4] : y === 0 ? P.stone[3] : P.stone[2]);
+      }
+    }
+  }
+  const out = p.outlined('#1b1424aa');
+  return { frames: Array.from({ length: FRAMES }, () => out), ax: 12, ay: 10, shadow: 0 };
 }
 
 /** Little red-capped mushrooms. */

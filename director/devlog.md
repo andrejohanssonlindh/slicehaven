@@ -1,5 +1,21 @@
 # Devlog
 
+## 2026-10-25 — Session 3: engine sandbox
+
+**Done**
+- **Own engine** (`src/engine/`), replacing the old Phaser prototype on the main page:
+  - **Camera:** pinch / mouse wheel / +− buttons to zoom (whole-pixel steps, so pixels stay crisp), drag to pan, ⤢ to fit.
+  - **Weather:** clear, cloudy (drifting cloud shadows), rain (drops, splashes, washed-out colours), storm (heavy rain, strong wind, blowing leaves, random lightning on tall things). Changes roll in smoothly.
+  - **Time of day:** day, dusk (warm), night (dark blue). Fire lights up its surroundings, skeleton eyes glow, heroes carry a faint lantern at night.
+  - **Wind:** trees, thickets and grass sway harder and lean downwind as the wind picks up.
+  - **Fire:** set fire to trees, thickets, grass. It burns, smokes, throws embers, then leaves ash and charred trunks. Thickets burn away and open the hex. Rain shortens fires. No spreading yet.
+  - **Lightning:** tap to strike. Bolt + screen flash, damages and sets fire.
+- **Sandbox controls:** Walk (lit hexes; tap to plot, tap the end again to go; or plot your own route hex by hex), Jump (straight lines over obstacles/water), Strike, Sling (range 2–4), Heal, "Foes act" (enemies walk up and bite). World tab: weather, time, fire, lightning, spawn foes (tap again to cycle wolf/rat/skeleton) and friends.
+- Rules for movement, targeting, damage and the simple monster AI are in `src/core/battle.ts`, with tests.
+- Tested in the browser: all actions, weather, fire and lightning work. One frame takes about 3 ms in a night storm.
+
+**Not done yet:** mob art pass (your 5/10 feedback), zoom in the Art Lab, real turn structure, and dice driving the actions.
+
 ## 2026-10-25 — Session 2: art direction test #1
 
 **Done**
