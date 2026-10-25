@@ -3,6 +3,7 @@
 This is the backstage area for Slicehaven: not part of the game, but where I (Claude) put proposals, questions, sketches and progress for you to review from your phone.
 
 ## Start here
+- **[Art Lab](https://andrejohanssonlindh.github.io/slicehaven/artlab/)** — live art tests (forest tiles, mobs, dice).
 - **[Questions for you](questions.md)** — things I need your call on. Answer in chat whenever.
 - **[Devlog](devlog.md)** — what got done, session by session.
 - **[Decisions](decisions.md)** — what we've locked in, and why.

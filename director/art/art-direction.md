@@ -1,20 +1,49 @@
-# Art direction (proposal)
+# Art direction
 
-## Target look
-**SNES-era pixel art, 2D with depth.** Think *Final Fantasy VI*, *Secret of Mana*, *Ogre Battle*, *Tactics Ogre*: chunky pixels, rich but limited palettes, drop shadows, tiles with a visible side face so the map reads like a little diorama.
+**See it live: [Art Lab](https://andrejohanssonlindh.github.io/slicehaven/artlab/)**
 
-## Choices
-- **Hexes drawn as raised tiles** (top face + darker side face). Already in the prototype as flat colours.
-- **Sprites ~24–32 px tall**, rendered with nearest-neighbour scaling (crisp pixels, no blur).
-- **Palette:** dusty and warm for Asharien: red-ochre steppe, bone, rust, sun-bleached cloth; cold teal and violet for undead/magic. One shared master palette (~32 colours) so everything belongs together.
-- **Lighting:** light from top-left everywhere; 1px dark outlines on characters, not on tiles.
-- **UI:** framed panels with bevelled borders (like old JRPG menus), parchment for story text.
-- **Dice:** chunky pixel dice with icon faces. Rolling = a short tumble animation and a "clack".
+## Brief from the director (2026-10-25)
+- The first prototype looked 8-bit and ugly. Aim for **"16-bit, but pretty"**: animated water, swaying trees, shadows, still visibly pixelated.
+- **Bigger hexes**, with real ground on them.
+- **Mobs stand upright on the hexes**, giving a slight isometric feel (not lying flat).
+- Obstacles have a **reddish border**.
+- Dice: D6 is the base. Three levels: (1) a pseudo-3D cube showing 3 sides + name, (2) the die unfolded as a lying cross, (3) tap a side for details.
+- Build **tools that make the art**, once we've settled on a style.
 
-## How I'll make the art
-I can't draw in an image editor, so I'll make art in code: pixel sprites defined as text grids + palette, turned into textures in the game. This keeps everything in git and easy to tweak ("make the skeleton's eyes glow"). Later we can swap in hand-made or commissioned sprite sheets without changing game code.
+## Test #1 — forest (2026-10-25)
+What's in the Art Lab:
+1. **Forest scene**: an animated 8×9 hex diorama with a river, pond, path, tall grass, oaks, pines, boulders, thickets, the shepherd, wolves, a giant rat and a skeleton.
+2. **Tile sheet**: grass, flowers, forest floor, path, tall grass, mushrooms, 3 river pieces, pond, 4 obstacle types.
+3. **Mobs** on their hexes.
+4. **Dice**: 6 example dice (including a D5) with all three levels working.
 
-I'll post art studies here (as images) for you to approve before going wide.
+### Technical choices
+| | |
+|---|---|
+| Hex shape | Pointy-top, 32 px wide, 2:1 pixel slopes, slightly squashed vertically, so the board reads as tilted toward you. 6 px earth side face for depth. |
+| Scale | Drawn at native resolution and scaled by a whole number (crisp pixels). On a phone, one art pixel ≈ 4 screen pixels. |
+| Light | Always from the top-left. Shadows fall bottom-right. |
+| Palette | One master palette (`src/art/palette.ts`). Every colour comes from a ramp (dark → light). |
+| Animation | 8 frames/second. Water flows along the river, trees and grass sway 1 px, mobs "breathe". |
+| Obstacles | Red double-line hex border (dark + bright red). |
+| Dice faces | 28×28 px, bone-white with a coloured bevelled frame by type (red attack, blue shield, green heal, tan move, teal jump…), icon + big number. Riders (bleed, push, lose…) show as small coloured pips top-left. |
 
-## Overworld
-A painted-looking pixel map of the region (river, steppe, forest edge, towns). Available scenarios are glowing markers; travel is a dotted path between them. Locked ones are greyed or hidden.
+## The art tools (`src/art/`)
+The art is made **by code**, so it lives in git and can be changed by describing what you want.
+- `pix.ts` — pixel buffer, text-grid sprites, outlines, ordered dithering.
+- `noise.ts` — seeded noise. Textures use world coordinates, so tiles join seamlessly.
+- `terrain.ts` — ground types, rivers (any entry/exit edge), ponds, bevels, red obstacle borders, animated water.
+- `props.ts` — procedural oaks, pines, thickets, boulders, grass tufts, mushrooms (each with 8 sway frames).
+- `mobs.ts` — hand-placed pixel characters with idle animation.
+- `icons.ts` / `diceArt.ts` — face icons, pixel digits, faces, the 3D cube.
+- `mapScene.ts` — puts it all together into an animated diorama.
+
+Strengths: terrain, vegetation, water, dice: anything that can be generated. Weakest area: **characters**. They're placed pixel by pixel from text, and they'll need iteration, or later a hand-drawn sprite sheet we drop in.
+
+## Feedback wanted (see Q6 in [questions](../questions.md))
+- Overall: is this the right direction?
+- Hex size: right, or bigger still?
+- Saturation / colours: too bright or too dark? (Eon is grim; this forest is quite friendly.)
+- The red obstacle border: too loud?
+- Mobs: size relative to the hex? Should the hero be bigger?
+- Dice faces: icon + number side by side — readable?

@@ -5,12 +5,18 @@ import type { Rng } from './rng';
  * Gear can modify a die (add/remove faces, buff a face kind), which is why
  * a "D6" can become a D5 or D7 - dice are not fixed to six sides.
  */
-export type FaceKind = 'attack' | 'move' | 'heal' | 'shield' | 'range' | 'blank';
+export type FaceKind =
+  | 'attack' | 'range' | 'move' | 'jump' | 'heal' | 'shield'
+  | 'bleed' | 'poison' | 'rend' | 'disease'
+  | 'blank';
 
 export interface Face {
   kind: FaceKind;
   value: number;
-  /** Optional keywords, e.g. 'pierce', 'push', 'stun'. Effects resolved by the combat engine. */
+  /**
+   * Optional riders, e.g. 'push', 'lose', or a status with strength like 'bleed:1'.
+   * Effects resolved by the combat engine.
+   */
   tags?: string[];
 }
 

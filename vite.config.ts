@@ -9,6 +9,7 @@ export default defineConfig({
       input: {
         game: 'index.html',
         director: 'director/index.html',
+        artlab: 'artlab/index.html',
       },
     },
   },

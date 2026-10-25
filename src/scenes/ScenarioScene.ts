@@ -18,6 +18,7 @@ const DIE_BOX = 70;
 
 const FACE_ICON: Record<Face['kind'], string> = {
   attack: '⚔', move: '➜', heal: '✚', shield: '⛨', range: '➶', blank: '·',
+  jump: '⤴', bleed: '♦', poison: '☠', rend: '⚒', disease: '✺',
 };
 
 interface Enemy {
@@ -179,11 +180,16 @@ export class ScenarioScene extends Phaser.Scene {
     const label = `${dieName}: ${FACE_ICON[face.kind]} ${face.kind} ${face.value || ''}`;
     switch (face.kind) {
       case 'move':
+      case 'jump':
         this.mode = { kind: 'move', range: face.value, options: reachable(this.heroAt, face.value, this.passable) };
         this.log(`${label} - tap a highlighted hex (or the tray to skip).`);
         break;
       case 'attack':
       case 'range':
+      case 'bleed':
+      case 'poison':
+      case 'rend':
+      case 'disease':
         if (this.enemies.some((e) => e.hp > 0 && hexDistance(e.at, this.heroAt) === 1)) {
           this.mode = { kind: 'attack', damage: face.value };
           this.log(`${label} - tap an adjacent enemy.`);
