@@ -17,3 +17,6 @@
 | 2026-10-25 | Reuse tiles with other palettes for other forest types (old-school recolouring) | Director's idea. Palette swap already works for characters (herbalist = recoloured shepherd). |
 | 2026-10-25 | Own canvas engine instead of Phaser | Art, lighting and weather are all per-pixel; our own renderer gives full control and saves ~1.3 MB. |
 | 2026-10-25 | Weather is a core system (clear/cloudy/rain/storm, day/dusk/night, wind) | Director: ties into Eon's magic, which draws power from the surroundings. |
+| 2026-10-25 | Lightning storms are rare, special-occasion weather | Director: it gets chaotic fast. |
+| 2026-10-25 | Engine sandbox approved as the base to build on | Director: "this is what I envisioned". |
+| 2026-10-25 | When real game work starts, begin with the first missions and use them to work out the mechanics | Director's plan. The director has changes to the earlier ideas coming (basics stay). |

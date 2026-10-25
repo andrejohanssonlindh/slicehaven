@@ -52,8 +52,19 @@ export function startSandbox(): void {
 
   const camera = new Camera(canvas, renderer.width, renderer.height, (wx, wy) => {
     const h = renderer.hexAt(wx, wy);
-    if (h) void onTap(h);
+    if (h) void safeTap(h);
   });
+
+  async function safeTap(h: Hex): Promise<void> {
+    try {
+      await onTap(h);
+    } catch (err) {
+      console.error('[sandbox] action failed', err);
+      busy = false;
+      say('That action failed (logged).');
+      refresh();
+    }
+  }
 
   const sel = (): Unit | undefined => battle.units.find((u) => u.id === selected && u.hp > 0);
 
@@ -276,6 +287,19 @@ export function startSandbox(): void {
     plotted = [];
     jumpTarget = null;
     refresh();
+    try {
+      await foesAct();
+      say('Your turn.');
+    } catch (err) {
+      console.error('[sandbox] enemy turn failed', err);
+      say('Something went wrong in the enemy turn (logged). Your turn.');
+    } finally {
+      busy = false;
+      refresh();
+    }
+  }
+
+  async function foesAct(): Promise<void> {
     for (const foe of battle.units.filter((u) => u.team === 'foe' && u.hp > 0)) {
       if (foe.hp <= 0) continue;
       const s = STATS[foe.kind];
@@ -285,16 +309,14 @@ export function startSandbox(): void {
         foe.at = hexes[hexes.length - 1];
         await renderer.animateMove(foe, hexes, false);
       }
-      if (target && target.hp > 0 && hexDistance(target.at, foe.at) === 1) {
+      // A storm bolt may have killed it on the way.
+      if (foe.hp > 0 && target && target.hp > 0 && hexDistance(target.at, foe.at) === 1) {
         renderer.lunge(foe, target.at);
         await wait(110);
         await hurt(target, s.damage, foe.at);
       }
       await wait(150);
     }
-    busy = false;
-    say('Your turn.');
-    refresh();
   }
 
   // --- highlights & info ---------------------------------------------------------------
@@ -388,6 +410,7 @@ export function startSandbox(): void {
   button(world, 'bolt', 'Lightning', { mode: 'lightning' }, () => setMode('lightning'));
   button(world, 'foe', '+Foe', { mode: 'spawnFoe' }, () => setMode('spawnFoe'));
   button(world, 'friend', '+Friend', { mode: 'spawnFriend' }, () => setMode('spawnFriend'));
+  button(world, 'turn', 'Reset', {}, () => location.reload());
 
   for (const tab of document.querySelectorAll<HTMLButtonElement>('[data-tab]')) {
     tab.addEventListener('click', () => {
@@ -413,7 +436,17 @@ export function startSandbox(): void {
   let last = performance.now();
   let lastDraw = 0;
   function frame(now: number): void {
-    const dt = Math.min(100, now - last);
+    // Schedule first: one bad frame must never stop the loop.
+    requestAnimationFrame(frame);
+    try {
+      step(now);
+    } catch (err) {
+      console.error('[sandbox] frame error', err);
+    }
+  }
+
+  function step(now: number): void {
+    const dt = Math.max(0, Math.min(100, now - last));
     last = now;
     if (weather.update(dt, now)) randomStrike();
     effects.update(dt, weather.wind);
@@ -430,12 +463,17 @@ export function startSandbox(): void {
       ctx.setTransform(camera.scale, 0, 0, camera.scale, camera.offX, camera.offY);
       ctx.drawImage(offscreen, 0, 0);
     }
-    requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 
   // Exposed for debugging in the console.
-  (window as unknown as { sandbox: unknown }).sandbox = { battle: battle as Battle, weather, effects, renderer, camera };
+  (window as unknown as { sandbox: unknown }).sandbox = {
+    battle: battle as Battle, weather, effects, renderer, camera,
+    tap: (q: number, r: number) => safeTap({ q, r }),
+    setMode: (m: Mode) => setMode(m),
+    enemyTurn,
+    isBusy: () => busy,
+  };
 }
 
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));

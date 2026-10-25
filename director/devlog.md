@@ -1,5 +1,13 @@
 # Devlog
 
+## 2026-10-25 — Session 3b: crash fix
+
+**Bug you found:** the game froze after the first monster acted.
+- **Cause:** a timing bug. Each animation recorded its start time slightly *after* the timestamp of the frame that drew it. On the first frame the animation's progress came out negative, the code read a path point that didn't exist, and that error stopped the render loop for good. The enemy turn then waited forever. It depended on exact timing, which is why it seemed random and reloading "fixed" it.
+- **Fixed**, plus safety nets: the render loop survives errors, a removed unit (e.g. killed by lightning mid-walk) never leaves the game waiting, and a failed action or enemy turn hands control back to you.
+- **Verified** with an automated stress test in the browser: 200 random actions and 36 enemy turns during a storm. No errors, never stuck.
+- Added a **Reset** button (World tab).
+
 ## 2026-10-25 — Session 3: engine sandbox
 
 **Done**

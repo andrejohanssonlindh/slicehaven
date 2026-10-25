@@ -38,6 +38,8 @@ public/      Static assets (sprites, audio, fonts).
 Rules of thumb:
 - Keep rules in `core/` and data in `content/`; the engine renders and animates, it doesn't decide rules.
 - Check visual work in a real browser (dev server + Chrome tools) before pushing.
+- The sandbox exposes debug hooks on `window.sandbox` (`tap(q,r)`, `setMode`, `enemyTurn`, `isBusy`, state). Use them to fuzz-test async/animation code: random actions in a loop, record errors, flag if `isBusy()` stays true.
+- Animations: clamp progress to [0,1] and always resolve pending animation promises when a unit is removed.
 - Game state must be plain JSON-serialisable (it goes into the save).
 - Save format is versioned in `core/save.ts`; add a migration when changing it.
 - Phone-first: portrait 400×720 logical canvas, everything tappable, no hover-only UI.

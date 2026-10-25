@@ -210,6 +210,7 @@ export class Renderer {
     if (!v || hexes.length === 0) return Promise.resolve();
     const points = [{ x: v.x, y: v.y }, ...(jump ? [hexes[hexes.length - 1]] : hexes).map((h) => this.feet(h))];
     this.face(u, v, points[points.length - 1].x - points[0].x);
+    v.anim?.resolve(); // a new move replaces an unfinished one
     return new Promise((resolve) => {
       v.anim = {
         points,
@@ -247,6 +248,7 @@ export class Renderer {
   }
 
   removeUnit(id: string): void {
+    this.units.get(id)?.anim?.resolve();
     this.units.delete(id);
   }
 
@@ -265,7 +267,8 @@ export class Renderer {
     for (const [id, v] of this.units) {
       if (v.anim) {
         const a = v.anim;
-        const t = Math.min(1, (now - a.start) / a.duration);
+        // Clamp low too: the frame timestamp can be slightly older than the anim's start.
+        const t = Math.max(0, Math.min(1, (now - a.start) / a.duration));
         const segs = a.points.length - 1;
         const f = t * segs;
         const i = Math.min(segs - 1, Math.floor(f));
@@ -283,6 +286,7 @@ export class Renderer {
       }
       if (v.dyingSince && now - v.dyingSince > 500) {
         effects.burst('puff', v.x, v.y - 8, 14);
+        v.anim?.resolve(); // never leave a caller waiting on a removed unit
         this.units.delete(id);
       }
     }
@@ -369,11 +373,11 @@ export class Renderer {
       let y = v.y;
       let lift = 0;
       if (v.anim) {
-        const t = Math.min(1, (now - v.anim.start) / v.anim.duration);
+        const t = Math.max(0, Math.min(1, (now - v.anim.start) / v.anim.duration));
         lift = v.anim.arc ? Math.sin(t * Math.PI) * v.anim.arc : Math.abs(Math.sin(t * (v.anim.points.length - 1) * Math.PI)) * 2;
       }
       if (v.lunge) {
-        const t = (now - v.lunge.start) / 220;
+        const t = Math.max(0, (now - v.lunge.start) / 220);
         if (t >= 1) v.lunge = undefined;
         else {
           const k = Math.sin(t * Math.PI);
