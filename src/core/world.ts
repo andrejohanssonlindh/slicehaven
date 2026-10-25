@@ -65,17 +65,31 @@ export interface WorldEvents {
   damage: { unitId: string; amount: number; reason: 'fire' | 'lightning' }[];
 }
 
-/** Advance the world by one turn. Mutates battle and world state. */
+/** Advance the world by one turn (clouds + nature). Mutates battle and world state. */
 export function stepWorld(b: Battle, env: Environment, w: WorldState, rng: Rng): WorldEvents {
+  driftClouds(w, env, 1);
+  const ev = stepNature(b, env, w, rng);
+  w.turn += 1;
+  return ev;
+}
+
+/**
+ * Move the clouds with the wind. `turns` can be fractional, for free-flowing
+ * time (exploration) where clouds drift continuously instead of per turn.
+ */
+export function driftClouds(w: WorldState, env: Environment, turns: number): void {
+  const wind = windVector(env);
+  const speed = 0.3 + env.windForce * 0.3;
+  w.cloudX += wind.x * speed * turns;
+  w.cloudY += wind.y * speed * turns;
+}
+
+/** Fire and storms: one tick of nature. */
+export function stepNature(b: Battle, env: Environment, w: WorldState, rng: Rng): WorldEvents {
   const ev: WorldEvents = { strikes: [], ignited: [], burntOut: [], damage: [] };
   const wind = windVector(env);
 
-  // 1. Clouds drift with the wind.
-  const speed = 0.3 + env.windForce * 0.3;
-  w.cloudX += wind.x * speed;
-  w.cloudY += wind.y * speed;
-
-  // 2. Fire spreads, then burns down.
+  // Fire spreads, then burns down.
   const burning = Object.values(b.cells).filter((c) => c.fire === 'burning');
   const wet = env.sky === 'storm' ? 0.25 : env.sky === 'rain' ? 0.4 : 1;
   for (const c of burning) {
@@ -100,7 +114,7 @@ export function stepWorld(b: Battle, env: Environment, w: WorldState, rng: Rng):
     }
   }
 
-  // 3. Storm: at most one bolt per turn, drawn to tall things and clouded hexes.
+  // Storm: at most one bolt per tick, drawn to tall things and clouded hexes.
   if (env.sky === 'storm' && rng.next() < 0.75) {
     const cells = Object.values(b.cells);
     const weights = cells.map((c) => (c.obstacle && c.feature !== 'rock' ? 4 : 1) * (isClouded(c.at, w, env.sky) ? 2 : 1));
@@ -112,11 +126,9 @@ export function stepWorld(b: Battle, env: Environment, w: WorldState, rng: Rng):
     if (ignite(target, env)) ev.ignited.push(target.at);
   }
 
-  // 4. Standing in fire hurts.
+  // Standing in fire hurts.
   for (const u of b.units) {
     if (u.hp > 0 && cellAt(b, u.at)?.fire === 'burning') ev.damage.push({ unitId: u.id, amount: 1, reason: 'fire' });
   }
-
-  w.turn += 1;
   return ev;
 }

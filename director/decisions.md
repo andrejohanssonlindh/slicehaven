@@ -24,5 +24,8 @@
 | 2026-10-25 | Filament sources radiate up to 2 hexes (falloff + cap per kind); object shadows and clouds count | Director: things should affect their surroundings. |
 | 2026-10-25 | Clear day = light +1 (+2 near water) | Director. |
 | 2026-10-25 | Bodies stay on the field and radiate necrotropy | Director. |
+| 2026-10-25 | Radiation must be felt next to the source (fire +1 adjacent, rock +1 adjacent, friends' life reaches neighbours) | Director: weak radiation "won't be usable". |
+| 2026-10-25 | The game mixes turn-based and free-flowing time | Director: e.g. continuously drifting clouds suit free-flowing parts. |
+| 2026-10-25 | Filaments are a hidden layer of bonuses; nature & magic are "good enough" for now | Director. |
 | 2026-10-25 | Engine sandbox approved as the base to build on | Director: "this is what I envisioned". |
 | 2026-10-25 | When real game work starts, begin with the first missions and use them to work out the mechanics | Director's plan. The director has changes to the earlier ideas coming (basics stay). |

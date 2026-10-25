@@ -84,27 +84,44 @@ describe('filaments: sources radiate', () => {
     expect(read(b, { ...NIGHT, sky: 'rain' }).skoto.level).toBe(2);
   });
 
-  it('fire radiates heat and light outward', () => {
-    const near = world({}, [{ fire: 'burning' }]);
-    expect(read(near).pyro.level).toBe(0); // next to a fire: normal
+  it('fire warms its neighbours, more so with more fire', () => {
+    expect(read(world({ fire: 'burning' })).pyro.level).toBe(2); // in the fire
+    expect(read(world({}, [{ fire: 'burning' }])).pyro.level).toBe(1); // next to one
+    expect(read(world({}, [{ fire: 'burning' }, { fire: 'burning' }])).pyro.level).toBe(2); // between two
     const inferno = world({ fire: 'burning' }, [{ fire: 'burning' }]);
     expect(read(inferno).pyro.level).toBe(3);
     expect(read(inferno, NIGHT).skoto.level).toBe(-3);
   });
 
+  it('two hexes from a fire you still feel it', () => {
+    const b = world();
+    b.cells[hexKey(hex(2, 0))].fire = 'burning';
+    expect(read(b).pyro.level).toBe(-1);
+  });
+
+  it('stone: strong right next to it, fading fast', () => {
+    const b = world({}, [{ feature: 'rock' }]);
+    expect(read(b).geo.level).toBe(1);
+    const far = world();
+    far.cells[hexKey(hex(2, 0))].feature = 'rock';
+    expect(read(far).geo.level).toBe(0);
+  });
+
   it('the dead and the undead radiate necrotropy', () => {
-    expect(read(world({ corpses: 2 })).nekro.level).toBe(1);
+    expect(read(world({ corpses: 2 })).nekro.level).toBe(2);
+    expect(read(world({}, [{ corpses: 2 }])).nekro.level).toBe(1);
     const b = world();
     const skel: Unit = { id: 's', kind: 'skeleton', name: 's', team: 'foe', at: hex(1, 0), hp: 5, maxHp: 5 };
     b.units.push(skel);
-    expect(read(b, DAY, { isUndead: () => true }).nekro.raw).toBeCloseTo(-0.5);
+    expect(read(b, DAY, { isUndead: () => true }).nekro.level).toBe(0); // from -1
   });
 
-  it('friends radiate a little life', () => {
+  it('friends radiate life to the hexes around them', () => {
     const b = world();
-    b.units.push({ id: 'a', kind: 'x', name: 'a', team: 'party', at: hex(0, 0), hp: 5, maxHp: 5 });
-    b.units.push({ id: 'b', kind: 'x', name: 'b', team: 'party', at: hex(1, 0), hp: 5, maxHp: 5 });
-    expect(read(b).bio.raw).toBeCloseTo(0.75);
+    b.units.push({ id: 'a', kind: 'x', name: 'a', team: 'party', at: hex(1, 0), hp: 5, maxHp: 5 });
+    expect(read(b).bio.level).toBe(1); // next to a friend
+    b.units.push({ id: 'b', kind: 'x', name: 'b', team: 'party', at: hex(0, 0), hp: 5, maxHp: 5 });
+    expect(read(b).bio.level).toBe(1); // capped: no runaway stacking
   });
 
   it('explains every contribution', () => {

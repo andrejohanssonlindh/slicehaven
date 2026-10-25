@@ -6,7 +6,9 @@ import { type Hex, hexDistance, hexEquals, hexKey, offsetToHex, parseHexKey } fr
 import { WIND_NAMES } from '../core/environment';
 import { ASPECTS, type AspectId, type HexFilaments, LEVEL_NAMES, readHex, readMap } from '../core/filaments';
 import { Rng } from '../core/rng';
-import { ignite as igniteCell, isClouded, newWorld, stepWorld } from '../core/world';
+import {
+  type WorldEvents, driftClouds, ignite as igniteCell, isClouded, newWorld, stepNature, stepWorld,
+} from '../core/world';
 import { icon } from '../art/icons';
 import { STATS, type SandboxCell, buildSandbox, newUnit } from '../content/sandbox';
 import { Camera } from './camera';
@@ -65,6 +67,11 @@ export function startSandbox(): void {
   const world = newWorld();
   const worldRng = Rng.fromSeed(Date.now());
   const filamentOpts = () => ({ isUndead, isClouded: (h: Hex) => isClouded(h, world, weather.sky) });
+  /** Turns (combat) or free-flowing time (exploration): clouds drift continuously, nature ticks on its own. */
+  let flow = false;
+  const FLOW_TICK_MS = 4000;
+  let lastTick = 0;
+  let ticking = false;
 
   const camera = new Camera(canvas, renderer.width, renderer.height, (wx, wy) => {
     const h = renderer.hexAt(wx, wy);
@@ -154,10 +161,22 @@ export function startSandbox(): void {
     renderer.markBurnt(key);
   }
 
-  /** The world moves: clouds drift, fire spreads or dies, storms strike. */
+  /** The world moves one turn: clouds drift, fire spreads or dies, storms strike. */
   async function worldStep(): Promise<void> {
     const ev = stepWorld(battle, weather.env(), world, worldRng);
     weather.moveCloudsTo(world.cloudX, world.cloudY);
+    const news = await showWorldEvents(ev);
+    say(`Turn ${world.turn}${news ? ': ' + news : ''}.`);
+  }
+
+  /** Free-flowing time: nature ticks on its own every few seconds. */
+  async function flowTick(): Promise<void> {
+    const news = await showWorldEvents(stepNature(battle, weather.env(), world, worldRng));
+    if (news) say(news[0].toUpperCase() + news.slice(1) + '.');
+  }
+
+  /** Animate what nature did; returns a short summary (or ''). */
+  async function showWorldEvents(ev: WorldEvents): Promise<string> {
     for (const h of ev.burntOut) burntOut(h);
     for (const h of ev.strikes) {
       boltVisual(h);
@@ -171,7 +190,7 @@ export function startSandbox(): void {
     if (ev.ignited.length) news.push(`fire spreads to ${ev.ignited.length} hex${ev.ignited.length > 1 ? 'es' : ''}`);
     if (ev.burntOut.length) news.push(`${ev.burntOut.length} burnt out`);
     if (ev.strikes.length) news.push('lightning strikes');
-    say(`Turn ${world.turn}${news.length ? ': ' + news.join(', ') : ''}.`);
+    return news.join(', ');
   }
 
   // --- input ---------------------------------------------------------------------
@@ -391,7 +410,7 @@ export function startSandbox(): void {
 
   function refreshInfo(): void {
     const unit = sel();
-    const head = `<b>Turn ${world.turn}</b> · ` + (unit ? `<b>${unit.name}</b> ♥ ${unit.hp}/${unit.maxHp}` : '<b>No hero selected</b>');
+    const head = (flow ? '<b>Flowing time</b> · ' : `<b>Turn ${world.turn}</b> · `) + (unit ? `<b>${unit.name}</b> ♥ ${unit.hp}/${unit.maxHp}` : '<b>No hero selected</b>');
     const hint: Record<Mode, string> = {
       walk: 'Walk: tap a lit hex, tap again to go.',
       jump: 'Jump: straight lines, over obstacles and water.',
@@ -472,6 +491,11 @@ export function startSandbox(): void {
     if (wf) wf.textContent = `Wind ${weather.windForce}`;
     const wd = document.querySelector('[data-wind="dir"] span');
     if (wd) wd.textContent = `To ${WIND_DIRS[weather.windDir].arrow}`;
+    const fl = document.querySelector<HTMLButtonElement>('[data-flow]');
+    if (fl) {
+      fl.querySelector('span')!.textContent = flow ? 'Flow' : 'Turns';
+      fl.classList.toggle('on', flow);
+    }
   }
 
   function setMode(m: Mode): void {
@@ -513,6 +537,12 @@ export function startSandbox(): void {
   button(worldBar, 'wind', 'Wind', { wind: 'force' }, () => { weather.setWind((weather.windForce + 1) % 7); refresh(); });
   button(worldBar, 'wind', 'Dir', { wind: 'dir' }, () => { weather.setWind(weather.windForce, weather.windDir + 1); refresh(); });
   button(worldBar, 'turn', 'Pass turn', {}, () => void endTurn(false));
+  button(worldBar, 'wind', 'Turns', { flow: '' }, () => {
+    flow = !flow;
+    lastTick = performance.now();
+    say(flow ? 'Free-flowing time: clouds drift, fire and storms tick on their own.' : 'Turn-based: the world moves when a turn ends.');
+    refresh();
+  });
   button(worldBar, 'fire', 'Fire', { mode: 'fire' }, () => setMode('fire'));
   button(worldBar, 'bolt', 'Lightning', { mode: 'lightning' }, () => setMode('lightning'));
   button(worldBar, 'foe', '+Foe', { mode: 'spawnFoe' }, () => setMode('spawnFoe'));
@@ -570,6 +600,17 @@ export function startSandbox(): void {
     const dt = Math.max(0, Math.min(100, now - last));
     last = now;
     weather.update(dt);
+    if (flow) {
+      driftClouds(world, weather.env(), dt / FLOW_TICK_MS);
+      weather.moveCloudsTo(world.cloudX, world.cloudY);
+      if (!busy && !ticking && now - lastTick > FLOW_TICK_MS) {
+        lastTick = now;
+        ticking = true;
+        void flowTick()
+          .catch((err) => console.error('[sandbox] flow tick failed', err))
+          .finally(() => (ticking = false));
+      }
+    }
     effects.update(dt, weather.windX, weather.windY);
     // Fires start and burn out on their own, so keep the magic map fresh.
     if (aspect && now - lastMagic > 400) {

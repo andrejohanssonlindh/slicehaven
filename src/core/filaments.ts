@@ -96,11 +96,15 @@ function emissions(c: Cell, units: Unit[], env: Environment, opts: FilamentOptio
       e('skoto', 'Forest at night', [1, 0.5, 0.2], 1);
     }
   }
-  if (c.feature === 'rock') e('geo', 'Stone', [1.5, 0.75, 0.25], 2);
+  // Rocks are never stood on, so their full strength reaches the hexes next to them, then fades fast.
+  if (c.feature === 'rock') e('geo', 'Stone', [2, 2, 0.75], 2.5);
   if (c.fire === 'burning') {
-    e('pyro', 'Fire', [4, 1.5, 0.5], 5);
-    e('foto', 'Firelight', [2, 1, 0.5], 2);
-    e('skoto', 'Firelight', [-2, -1, -0.5], -3);
+    // The flames themselves and the heat around them are capped separately, so one fire
+    // clearly warms its neighbours (+1 next to it) without making every edge of a blaze extreme.
+    e('pyro', 'Fire', [4, 0, 0], 4);
+    e('pyro', 'Heat of fire', [0, 2.5, 1.2], 3.5);
+    e('foto', 'Firelight', [2, 1.5, 0.75], 2.5);
+    e('skoto', 'Firelight', [-2, -1.5, -0.75], -3);
     e('bio', 'Burning', [-1.5, -0.25, 0], -1.5);
   }
   if (c.fire === 'burnt') {
@@ -108,11 +112,11 @@ function emissions(c: Cell, units: Unit[], env: Environment, opts: FilamentOptio
     e('pyro', 'Embers', [0.5, 0, 0], 0.5);
     e('bio', 'Scorched earth', [-1.5, -0.25, 0], -1.5);
   }
-  if (c.corpses) e('nekro', 'The dead', [c.corpses, 0.5 * c.corpses, 0.25 * c.corpses], 3);
+  if (c.corpses) e('nekro', 'The dead', [1.5 * c.corpses, c.corpses, 0.4 * c.corpses], 3);
   for (const u of units) {
-    if (opts.isUndead?.(u)) e('nekro', 'Undead', [1, 0.5, 0.25], 2);
-    else if (u.team === 'party') e('bio', 'Friends', [0.5, 0.25, 0], 1);
-    else e('bio', 'Beasts', [0.25, 0.1, 0], 0.5);
+    if (opts.isUndead?.(u)) e('nekro', 'Undead', [1.5, 1, 0.4], 2);
+    else if (u.team === 'party') e('bio', 'Friends', [1, 0.6, 0.25], 1.4);
+    else e('bio', 'Beasts', [0.5, 0.3, 0.1], 0.8);
   }
   return out;
 }

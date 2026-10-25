@@ -28,18 +28,20 @@ A hex's reading for an aspect =
 Then it's rounded and clamped to −3..+3. Tapping a hex shows every contribution, e.g. *"Dry land −1 · Rain +1 · Water ×2 nearby +1.5 = 1.5 → +2"*.
 
 ### Sources (here / 1 away / 2 away, and cap)
+*v2.1: radiation strengthened so it's actually felt next to the source (director feedback).*
+
 | Source | Radiates |
 |---|---|
 | **Water** (river, pond, ford) | Water +1.5 / +0.75 / +0.25 (cap +2). On a clear day: sun glare, light +1 / +1. |
 | **Pond** | Death (still water) +1 / +0.5. |
 | **Trees & thickets** | Life +0.5 / +0.3 / +0.1 (cap +1). Shelter: air −1 / −0.5. By day: canopy, light −1 / −0.3, shade +1 / +0.3 darkness. At night: darkness +1 / +0.5 / +0.2. |
-| **Rocks** | Earth +1.5 / +0.75 / +0.25 (cap +2). |
-| **Fire** | Fire +4 / +1.5 / +0.5 (cap +5). Light +2 / +1 / +0.5. Darkness −2 / −1 / −0.5. Life −1.5. |
+| **Rocks** | Earth +2 / **+2** / +0.75 (cap +2.5): full strength next to the rock, then fades fast. Next to a rock: **+1** (gravel: +2). |
+| **Fire** | The flames: fire +4 on the hex (cap 4). Heat: fire +2.5 / +1.2 around it (cap 3.5). → in the fire **+2**, next to one **+1**, between two **+2**, two away −1, inside a blaze **+3**. Light +2 / +1.5 / +0.75. Darkness −2 / −1.5 / −0.75. Life −1.5. |
 | **Ash** | Death +2 / +0.5 / +0.2. Embers: fire +0.5. Life −1.5 / −0.25. |
-| **The dead** (bodies stay on the field) | Death +1 / +0.5 / +0.25 per body (cap +3). |
-| **Undead** (skeletons) | Death +1 / +0.5 / +0.25 (cap +2). |
-| **Friends** | Life +0.5 / +0.25. |
-| **Beasts** | Life +0.25 / +0.1. |
+| **The dead** (bodies stay on the field) | Death +1.5 / +1 / +0.4 per body (cap +3). |
+| **Undead** (skeletons) | Death +1.5 / +1 / +0.4 (cap +2). |
+| **Friends** (incl. your own hero) | Life +1 / +0.6 / +0.25 (cap +1.4): +1 on and next to them. |
+| **Beasts** | Life +0.5 / +0.3 / +0.1 (cap +0.8). |
 
 ### Conditions on the hex
 | Aspect | Conditions |
@@ -66,6 +68,11 @@ On cloudy days, cloud patches drift over the map. The same cloud field drives th
 - Standing south-east of a tree by day: in its shadow, darkness −2.
 - Next to a fire: fire 0 (normal); in a blaze, +3. Firelight pushes darkness to magic-dead at night.
 - After a fight: bodies lie where they fell and death rises around them.
+
+## Turns and free-flowing time
+The game will have both: **turn-based** (combat) and **free-flowing** (e.g. exploration). The sandbox's World tab has a **Turns / Flow** toggle:
+- **Turns:** the world moves only when a turn ends.
+- **Flow:** clouds drift continuously; fire and storms tick on their own every 4 seconds.
 
 ## World step (end of turn)
 1. Clouds drift with the wind.

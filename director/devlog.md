@@ -1,5 +1,15 @@
 # Devlog
 
+## 2026-10-25 — Session 5b: radiation you can feel, Turns/Flow
+
+- **Fire:** next to a burning hex is now **+1** (was 0), between two fires +2, two away −1. Inside a blaze it's still +3. (The flames and the heat around them now have separate caps.)
+- **Rocks:** full strength on the neighbouring hexes, so next to a rock is **+1** earth (+2 on gravel), fading fast beyond.
+- **Friends / your hero:** life now visibly reaches the neighbouring hexes (+1 on and next to them). Beasts, bodies and undead radiate a bit more too.
+- **Turns / Flow toggle** (World tab): flowing time drifts clouds continuously and lets fire and storms tick on their own. This is a first feel for the free-flowing parts of the game.
+- 33 rule tests.
+
+**Director's notes on this:** happy enough with nature and magic for now. The filaments are a hidden layer of bonuses: a detail, but a much-liked one.
+
 ## 2026-10-25 — Session 5: the world moves in turns, magic v2
 
 **Your feedback, done**
