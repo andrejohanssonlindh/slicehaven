@@ -20,5 +20,9 @@
 | 2026-10-25 | Lightning storms are rare, special-occasion weather | Director: it gets chaotic fast. |
 | 2026-10-25 | Wind is its own setting: force 0–6 (Eon scale) + direction | Director asked for wind; it drives visuals and pneumotropy. |
 | 2026-10-25 | Filaments per hex, −3..+3, from terrain + neighbours + time/weather/wind + indoors | Director's brief, built on Eon's seven-level flow table (which maps exactly to −3..+3). Extremes kept uncommon. |
+| 2026-10-25 | The world moves between turns: clouds drift, fire spreads/burns out, max one lightning bolt per turn | Director: makes weather readable and tames lightning. |
+| 2026-10-25 | Filament sources radiate up to 2 hexes (falloff + cap per kind); object shadows and clouds count | Director: things should affect their surroundings. |
+| 2026-10-25 | Clear day = light +1 (+2 near water) | Director. |
+| 2026-10-25 | Bodies stay on the field and radiate necrotropy | Director. |
 | 2026-10-25 | Engine sandbox approved as the base to build on | Director: "this is what I envisioned". |
 | 2026-10-25 | When real game work starts, begin with the first missions and use them to work out the mechanics | Director's plan. The director has changes to the earlier ideas coming (basics stay). |

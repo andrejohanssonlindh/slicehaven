@@ -1,4 +1,3 @@
-import { fbm } from '../art/noise';
 import { type Pix, bayer } from '../art/pix';
 import type { RGB } from './weather';
 
@@ -12,9 +11,9 @@ export interface Light {
 export interface LightingParams {
   ambient: RGB;
   desaturate: number;
-  cloud: number; // 0..1 cloud cover (shadows)
-  driftX: number; // cloud shadow scroll (follows the wind)
-  driftY: number;
+  cloud: number; // 0..1 cloud cover
+  /** Cloud shadow strength at a world pixel, 0..1 (same field the rules use). */
+  shadowAt?: (x: number, y: number) => number;
   flash: number; // lightning flash 0..1
   lights: Light[];
 }
@@ -46,24 +45,22 @@ export class Lighting {
     const { w, h, lr, lg, lb } = this;
     const flash = p.flash;
     const amb: RGB = [p.ambient[0] + flash * 1.4, p.ambient[1] + flash * 1.5, p.ambient[2] + flash * 1.8];
-    const neutral = p.cloud < 0.02 && flash < 0.01 && p.lights.length === 0 && p.desaturate < 0.01
+    const neutral = !p.shadowAt && flash < 0.01 && p.lights.length === 0 && p.desaturate < 0.01
       && Math.abs(amb[0] - 1) < 0.01 && Math.abs(amb[1] - 1) < 0.01 && Math.abs(amb[2] - 1) < 0.01;
     if (neutral) return;
 
     // Cloud shadows at quarter resolution.
-    if (p.cloud > 0.02) {
+    const shadows = !!p.shadowAt;
+    if (p.shadowAt) {
       for (let y = 0; y < this.sh; y++) {
-        for (let x = 0; x < this.sw; x++) {
-          const n = fbm((x * 4 - p.driftX) / 60, (y * 4 - p.driftY) / 40, 50, 2);
-          this.shadow[y * this.sw + x] = Math.max(0, Math.min(1, (n - 0.62 + p.cloud * 0.12) * 10)) * (0.28 + 0.12 * p.cloud);
-        }
+        for (let x = 0; x < this.sw; x++) this.shadow[y * this.sw + x] = p.shadowAt(x * 4 + 2, y * 4 + 2) * 0.4;
       }
     }
 
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         let s = 1;
-        if (p.cloud > 0.02) s = 1 - this.shadow[(y >> 2) * this.sw + (x >> 2)] * Math.min(1, p.cloud * 1.5);
+        if (shadows) s = 1 - this.shadow[(y >> 2) * this.sw + (x >> 2)];
         const i = y * w + x;
         lr[i] = amb[0] * s;
         lg[i] = amb[1] * s;

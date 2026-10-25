@@ -1,62 +1,37 @@
 import { describe, expect, it } from 'vitest';
-import type { Battle, Cell } from '../src/core/battle';
+import type { Battle, Cell, Unit } from '../src/core/battle';
 import type { Environment } from '../src/core/environment';
-import { readHex } from '../src/core/filaments';
-import { hex, hexKey, neighbors } from '../src/core/hex';
+import { type FilamentOptions, readHex } from '../src/core/filaments';
+import { DIRECTIONS, hex, hexAdd, hexKey, hexesWithin } from '../src/core/hex';
 
-/** A grass hex at 0,0 with configurable neighbours. */
-function world(center: Partial<Cell> = {}, around: Partial<Cell>[] = []): Battle {
+/** Grass hexes out to 2 rings around 0,0; `ring1[i]` customises the neighbour in DIRECTIONS[i]. */
+function world(center: Partial<Cell> = {}, ring1: Partial<Cell>[] = []): Battle {
   const cells: Battle['cells'] = {};
-  const put = (at: ReturnType<typeof hex>, extra: Partial<Cell>) => {
-    cells[hexKey(at)] = { at, obstacle: false, flammable: true, water: false, fire: 'none', ground: 'grass', ...extra };
-  };
-  put(hex(0, 0), center);
-  neighbors(hex(0, 0)).forEach((n, i) => put(n, around[i] ?? {}));
+  for (const at of hexesWithin(hex(0, 0), 2)) {
+    cells[hexKey(at)] = { at, obstacle: false, flammable: true, water: false, fire: 'none', ground: 'grass' };
+  }
+  Object.assign(cells[hexKey(hex(0, 0))], center);
+  ring1.forEach((extra, i) => Object.assign(cells[hexKey(hexAdd(hex(0, 0), DIRECTIONS[i]))], extra));
   return { cells, units: [] };
 }
 
-const DAY: Environment = { time: 'day', sky: 'clear', windForce: 1 };
-const read = (b: Battle, env: Environment = DAY) => readHex(b, hex(0, 0), env)!;
+const DAY: Environment = { time: 'day', sky: 'clear', windForce: 1, windDir: 0 };
+const NIGHT: Environment = { ...DAY, time: 'night' };
+const read = (b: Battle, env: Environment = DAY, opts?: FilamentOptions) => readHex(b, hex(0, 0), env, opts)!;
 
-describe('filaments', () => {
-  it('a plain meadow on a clear day matches Eon defaults', () => {
+describe('filaments: conditions', () => {
+  it('a plain meadow on a clear day', () => {
     const r = read(world());
-    expect(r.hydro.level).toBe(-1); // grass, no water near: weak
+    expect(r.foto.level).toBe(1); // clear day: +1
+    expect(r.hydro.level).toBe(-1); // no water near: weak
     expect(r.skoto.level).toBe(-3); // daylight: magic-dead
-    expect(r.foto.level).toBe(0); // daylight: normal
     expect(r.pyro.level).toBe(-2); // no fire: very weak
     expect(r.pneumo.level).toBe(-1); // light breeze: weak
   });
 
-  it('rain alone only lifts dry land to normal', () => {
+  it('rain lifts dry land to normal water, a downpour to strong', () => {
     expect(read(world(), { ...DAY, sky: 'rain' }).hydro.level).toBe(0);
     expect(read(world(), { ...DAY, sky: 'storm' }).hydro.level).toBe(1);
-  });
-
-  it('two water hexes plus a downpour reaches the extreme', () => {
-    const b = world({}, [{ ground: 'river' }, { ground: 'river' }]);
-    expect(read(b, { ...DAY, sky: 'rain' }).hydro.level).toBe(2);
-    expect(read(b, { ...DAY, sky: 'storm' }).hydro.level).toBe(3);
-  });
-
-  it('standing in water is strong, not extreme, unless it pours', () => {
-    const b = world({ ground: 'ford' }, [{ ground: 'river' }, { ground: 'river' }]);
-    expect(read(b).hydro.level).toBe(1);
-    expect(read(b, { ...DAY, sky: 'rain' }).hydro.level).toBe(2);
-    expect(read(b, { ...DAY, sky: 'storm' }).hydro.level).toBe(3);
-  });
-
-  it('darkness grows at night, in clouds and forest', () => {
-    const night: Environment = { time: 'night', sky: 'clear', windForce: 1 };
-    expect(read(world(), night).skoto.level).toBe(0);
-    expect(read(world({}, [{ feature: 'tree' }, { feature: 'tree' }, { feature: 'pine' }]), { ...night, sky: 'cloudy' }).skoto.level).toBe(2);
-    expect(read(world(), { ...night, sky: 'cloudy' }).foto.level).toBe(-3); // moonless night
-  });
-
-  it('fire feeds pyrotropy and pushes back the dark', () => {
-    const b = world({ fire: 'burning' }, [{ fire: 'burning' }]);
-    expect(read(b).pyro.level).toBe(3);
-    expect(read(b, { time: 'night', sky: 'clear', windForce: 1 }).skoto.level).toBe(-3);
   });
 
   it('indoors kills water and air but not darkness by day', () => {
@@ -71,8 +46,69 @@ describe('filaments', () => {
     expect(read(world(), { ...DAY, windForce: 5 }).pneumo.level).toBe(2);
   });
 
-  it('keeps an explanation of every contribution', () => {
+  it('a cloud over the hex dims light and deepens darkness', () => {
+    const cloudy = { ...DAY, sky: 'cloudy' as const };
+    const under = read(world(), cloudy, { isClouded: () => true });
+    const sunny = read(world(), cloudy, { isClouded: () => false });
+    expect(sunny.skoto.level).toBe(-3);
+    expect(under.skoto.level).toBe(-1);
+    expect(under.foto.level).toBe(-1);
+  });
+
+  it('trees cast shadows: south-east by day', () => {
+    const b = world({}, [{}, {}, { feature: 'tree' }]); // tree to the north-west
+    expect(read(b).skoto.level).toBe(-2);
+  });
+});
+
+describe('filaments: sources radiate', () => {
+  it('water around you, plus weather, can reach the extreme', () => {
+    const b = world({}, [{ ground: 'river' }, { ground: 'river' }]);
+    expect(read(b, { ...DAY, sky: 'rain' }).hydro.level).toBe(2);
+    expect(read(b, { ...DAY, sky: 'storm' }).hydro.level).toBe(3);
+  });
+
+  it('standing in the river is strong, not extreme, unless it pours', () => {
+    const b = world({ ground: 'ford' }, [{ ground: 'river' }, { ground: 'river' }]);
+    expect(read(b).hydro.level).toBe(1);
+    expect(read(b, { ...DAY, sky: 'storm' }).hydro.level).toBe(3);
+  });
+
+  it('clear day: light +2 around water', () => {
+    expect(read(world({}, [{ ground: 'river' }])).foto.level).toBe(2);
+  });
+
+  it('trees radiate life and darkness at night', () => {
+    const b = world({}, [{ feature: 'tree' }, { feature: 'pine' }, { feature: 'tree' }]);
+    expect(read(b).bio.level).toBe(1);
+    expect(read(b, { ...NIGHT, sky: 'rain' }).skoto.level).toBe(2);
+  });
+
+  it('fire radiates heat and light outward', () => {
+    const near = world({}, [{ fire: 'burning' }]);
+    expect(read(near).pyro.level).toBe(0); // next to a fire: normal
+    const inferno = world({ fire: 'burning' }, [{ fire: 'burning' }]);
+    expect(read(inferno).pyro.level).toBe(3);
+    expect(read(inferno, NIGHT).skoto.level).toBe(-3);
+  });
+
+  it('the dead and the undead radiate necrotropy', () => {
+    expect(read(world({ corpses: 2 })).nekro.level).toBe(1);
+    const b = world();
+    const skel: Unit = { id: 's', kind: 'skeleton', name: 's', team: 'foe', at: hex(1, 0), hp: 5, maxHp: 5 };
+    b.units.push(skel);
+    expect(read(b, DAY, { isUndead: () => true }).nekro.raw).toBeCloseTo(-0.5);
+  });
+
+  it('friends radiate a little life', () => {
+    const b = world();
+    b.units.push({ id: 'a', kind: 'x', name: 'a', team: 'party', at: hex(0, 0), hp: 5, maxHp: 5 });
+    b.units.push({ id: 'b', kind: 'x', name: 'b', team: 'party', at: hex(1, 0), hp: 5, maxHp: 5 });
+    expect(read(b).bio.raw).toBeCloseTo(0.75);
+  });
+
+  it('explains every contribution', () => {
     const r = read(world({}, [{ ground: 'river' }]), { ...DAY, sky: 'rain' });
-    expect(r.hydro.parts.map((p) => p.label)).toEqual(['Dry land', 'Water next to you ×1', 'Rain']);
+    expect(r.hydro.parts.map((p) => p.label)).toEqual(['Dry land', 'Rain', 'Water ×1 nearby']);
   });
 });

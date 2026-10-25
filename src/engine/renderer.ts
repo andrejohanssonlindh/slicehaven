@@ -1,6 +1,7 @@
 import type { Battle, Unit } from '../core/battle';
 import { type Hex, hexKey, hexToOffset, offsetToHex } from '../core/hex';
 import { Rng } from '../core/rng';
+import { cloudShade } from '../core/world';
 import { tinyText } from '../art/icons';
 import { EDGE, TILE_CENTER, TILE_DEPTH, TILE_H, TILE_STEP_Y, TILE_W, inHex, tileOrigin } from '../art/hexTile';
 import type { MobKind } from '../art/mapScene';
@@ -77,6 +78,8 @@ interface UnitVis {
   flip: boolean;
   flashUntil: number;
   dyingSince?: number;
+  /** Body to leave behind when the death animation ends. */
+  corpse?: Sprite;
   anim?: UnitAnim;
   lunge?: { dx: number; dy: number; start: number };
 }
@@ -96,6 +99,13 @@ export class Renderer {
   private mask: Uint8Array;
   private burnt = new Set<string>();
   private decals: { x: number; y: number }[] = [];
+  private corpses: { x: number; y: number; sprite: Sprite }[] = [];
+  /**
+   * Sway/idle animation clock in frames. Accumulated per frame (rate depends on
+   * wind), so a change in wind changes the speed instead of jumping the phase.
+   */
+  private animClock = 0;
+  private lastUpdate = 0;
 
   constructor(cells: SandboxCell[], private battle: Battle) {
     const cols = Math.max(...cells.map((c) => c.col + (c.row & 1 ? 1.5 : 1)));
@@ -251,9 +261,13 @@ export class Renderer {
     if (v) v.flashUntil = performance.now() + 260;
   }
 
+  /** Flicker out, then leave the body lying on the hex. */
   kill(u: Unit): Promise<void> {
     const v = this.units.get(u.id);
-    if (v) v.dyingSince = performance.now();
+    if (v) {
+      v.dyingSince = performance.now();
+      v.corpse = corpseOf(this.mobSprite(u, v.flip));
+    }
     return new Promise((r) => setTimeout(r, 520));
   }
 
@@ -274,6 +288,9 @@ export class Renderer {
   // --- per-frame -------------------------------------------------------------
 
   update(now: number, effects: Effects, weather: Weather): void {
+    const dt = this.lastUpdate ? Math.max(0, Math.min(100, now - this.lastUpdate)) : 0;
+    this.lastUpdate = now;
+    this.animClock += (dt / 125) * (1 + Math.min(1.2, weather.wind) * 1.2);
     for (const [id, v] of this.units) {
       if (v.anim) {
         const a = v.anim;
@@ -295,11 +312,13 @@ export class Renderer {
         }
       }
       if (v.dyingSince && now - v.dyingSince > 500) {
-        effects.burst('puff', v.x, v.y - 8, 14);
+        effects.burst('puff', v.x, v.y - 8, 8);
         v.anim?.resolve(); // never leave a caller waiting on a removed unit
+        if (v.corpse) this.corpses.push({ x: v.x + (Math.random() - 0.5) * 6, y: v.y + 1, sprite: v.corpse });
         this.units.delete(id);
       }
     }
+    void weather;
 
     // Fire: particles from burning cells, embers from fresh ash.
     for (const [key, c] of Object.entries(this.battle.cells)) {
@@ -317,7 +336,6 @@ export class Renderer {
         if (Math.random() < 0.15) effects.emit('ember', cv.cx + (Math.random() - 0.5) * 16, cv.cy - 10, (Math.random() - 0.5) * 1.5, -1.2, 18);
       }
     }
-    void weather;
   }
 
   /** Point lights for this frame: fires, glowing eyes. */
@@ -349,7 +367,7 @@ export class Renderer {
   render(now: number, weather: Weather, effects: Effects, highlights: Highlight[], selected?: string, magic?: MagicView): Pix {
     const out = new Pix(this.width, this.height);
     out.data.set(this.ground.data);
-    const frame = Math.floor((now / 125) * (1 + weather.wind * 1.2));
+    const frame = Math.floor(this.animClock);
     paintWater(out, this.water, Math.floor(now / 125));
 
     // Rain rings on water and ground.
@@ -383,6 +401,7 @@ export class Renderer {
       }
       draws.push({ x: th.x, y: th.y, sprite: sp, f: (frame + th.phase) % FRAMES });
     }
+    for (const c of this.corpses) draws.push({ x: Math.round(c.x), y: Math.round(c.y), sprite: c.sprite, f: 0 });
     for (const u of this.battle.units) {
       const v = this.units.get(u.id);
       if (!v) continue;
@@ -408,8 +427,19 @@ export class Renderer {
       // Ground shadow stays on the ground during jumps.
       ellipse(out, x + 2, y, sp.shadow / 2, Math.max(2, sp.shadow / 6), SHADOW);
     }
+    // Object shadows follow the sun: short to the south-east by day, long to the east at dusk,
+    // just a dark patch at the base at night or under a grey sky. (The rules use the same directions.)
+    const tod = weather.tod;
+    const sunUp = Math.max(0, Math.min(1, 2 - tod)) * (1 - Math.min(1, weather.cloud * 1.15));
+    const dusk = Math.max(0, Math.min(1, tod)); // 0 day .. 1 dusk
+    const sunOff = { x: 10 + 12 * dusk, y: 8 - 7 * dusk, stretch: 1.25 + 0.9 * dusk };
     for (const d of draws) {
-      if (!d.unit && d.sprite.shadow) ellipse(out, d.x + 2, d.y, d.sprite.shadow / 2, Math.max(2, d.sprite.shadow / 6), SHADOW);
+      if (d.unit || !d.sprite.shadow) continue;
+      const tall = d.sprite.frames[0].h > 30 ? 1 : 0.55;
+      const ox = 2 + (sunOff.x - 2) * sunUp * tall;
+      const oy = sunOff.y * sunUp * tall;
+      const st = 1 + (sunOff.stretch - 1) * sunUp * tall;
+      ellipse(out, d.x + ox, d.y + oy, (d.sprite.shadow / 2) * st, Math.max(2, d.sprite.shadow / 6) * (1 + (st - 1) * 0.3), SHADOW);
     }
 
     this.mask.fill(0);
@@ -422,8 +452,11 @@ export class Renderer {
       ambient: weather.ambient(),
       desaturate: weather.desaturation(),
       cloud: weather.cloud,
-      driftX: weather.driftX,
-      driftY: weather.driftY,
+      // Same cloud field as the rules, converted from world pixels to hex space.
+      shadowAt: weather.cloud > 0.02
+        ? (px, py) => cloudShade((px - PAD_SIDE - TILE_CENTER.x) / TILE_W, (py - PAD_TOP - TILE_CENTER.y) / TILE_STEP_Y,
+          weather.cloudX, weather.cloudY, weather.cloud)
+        : undefined,
       flash: weather.flash,
       lights: this.lights(now, this.battle, effects, Math.max(0, weather.tod - 1)),
     });
@@ -587,6 +620,22 @@ export class Renderer {
       }
     }
   }
+}
+
+/** A fallen body, darkened: upright figures tip over sideways, four-legged beasts roll onto their backs. */
+function corpseOf(s: Sprite): Sprite {
+  const f = s.frames[0];
+  const lying = f.h > f.w ? f.rotate90() : f.flipY();
+  const out = new Pix(lying.w, lying.h);
+  for (let y = 0; y < lying.h; y++) {
+    for (let x = 0; x < lying.w; x++) {
+      const [r, g, b, a] = lying.get(x, y);
+      if (!a) continue;
+      const l = r * 0.3 + g * 0.59 + b * 0.11;
+      out.set(x, y, [(r * 0.6 + l * 0.4) * 0.7, (g * 0.6 + l * 0.4) * 0.66, (b * 0.6 + l * 0.4) * 0.66, a]);
+    }
+  }
+  return { frames: [out], ax: Math.floor(out.w / 2), ay: out.h - 1, shadow: 0 };
 }
 
 function silhouette(p: Pix): Pix {

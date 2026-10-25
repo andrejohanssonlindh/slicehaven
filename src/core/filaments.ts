@@ -1,15 +1,19 @@
 import { type Battle, type Cell, type Unit, cellAt } from './battle';
 import type { Environment } from './environment';
-import { type Hex, hexKey, neighbors } from './hex';
+import { DIRECTIONS, type Hex, hexAdd, hexDistance, hexKey, hexesWithin } from './hex';
 
 /**
  * Filaments: how strongly each magical aspect flows on each hex.
  *
  * Based on Eon's "Omgivningens tillstånd" (seven levels, from magic-dead to
- * extremely strong). Here: -3 (magic-dead) .. +3 (extreme). Each hex gets a raw
- * score from its own terrain, its neighbours, and the time/weather/wind, and
- * is then rounded and clamped. Every contribution is kept so the UI can
- * explain the number.
+ * extremely strong). Here: -3 (magic-dead) .. +3 (extreme).
+ *
+ * A hex's reading = the conditions on that hex (time, sky, wind, indoors, its
+ * ground, clouds and shadows) + what radiates into it from sources around it:
+ * water, trees, stone, fire, ash, the dead, undead and the living. Sources
+ * radiate to their own hex and up to two hexes out, weakening with distance,
+ * and each kind of source is capped so stacking stays sane. The sum is
+ * rounded and clamped. Every contribution is kept so the UI can explain it.
  */
 export type AspectId = 'bio' | 'foto' | 'geo' | 'hydro' | 'nekro' | 'pneumo' | 'pyro' | 'skoto';
 
@@ -49,171 +53,255 @@ export interface Reading {
 export type HexFilaments = Record<AspectId, Reading>;
 
 export interface FilamentOptions {
-  /** Which units count as undead (strengthen necrotropy around them). */
+  /** Which units count as undead (they radiate necrotropy). */
   isUndead?: (u: Unit) => boolean;
+  /** Is this hex under a cloud? (from the world's cloud field) */
+  isClouded?: (h: Hex) => boolean;
 }
 
-/** Facts about a hex and its surroundings that the aspect rules look at. */
+// --- sources --------------------------------------------------------------------
+
+/** Strength on the source hex, one hex away, two hexes away. */
+type Falloff = [number, number, number];
+
+interface Emission {
+  aspect: AspectId;
+  label: string;
+  fall: Falloff;
+  /** Max total from all sources of this label (same sign as the emission). */
+  cap: number;
+}
+
+const isWater = (c: Cell): boolean => c.ground === 'river' || c.ground === 'pond' || c.ground === 'ford';
+const isTall = (c: Cell): boolean =>
+  (c.feature === 'tree' || c.feature === 'pine' || c.feature === 'thicket') && c.fire !== 'burnt';
+
+function emissions(c: Cell, units: Unit[], env: Environment, opts: FilamentOptions): Emission[] {
+  const out: Emission[] = [];
+  const e = (aspect: AspectId, label: string, fall: Falloff, cap: number) => out.push({ aspect, label, fall, cap });
+  const lit = env.time !== 'night';
+
+  if (isWater(c)) {
+    e('hydro', 'Water', [1.5, 0.75, 0.25], 2);
+    if (env.time === 'day' && env.sky === 'clear' && !c.indoors) e('foto', 'Sun glare off water', [1, 1, 0], 1);
+  }
+  if (c.ground === 'pond') e('nekro', 'Still water', [1, 0.5, 0], 1);
+  if (isTall(c)) {
+    e('bio', 'Trees', [0.5, 0.3, 0.1], 1);
+    e('pneumo', 'Shelter of trees', [-1, -0.5, 0], -1);
+    if (lit) {
+      e('foto', 'Canopy', [-1, -0.3, 0], -1);
+      e('skoto', 'Shade of trees', [1, 0.3, 0], 1);
+    } else {
+      e('skoto', 'Forest at night', [1, 0.5, 0.2], 1);
+    }
+  }
+  if (c.feature === 'rock') e('geo', 'Stone', [1.5, 0.75, 0.25], 2);
+  if (c.fire === 'burning') {
+    e('pyro', 'Fire', [4, 1.5, 0.5], 5);
+    e('foto', 'Firelight', [2, 1, 0.5], 2);
+    e('skoto', 'Firelight', [-2, -1, -0.5], -3);
+    e('bio', 'Burning', [-1.5, -0.25, 0], -1.5);
+  }
+  if (c.fire === 'burnt') {
+    e('nekro', 'Ash', [2, 0.5, 0.2], 2);
+    e('pyro', 'Embers', [0.5, 0, 0], 0.5);
+    e('bio', 'Scorched earth', [-1.5, -0.25, 0], -1.5);
+  }
+  if (c.corpses) e('nekro', 'The dead', [c.corpses, 0.5 * c.corpses, 0.25 * c.corpses], 3);
+  for (const u of units) {
+    if (opts.isUndead?.(u)) e('nekro', 'Undead', [1, 0.5, 0.25], 2);
+    else if (u.team === 'party') e('bio', 'Friends', [0.5, 0.25, 0], 1);
+    else e('bio', 'Beasts', [0.25, 0.1, 0], 0.5);
+  }
+  return out;
+}
+
+// --- conditions on the hex itself ------------------------------------------------------
+
 interface Context {
   cell: Cell;
   env: Environment;
   outdoors: boolean;
-  near: Cell[]; // existing neighbour cells
-  count: (pred: (c: Cell) => boolean) => number;
-  living: number; // living creatures on/next to the hex
-  undead: number;
+  clouded: boolean;
+  /** Who casts a shadow onto this hex (tree/rock), if anyone. */
+  shadowedBy: string | null;
 }
 
-const isWaterCell = (c: Cell): boolean => c.ground === 'river' || c.ground === 'pond' || c.ground === 'ford';
-const isTree = (c: Cell): boolean =>
-  (c.feature === 'tree' || c.feature === 'pine' || c.feature === 'thicket') && c.fire !== 'burnt';
+type Base = (x: Context, add: (label: string, value: number) => void) => 'skipSources' | void;
 
-const DARK_SKY = (env: Environment): boolean => env.sky !== 'clear';
+const overcast = (env: Environment): boolean => env.sky === 'rain' || env.sky === 'storm';
 
-type Rule = (x: Context, add: (label: string, value: number) => void) => void;
-
-const RULES: Record<AspectId, Rule> = {
-  hydro: ({ cell, env, outdoors, count }, add) => {
+const BASE: Record<AspectId, Base> = {
+  hydro: ({ cell, env, outdoors }, add) => {
     if (!outdoors) {
       add('Indoors, no water', -3);
-      return;
+      return 'skipSources';
     }
-    const inWater = isWaterCell(cell);
-    if (inWater) {
-      // Already in it: the water around you adds nothing more.
-      add('Ground level', -1);
-      add(cell.ground === 'ford' ? 'Wading in the river' : 'In the water', 1.5);
-    } else {
-      add('Dry land', -1);
-      const w = count(isWaterCell);
-      if (w) add(`Water next to you ×${w}`, Math.min(2, w * 0.75));
-    }
+    add(isWater(cell) ? 'Ground level' : 'Dry land', -1);
     if (env.sky === 'rain') add('Rain', 1);
     if (env.sky === 'storm') add('Downpour', 2);
   },
 
-  foto: ({ cell, env, outdoors, count }, add) => {
+  foto: ({ env, outdoors, clouded, shadowedBy }, add) => {
+    if (!outdoors) {
+      add('Indoors', env.time === 'day' ? -1 : env.time === 'dusk' ? -2 : -3);
+      return;
+    }
     if (env.time === 'day') add('Daylight', 0);
     if (env.time === 'dusk') add('Dusk', -1);
     if (env.time === 'night') add('Moon and stars', -2);
-    if (!outdoors) add('Indoors', -1);
-    else if (DARK_SKY(env)) add(env.time === 'night' ? 'No moon (clouds)' : 'Sun behind clouds', env.sky === 'storm' ? -1.5 : -1);
-    if (isTree(cell)) add('Dense trees', -1);
-    else if (count(isTree) >= 3) add('Under the canopy', -0.5);
-    if (cell.fire === 'burning') add('Standing in fire', 2);
-    const f = count((c) => c.fire === 'burning');
-    if (f) add(`Firelight ×${f}`, Math.min(2, f));
-    if (outdoors && env.time === 'day' && env.sky === 'clear' && count(isWaterCell) >= 2) add('Sun glare off water', 0.5);
+    if (env.time === 'day' && env.sky === 'clear') add('Clear sky', 1);
+    if (overcast(env)) add('Overcast', env.sky === 'storm' ? -1.5 : -1);
+    else if (clouded) add(env.time === 'night' ? 'Cloud over the moon' : 'Under a cloud', -1);
+    if (shadowedBy) add(`In the shadow of a ${shadowedBy}`, -1);
   },
 
-  skoto: ({ cell, env, outdoors, count }, add) => {
-    if (env.time === 'day') {
-      add(outdoors ? 'Daylight' : 'Indoors by day', outdoors ? -3 : -1);
-      if (outdoors && DARK_SKY(env)) add('Thick clouds', 2);
-      if (outdoors && isTree(cell)) add('Shade of trees', 1);
-    } else if (env.time === 'dusk') {
-      add('Dusk', -1);
-    } else {
-      add('Night', 0);
-      if (outdoors && DARK_SKY(env)) add('Clouded night', 1);
-      if (isTree(cell) || count(isTree) >= 3) add('Forest at night', 1);
+  skoto: ({ env, outdoors, clouded, shadowedBy }, add) => {
+    if (!outdoors) {
+      add('Indoors', env.time === 'day' ? -1 : env.time === 'dusk' ? -0.5 : 0);
+      return;
     }
-    if (cell.fire === 'burning') add('Standing in fire', -2);
-    const f = count((c) => c.fire === 'burning');
-    if (f) add(`Firelight ×${f}`, -Math.min(2, f));
+    if (env.time === 'day') add('Daylight', -3);
+    if (env.time === 'dusk') add('Dusk', -1);
+    if (env.time === 'night') add('Night', 0);
+    const gloom = env.time === 'day' ? 2 : 1;
+    if (overcast(env)) add('Overcast', gloom);
+    else if (clouded) add(env.time === 'night' ? 'Cloud over the moon' : 'Under a cloud', gloom);
+    if (shadowedBy) add(`In the shadow of a ${shadowedBy}`, 1);
   },
 
-  pneumo: ({ cell, env, outdoors, count }, add) => {
+  pneumo: ({ env, outdoors }, add) => {
     if (!outdoors) {
       add('Indoors', -2);
-      return;
+      return 'skipSources';
     }
-    const byForce = [-2, -1, 0, 0, 1, 2, 2][Math.max(0, Math.min(6, env.windForce))];
-    add(`Wind force ${env.windForce}`, byForce);
-    if (isTree(cell) || count(isTree) >= 3) add('Sheltered by trees', -1);
+    add(`Wind force ${env.windForce}`, [-2, -1, 0, 0, 1, 2, 2][Math.max(0, Math.min(6, env.windForce))]);
   },
 
-  pyro: ({ cell, env, count }, add) => {
-    if (cell.ground === 'ford' || cell.ground === 'river' || cell.ground === 'pond') {
+  pyro: ({ cell, env }, add) => {
+    if (isWater(cell)) {
       add('In water', -3);
-      return;
+      return 'skipSources';
     }
     add('No open fire', -2);
-    if (env.sky === 'rain' || env.sky === 'storm') add('Everything is wet', env.sky === 'storm' ? -0.75 : -0.5);
-    if (cell.fire === 'burning') add('Standing in fire', 4);
-    if (cell.fire === 'burnt') add('Smouldering embers', 0.5);
-    const f = count((c) => c.fire === 'burning');
-    if (f) add(`Fire next to you ×${f}`, Math.min(4, f * 1.5));
+    if (overcast(env)) add('Everything is wet', env.sky === 'storm' ? -0.75 : -0.5);
   },
 
-  geo: ({ cell, count, outdoors }, add) => {
-    if (cell.ground === 'river' || cell.ground === 'pond') add('In the water', -3);
-    else if (cell.ground === 'ford') add('Standing in a river', -2);
+  geo: ({ cell, outdoors }, add) => {
+    if (cell.ground === 'river' || cell.ground === 'pond') {
+      add('In the water', -3);
+      return 'skipSources';
+    }
+    if (cell.ground === 'ford') add('Standing in a river', -2);
     else if (cell.ground === 'path') add('Packed gravel', 0);
     else add('Loose soil', -1);
-    const r = count((c) => c.feature === 'rock');
-    if (r) add(`Stone next to you ×${r}`, r * 0.75);
     if (!outdoors) add('Walls around you', 0.5);
   },
 
-  bio: ({ cell, count, living, outdoors }, add) => {
-    add('Living forest', 0);
+  bio: ({ cell, outdoors }, add) => {
+    add('Living land', 0);
     if (cell.ground === 'flowers' || cell.ground === 'tallgrass') add('Lush growth', 0.5);
     if (cell.ground === 'path') add('Trampled path', -0.5);
-    if (count(isTree) >= 3) add('Thick with trees', 0.5);
-    if (cell.fire === 'burnt' || cell.fire === 'burning') add('Scorched earth', -1.5);
-    const b = count((c) => c.fire === 'burnt');
-    if (b) add(`Burnt ground nearby ×${b}`, -Math.min(1, b * 0.25));
-    if (living >= 3) add(`Crowd (${living} living)`, 0.5);
     if (!outdoors) add('Indoors', -0.5);
   },
 
-  nekro: ({ cell, count, undead }, add) => {
+  nekro: ({ cell }, add) => {
     add('Forest', -1);
     if (cell.ground === 'forest') add('Rotting leaf litter', 1.5);
-    if (cell.ground === 'pond' || count((c) => c.ground === 'pond')) add('Still water', 1);
-    if (cell.fire === 'burnt') add('Ash of a fire', 2);
-    const b = count((c) => c.fire === 'burnt');
-    if (b) add(`Ash nearby ×${b}`, Math.min(1, b * 0.5));
-    if (cell.corpses) add(`Died here ×${cell.corpses}`, Math.min(3, cell.corpses));
-    const nc = count((c) => !!c.corpses);
-    if (nc) add(`Death nearby ×${nc}`, Math.min(1, nc * 0.5));
-    if (undead) add(`Undead presence ×${undead}`, undead * 0.5);
   },
 };
 
-export function readHex(b: Battle, h: Hex, env: Environment, opts: FilamentOptions = {}): HexFilaments | null {
-  const cell = cellAt(b, h);
-  if (!cell) return null;
-  const near = neighbors(h).map((n) => cellAt(b, n)).filter((c): c is Cell => !!c);
-  const around = new Set([hexKey(h), ...neighbors(h).map(hexKey)]);
-  const nearUnits = b.units.filter((u) => u.hp > 0 && around.has(hexKey(u.at)));
-  const undead = nearUnits.filter((u) => opts.isUndead?.(u)).length;
-  const ctx: Context = {
-    cell,
-    env,
-    outdoors: !cell.indoors,
-    near,
-    count: (pred) => near.filter(pred).length,
-    living: nearUnits.length - undead,
-    undead,
+/**
+ * Object shadows. Light comes from the top-left, so by day trees throw their
+ * shadow one hex to the south-east; at dusk the low sun throws long shadows
+ * two hexes east (from trees) and one (from rocks). No shadows at night or
+ * under a grey sky.
+ */
+function shadowCaster(b: Battle, h: Hex, env: Environment, clouded: boolean): string | null {
+  if (env.time === 'night' || overcast(env) || clouded) return null;
+  const nameOf = (c: Cell | undefined, rocksToo: boolean): string | null => {
+    if (!c) return null;
+    if (isTall(c)) return c.feature === 'thicket' ? 'thicket' : 'tree';
+    if (rocksToo && c.feature === 'rock') return 'rock';
+    return null;
   };
-  const out = {} as HexFilaments;
-  for (const a of ASPECTS) {
-    const parts: Part[] = [];
-    RULES[a.id](ctx, (label, value) => parts.push({ label, value }));
-    const raw = parts.reduce((s, p) => s + p.value, 0);
-    out[a.id] = { raw, parts, level: Math.max(-3, Math.min(3, Math.round(raw))) };
-  }
-  return out;
+  if (env.time === 'day') return nameOf(cellAt(b, hexAdd(h, DIRECTIONS[2])), false); // caster to the north-west
+  const w1 = hexAdd(h, DIRECTIONS[3]);
+  return nameOf(cellAt(b, w1), true) ?? nameOf(cellAt(b, hexAdd(w1, DIRECTIONS[3])), false); // casters to the west
+}
+
+// --- reading ---------------------------------------------------------------------
+
+interface Gathered {
+  total: number;
+  here: boolean;
+  near: number;
+  cap: number;
 }
 
 /** Filaments for every hex on the map. */
 export function readMap(b: Battle, env: Environment, opts: FilamentOptions = {}): Map<string, HexFilaments> {
+  // 1. Radiate every source out to its neighbourhood.
+  const incoming = new Map<string, Map<string, Gathered>>(); // hex -> "aspect|label" -> total
+  const unitsAt = new Map<string, Unit[]>();
+  for (const u of b.units) {
+    if (u.hp <= 0) continue;
+    const k = hexKey(u.at);
+    unitsAt.set(k, [...(unitsAt.get(k) ?? []), u]);
+  }
+  for (const [key, cell] of Object.entries(b.cells)) {
+    for (const em of emissions(cell, unitsAt.get(key) ?? [], env, opts)) {
+      for (const t of hexesWithin(cell.at, 2)) {
+        const d = hexDistance(cell.at, t);
+        const v = em.fall[d];
+        if (!v) continue;
+        const tk = hexKey(t);
+        if (!b.cells[tk]) continue;
+        let m = incoming.get(tk);
+        if (!m) incoming.set(tk, (m = new Map()));
+        const id = `${em.aspect}|${em.label}`;
+        const g = m.get(id) ?? { total: 0, here: false, near: 0, cap: em.cap };
+        g.total += v;
+        if (d === 0) g.here = true;
+        else g.near += 1;
+        m.set(id, g);
+      }
+    }
+  }
+
+  // 2. Add each hex's own conditions, then everything that reached it.
   const out = new Map<string, HexFilaments>();
   for (const [key, cell] of Object.entries(b.cells)) {
-    const r = readHex(b, cell.at, env, opts);
-    if (r) out.set(key, r);
+    const clouded = !cell.indoors && !!opts.isClouded?.(cell.at);
+    const ctx: Context = {
+      cell,
+      env,
+      outdoors: !cell.indoors,
+      clouded,
+      shadowedBy: cell.indoors ? null : shadowCaster(b, cell.at, env, clouded),
+    };
+    const reading = {} as HexFilaments;
+    for (const a of ASPECTS) {
+      const parts: Part[] = [];
+      const skip = BASE[a.id](ctx, (label, value) => parts.push({ label, value }));
+      if (skip !== 'skipSources') {
+        for (const [id, g] of incoming.get(key) ?? []) {
+          const [aspect, label] = id.split('|');
+          if (aspect !== a.id) continue;
+          const value = g.cap >= 0 ? Math.min(g.total, g.cap) : Math.max(g.total, g.cap);
+          const where = g.here && g.near ? ` (here + ${g.near} near)` : g.here ? ' (here)' : ` ×${g.near} nearby`;
+          parts.push({ label: label + where, value });
+        }
+      }
+      const raw = parts.reduce((s, p) => s + p.value, 0);
+      reading[a.id] = { raw, parts, level: Math.max(-3, Math.min(3, Math.round(raw))) + 0 }; // +0 drops -0
+    }
+    out.set(key, reading);
   }
   return out;
+}
+
+export function readHex(b: Battle, h: Hex, env: Environment, opts: FilamentOptions = {}): HexFilaments | null {
+  return readMap(b, env, opts).get(hexKey(h)) ?? null;
 }

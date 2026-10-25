@@ -26,6 +26,8 @@ export interface Cell {
   flammable: boolean;
   water: boolean;
   fire: FireState;
+  /** Turns left before a burning hex burns out. */
+  burnTurns?: number;
   /** What the ground is, for magic and other terrain rules. */
   ground?: 'grass' | 'forest' | 'path' | 'tallgrass' | 'flowers' | 'river' | 'pond' | 'ford';
   /** What stands on the hex. */

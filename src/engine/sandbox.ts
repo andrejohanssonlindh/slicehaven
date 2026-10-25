@@ -5,6 +5,8 @@ import {
 import { type Hex, hexDistance, hexEquals, hexKey, offsetToHex, parseHexKey } from '../core/hex';
 import { WIND_NAMES } from '../core/environment';
 import { ASPECTS, type AspectId, type HexFilaments, LEVEL_NAMES, readHex, readMap } from '../core/filaments';
+import { Rng } from '../core/rng';
+import { ignite as igniteCell, isClouded, newWorld, stepWorld } from '../core/world';
 import { icon } from '../art/icons';
 import { STATS, type SandboxCell, buildSandbox, newUnit } from '../content/sandbox';
 import { Camera } from './camera';
@@ -59,6 +61,10 @@ export function startSandbox(): void {
   let aspect: AspectId | null = null;
   let inspected: Hex | null = null;
   const isUndead = (u: Unit): boolean => STATS[u.kind]?.sprite === 'skeleton';
+  /** The world between turns (clouds, turn count). */
+  const world = newWorld();
+  const worldRng = Rng.fromSeed(Date.now());
+  const filamentOpts = () => ({ isUndead, isClouded: (h: Hex) => isClouded(h, world, weather.sky) });
 
   const camera = new Camera(canvas, renderer.width, renderer.height, (wx, wy) => {
     const h = renderer.hexAt(wx, wy);
@@ -112,48 +118,60 @@ export function startSandbox(): void {
     }
   }
 
+  /** Fire tool: set a hex alight. It burns (and may spread) as turns pass. */
   function ignite(h: Hex): void {
     const c = cellAt(battle, h);
     if (!c) return;
-    if (!c.flammable || c.fire !== 'none') {
-      say(c.fire === 'burnt' ? 'Already burnt.' : "That won't burn.");
+    if (!igniteCell(c, weather.env())) {
+      say(c.fire === 'burnt' ? 'Already burnt.' : c.fire === 'burning' ? 'Already burning.' : "That won't burn.");
       return;
     }
-    c.fire = 'burning';
-    const key = hexKey(h);
     const victim = unitAt(battle, h);
     if (victim) void hurt(victim, 2);
-    const burnTime = weather.rain > 0.4 ? 3500 : 7000;
-    setTimeout(() => {
-      c.fire = 'burnt';
-      // A burnt thicket is gone: the hex opens up. Trees stay as charred trunks.
-      const art = artByKey.get(key);
-      if (art?.prop === 'thicket') {
-        c.obstacle = false;
-        art.obstacle = false; // drop the red border too
-      }
-      renderer.markBurnt(key);
-      refreshHighlights();
-    }, burnTime);
-    say(weather.rain > 0.4 ? 'It catches, but the rain will drown it soon.' : 'Fire!');
+    say(`Fire! It burns for ${c.burnTurns} turn${c.burnTurns === 1 ? '' : 's'} and may spread when the turn ends.`);
   }
 
+  /** Lightning tool: strike now (storms also strike on their own, once per turn). */
   function strike(h: Hex): void {
-    const p = renderer.feet(h);
-    effects.lightning(p.x, p.y - 2);
-    weather.flash = 1;
+    boltVisual(h);
     const victim = unitAt(battle, h);
     if (victim) void hurt(victim, 3);
     const c = cellAt(battle, h);
-    if (c?.flammable && c.fire === 'none') ignite(h);
+    if (c) igniteCell(c, weather.env());
   }
 
-  function randomStrike(): void {
-    const keys = Object.keys(battle.cells);
-    // Lightning likes tall things.
-    const tall = keys.filter((k) => battle.cells[k].obstacle && battle.cells[k].fire === 'none');
-    const pool = Math.random() < 0.6 && tall.length ? tall : keys;
-    strike(parseHexKey(pool[Math.floor(Math.random() * pool.length)]));
+  function boltVisual(h: Hex): void {
+    const p = renderer.feet(h);
+    effects.lightning(p.x, p.y - 2);
+    weather.flash = 1;
+  }
+
+  /** When a hex burns out: show ash, and a burnt thicket loses its obstacle border. */
+  function burntOut(h: Hex): void {
+    const key = hexKey(h);
+    const art = artByKey.get(key);
+    if (art && !battle.cells[key].obstacle) art.obstacle = false;
+    renderer.markBurnt(key);
+  }
+
+  /** The world moves: clouds drift, fire spreads or dies, storms strike. */
+  async function worldStep(): Promise<void> {
+    const ev = stepWorld(battle, weather.env(), world, worldRng);
+    weather.moveCloudsTo(world.cloudX, world.cloudY);
+    for (const h of ev.burntOut) burntOut(h);
+    for (const h of ev.strikes) {
+      boltVisual(h);
+      await wait(350);
+    }
+    for (const d of ev.damage) {
+      const u = battle.units.find((x) => x.id === d.unitId);
+      if (u && u.hp > 0) await hurt(u, d.amount);
+    }
+    const news: string[] = [];
+    if (ev.ignited.length) news.push(`fire spreads to ${ev.ignited.length} hex${ev.ignited.length > 1 ? 'es' : ''}`);
+    if (ev.burntOut.length) news.push(`${ev.burntOut.length} burnt out`);
+    if (ev.strikes.length) news.push('lightning strikes');
+    say(`Turn ${world.turn}${news.length ? ': ' + news.join(', ') : ''}.`);
   }
 
   // --- input ---------------------------------------------------------------------
@@ -306,18 +324,19 @@ export function startSandbox(): void {
     }
   }
 
-  async function enemyTurn(): Promise<void> {
+  /** End of turn: foes act (unless just passing time), then the world moves. */
+  async function endTurn(withFoes: boolean): Promise<void> {
     if (busy) return;
     busy = true;
     plotted = [];
     jumpTarget = null;
     refresh();
     try {
-      await foesAct();
-      say('Your turn.');
+      if (withFoes) await foesAct();
+      await worldStep();
     } catch (err) {
-      console.error('[sandbox] enemy turn failed', err);
-      say('Something went wrong in the enemy turn (logged). Your turn.');
+      console.error('[sandbox] end of turn failed', err);
+      say('Something went wrong ending the turn (logged).');
     } finally {
       busy = false;
       refresh();
@@ -372,7 +391,7 @@ export function startSandbox(): void {
 
   function refreshInfo(): void {
     const unit = sel();
-    const head = unit ? `<b>${unit.name}</b> ♥ ${unit.hp}/${unit.maxHp}` : '<b>No hero selected</b>';
+    const head = `<b>Turn ${world.turn}</b> · ` + (unit ? `<b>${unit.name}</b> ♥ ${unit.hp}/${unit.maxHp}` : '<b>No hero selected</b>');
     const hint: Record<Mode, string> = {
       walk: 'Walk: tap a lit hex, tap again to go.',
       jump: 'Jump: straight lines, over obstacles and water.',
@@ -401,7 +420,7 @@ export function startSandbox(): void {
       magicView = undefined;
       return;
     }
-    const map = readMap(battle, weather.env(), { isUndead });
+    const map = readMap(battle, weather.env(), filamentOpts());
     const levels = new Map<string, number>();
     for (const [k, r] of map) levels.set(k, r[aspect].level);
     magicView = { color: ASPECTS.find((a) => a.id === aspect)!.color, levels };
@@ -414,7 +433,7 @@ export function startSandbox(): void {
       magicEl.innerHTML = '<p class="hint">Tap a hex to read its filaments.</p>';
       return;
     }
-    const r: HexFilaments | null = readHex(battle, at, weather.env(), { isUndead });
+    const r: HexFilaments | null = readHex(battle, at, weather.env(), filamentOpts());
     if (!r) return;
     const where = inspected ? 'Tapped hex' : `${sel()?.name}'s hex`;
     const chips = ASPECTS.map((a) => {
@@ -484,20 +503,21 @@ export function startSandbox(): void {
   button(act, 'attack', 'Strike', { mode: 'strike' }, () => setMode('strike'));
   button(act, 'range', 'Sling', { mode: 'sling' }, () => setMode('sling'));
   button(act, 'heal', 'Heal', { mode: 'heal' }, () => setMode('heal'));
-  button(act, 'turn', 'Foes act', {}, () => void enemyTurn());
+  button(act, 'turn', 'End turn', {}, () => void endTurn(true));
 
-  const world = document.getElementById('bar-world')!;
+  const worldBar = document.getElementById('bar-world')!;
   const skies: [Sky, string, string][] = [['clear', 'sun', 'Clear'], ['cloudy', 'cloud', 'Cloudy'], ['rain', 'rain', 'Rain'], ['storm', 'storm', 'Storm']];
-  for (const [sky, ic, label] of skies) button(world, ic, label, { sky }, () => { weather.set(sky); refresh(); });
+  for (const [sky, ic, label] of skies) button(worldBar, ic, label, { sky }, () => { weather.set(sky); refresh(); });
   const times: [TimeOfDay, string, string][] = [['day', 'sun', 'Day'], ['dusk', 'dusk', 'Dusk'], ['night', 'moon', 'Night']];
-  for (const [time, ic, label] of times) button(world, ic, label, { time }, () => { weather.setTime(time); refresh(); });
-  button(world, 'wind', 'Wind', { wind: 'force' }, () => { weather.setWind((weather.windForce + 1) % 7); refresh(); });
-  button(world, 'wind', 'Dir', { wind: 'dir' }, () => { weather.setWind(weather.windForce, weather.windDir + 1); refresh(); });
-  button(world, 'fire', 'Fire', { mode: 'fire' }, () => setMode('fire'));
-  button(world, 'bolt', 'Lightning', { mode: 'lightning' }, () => setMode('lightning'));
-  button(world, 'foe', '+Foe', { mode: 'spawnFoe' }, () => setMode('spawnFoe'));
-  button(world, 'friend', '+Friend', { mode: 'spawnFriend' }, () => setMode('spawnFriend'));
-  button(world, 'turn', 'Reset', {}, () => location.reload());
+  for (const [time, ic, label] of times) button(worldBar, ic, label, { time }, () => { weather.setTime(time); refresh(); });
+  button(worldBar, 'wind', 'Wind', { wind: 'force' }, () => { weather.setWind((weather.windForce + 1) % 7); refresh(); });
+  button(worldBar, 'wind', 'Dir', { wind: 'dir' }, () => { weather.setWind(weather.windForce, weather.windDir + 1); refresh(); });
+  button(worldBar, 'turn', 'Pass turn', {}, () => void endTurn(false));
+  button(worldBar, 'fire', 'Fire', { mode: 'fire' }, () => setMode('fire'));
+  button(worldBar, 'bolt', 'Lightning', { mode: 'lightning' }, () => setMode('lightning'));
+  button(worldBar, 'foe', '+Foe', { mode: 'spawnFoe' }, () => setMode('spawnFoe'));
+  button(worldBar, 'friend', '+Friend', { mode: 'spawnFriend' }, () => setMode('spawnFriend'));
+  button(worldBar, 'off', 'Reset', {}, () => location.reload());
 
   const magicBar = document.getElementById('bar-magic')!;
   button(magicBar, 'off', 'Off', { show: '' }, () => setAspect(null));
@@ -508,7 +528,7 @@ export function startSandbox(): void {
     tab.addEventListener('click', () => {
       for (const t of document.querySelectorAll<HTMLButtonElement>('[data-tab]')) t.classList.toggle('on', t === tab);
       act.hidden = tab.dataset.tab !== 'act';
-      world.hidden = tab.dataset.tab !== 'world';
+      worldBar.hidden = tab.dataset.tab !== 'world';
       magicBar.hidden = tab.dataset.tab !== 'magic';
       magicEl.hidden = tab.dataset.tab !== 'magic';
       if (tab.dataset.tab === 'magic') {
@@ -549,7 +569,7 @@ export function startSandbox(): void {
   function step(now: number): void {
     const dt = Math.max(0, Math.min(100, now - last));
     last = now;
-    if (weather.update(dt, now)) randomStrike();
+    weather.update(dt);
     effects.update(dt, weather.windX, weather.windY);
     // Fires start and burn out on their own, so keep the magic map fresh.
     if (aspect && now - lastMagic > 400) {
@@ -577,7 +597,8 @@ export function startSandbox(): void {
     battle: battle as Battle, weather, effects, renderer, camera,
     tap: (q: number, r: number) => safeTap({ q, r }),
     setMode: (m: Mode) => setMode(m),
-    enemyTurn,
+    endTurn,
+    world,
     isBusy: () => busy,
   };
 }

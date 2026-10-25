@@ -1,9 +1,9 @@
 # Magic: filaments
 
-*First version, 2026-10-25. Try it in the sandbox's **Magic** tab.*
+*Version 2, 2026-10-25. Try it in the sandbox's **Magic** tab.*
 
 ## The idea (director)
-We want to know which filaments are strong or weak where, changed by day/night (outdoors), indoors/outdoors and weather. Modifiers run from **−3 to +3**, with the extremes uncommon, but combinations can reach them (e.g. water around you + heavy weather). Hexes affect each other.
+We want to know which filaments are strong or weak where, changed by day/night (outdoors), indoors/outdoors and weather. Modifiers run from **−3 to +3**, with the extremes uncommon, but combinations can reach them (e.g. water around you + heavy weather). **Things radiate outward**: trees, rocks, fire, the dead and the living affect the hexes around them. **The world moves between turns**: clouds drift, fire spreads.
 
 ## How Eon does it
 In Eon, magic is made of **filaments** belonging to **aspects** (power sources). To cast, the aspect must be present around the caster. Its **flow** in the surroundings ("Omgivningens tillstånd") has seven levels:
@@ -18,46 +18,63 @@ In Eon, magic is made of **filaments** belonging to **aspects** (power sources).
 | Mycket starkt | +2 | Very strong |
 | Extremt starkt | +3 | Extreme |
 
-So Eon's scale maps exactly onto −3..+3. (Eon also has *magic storms* above extreme, where casting is impossible. That's a possible rare story event.) Strong flow is not only good: in Eon, failures in strong flow cause worse *dissipations* (magical backlash).
+Eon also has *magic storms* above extreme (casting impossible), which could be a rare story event. In Eon, strong flow also makes failures worse (*dissipations*). Eon names ~24 aspects; the core rulebook gives environment tables for 8, which we use for now.
 
-Eon names ~24 aspects. The core rulebook gives environment tables for 8, and those are the 8 we use for now.
+## The model (v2)
+A hex's reading for an aspect =
+1. **Conditions on the hex**: time of day, sky, wind, indoors/outdoors, its ground, **a cloud over it**, **a shadow cast on it**.
+2. **What radiates into it**: every source sends its effect to its own hex and up to 2 hexes out, weakening with distance. Each *kind* of source is capped, so ten trees don't add up to ten times one tree.
 
-## Our model
-Each hex scores each aspect by adding up contributions, then **rounds and clamps** to −3..+3:
-1. **Its own terrain** (ground, trees, rocks, water, fire, ash, deaths).
-2. **Its neighbours** (the 6 surrounding hexes: water, trees, rocks, fire, the dead, undead).
-3. **The world**: time of day, sky, wind force, indoors/outdoors.
+Then it's rounded and clamped to −3..+3. Tapping a hex shows every contribution, e.g. *"Dry land −1 · Rain +1 · Water ×2 nearby +1.5 = 1.5 → +2"*.
 
-Every contribution is kept, so tapping a hex explains its number ("Dry land −1 · Water next to you ×2 +1.5 · Downpour +2 = 2.5 → +3").
-
-### The rules (all numbers are first drafts, easy to tune)
-| Aspect | What drives it |
+### Sources (here / 1 away / 2 away, and cap)
+| Source | Radiates |
 |---|---|
-| **Hydrotropy** (water) | Dry land −1. Water next to you +0.75 each (max +2). Standing in water +1.5 (water around you then adds nothing more). Rain +1, downpour (storm) +2. Indoors: magic-dead. |
-| **Phototropy** (light) | Day 0, dusk −1, night −2 (moon/stars). Clouds −1 (storm −1.5), so a cloudy night is magic-dead. Dense trees −1. Firelight +1 per burning neighbour, +2 standing in it. Sun glare off water +0.5. |
-| **Skototropy** (darkness) | Magic-dead outdoors by day (thick clouds +2, tree shade +1). Dusk −1. Night 0, clouded night +1, forest at night +1. Fire pushes it back. Indoors by day −1. |
-| **Pneumotropy** (air) | Follows wind force (Eon's table): calm −2, light breeze −1, fresh/strong breeze 0, gale +1, storm/hurricane +2. Sheltered by trees −1. Indoors −2. |
-| **Pyrotropy** (fire) | No open fire −2. Wet (rain/storm) −0.5/−0.75. Burning neighbour +1.5 each (max +4), standing in fire +4. Embers +0.5. In water: magic-dead. |
-| **Geotropy** (earth) | Loose soil −1, packed gravel 0, standing in a river −2, in water magic-dead. Stone next to you +0.75 each. Walls (indoors) +0.5. |
-| **Biotropy** (life) | Living forest 0. Lush growth (flowers, tall grass) +0.5, thick with trees +0.5, crowd of 3+ living +0.5. Trampled path −0.5. Scorched −1.5, burnt neighbours −0.25 each. |
-| **Necrotropy** (death) | Forest −1. Rotting leaf litter +1.5, still water (pond) +1, ash of a fire +2. **Someone died here** +1 each (max +3), death nearby +0.5. Undead presence +0.5 each. |
+| **Water** (river, pond, ford) | Water +1.5 / +0.75 / +0.25 (cap +2). On a clear day: sun glare, light +1 / +1. |
+| **Pond** | Death (still water) +1 / +0.5. |
+| **Trees & thickets** | Life +0.5 / +0.3 / +0.1 (cap +1). Shelter: air −1 / −0.5. By day: canopy, light −1 / −0.3, shade +1 / +0.3 darkness. At night: darkness +1 / +0.5 / +0.2. |
+| **Rocks** | Earth +1.5 / +0.75 / +0.25 (cap +2). |
+| **Fire** | Fire +4 / +1.5 / +0.5 (cap +5). Light +2 / +1 / +0.5. Darkness −2 / −1 / −0.5. Life −1.5. |
+| **Ash** | Death +2 / +0.5 / +0.2. Embers: fire +0.5. Life −1.5 / −0.25. |
+| **The dead** (bodies stay on the field) | Death +1 / +0.5 / +0.25 per body (cap +3). |
+| **Undead** (skeletons) | Death +1 / +0.5 / +0.25 (cap +2). |
+| **Friends** | Life +0.5 / +0.25. |
+| **Beasts** | Life +0.25 / +0.1. |
 
-### Examples that fall out of it
-- Shepherd on a meadow, clear day: water −1, light 0, darkness magic-dead, fire −2, air −1.
-- Between two river hexes in rain: water **+2**; in a storm: **+3**.
-- Wading the ford: +1, rain +2, storm +3.
-- A cloudy night in the forest: darkness +2, light magic-dead.
-- Next to a burning thicket: fire 0, at its heart +2, inside a ring of fire +3.
-- After a fight: where creatures died, necrotropy rises (bloodstains mark the spot).
+### Conditions on the hex
+| Aspect | Conditions |
+|---|---|
+| **Light** | Day 0, **clear sky +1**, dusk −1, night −2. Overcast (rain/storm) −1/−1.5. A cloud over the hex −1. In an object's shadow −1. Indoors −1 by day, −3 at night. |
+| **Darkness** | Daylight −3 (magic-dead), dusk −1, night 0. Overcast or a cloud over the hex: +2 by day, +1 at dusk/night. In an object's shadow +1. Indoors −1 by day. |
+| **Water** | Dry land −1. Rain +1, downpour +2. Indoors: magic-dead. |
+| **Air** | Wind force (Eon): calm −2, light breeze −1, fresh/strong breeze 0, gale +1, storm/hurricane +2. Indoors −2. |
+| **Fire** | No open fire −2. Wet −0.5 (storm −0.75). In water: magic-dead. |
+| **Earth** | Loose soil −1, gravel 0, standing in a river −2, in water magic-dead. Walls +0.5. |
+| **Life** | 0. Lush growth +0.5, trampled path −0.5, indoors −0.5. |
+| **Death** | −1. Rotting leaf litter +1.5. |
 
-## In the sandbox
-- **Magic tab**: pick an aspect to colour the map: coloured with rising motes = strong, darkened = weak, cross-hatched = magic-dead. Every hex shows its number.
-- The readout shows **all 8 aspects** for the tapped hex (or your hero's hex), plus the explanation for the chosen one.
-- **Roof** tool: tap hexes to make them indoors and see what changes.
-- **World tab**: wind force (0–6, Eon's scale) and direction now set separately from the sky.
+### Shadows
+Light comes from the top-left. By day, trees throw a shadow one hex to the **south-east**. At dusk the low sun throws **long shadows east** (two hexes from trees, one from rocks). No shadows at night or under a grey sky. The shadows are drawn on the map and they count in the rules.
+
+### Clouds
+On cloudy days, cloud patches drift over the map. The same cloud field drives the drawn shadows and the rules, so what you see is what counts. Clouds move with the wind **when a turn ends** (faster in strong wind) and glide into place.
+
+### Examples
+- Clear day on a meadow: light **+1**. Next to the river: **+2**.
+- Between two river hexes: water +1; in rain **+2**; in a storm **+3**.
+- A cloud passes over you on a cloudy day: darkness goes from −3 to −1, light from 0 to −1.
+- Standing south-east of a tree by day: in its shadow, darkness −2.
+- Next to a fire: fire 0 (normal); in a blaze, +3. Firelight pushes darkness to magic-dead at night.
+- After a fight: bodies lie where they fell and death rises around them.
+
+## World step (end of turn)
+1. Clouds drift with the wind.
+2. Fire: each burning hex may spread to neighbours (more downwind, much less in rain), then burns down. Trees burn 3 turns, grass/thickets 2, rain shortens it. Burnt thickets open up.
+3. Storms: at most **one lightning bolt per turn**, drawn to tall things and clouded hexes.
+4. Anyone standing in fire takes 1 damage.
 
 ## Open questions
 - More aspects later (24 in Eon)? Which matter for our campaign?
-- **Personal state** (Eon has it: wet −1 fire, thirsty −1 water, wounded −1 life, undead +1 death). Use it for heroes?
-- How does magic plug into the **dice**? Ideas: the flow level adds/removes pips on magic faces; strong flow lets you reroll magic dice, but makes misfires worse (Eon's dissipations); magic-dead hexes turn magic faces blank.
-- Should heroes be able to *change* the flow (light a fire to fuel pyrotropy, call rain)? Eon allows this.
+- **Personal state** (Eon: wet −1 fire, thirsty −1 water, wounded −1 life, undead +1 death). Use it for heroes?
+- How does magic plug into the **dice**? Ideas: the flow level adds/removes pips on magic faces; strong flow lets you reroll magic dice but makes misfires worse; magic-dead hexes turn magic faces blank.
+- Should heroes be able to *change* the flow (light fires, call rain)? Eon allows it.

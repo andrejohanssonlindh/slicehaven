@@ -103,6 +103,27 @@ export class Pix {
     return out;
   }
 
+  /** Rotate 90° clockwise (a standing sprite ends up lying on its side). */
+  rotate90(): Pix {
+    const out = new Pix(this.h, this.w);
+    for (let y = 0; y < this.h; y++) {
+      for (let x = 0; x < this.w; x++) {
+        const i = (y * this.w + x) * 4;
+        const o = (x * out.w + (this.h - 1 - y)) * 4;
+        for (let c = 0; c < 4; c++) out.data[o + c] = this.data[i + c];
+      }
+    }
+    return out;
+  }
+
+  flipY(): Pix {
+    const out = new Pix(this.w, this.h);
+    for (let y = 0; y < this.h; y++) {
+      out.data.set(this.data.subarray(y * this.w * 4, (y + 1) * this.w * 4), (this.h - 1 - y) * this.w * 4);
+    }
+    return out;
+  }
+
   flipX(): Pix {
     const out = new Pix(this.w, this.h);
     for (let y = 0; y < this.h; y++) {

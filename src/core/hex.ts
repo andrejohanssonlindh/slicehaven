@@ -41,6 +41,23 @@ export function hexDistance(a: Hex, b: Hex): number {
   return (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2;
 }
 
+/**
+ * Continuous position of a hex centre in "hex space": x = q + r/2, y = r.
+ * The art layout is this scaled by (32, 20) px, so rules and visuals line up.
+ */
+export const hexSpace = (h: Hex): { x: number; y: number } => ({ x: h.q + h.r / 2, y: h.r });
+
+/** All hexes within `radius` steps (including the centre). */
+export function hexesWithin(center: Hex, radius: number): Hex[] {
+  const out: Hex[] = [];
+  for (let dq = -radius; dq <= radius; dq++) {
+    for (let dr = Math.max(-radius, -dq - radius); dr <= Math.min(radius, -dq + radius); dr++) {
+      out.push(hex(center.q + dq, center.r + dr));
+    }
+  }
+  return out;
+}
+
 export function hexToPixel(h: Hex, size: number): { x: number; y: number } {
   return {
     x: size * Math.sqrt(3) * (h.q + h.r / 2),

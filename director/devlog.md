@@ -1,5 +1,22 @@
 # Devlog
 
+## 2026-10-25 — Session 5: the world moves in turns, magic v2
+
+**Your feedback, done**
+- **Animations racing** when wind or sky changed: fixed. (The sway frame was calculated as time × wind, so any change in wind made it race. It now runs on an accumulated clock.)
+- **Turns:** "Foes act" → **End turn** (foes act, then the world moves). **Pass turn** on the World tab moves only the world.
+  - **Clouds** drift with the wind each turn and glide into place. The same cloud field drives the drawn shadows and the rules.
+  - **Fire** is turn-based: it burns for 2–3 turns, **spreads** to neighbours (much more downwind, much less in rain), then burns out. Standing in fire hurts.
+  - **Lightning:** storms throw at most one bolt per turn, drawn to tall things.
+- **Filaments v2: sources radiate.** Trees, rocks, water, fire, ash, bodies, undead, friends and beasts all affect hexes up to 2 away (weaker with distance, capped per kind). See [Magic: filaments](design/magic-filaments.md).
+  - Clear day: light +1 everywhere, **+2 around water**.
+  - Trees: life and darkness around them. Rocks: earth around them.
+  - **Shadows**: trees cast them south-east by day, long and east at dusk. Drawn on the map and counted in the rules (less light, more darkness).
+  - **Clouds** over a hex: less light, more darkness.
+  - Fire's heat and light spread outward.
+- **Bodies stay** where they fell (upright figures fall sideways, beasts roll onto their backs) and radiate necrotropy. Skeletons radiate it too.
+- 31 rule tests (filaments + world step).
+
 ## 2026-10-25 — Session 4: wind & filaments
 
 **Done**
