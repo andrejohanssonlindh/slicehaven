@@ -89,12 +89,13 @@ export class Effects {
     this.projectiles.push({ x0, y0, x1, y1, t: 0, duration, done });
   }
 
-  update(dt: number, wind: number): void {
+  update(dt: number, windX: number, windY = 0): void {
     const steps = dt / 33;
     for (const p of this.particles) {
       p.life -= steps;
-      p.x += (p.vx + (p.kind === 'smoke' || p.kind === 'fire' ? wind * 0.8 : 0)) * steps;
-      p.y += p.vy * steps;
+      const blown = p.kind === 'smoke' || p.kind === 'fire' || p.kind === 'ember';
+      p.x += (p.vx + (blown ? windX * 0.8 : 0)) * steps;
+      p.y += (p.vy + (blown ? windY * 0.5 : 0)) * steps;
       if (p.kind === 'spark' || p.kind === 'puff') p.vy += 0.08 * steps;
       if (p.kind === 'smoke') p.vx *= 0.98;
     }

@@ -1,5 +1,15 @@
 # Devlog
 
+## 2026-10-25 — Session 4: wind & filaments
+
+**Done**
+- **Wind** as its own control (World tab): force 0–6 on Eon's scale (calm → hurricane) and 8 directions. Trees and grass lean downwind, and rain, leaves, smoke, embers and cloud shadows all follow it. Changing the sky still sets a typical wind, which you can then adjust.
+- **Filaments (magic flow)**, from Eon's magic rules: 8 aspects (life, light, earth, water, death, air, fire, darkness), each hex scored −3 (magic-dead) to +3 (extreme) from its terrain, its neighbours, time of day, weather, wind and indoors/outdoors. Full explanation in **[Magic: filaments](design/magic-filaments.md)**.
+- **Magic tab** in the sandbox: heat map per aspect with numbers on every hex, a readout of all 8 aspects for a tapped hex with the reasoning, and a **Roof** tool to make hexes indoors.
+- Deaths now leave a bloodstain and feed necrotropy.
+- Tuned so extremes are rare: wading in the ford is +1 water, +2 in rain, +3 only in a storm. Rain alone only lifts dry land to normal.
+- 22 rule tests, including your example (2 water + downpour → extreme).
+
 ## 2026-10-25 — Session 3b: crash fix
 
 **Bug you found:** the game froze after the first monster acted.

@@ -1,6 +1,7 @@
 import type { Battle, Unit } from '../core/battle';
 import { type Hex, hexKey, hexToOffset, offsetToHex } from '../core/hex';
 import { Rng } from '../core/rng';
+import { tinyText } from '../art/icons';
 import { EDGE, TILE_CENTER, TILE_DEPTH, TILE_H, TILE_STEP_Y, TILE_W, inHex, tileOrigin } from '../art/hexTile';
 import type { MobKind } from '../art/mapScene';
 import { makeRat, makeShepherd, makeSkeleton, makeWolf } from '../art/mobs';
@@ -15,7 +16,13 @@ import type { Effects } from './effects';
 import { type Light, Lighting } from './lighting';
 import type { Weather } from './weather';
 
-export type HighlightStyle = 'reach' | 'path' | 'jump' | 'foe' | 'ally' | 'tool';
+/** What the filament overlay should show: one aspect's level per hex. */
+export interface MagicView {
+  color: string;
+  levels: Map<string, number>;
+}
+
+export type HighlightStyle ='reach' | 'path' | 'jump' | 'foe' | 'ally' | 'tool';
 
 export interface Highlight {
   at: Hex;
@@ -48,7 +55,8 @@ interface WindSprite {
   y: number;
   cell: string;
   make: (wind: number) => Sprite;
-  sets: Map<number, Sprite>;
+  /** Sprites per wind level and direction ("0.5:L"). */
+  sets: Map<string, Sprite>;
   burnt?: Sprite;
   phase: number;
   /** Props stay (as charred); tufts disappear when burnt. */
@@ -87,6 +95,7 @@ export class Renderer {
   private lighting: Lighting;
   private mask: Uint8Array;
   private burnt = new Set<string>();
+  private decals: { x: number; y: number }[] = [];
 
   constructor(cells: SandboxCell[], private battle: Battle) {
     const cols = Math.max(...cells.map((c) => c.col + (c.row & 1 ? 1.5 : 1)));
@@ -136,6 +145,7 @@ export class Renderer {
     for (const [key, cv] of this.cells) {
       paintTile(this.ground, cv.ox, cv.oy, { ...cv.art, scorched: this.burnt.has(key) }, this.water);
     }
+    this.paintDecals();
   }
 
   // --- queries -------------------------------------------------------------
@@ -336,7 +346,7 @@ export class Renderer {
     return out;
   }
 
-  render(now: number, weather: Weather, effects: Effects, highlights: Highlight[], selected?: string): Pix {
+  render(now: number, weather: Weather, effects: Effects, highlights: Highlight[], selected?: string, magic?: MagicView): Pix {
     const out = new Pix(this.width, this.height);
     out.data.set(this.ground.data);
     const frame = Math.floor((now / 125) * (1 + weather.wind * 1.2));
@@ -350,7 +360,10 @@ export class Renderer {
     }
 
     // Collect drawables with their feet y for depth sorting.
-    const windLevel = Math.round(weather.wind * 2) / 2;
+    // Plants lean with the wind: sprites are made leaning right and mirrored for a westerly wind.
+    const windLevel = Math.round(Math.min(1, weather.wind) * 2) / 2;
+    const mirror = weather.wx < -0.2 && windLevel > 0;
+    const setKey = `${windLevel}:${mirror ? 'L' : 'R'}`;
     const draws: { y: number; x: number; sprite: Sprite; f: number; unit?: Unit }[] = [];
     for (const th of this.things) {
       const burnt = this.burnt.has(th.cell);
@@ -360,8 +373,13 @@ export class Renderer {
         th.burnt ??= charred(th.make(0), th.x * 31 + th.y);
         sp = th.burnt;
       } else {
-        sp = th.sets.get(windLevel) ?? th.make(windLevel);
-        th.sets.set(windLevel, sp);
+        let s = th.sets.get(setKey);
+        if (!s) {
+          s = th.make(windLevel);
+          if (mirror) s = { ...s, frames: s.frames.map((f) => f.flipX()), ax: s.frames[0].w - 1 - s.ax };
+          th.sets.set(setKey, s);
+        }
+        sp = s;
       }
       draws.push({ x: th.x, y: th.y, sprite: sp, f: (frame + th.phase) % FRAMES });
     }
@@ -404,7 +422,8 @@ export class Renderer {
       ambient: weather.ambient(),
       desaturate: weather.desaturation(),
       cloud: weather.cloud,
-      drift: weather.drift,
+      driftX: weather.driftX,
+      driftY: weather.driftY,
       flash: weather.flash,
       lights: this.lights(now, this.battle, effects, Math.max(0, weather.tod - 1)),
     });
@@ -414,7 +433,9 @@ export class Renderer {
       if ((p.kind === 'fire' || p.kind === 'ember') && p.life / p.max > 0.5) out.set(p.x, p.y, p.kind === 'fire' ? '#fff2a0' : '#f2a24a');
     }
 
-    // Unlit UI layer on the ground: highlights + selection ring (hidden behind sprites).
+    // Unlit UI layer on the ground: indoor marks, filament map, highlights, selection ring.
+    for (const [key, c] of Object.entries(this.battle.cells)) if (c.indoors) this.drawIndoor(out, key);
+    if (magic) this.drawMagic(out, magic, now);
     for (const h of highlights) this.drawHighlight(out, h);
     if (selected) {
       const v = this.units.get(selected);
@@ -423,7 +444,7 @@ export class Renderer {
 
     // Rain and leaves.
     const dropColor = weather.tod > 1.5 ? '#6a7c9890' : '#a8c4dca0';
-    const vx = weather.wind * 2.2;
+    const vx = weather.windX * 2.2;
     for (const d of weather.drops) {
       for (let i = 0; i < 3; i++) out.set(d.x - (vx * i) / 5, d.y - i * 1.5, dropColor);
     }
@@ -461,6 +482,78 @@ export class Renderer {
         if (e <= 2) out.set(wx, wy, e === 1 ? style.edge : style.fill);
         else out.set(wx, wy, style.fill);
       }
+    }
+  }
+
+  /** Roofed hex: diagonal hatching and a timber-brown rim. */
+  private drawIndoor(out: Pix, key: string): void {
+    const cv = this.cells.get(key);
+    if (!cv) return;
+    for (let y = 0; y < TILE_H; y++) {
+      for (let x = 0; x < TILE_W; x++) {
+        if (!inHex(x, y)) continue;
+        const wx = cv.ox + x;
+        const wy = cv.oy + y;
+        if (this.mask[wy * this.width + wx]) continue;
+        if (EDGE[y][x] === 1) out.set(wx, wy, '#a35f2a');
+        else if ((x + y) % 4 === 0) out.set(wx, wy, '#3a2618a0');
+      }
+    }
+  }
+
+  /** Filament heat map: colour + rising motes for strong flow, darkness for weak, cross-hatch for magic-dead. */
+  private drawMagic(out: Pix, magic: MagicView, now: number): void {
+    const color = magic.color;
+    for (const [key, cv] of this.cells) {
+      const level = magic.levels.get(key);
+      if (level === undefined) continue;
+      for (let y = 0; y < TILE_H; y++) {
+        for (let x = 0; x < TILE_W; x++) {
+          if (!inHex(x, y)) continue;
+          const wx = cv.ox + x;
+          const wy = cv.oy + y;
+          if (this.mask[wy * this.width + wx]) continue;
+          const e = EDGE[y][x];
+          if (level > 0) {
+            if (e === 1 && level >= 2) out.set(wx, wy, color);
+            else out.set(wx, wy, color + ['28', '48', '70'][level - 1]);
+          } else if (level < 0) {
+            out.set(wx, wy, '#0e0a14' + ['38', '60', '90'][-level - 1]);
+            if (level === -3 && ((x + y) % 4 === 0 || (x - y + 64) % 4 === 0)) out.set(wx, wy, '#000000a0');
+          } else if (e === 1) {
+            out.set(wx, wy, color + '50');
+          }
+        }
+      }
+      // Filaments: motes drifting upward, more of them the stronger the flow.
+      for (let i = 0; i < Math.max(0, level) * 3; i++) {
+        const seed = (cv.cx * 73 + cv.cy * 151 + i * 977) % 1000;
+        const period = 1600 + (seed % 7) * 200;
+        const k = ((now + seed * 13) % period) / period;
+        const mx = cv.cx - 11 + (seed % 23) + Math.round(Math.sin(k * 6.28 + seed) * 1.5);
+        const my = cv.cy + 7 - k * 22;
+        out.set(mx, my, level === 3 && i % 2 === 0 ? '#ffffff' : color);
+      }
+      const label = tinyText(level > 0 ? `+${level}` : `${level}`, level > 0 ? color : level < 0 ? '#9a90a8' : '#e8e0d0');
+      out.blit(label, Math.round(cv.cx - label.w / 2), cv.oy + 2);
+    }
+  }
+
+  /** A small permanent mark where something died. */
+  addDecal(h: Hex): void {
+    const cv = this.cells.get(hexKey(h));
+    if (!cv) return;
+    this.decals.push({ x: cv.cx + Math.round((Math.random() - 0.5) * 8), y: cv.cy + 2 + Math.round((Math.random() - 0.5) * 4) });
+    this.paintDecals();
+  }
+
+  private paintDecals(): void {
+    for (const d of this.decals) {
+      const px: [number, number, string][] = [
+        [0, 0, '#5a1a1e'], [1, 0, '#7a2226'], [-1, 1, '#5a1a1e'], [2, 1, '#4a1418'], [0, 1, '#7a2226'],
+        [3, -1, '#e8e2cc'], [4, -1, '#bdb59a'], [-3, 0, '#e8e2cc'],
+      ];
+      for (const [dx, dy, c] of px) this.ground.set(d.x + dx, d.y + dy, c);
     }
   }
 

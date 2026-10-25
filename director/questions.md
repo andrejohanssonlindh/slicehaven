@@ -4,6 +4,9 @@ Newest on top. Answer in chat (just reference the number, e.g. "Q3: option B"). 
 
 ---
 
+### Q8 — Filaments: does the model feel right?
+See [Magic: filaments](design/magic-filaments.md) and the sandbox's Magic tab. Are the numbers believable? Which of the open questions there (more aspects, personal state, how magic plugs into dice) matter first?
+
 ### Q7 — Engine sandbox: how does it feel?
 Play with the **[engine sandbox](https://andrejohanssonlindh.github.io/slicehaven/)** (the main game page now).
 1. Movement: is "tap to plot, tap the end to go" right? Does plotting your own route hex by hex work for you?

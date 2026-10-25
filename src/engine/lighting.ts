@@ -13,7 +13,8 @@ export interface LightingParams {
   ambient: RGB;
   desaturate: number;
   cloud: number; // 0..1 cloud cover (shadows)
-  drift: number; // cloud shadow scroll
+  driftX: number; // cloud shadow scroll (follows the wind)
+  driftY: number;
   flash: number; // lightning flash 0..1
   lights: Light[];
 }
@@ -53,7 +54,7 @@ export class Lighting {
     if (p.cloud > 0.02) {
       for (let y = 0; y < this.sh; y++) {
         for (let x = 0; x < this.sw; x++) {
-          const n = fbm((x * 4 + p.drift) / 60, (y * 4 + p.drift * 0.3) / 40, 50, 2);
+          const n = fbm((x * 4 - p.driftX) / 60, (y * 4 - p.driftY) / 40, 50, 2);
           this.shadow[y * this.sw + x] = Math.max(0, Math.min(1, (n - 0.62 + p.cloud * 0.12) * 10)) * (0.28 + 0.12 * p.cloud);
         }
       }

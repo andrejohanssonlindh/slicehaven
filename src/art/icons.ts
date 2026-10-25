@@ -87,6 +87,51 @@ const ICONS: Record<string, { rows: string[]; key: Record<string, string> }> = {
     rows: ['..sss..', '..sss..', '...s...', '.ggggg.', 'g.ggg.g', '..ggg..', '..g.g..', '..g.g..'],
     key: { s: '#f2cba2', g: '#79a85a' },
   },
+  wind: {
+    rows: ['wwwww....', '.....w...', 'wwwwww...', '......ww.', 'wwwwwwww.', '.......w.', 'www..ww..'],
+    key: { w: '#c8f0f4' },
+  },
+  roof: {
+    rows: ['...r...', '..rrr..', '.rrrrr.', 'rrrrrrr', '.wwwww.', '.wdwww.', '.wdwww.'],
+    key: { r: '#a35f2a', w: '#d8c8a0', d: '#56351e' },
+  },
+  off: {
+    rows: ['.ggggg.', 'g.....g', 'g.g.g.g', 'g..g..g', 'g.g.g.g', 'g.....g', '.ggggg.'],
+    key: { g: '#a89c88' },
+  },
+  // Aspect glyphs (Magic tab).
+  'a-bio': {
+    rows: ['....gg', '..gglg', '.gglg.', '.glgg.', 'glgg..', 'g.....'],
+    key: { g: '#4f8a3a', l: '#9fe070' },
+  },
+  'a-foto': {
+    rows: ['y..y..y', '.y.y.y.', '..www..', 'yywwwyy', '..www..', '.y.y.y.', 'y..y..y'],
+    key: { y: '#f2c94c', w: '#fff6c0' },
+  },
+  'a-geo': {
+    rows: ['...s...', '..sSs..', '.sSssd.', 'sSsssdd', 'ssssddd'],
+    key: { s: '#a8a0a0', S: '#e0dcd8', d: '#6a6470' },
+  },
+  'a-hydro': {
+    rows: ['..b..', '..b..', '.bbb.', 'bwbbb', 'bwbbb', '.bbb.'],
+    key: { b: '#4c9bc8', w: '#d4f1f6' },
+  },
+  'a-nekro': {
+    rows: ['.bbbbb.', 'bbbbbbb', 'bpbbbpb', 'bbbbbbb', '.bpbpb.', '.bbbbb.'],
+    key: { b: '#cfc4e0', p: '#4a2a6a' },
+  },
+  'a-pneumo': {
+    rows: ['..ccc..', '.c...c.', 'c..cc.c', 'c.c..c.', 'c..cc..', '.c.....', '..cccc.'],
+    key: { c: '#c8f0f4' },
+  },
+  'a-pyro': {
+    rows: ['...r...', '..rr...', '..ryr..', '.ryyrr.', 'rryyyrr', 'ryywyyr', '.ryyyr.'],
+    key: { r: '#e0552e', y: '#f2a24a', w: '#fff2a0' },
+  },
+  'a-skoto': {
+    rows: ['..vvv..', '.vv....', 'vv.....', 'vv...e.', 'vv.....', '.vv....', '..vvv..'],
+    key: { v: '#8a6ad8', e: '#d0c0ff' },
+  },
   turn: {
     rows: ['bbbbbbb', '.byyyb.', '..byb..', '...b...', '..b.b..', '.byyyb.', 'bbbbbbb'],
     key: { b: '#c9a06a', y: '#f2d75c' },
@@ -122,6 +167,7 @@ const DIGITS: Record<string, string[]> = {
   '8': ['aaa', 'a.a', 'aaa', 'a.a', 'aaa'],
   '9': ['aaa', 'a.a', 'aaa', '..a', 'aaa'],
   '+': ['...', '.a.', 'aaa', '.a.', '...'],
+  '-': ['...', '...', 'aaa', '...', '...'],
 };
 
 /** Render text in the tiny font, optionally with a 1px outline. */

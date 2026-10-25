@@ -3,18 +3,24 @@ import {
   targetsInRange, unitAt, walkReach,
 } from '../core/battle';
 import { type Hex, hexDistance, hexEquals, hexKey, offsetToHex, parseHexKey } from '../core/hex';
+import { WIND_NAMES } from '../core/environment';
+import { ASPECTS, type AspectId, type HexFilaments, LEVEL_NAMES, readHex, readMap } from '../core/filaments';
 import { icon } from '../art/icons';
 import { STATS, type SandboxCell, buildSandbox, newUnit } from '../content/sandbox';
 import { Camera } from './camera';
 import { Effects } from './effects';
-import { type Highlight, Renderer } from './renderer';
-import { type Sky, type TimeOfDay, Weather } from './weather';
+import { type Highlight, type MagicView, Renderer } from './renderer';
+import { type Sky, type TimeOfDay, WIND_DIRS, Weather } from './weather';
 
 /**
  * Engine sandbox: a forest clearing where the director can try movement,
- * attacks, heals, weather, fire and lightning. No turn limits; dice come later.
+ * attacks, heals, weather, wind, fire, lightning and see the magic (filaments).
+ * No turn limits; dice come later.
  */
-type Mode = 'walk' | 'jump' | 'strike' | 'sling' | 'heal' | 'fire' | 'lightning' | 'spawnFoe' | 'spawnFriend';
+type Mode =
+  | 'walk' | 'jump' | 'strike' | 'sling' | 'heal'
+  | 'fire' | 'lightning' | 'spawnFoe' | 'spawnFriend'
+  | 'inspect' | 'roof';
 
 const JUMP_RANGE = 3;
 const SLING_RANGE = 4;
@@ -49,6 +55,10 @@ export function startSandbox(): void {
   let foeKind = 0;
   let friendKind = 0;
   let message = '';
+  /** Filament overlay: which aspect is shown (null = off), and which hex is inspected. */
+  let aspect: AspectId | null = null;
+  let inspected: Hex | null = null;
+  const isUndead = (u: Unit): boolean => STATS[u.kind]?.sprite === 'skeleton';
 
   const camera = new Camera(canvas, renderer.width, renderer.height, (wx, wy) => {
     const h = renderer.hexAt(wx, wy);
@@ -82,6 +92,9 @@ export function startSandbox(): void {
     const p = renderer.unitPos(u.id);
     if (p) effects.floatText(`${dealt}`, p.x, renderer.unitTop(u) - 6, '#ff8a6a');
     if (u.hp <= 0) {
+      const c = cellAt(battle, u.at);
+      if (c) c.corpses = (c.corpses ?? 0) + 1; // death lingers: necrotropy
+      renderer.addDecal(u.at);
       await renderer.kill(u);
       battle.units = battle.units.filter((x) => x !== u);
       renderer.removeUnit(u.id);
@@ -152,6 +165,18 @@ export function startSandbox(): void {
     const occupant = unitAt(battle, h);
 
     switch (mode) {
+      case 'inspect':
+        inspected = h;
+        return refresh();
+      case 'roof': {
+        const c = cellAt(battle, h);
+        if (c) {
+          c.indoors = !c.indoors;
+          inspected = h;
+          say(c.indoors ? 'Roofed over: this hex now counts as indoors.' : 'Roof removed: outdoors again.');
+        }
+        return refresh();
+      }
       case 'fire':
         ignite(h);
         return refresh();
@@ -358,8 +383,63 @@ export function startSandbox(): void {
       lightning: 'Lightning: tap anywhere.',
       spawnFoe: `Place a ${STATS[FOE_KINDS[foeKind]].name.toLowerCase()} (tap the button again to change type).`,
       spawnFriend: `Place a ${STATS[FRIEND_KINDS[friendKind]].name.toLowerCase()} (tap again to change).`,
+      inspect: 'Magic: pick an aspect to map it, tap a hex to read its filaments.',
+      roof: 'Roof: tap a hex to put it indoors (or back outdoors).',
     };
-    info.innerHTML = `${head} · <span>${message || hint[mode]}</span>`;
+    const windTxt = `Wind ${weather.windForce} (${WIND_NAMES[weather.windForce].toLowerCase()}) ${WIND_DIRS[weather.windDir].arrow}`;
+    info.innerHTML = `${head} · <span>${message || hint[mode]}</span><br><span class="wind">${windTxt}</span>`;
+    refreshMagic();
+  }
+
+  // --- filaments ---------------------------------------------------------------------
+
+  const magicEl = document.getElementById('magic-readout')!;
+  let magicView: MagicView | undefined;
+
+  function refreshMagicView(): void {
+    if (!aspect) {
+      magicView = undefined;
+      return;
+    }
+    const map = readMap(battle, weather.env(), { isUndead });
+    const levels = new Map<string, number>();
+    for (const [k, r] of map) levels.set(k, r[aspect].level);
+    magicView = { color: ASPECTS.find((a) => a.id === aspect)!.color, levels };
+  }
+
+  function refreshMagic(): void {
+    refreshMagicView();
+    const at = inspected ?? sel()?.at;
+    if (!at) {
+      magicEl.innerHTML = '<p class="hint">Tap a hex to read its filaments.</p>';
+      return;
+    }
+    const r: HexFilaments | null = readHex(battle, at, weather.env(), { isUndead });
+    if (!r) return;
+    const where = inspected ? 'Tapped hex' : `${sel()?.name}'s hex`;
+    const chips = ASPECTS.map((a) => {
+      const lv = r[a.id].level;
+      const txt = lv > 0 ? `+${lv}` : `${lv}`;
+      return `<button type="button" class="chip${a.id === aspect ? ' on' : ''}" data-aspect="${a.id}" style="--c:${a.color}">`
+        + `<i>${a.name.replace('tropy', '')}</i><b class="lv${lv}">${txt}</b></button>`;
+    }).join('');
+    let detail = '';
+    if (aspect) {
+      const a = ASPECTS.find((x) => x.id === aspect)!;
+      const rd = r[aspect];
+      const parts = rd.parts.map((p) => `${p.label} <b>${p.value > 0 ? '+' : ''}${+p.value.toFixed(2)}</b>`).join(' · ');
+      detail = `<p><b style="color:${a.color}">${a.name}</b> (${a.gloss}): <b>${rd.level > 0 ? '+' : ''}${rd.level} ${LEVEL_NAMES[rd.level]}</b><br><small>${parts} = ${+rd.raw.toFixed(2)}</small></p>`;
+    }
+    magicEl.innerHTML = `<div class="where">${where}</div><div class="chips">${chips}</div>${detail}`;
+    for (const b of magicEl.querySelectorAll<HTMLButtonElement>('[data-aspect]')) {
+      b.addEventListener('click', () => setAspect(b.dataset.aspect as AspectId));
+    }
+  }
+
+  function setAspect(a: AspectId | null): void {
+    aspect = a;
+    if (a && mode !== 'roof') setMode('inspect');
+    refresh();
   }
 
   function refresh(): void {
@@ -368,6 +448,11 @@ export function startSandbox(): void {
     for (const b of document.querySelectorAll<HTMLButtonElement>('[data-mode]')) b.classList.toggle('on', b.dataset.mode === mode);
     for (const b of document.querySelectorAll<HTMLButtonElement>('[data-sky]')) b.classList.toggle('on', b.dataset.sky === weather.sky);
     for (const b of document.querySelectorAll<HTMLButtonElement>('[data-time]')) b.classList.toggle('on', b.dataset.time === weather.time);
+    for (const b of document.querySelectorAll<HTMLButtonElement>('[data-show]')) b.classList.toggle('on', (b.dataset.show || null) === aspect);
+    const wf = document.querySelector('[data-wind="force"] span');
+    if (wf) wf.textContent = `Wind ${weather.windForce}`;
+    const wd = document.querySelector('[data-wind="dir"] span');
+    if (wd) wd.textContent = `To ${WIND_DIRS[weather.windDir].arrow}`;
   }
 
   function setMode(m: Mode): void {
@@ -406,17 +491,32 @@ export function startSandbox(): void {
   for (const [sky, ic, label] of skies) button(world, ic, label, { sky }, () => { weather.set(sky); refresh(); });
   const times: [TimeOfDay, string, string][] = [['day', 'sun', 'Day'], ['dusk', 'dusk', 'Dusk'], ['night', 'moon', 'Night']];
   for (const [time, ic, label] of times) button(world, ic, label, { time }, () => { weather.setTime(time); refresh(); });
+  button(world, 'wind', 'Wind', { wind: 'force' }, () => { weather.setWind((weather.windForce + 1) % 7); refresh(); });
+  button(world, 'wind', 'Dir', { wind: 'dir' }, () => { weather.setWind(weather.windForce, weather.windDir + 1); refresh(); });
   button(world, 'fire', 'Fire', { mode: 'fire' }, () => setMode('fire'));
   button(world, 'bolt', 'Lightning', { mode: 'lightning' }, () => setMode('lightning'));
   button(world, 'foe', '+Foe', { mode: 'spawnFoe' }, () => setMode('spawnFoe'));
   button(world, 'friend', '+Friend', { mode: 'spawnFriend' }, () => setMode('spawnFriend'));
   button(world, 'turn', 'Reset', {}, () => location.reload());
 
+  const magicBar = document.getElementById('bar-magic')!;
+  button(magicBar, 'off', 'Off', { show: '' }, () => setAspect(null));
+  for (const a of ASPECTS) button(magicBar, `a-${a.id}`, a.name.replace('tropy', ''), { show: a.id }, () => setAspect(a.id));
+  button(magicBar, 'roof', 'Roof', { mode: 'roof' }, () => setMode('roof'));
+
   for (const tab of document.querySelectorAll<HTMLButtonElement>('[data-tab]')) {
     tab.addEventListener('click', () => {
       for (const t of document.querySelectorAll<HTMLButtonElement>('[data-tab]')) t.classList.toggle('on', t === tab);
       act.hidden = tab.dataset.tab !== 'act';
       world.hidden = tab.dataset.tab !== 'world';
+      magicBar.hidden = tab.dataset.tab !== 'magic';
+      magicEl.hidden = tab.dataset.tab !== 'magic';
+      if (tab.dataset.tab === 'magic') {
+        if (!aspect) aspect = 'hydro';
+        setMode('inspect');
+      } else if (mode === 'inspect' || mode === 'roof') {
+        setMode('walk');
+      }
     });
   }
   for (const z of document.querySelectorAll<HTMLButtonElement>('[data-zoom]')) {
@@ -435,6 +535,7 @@ export function startSandbox(): void {
 
   let last = performance.now();
   let lastDraw = 0;
+  let lastMagic = 0;
   function frame(now: number): void {
     // Schedule first: one bad frame must never stop the loop.
     requestAnimationFrame(frame);
@@ -449,12 +550,17 @@ export function startSandbox(): void {
     const dt = Math.max(0, Math.min(100, now - last));
     last = now;
     if (weather.update(dt, now)) randomStrike();
-    effects.update(dt, weather.wind);
+    effects.update(dt, weather.windX, weather.windY);
+    // Fires start and burn out on their own, so keep the magic map fresh.
+    if (aspect && now - lastMagic > 400) {
+      lastMagic = now;
+      refreshMagicView();
+    }
     renderer.update(now, effects, weather);
     if (now - lastDraw >= 33) {
       lastDraw = now;
       if (!busy && highlights.length === 0 && mode !== 'fire' && mode !== 'lightning') refreshHighlights();
-      const img = renderer.render(now, weather, effects, busy ? [] : highlights, selected);
+      const img = renderer.render(now, weather, effects, busy ? [] : highlights, selected, magicView);
       img.drawTo(octx);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = '#0e0a14';

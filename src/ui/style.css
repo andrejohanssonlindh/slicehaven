@@ -76,6 +76,33 @@ button:active { box-shadow: inset 2px 2px 0 #261d2e; }
 .bar button canvas { image-rendering: pixelated; width: 22px; height: auto; }
 .bar button.on { outline: 2px solid var(--accent); outline-offset: -4px; color: var(--accent); }
 
+#info .wind { font-size: 12px; }
+
+#magic-readout { font-size: 13px; padding: 0 2px 6px; }
+#magic-readout[hidden] { display: none; }
+#magic-readout .where { color: var(--muted); font-size: 11px; margin-bottom: 3px; }
+#magic-readout .chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; }
+#magic-readout .chip {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 2px 5px;
+  font-size: 11px;
+  background: var(--bg);
+  border-left: 4px solid var(--c);
+  box-shadow: none;
+}
+#magic-readout .chip.on { outline: 2px solid var(--c); outline-offset: -2px; }
+#magic-readout .chip i { font-style: normal; color: var(--muted); }
+#magic-readout .chip b { font-family: 'Courier New', monospace; }
+#magic-readout .lv-3, #magic-readout .lv-2 { color: #7a7088; }
+#magic-readout .lv-1 { color: #a89cb8; }
+#magic-readout .lv1 { color: #cfe8a8; }
+#magic-readout .lv2 { color: #f2d75c; }
+#magic-readout .lv3 { color: #ff9a5a; }
+#magic-readout p { margin: 6px 0 0; line-height: 1.35; }
+#magic-readout small { color: var(--muted); }
+
 #toast {
   position: fixed;
   left: 50%;

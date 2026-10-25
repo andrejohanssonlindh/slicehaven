@@ -82,7 +82,8 @@ export function buildSandbox(): { cells: SandboxCell[]; battle: Battle } {
       const at = offsetToHex(col, row);
       const water = (!!cell.river && !cell.ford) || !!cell.pond;
       const flammable = !water && !cell.river && def.ground !== 'path' && def.prop !== 'rock';
-      battle.cells[hexKey(at)] = { at, obstacle: !!def.obstacle, flammable, water, fire: 'none' };
+      const ground = cell.ford ? 'ford' : cell.river ? 'river' : cell.pond ? 'pond' : def.ground;
+      battle.cells[hexKey(at)] = { at, obstacle: !!def.obstacle, flammable, water, fire: 'none', ground, feature: def.prop };
     });
   });
   START_UNITS.forEach(([kind, col, row], i) => battle.units.push(newUnit(kind, offsetToHex(col, row), i)));
