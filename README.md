@@ -1,6 +1,6 @@
 # Slicehaven
 
-A fantasy campaign game: **Gloomhaven** structure (campaign, hex maps, hidden rooms, events, gear) with **Slice & Dice** style dice instead of cards. 16-bit inspired pixel art. Runs in the browser.
+A grounded fantasy campaign game on hex maps, built on a tabletop ruleset (D6 pools, skills, conflicts). Early design stage: we are building the engine in small vignettes. Runs in the browser, pixel art drawn by code (final style not set).
 
 - **Play:** https://andrejohanssonlindh.github.io/slicehaven/
 - **Director's Room** (design notes, questions, devlog): https://andrejohanssonlindh.github.io/slicehaven/director/ — or browse [`director/`](director/README.md) on GitHub.

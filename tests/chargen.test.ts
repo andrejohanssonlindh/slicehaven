@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { derive } from '../src/core/chargen/derive';
 import { parseGrants, tokenSkills, type Token } from '../src/core/chargen/grants';
-import { CHAR_VERSION, migrateChar, newChar, roll } from '../src/core/chargen/state';
+import { CHAR_VERSION, loadRoster, newChar, roll, saveRoster } from '../src/core/chargen/state';
 import { attrDice, baseArmour, baseDamage, diceText, skillDice, wisdomRow } from '../src/core/chargen/tables';
 import { checkDetails, genderKey, typical } from '../src/core/chargen/details';
 import { CONTENT } from '../src/content/chargen';
@@ -211,12 +211,11 @@ describe('chargen derive', () => {
     expect(derive(s, CONTENT).skills.find((x) => x.id === 'Förnimma')?.value).toBe(2);
   });
 
-  it('old saves lose the living standard and keep their place in the steps', () => {
-    const old = { ...newChar(7), v: 1, step: 7, living: 'rik' } as ReturnType<typeof newChar> & { living?: string };
-    const m = migrateChar(old);
-    expect(m.v).toBe(CHAR_VERSION);
-    expect(m.step).toBe(8);
-    expect('living' in m).toBe(false);
+  it('characters from another version are dropped, not migrated', () => {
+    const store = new Map<string, string>();
+    const storage = { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v) } as Storage;
+    saveRoster({ chars: [newChar(7), { ...newChar(8), v: CHAR_VERSION - 1 }] }, storage);
+    expect(loadRoster(storage).chars).toHaveLength(1);
   });
 
   it('units above the skill cap turn into free units', () => {

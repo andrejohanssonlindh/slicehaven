@@ -2,28 +2,33 @@
 
 This is the backstage area for Slicehaven: not part of the game, but where I (Claude) put proposals, questions, sketches and progress for you to review from your phone.
 
+*We are in a design stage and building the engine in small vignettes. Nothing is finished; what you try in the app is testing.*
+
 ## Start here
-- **[Art Lab](https://andrejohanssonlindh.github.io/slicehaven/artlab/)** — live art tests (forest tiles, mobs, dice).
-- **[Questions for you](questions.md)** — things I need your call on. Answer in chat whenever.
-- **[Devlog](devlog.md)** — what got done, session by session.
-- **[Decisions](decisions.md)** — what we've locked in, and why.
+- **[Questions for you](questions.md)**: things I need your call on. Answer in chat whenever.
+- **[Devlog](devlog.md)**: what got done, session by session.
+- **[Decisions](decisions.md)**: what we've locked in, and why.
+
+## Try it
+- [Character creator](https://andrejohanssonlindh.github.io/slicehaven/chargen/)
+- [Village gate scene](https://andrejohanssonlindh.github.io/slicehaven/scene/)
+- [Engine sandbox](https://andrejohanssonlindh.github.io/slicehaven/) (hex movement, weather, fire, magic flow)
+- [Art Lab](https://andrejohanssonlindh.github.io/slicehaven/artlab/) (art tests; the final style isn't set)
 
 ## Your vision
-- [Director's notes 2026-10-25](vision/2026-10-25-director-notes.md) — movement, party traits, dice, progression, the shepherd story. *The foundation everything builds on.*
+- [Director's notes 2026-10-25](vision/2026-10-25-director-notes.md): movement, party traits, progression, the shepherd story. Ambitions to build on, not a checklist.
 
 ## Design
-- **[Character creator plan](design/character-creator.md)**: the new direction (the full tabletop creation flow). [Open the creator](https://andrejohanssonlindh.github.io/slicehaven/chargen/).
-- **[Exploration scenes: the village gate](design/exploration-scenes.md)**: skills, talking, things bigger than one hex. [Play it](https://andrejohanssonlindh.github.io/slicehaven/scene/).
-- [Game design overview](design/game-design.md) — pillars, loops, structure.
-- [Dice system](design/dice-system.md) — how dice replace Gloomhaven's cards.
-- [Magic: filaments](design/magic-filaments.md) — where magic flows strong or weak, and why.
-- [Magic on the map](design/magic-on-map.md) — what each mystic skill could do in play; Sensing groundwork.
-- [Roadmap](design/roadmap.md) — milestones.
+- [Game design overview](design/game-design.md): where we are, what exists, what's undecided.
+- [Character creator](design/character-creator.md): plan, status, handover notes.
+- [Exploration scenes: the village gate](design/exploration-scenes.md): skills, talking, multi-hex things.
+- [Magic: filaments](design/magic-filaments.md): where magic flows strong or weak, and why.
+- [Magic on the map](design/magic-on-map.md): what each mystic skill could do in play.
+- [Roadmap](design/roadmap.md): candidate vignettes.
 
-## World, story, art
-- [World notes (Eon)](world/eon-notes.md) — what we borrow and where we start.
-- [Story seeds](story/story-seeds.md) — early campaign ideas, waiting for your direction.
-- [Art direction](art/art-direction.md) — the 16-bit look.
+## World and art
+- [World notes (Eon)](world/eon-notes.md): what we borrow and where we start.
+- [Art direction](art/art-direction.md): the current look, which is provisional.
 
 ## Roles I'm filling
 Programmer · game designer · level designer · pixel artist · writer · (later) sound. You're the producer/director: you set direction, I propose and build, you veto.

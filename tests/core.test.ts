@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Rng } from '../src/core/rng';
 import { hex, hexDistance, hexKey, hexToPixel, pixelToHex, reachable } from '../src/core/hex';
-import { effectiveFaces, isExhausted, mustRest, newPool, rest, spend } from '../src/core/dice';
 import { exportSave, importSave, newSave } from '../src/core/save';
-import { MERCENARY } from '../src/content/heroes';
+import { t } from '../src/i18n';
 
 describe('rng', () => {
   it('is deterministic per seed', () => {
@@ -29,34 +28,18 @@ describe('hex', () => {
   });
 });
 
-describe('dice', () => {
-  const blade = MERCENARY.dice[0];
-  it('gear can remove a face (D6 -> D5) and buff a kind', () => {
-    const faces = effectiveFaces(blade, [
-      { type: 'removeFace', index: 5 },
-      { type: 'bonus', kind: 'attack', amount: 1 },
-    ]);
-    expect(faces).toHaveLength(5);
-    expect(faces[0]).toEqual({ kind: 'attack', value: 3 });
-    expect(blade.faces[0].value).toBe(2); // original untouched
-  });
-
-  it('runs the spend / rest / lose loop', () => {
-    let pool = newPool(['a', 'b', 'c']);
-    pool = spend(spend(spend(pool, 'a'), 'b'), 'c');
-    expect(mustRest(pool)).toBe(true);
-    pool = rest(pool, 'b');
-    expect(pool).toEqual({ ready: ['a', 'c'], spent: [], lost: ['b'] });
-    pool = rest(spend(spend(pool, 'a'), 'c'), 'a');
-    pool = spend(pool, 'c');
-    expect(isExhausted(pool)).toBe(true);
-  });
-});
-
 describe('save', () => {
   it('round-trips export/import', () => {
     const s = newSave();
     s.campaign.flags['met_åsa'] = true;
     expect(importSave(exportSave(s))).toEqual(s);
+  });
+});
+
+describe('i18n', () => {
+  it('falls back to the fallback text, then the key, and fills in {params}', () => {
+    expect(t('no.such.key')).toBe('no.such.key');
+    expect(t('no.such.key', 'Hello')).toBe('Hello');
+    expect(t('no.such.key', 'Hello {name}', { name: 'Åsa' })).toBe('Hello Åsa');
   });
 });

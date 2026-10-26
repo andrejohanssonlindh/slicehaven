@@ -2,9 +2,11 @@
 
 *The director's notes from mobile, after session 1. These are **hopes and ambitions, not hard requirements**: a foundation to build on and expand. The original text is kept word for word at the bottom; my structured English reading comes first.*
 
+> **Status 2026-10-26:** the project moved to the tabletop ruleset's D6 pools. The **Dice** sections below were written for the dropped dice-as-cards design (dice with faces, spend and rest); keep them as ideas, not plans. Movement, party traits, progression and the story are still live ambitions. Story is parked for now.
+
 ## Answers to session 1 questions
 - **Names:** keep Eon's names (Mundana, Asharien…).
-- **Party size:** variable, **max 4**. Early game 1 hero, later usually 2. Some heroes can sometimes use **3 dice** in a turn, which burns through your dice fast.
+- **Party size:** variable, **max 4**. Early game 1 hero, later usually 2.
 - **Language:** game text in English.
 
 ---

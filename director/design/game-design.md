@@ -1,43 +1,28 @@
 # Game design overview
 
-*Living document, early stage. Everything here can change.*
+*Design stage, 2026-10-26. We are building the engine, in small vignettes (a scene, a system, a test). Nothing here is final.*
 
-## Pitch
-A grim fantasy campaign in the spirit of Gloomhaven, but your abilities are **dice**, not cards. Each die face is an action. You build your dice over the campaign with gear and level-ups, and you manage them carefully in every scenario, because a spent die only comes back when you rest, and every rest costs you a die.
+## Where we are
+The first idea was Gloomhaven with dice instead of cards. That has been dropped as a design. What's left of the original is the **spirit**: a grounded campaign, hex maps, choices that stick, a party of up to 4. The rules now come from the tabletop ruleset the director has played for 25 years: D6 pools, skills, attributes, Focus, conflicts. The [character creator](character-creator.md) is the first piece of it.
 
-## Pillars
-1. **Every roll is a decision.** Which die you roll, when you roll it, and when you rest matter more than luck.
-2. **The campaign remembers.** Choices in events and scenarios unlock, close off and change places.
-3. **Dice are your build.** Gear and progression change *faces*, which you can see and feel.
-4. **Grim, grounded fantasy.** Ruins, famine, petty lords and old horrors (Eon's tone).
-5. **Pocket-sized.** A scenario fits a bus ride; the game plays well in portrait on a phone.
+How we work: pick one thing (talking to a guard, a skill on a boulder, fire spreading in the wind), build it as a vignette, play it, keep what works. The [exploration scene](exploration-scenes.md) at the village gate is the first.
 
-## Loops
-**Scenario (10–20 min):** hex map, hidden rooms, monsters. Each round: choose and roll dice, act, monsters act. Rest when you're out of dice. Win by the scenario goal; lose if all heroes are exhausted or fall.
+## What exists
+| Piece | State |
+|---|---|
+| Character creator (the full creation flow, sheet) | Playable, see [plan](character-creator.md) |
+| Hex sandbox: movement, simple combat, weather, time of day, fire, lightning | Engine base, approved |
+| Magic as hidden hex bonuses (filaments) | Good enough for now, see [filaments](magic-filaments.md) |
+| Exploration scene: skills, talking, multi-hex things | First vignette, see [scenes](exploration-scenes.md) |
+| Sensing on the map | Groundwork, see [magic on the map](magic-on-map.md) |
 
-**Between scenarios:** story text, road events (choices with consequences), loot, gear, level-ups, shop. Later a **home base** (town building, Frosthaven style).
+## Principles that have stood so far
+1. **The world reacts.** Weather, light, fire, bodies and sources all change the hexes around them.
+2. **Not linear.** Finishing one route never closes the others.
+3. **Almost everything can be tried.** Look at it, use a skill on it; most attempts just do nothing.
+4. **Hints are optional.** The standard game won't tell you which skill is useful; looking around does, in the world.
+5. **Phone first.** Portrait, everything tappable, no hover.
+6. **Mixed time.** Turn-based where it matters, free-flowing where it helps (drifting clouds).
 
-**Campaign:** the overworld shows the region. Available scenarios appear as places you can travel to.
-- **Main arc:** the spine of the story. Sometimes it locks until you've done something else ("you need the ferryman's favour first").
-- **Side quests:** one-shots, and chains of 2–4 scenarios.
-- Flags in the save track world state (who you helped, what burned).
-
-## Scenario structure (Gloomhaven-like)
-- Hex maps made of rooms. Only the starting room is visible; doors reveal the next room and spawn its monsters.
-- Story text at the start and end, plus "when you open door 2, read…" moments.
-- Goals vary: kill all, reach the exit, protect someone, loot X, survive N rounds.
-- Treasure hexes, traps, difficult terrain, obstacles.
-
-## Heroes
-Each hero has HP, a starting set of 4–5 dice, and a perk/level tree. Archetypes in the Eon flavour, e.g. sellsword, wind monk, sorcerer, scout, healer-priest. (See [questions](../questions.md) on party size.)
-
-## Gear
-Two kinds:
-- **Hero gear:** +max HP, shield 1 every round, start with one extra reroll...
-- **Die gear (runes, upgrades):** attach to one die: +1 to attack faces, replace a blank with move 2, remove a face (the best faces become more likely), add a 7th face.
-
-## Monsters
-Simple, readable AI (like Gloomhaven's monster deck): each monster type has a small die of its own, rolled once per round, everyone of that type does that face. Players can see the face before acting, which makes it a puzzle.
-
-## Open design questions
-See [questions](../questions.md). Main ones: dice per turn, party size, initiative.
+## Not decided yet
+Turn structure in a fight, what a scenario is, the campaign map and structure, party traits, progression, monsters, the final art style. These get decided as vignettes show what's fun. The director's earlier ambitions for them are in the [vision notes](../vision/2026-10-25-director-notes.md).

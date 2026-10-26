@@ -2,8 +2,7 @@ import { OUTLINE, P } from './palette';
 import { Pix, sprite } from './pix';
 
 /**
- * Face icons. Drawn without outlines; the outline is added automatically.
- * Keyed by face kind (see core/dice.ts FaceKind).
+ * Action icons for the sandbox toolbar. Drawn without outlines; the outline is added automatically.
  */
 const ICONS: Record<string, { rows: string[]; key: Record<string, string> }> = {
   attack: {

@@ -6,7 +6,7 @@
 - **No brand name** anywhere in the repo, the UI or commit messages. Inside the app it is just "Character Creator".
 - **Our own words.** Mechanics (numbers, tables, what each choice gives) are recreated as data. Descriptions are short summaries written by me, never copied text. The PDFs stay local; my working notes from them live in `reference/`, which is gitignored.
 - **World names** (Mundana, Asharien, peoples, religions) are kept, following the earlier decision Q1.
-- **English** UI and text, following the earlier decision Q4. See Q10 in [questions](../questions.md).
+- **English** UI and text (decisions Q4 and Q10). Translation groundwork is in `src/i18n/`; the creator doesn't use it yet.
 
 ## Where it lives
 - Page: **`/slicehaven/chargen/`**, linked from the game's top bar and the Director's Room.
@@ -16,7 +16,7 @@
 
 ## How it works
 - **State = your decisions + your dice results.** Everything else (units, skill values, dice codes, languages, gear) is *derived* from that state by one pure function. Going back and changing an early step updates everything after it automatically, and nothing gets out of sync.
-- Saved automatically in the browser (localStorage, versioned). Several characters can be kept, with export/import as a text code.
+- Saved automatically in the browser (localStorage). Several characters can be kept, with export/import as a text code. There are no migrations: a character from another version is dropped (bump `CHAR_VERSION` when the shape changes).
 - Every die roll is a visible, tappable roll (d100, d10) and gets recorded. The one free re-roll on the event tables is tracked, like in the book.
 - Each grant from the book is written as a small "grant" line, e.g. `skill:Storytelling 2; group:social 3; roll:travel 1; numb:violence 1`. The rules engine reads these lines, and a test checks that every line in the data parses and names a real skill.
 
@@ -45,7 +45,7 @@ Then: **Character sheet**, 4 sections like the book's (person, attributes & skil
 1. Skeleton page, state/save, dice roller, steps 1–3, skill list, sheet stub.
 2. Peoples (all 42 cultures).
 3. Religions and doctrines.
-4. Archetypes, environments, living standards.
+4. Archetypes and environments.
 5. Event tables (7 tables × 100 results — the big one).
 6. Attributes and skill spending.
 7. Languages, circles, companions, drives, details.
@@ -71,7 +71,7 @@ Then: **Character sheet**, 4 sections like the book's (person, attributes & skil
 ## Handover notes (for the next session)
 - **Read first:** `src/core/chargen/grants.ts` (the grant mini-language, documented at the top) and `src/core/chargen/derive.ts` (everything is derived from `CharState`).
 - **Source text:** extracted page by page into `reference/p/NNN.txt` (gitignored). PDF page = book page + 3. Remaining chapters: drives p.203–210 (PDF 206–213), names p.211–218 (PDF 214–221), equipment p.219–248 (PDF 222–251), mystic gear & mysteries p.249–320 (PDF 252–323). `reference/ev.py A B` extracts "N. Name: … [grants]" entries from a page range.
-- **Data keys are the source's own terms** (skill names, attributes), so data can be checked against the book; the UI shows English via `skills.ts`, `ATTR_EN` etc. A Swedish UI toggle would mostly be a lookup swap (see Q10).
+- **Data keys are the source's own terms** (skill names, attributes), so data can be checked against the book; the UI shows English via `skills.ts`, `ATTR_EN` etc. Translation is a lookup swap: the UI strings should move into `src/i18n/` language files (empty for now, English only).
 - **Tests:** `tests/chargen.test.ts` checks that every grant line parses, names real skills/religions/peoples, that tables cover 1–100, unit totals per archetype/environment, plus rule maths.
 - **Browser check:** `reference/tools/fuzz.js` (local only, copy it to `/tmp/pw` to run: the repo is an ES module package): random taps through all 16 steps against `npx vite --port 5199`, reports page errors. It needs `playwright-core` installed in `/tmp/pw` and the cached Chromium in `~/Library/Caches/ms-playwright`. `window.chargen` exposes `state`, `derived`, `render()`.
 - **Choice keys:** `source#item[.token]` for in-grant choices, pick groups by key in `state.picks`, event slots `…@n`. Changing an early choice keeps later choices whose keys still exist.

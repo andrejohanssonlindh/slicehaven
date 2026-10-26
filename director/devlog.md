@@ -1,5 +1,16 @@
 # Devlog
 
+## 2026-10-26 — Session 9: clean-up
+
+We're in a design stage, building the engine in vignettes; nothing is finished and the final art style isn't set.
+
+- **Docs cleaned.** Removed the old dice-as-cards design (dice system, game-design pillars, turn proposal, Q3), the old story seeds, and the old Phaser/dice decisions. Rewrote the [overview](design/game-design.md), [roadmap](design/roadmap.md), [art direction](art/art-direction.md), [decisions](decisions.md), [questions](questions.md) and the Director's Room start page. Vision notes keep their original text with a status note.
+- **Code cleaned.** Removed the unused card-dice code (`core/dice`, demo dice, face texts, dice art, the Art Lab's dice section) and the old gold/party fields in the save.
+- **No backwards compatibility.** Save and character migrations removed; a save from another version is dropped.
+- **Translatable later (Q10).** `src/i18n/` has `t(key, 'English text')` and an empty English file. Nothing moved in yet.
+- Answers recorded: Q12 A, Q13 as is, Q5 parked. **Q11 (private) is open** with options: a private repo doesn't hide a Pages site.
+- 83 tests (the removed dice tests are gone, i18n and version-drop tests added).
+
 ## 2026-10-26 — Session 8b: the gate, after the director's answers
 
 - **Silver, not gold** (Q16).

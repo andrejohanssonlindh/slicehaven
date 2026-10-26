@@ -1,9 +1,5 @@
-import { renderCube, renderFace } from '../art/diceArt';
 import { type CellArt, MapScene, type MobKind, type PropKind } from '../art/mapScene';
-import type { Pix } from '../art/pix';
 import type { Ground } from '../art/terrain';
-import { DEMO_DICE, type DemoDie } from '../content/demoDice';
-import { faceRules, faceTitle } from '../content/faceText';
 
 // --- animation loop -------------------------------------------------------
 
@@ -133,81 +129,6 @@ const MOB_SAMPLES: { mob: MobKind; label: string; note: string }[] = [
 ];
 MOB_SAMPLES.forEach((m, i) => {
   card(mobsEl, m.label, m.note, new MapScene([{ col: 0, row: 0, ground: 'grass', mob: m.mob }], { seed: 40 + i, padTop: 14 }));
-});
-
-// --- 4. dice -----------------------------------------------------------------
-
-function pixCanvas(p: Pix, cssSize?: number): HTMLCanvasElement {
-  const c = p.toCanvas();
-  if (cssSize) {
-    c.style.width = `${cssSize}px`;
-    c.style.height = `${(cssSize * p.h) / p.w}px`;
-  }
-  return c;
-}
-
-const diceEl = document.getElementById('dice')!;
-for (const die of DEMO_DICE) {
-  const btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'card die-card';
-  btn.appendChild(pixCanvas(renderCube([die.net[0], die.net[2], die.net[3]], die.body), 114));
-  btn.insertAdjacentHTML('beforeend', `<b>${die.name}</b><small>${die.owner} · D${die.faces.length}</small>`);
-  btn.addEventListener('click', () => openSheet(die));
-  diceEl.appendChild(btn);
-}
-
-const sheet = document.getElementById('sheet')!;
-const netEl = document.getElementById('net')!;
-const detailEl = document.getElementById('detail')!;
-
-// Lying cross:     [0]
-//             [1] [2] [3] [4]
-//                 [5]
-const NET_SLOTS = [null, 0, null, null, 1, 2, 3, 4, null, 5, null, null];
-
-function openSheet(die: DemoDie): void {
-  document.getElementById('sheet-title')!.textContent = die.name;
-  document.getElementById('sheet-sub')!.textContent = `${die.owner} · D${die.faces.length}`;
-  netEl.innerHTML = '';
-  const buttons: HTMLButtonElement[] = [];
-  for (const slot of NET_SLOTS) {
-    if (slot === null) {
-      netEl.appendChild(Object.assign(document.createElement('div'), { className: 'gap' }));
-      continue;
-    }
-    const face = die.net[slot];
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.appendChild(pixCanvas(renderFace(face)));
-    b.addEventListener('click', () => {
-      buttons.forEach((x) => x.classList.remove('selected'));
-      b.classList.add('selected');
-      showDetail(die, slot);
-    });
-    buttons.push(b);
-    netEl.appendChild(b);
-  }
-  detailEl.innerHTML = '<p class="hint">Tap a face to inspect it.</p>';
-  sheet.hidden = false;
-}
-
-function showDetail(die: DemoDie, slot: number): void {
-  const face = die.net[slot];
-  detailEl.innerHTML = '';
-  detailEl.appendChild(pixCanvas(renderFace(face)));
-  const text = document.createElement('div');
-  if (!face) {
-    text.innerHTML = '<h4>Removed face</h4><p>This die has lost a side (D6 → D5). Its other faces come up more often.</p>';
-  } else {
-    text.innerHTML = `<h4>${faceTitle(face)}</h4>` + faceRules(face).map((l) => `<p>${l}</p>`).join('');
-  }
-  detailEl.appendChild(text);
-}
-
-sheet.querySelector('.close')!.addEventListener('click', () => (sheet.hidden = true));
-sheet.addEventListener('click', (e) => {
-  if (e.target === sheet) sheet.hidden = true;
 });
 
 requestAnimationFrame(tick);

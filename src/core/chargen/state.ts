@@ -135,15 +135,12 @@ export function roll(state: CharState, sides: number): number {
   return v;
 }
 
-export function migrateChar(data: CharState): CharState {
-  if ((data.v ?? 1) < 2) {
-    // v2: living standard removed; archetype and environment became two steps.
-    delete (data as { living?: string }).living;
-    if (data.step >= 6) data.step += 1;
-    data.v = 2;
-  }
-  const fresh = newChar(data.seed);
-  return { ...fresh, ...data, details: { ...fresh.details, ...data.details }, equipment: { ...fresh.equipment, ...data.equipment } };
+/**
+ * No migrations while the design is moving: a character saved by an older
+ * version (any other `v`) is simply dropped. Bump CHAR_VERSION when the shape changes.
+ */
+function isCurrent(data: CharState | undefined): data is CharState {
+  return !!data && data.v === CHAR_VERSION;
 }
 
 const KEY = 'slicehaven.chargen';
@@ -158,7 +155,7 @@ export function loadRoster(storage: Storage = localStorage): Roster {
     const raw = storage.getItem(KEY);
     if (!raw) return { chars: [] };
     const r = JSON.parse(raw) as Roster;
-    return { current: r.current, chars: (r.chars ?? []).map(migrateChar) };
+    return { current: r.current, chars: (r.chars ?? []).filter(isCurrent) };
   } catch {
     return { chars: [] };
   }
@@ -173,5 +170,7 @@ export function exportChar(c: CharState): string {
 }
 
 export function importChar(code: string): CharState {
-  return migrateChar(JSON.parse(decodeURIComponent(escape(atob(code.trim())))) as CharState);
+  const data = JSON.parse(decodeURIComponent(escape(atob(code.trim())))) as CharState;
+  if (!isCurrent(data)) throw new Error('This character was made by an older version');
+  return data;
 }

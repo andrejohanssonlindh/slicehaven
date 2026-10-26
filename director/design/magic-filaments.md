@@ -83,5 +83,5 @@ The game will have both: **turn-based** (combat) and **free-flowing** (e.g. expl
 ## Open questions
 - More aspects later (24 in Eon)? Which matter for our campaign?
 - **Personal state** (Eon: wet −1 fire, thirsty −1 water, wounded −1 life, undead +1 death). Use it for heroes?
-- How does magic plug into the **dice**? Ideas: the flow level adds/removes pips on magic faces; strong flow lets you reroll magic dice but makes misfires worse; magic-dead hexes turn magic faces blank.
+- How does magic plug into the **skill rolls**? Ideas: the flow level adds or removes dice on a mystic roll; strong flow makes misfires worse; magic-dead hexes make mystic skills fail. See [magic on the map](magic-on-map.md).
 - Should heroes be able to *change* the flow (light fires, call rain)? Eon allows it.

@@ -1,6 +1,13 @@
 # Slicehaven — instructions for Claude
 
-Gloomhaven-style campaign game where Slice & Dice-style **dice replace cards**. Web game, hosted on GitHub Pages, saves in the browser.
+Grounded fantasy campaign game on hex maps, built on a tabletop ruleset (D6 pools, skills, conflicts). Web game, hosted on GitHub Pages, saves in the browser. The original idea (Gloomhaven with dice instead of cards) is dropped.
+
+## Stage: design, building the engine
+- We are building the engine in **small vignettes** (a scene, a system). **Nothing is finished**: whatever the director does in the app is testing.
+- **No backwards compatibility.** Don't write save migrations or spend time keeping old saves working: bump the version and drop old data.
+- **The final graphical style is not set.** Some of the current art survives, not all. Don't polish art for its own sake; decide the style when game design starts.
+- **English only, translatable:** write new text as `t('key', 'English text')` from `src/i18n/`. Don't populate the language file yet.
+- **Story is parked** until the engine is further along.
 
 ## How we work
 - The user is **producer/director**; Claude does the heavy lifting (code, design, art, story, music notes).
@@ -30,9 +37,10 @@ Gloomhaven-style campaign game where Slice & Dice-style **dice replace cards**. 
 ## Code structure
 ```
 src/
-  core/      Pure game rules. NO Phaser/DOM imports. Deterministic (all randomness via core/rng.ts). Unit tested.
-  content/   Game data: heroes, dice, gear, monsters, scenarios, events, campaign graph. Plain TS objects.
-  art/       Art generators: pixel buffers, terrain, props, mobs, icons, dice faces. Everything is drawn by code.
+  core/      Pure game rules. NO DOM imports. Deterministic (all randomness via core/rng.ts). Unit tested.
+  content/   Game data: character creator data, scenes, skill sets. Plain TS objects.
+  i18n/      Language support groundwork: t(key, 'English'). Language files are empty for now.
+  art/       Art generators: pixel buffers, terrain, props, mobs, icons. Everything is drawn by code.
   engine/    Renderer, camera (zoom/pan), weather, lighting, effects, and the sandbox controller.
   ui/        DOM overlays (top bar, menus, long text, dialogs) - text reads better in HTML than canvas on phones.
   director/  Director's Room page script.
@@ -47,5 +55,5 @@ Rules of thumb:
 - The sandbox exposes debug hooks on `window.sandbox` (`tap(q,r)`, `setMode`, `enemyTurn`, `isBusy`, state). Use them to fuzz-test async/animation code: random actions in a loop, record errors, flag if `isBusy()` stays true.
 - Animations: clamp progress to [0,1] and always resolve pending animation promises when a unit is removed.
 - Game state must be plain JSON-serialisable (it goes into the save).
-- Save format is versioned in `core/save.ts`; add a migration when changing it.
+- Save formats carry a version (`core/save.ts`, `CHAR_VERSION`); data from another version is dropped, no migrations.
 - Phone-first: portrait 400×720 logical canvas, everything tappable, no hover-only UI.

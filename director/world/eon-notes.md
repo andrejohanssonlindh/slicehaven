@@ -1,6 +1,6 @@
 # World notes — Eon / Mundana
 
-*My own summary for our use, from a read of the world chapter. No text from the books goes into the game. See Q1 in [questions](../questions.md) about how directly we use names.*
+*My own summary for our use, from a read of the world chapter. No text from the books goes into the game. World names are used as they are (decision Q1 in [decisions](../decisions.md)).*
 
 ## Tone to borrow
 - **Grimy realism, grey morality.** No absolute good or evil: just people, their agendas and the consequences. Death comes as easily to a farmer as to a princess.
@@ -11,7 +11,7 @@
 ## The five realms in the core book
 | Realm | One-line feel | Game use |
 |---|---|---|
-| **Asharien** | Arid, unruly union of ten city-states; red steppe, famine, bandits, stubbornly free people | **Recommended starting region** |
+| **Asharien** | Arid, unruly union of ten city-states; red steppe, famine, bandits, stubbornly free people | **Starting region** (the shepherd hook is set here) |
 | Damarien | Isolated, gloomy grand duchy under an iron-fisted ruler; cults, undead, dark forests | Great "act 2" region |
 | Forion | Tropical theocracy under a reincarnated god | Exotic later region |
 | Jargian Empire | Huge creaking empire: legions, the Daak church, corrupt bureaucracy | Antagonist power / politics |
