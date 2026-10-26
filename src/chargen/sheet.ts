@@ -136,7 +136,6 @@ export function sheetHtml(s: CharState, d: Derived): string {
       ['Background', d.background ? esc(d.background.en) : ''],
       ['Archetype', d.archetype ? esc(d.archetype.en) : ''],
       ['Environment', d.environment ? esc(d.environment.en) : ''],
-      ['Living standard', d.living ? esc(d.living.en) : ''],
       ['Height / weight', [D.height, D.weight].filter(Boolean).map(esc).join(' / ')],
       ['Weapon arm', D.arm ? (D.arm === 'höger' ? 'Right' : 'Left') : ''],
     ])}</div>
@@ -186,9 +185,6 @@ export function sheetHtml(s: CharState, d: Derived): string {
     <div>${dl([
       ['Silver', `${d.silver - spent}`],
       ['Packages', packages.join(', ')],
-      ['Clothes', d.living ? esc(d.living.clothes) : ''],
-      ['Lodging', d.living ? esc(d.living.lodging) : ''],
-      ['Living costs', d.living ? esc(d.living.monthly) : ''],
     ])}
     ${d.items.length || s.equipment.bought.length ? `<h3>Belongings</h3><ul>${d.items.map((i) => `<li>${esc(i.text)}</li>`).join('')}${s.equipment.bought.map((b) => `<li>${b.qty > 1 ? `${b.qty}× ` : ''}${esc(b.name)}</li>`).join('')}</ul>` : ''}
     ${s.equipment.notes ? `<p>${esc(s.equipment.notes)}</p>` : ''}</div>

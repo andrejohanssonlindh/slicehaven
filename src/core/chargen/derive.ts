@@ -36,7 +36,6 @@ import type {
   EventTable,
   FamilyDef,
   Homeland,
-  LivingStandard,
   Opt,
   People,
   PickGroup,
@@ -59,20 +58,20 @@ export interface Content {
   religions: Religion[];
   archetypes: Archetype[];
   environments: Environment[];
-  living: LivingStandard[];
   tables: Partial<Record<TableId, EventTable>>;
   skill(id: string): SkillInfo | undefined;
   skills: SkillInfo[];
 }
 
-/** Steps, numbered like the book (0 = preparation … 13 = magic, 14 = sheet). */
+/** The creation steps in order; the last one is the finished sheet. */
 export const STEPS = [
   'Preparation',
   'Homeland',
   'Background',
   'People',
   'Religion',
-  'Archetype & environment',
+  'Archetype',
+  'Environment',
   'Event tables',
   'Attributes',
   'Skills',
@@ -90,15 +89,16 @@ export const STEP = {
   people: 3,
   religion: 4,
   archetype: 5,
-  events: 6,
-  attributes: 7,
-  skills: 8,
-  languages: 9,
-  drives: 10,
-  details: 11,
-  equipment: 12,
-  magic: 13,
-  sheet: 14,
+  environment: 6,
+  events: 7,
+  attributes: 8,
+  skills: 9,
+  languages: 10,
+  drives: 11,
+  details: 12,
+  equipment: 13,
+  magic: 14,
+  sheet: 15,
 } as const;
 
 /** A resolved grant with a single target. */
@@ -200,7 +200,6 @@ export interface Derived {
   religion?: Religion;
   archetype?: Archetype;
   environment?: Environment;
-  living?: LivingStandard;
   godless: boolean;
   forcedReligion?: string[];
   attuned: boolean;
@@ -292,7 +291,6 @@ export function derive(state: CharState, c: Content): Derived {
   const cultureSrc = c.peoples.find((p) => p.id === state.cultureFrom) ?? people;
   const archetype = c.archetypes.find((a) => a.id === state.archetype);
   const environment = c.environments.find((e) => e.id === state.environment);
-  const living = c.living.find((l) => l.id === state.living);
 
   /** Resolve one token into effects, registering any choices it needs. */
   function resolveToken(t: Token, key: string, step: number, label: string, out: Effect[]): void {
@@ -502,17 +500,15 @@ export function derive(state: CharState, c: Content): Derived {
     addSource('rel', STEP.religion, religion.en, '');
   } else if (!religion && !godless) pending.push({ k: 'option', key: 'religion', step: STEP.religion, label: 'Choose a religion', options: [] });
 
-  // 5 — Archetype, environment, living standard
+  // 5 — Archetype and environment
   if (archetype) {
     addSource('arch', STEP.archetype, archetype.en, archetype.g);
     addPick('arch.x', STEP.archetype, archetype.extras);
   } else pending.push({ k: 'option', key: 'archetype', step: STEP.archetype, label: 'Choose an archetype', options: [] });
   if (environment) {
-    addSource('env', STEP.archetype, environment.en, environment.g);
-    addPick('env.x', STEP.archetype, environment.extras);
-  } else pending.push({ k: 'option', key: 'environment', step: STEP.archetype, label: 'Choose an environment', options: [] });
-  if (living) addSource('liv', STEP.archetype, living.en, living.g);
-  else pending.push({ k: 'option', key: 'living', step: STEP.archetype, label: 'Choose a living standard', options: [] });
+    addSource('env', STEP.environment, environment.en, environment.g);
+    addPick('env.x', STEP.environment, environment.extras);
+  } else pending.push({ k: 'option', key: 'environment', step: STEP.environment, label: 'Choose an environment', options: [] });
 
   // Doctrines come after archetype so extra doctrine grants from anywhere count.
   if (religion && !godless) {
@@ -584,7 +580,9 @@ export function derive(state: CharState, c: Content): Derived {
   const all = sources.flatMap((s) => s.effects.map((e) => ({ e, s })));
   const sum = (k: Effect['k'], f: (e: Effect) => number = (e) => ('n' in e ? (e as { n: number }).n : 1)) =>
     all.filter((x) => x.e.k === k).reduce((n, x) => n + f(x.e), 0);
-  let attuned = all.some((x) => x.e.k === 'omstopt') || !!archetype?.mystic;
+  // Attuned by a mystic archetype or an attuning trait: Sensing starts at base 1.
+  const attunedByTrait = all.some((x) => x.e.k === 'omstopt') || !!archetype?.mystic;
+  let attuned = attunedByTrait;
 
   const toStrike = sum('stryk');
   const struckN = slots.filter((s) => s.struck).length;
@@ -661,7 +659,7 @@ export function derive(state: CharState, c: Content): Derived {
   }
 
   const baseOf = (id: string, def: SkillInfo): number => {
-    if (id === 'Förnimma') return attuned ? 1 : 0;
+    if (id === 'Förnimma') return attunedByTrait ? 1 : 0;
     const o = baseOverride.get(id);
     if (o !== undefined) return o;
     if (def.group === 'kunskap') {
@@ -749,7 +747,6 @@ export function derive(state: CharState, c: Content): Derived {
     religion: godless ? undefined : religion,
     archetype,
     environment,
-    living,
     godless,
     forcedReligion,
     attuned,
@@ -772,7 +769,7 @@ export function derive(state: CharState, c: Content): Derived {
     armour: list('rustning').map((e) => ({ key: e.key, rarity: e.rarity })),
     packages: list('paket').map((e) => ({ key: e.key, name: e.name })),
     mysticGear: list('mystikutr').map((e) => ({ key: e.key })),
-    silver: sum('silver') + (living?.silver ?? 0),
+    silver: sum('silver'),
     mysteries: {
       n: list('mysterier').filter((m) => m.learned).reduce((n, m) => n + m.n, 0),
       unlearned: list('mysterier').filter((m) => !m.learned).reduce((n, m) => n + m.n, 0),

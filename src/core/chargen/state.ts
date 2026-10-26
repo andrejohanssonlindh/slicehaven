@@ -6,7 +6,7 @@ import { Rng } from '../rng';
 import type { Attr, TableId } from './grants';
 import type { PointModel } from './tables';
 
-export const CHAR_VERSION = 1;
+export const CHAR_VERSION = 2;
 
 export interface RollRec {
   table: TableId;
@@ -39,7 +39,6 @@ export interface CharState {
   archetype?: string;
   environment?: string;
   occupation: string;
-  living?: string;
 
   /** Pick groups: key → chosen option ids (may repeat when allowed). */
   picks: Record<string, string[]>;
@@ -137,7 +136,12 @@ export function roll(state: CharState, sides: number): number {
 }
 
 export function migrateChar(data: CharState): CharState {
-  // Future: if (data.v === 1) { …; data.v = 2; }
+  if ((data.v ?? 1) < 2) {
+    // v2: living standard removed; archetype and environment became two steps.
+    delete (data as { living?: string }).living;
+    if (data.step >= 6) data.step += 1;
+    data.v = 2;
+  }
   const fresh = newChar(data.seed);
   return { ...fresh, ...data, details: { ...fresh.details, ...data.details }, equipment: { ...fresh.equipment, ...data.equipment } };
 }

@@ -147,6 +147,11 @@ table.t { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
 table.t th, table.t td { border-bottom: 1px solid var(--line); padding: 5px 4px; text-align: left; vertical-align: middle; }
 table.t th { color: var(--muted); font-weight: normal; font-size: 0.8rem; }
 table.t td.n, table.t th.n { text-align: right; white-space: nowrap; }
+/* Phone-narrow tables: tighter cells, a second small line under a value instead of another column. */
+table.t.fit th, table.t.fit td { padding: 4px 3px; }
+table.t.fit select { padding: 4px 2px; }
+table.t .sub { display: block; font-size: 0.75rem; color: var(--muted); font-weight: normal; line-height: 1.1; }
+.legend .tag { margin-left: 0; }
 .stepper { display: inline-flex; align-items: center; gap: 4px; }
 .stepper button { min-height: 32px; min-width: 32px; padding: 0; }
 .stepper .v { min-width: 22px; text-align: center; }

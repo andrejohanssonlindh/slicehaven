@@ -1,5 +1,5 @@
 /** Renderers for each creation step. Pure string templates; main.ts wires the actions. */
-import { ATTR_EN, baseTable, NUMB_EN, POOL_EN, poolAllows, rollsTwice, RARITY_EN, STEP, TABLE_EN, type Derived, type SourceRec } from '../core/chargen/derive';
+import { ATTR_EN, baseTable, NUMB_EN, POOL_EN, poolAllows, rollsTwice, RARITY_EN, STEP, TABLE_EN, type Derived, type SkillRow, type SourceRec } from '../core/chargen/derive';
 import { ATTRS, type Attr, type Rarity } from '../core/chargen/grants';
 import type { CharState } from '../core/chargen/state';
 import { diceText, MAX_POINTS_PER_ATTR, POINT_MODELS } from '../core/chargen/tables';
@@ -18,9 +18,24 @@ export const view = {
   pool: '' as string,
   showAllBackgrounds: false,
   showAllHomelands: true,
+  /** Card lists opened again after a choice was made (keyed by field). */
+  open: {} as Record<string, boolean>,
 };
 
 const intro = (t: string) => `<p class="intro">${t}</p>`;
+
+/**
+ * A choose-one list of cards. Once something is chosen it folds down to that card,
+ * so what the choice gives (and asks) sits right below it instead of under the whole list.
+ */
+function cardPicker(field: string, cards: { on: boolean; html: string }[]): string {
+  const chosen = cards.filter((c) => c.on);
+  if (!chosen.length) return `<div class="cards">${cards.map((c) => c.html).join('')}</div>`;
+  if (view.open[field])
+    return `<div class="row"><button type="button" class="small" data-act="fold" data-key="${field}">▲ Show only my choice</button></div><div class="cards">${cards.map((c) => c.html).join('')}</div>`;
+  return `<div class="cards">${chosen.map((c) => c.html).join('')}</div>
+    <div class="row"><button type="button" class="small" data-act="fold" data-key="${field}">▼ Change (show all ${cards.length})</button></div>`;
+}
 const skillLabel = (id: string) => CONTENT.skill(id)?.en ?? id;
 const sourcesFor = (d: Derived, step: number, skip: (s: SourceRec) => boolean = () => false) =>
   d.sources.filter((x) => x.step === step && !d.picks.some((p) => x.key.startsWith(`${p.key}.`)) && !skip(x));
@@ -30,39 +45,38 @@ function warningsHtml(d: Derived, step: number): string {
   return w.length ? `<div class="box todo">${w.map((x) => `<p class="warn small">⚠ ${esc(x.text)}</p>`).join('')}</div>` : '';
 }
 
-// ——— 0 Preparation ———
+// ——— Preparation ———
 function prep(s: CharState): string {
-  return `<h2>1. Preparation</h2>
+  return `<h2>Preparation</h2>
   ${intro('Talk with your game master and the other players before you start: what kind of adventures, any limits on what you may play, and how the characters know each other.')}
   <label class="field"><span>Campaign notes, restrictions, the group's agreements</span>
   <textarea data-bind="prep" placeholder="e.g. A campaign in Asharien; no pyromancers; we all serve the same merchant house…">${esc(s.prep)}</textarea></label>
   <div class="box"><h3>How this works</h3>
-  <p>Fourteen steps, like the book. Some things you choose, some you roll for: tap a die button and the result is kept. Everything you pick feeds the later steps, and you can go back and change things. The later steps update by themselves.</p>
+  <p>Some things you choose, some you roll for: tap a die button and the result is kept. Everything you pick feeds the later steps, and you can go back and change things. The later steps update by themselves.</p>
   <p class="small muted">Red dots in the step bar mark things still to do. Your character saves itself in this browser. Use ☰ for more characters or to export one.</p></div>`;
 }
 
-// ——— 1 Homeland ———
+// ——— Homeland ———
 function homeland(s: CharState, d: Derived): string {
   const rolls = s.homelandRolls ?? [];
   const hit = (lo: number, hi: number) => rolls.some((r) => r >= lo && r <= hi);
-  const cards = CONTENT.homelands
-    .map(
-      (h) => `<button type="button" class="card ${s.homeland === h.id ? 'on' : ''} ${hit(h.lo, h.hi) ? 'rolled' : ''}" data-act="set" data-field="homeland" data-val="${h.id}">
+  const cards = CONTENT.homelands.map((h) => ({
+    on: s.homeland === h.id,
+    html: `<button type="button" class="card ${s.homeland === h.id ? 'on' : ''} ${hit(h.lo, h.hi) ? 'rolled' : ''}" data-act="set" data-field="homeland" data-val="${h.id}">
       <span class="name"><span class="num">${h.lo === h.hi ? h.lo : `${h.lo}–${h.hi}`}</span>${esc(h.en)}</span>
       <span class="what">${esc(h.blurb)}</span></button>`,
-    )
-    .join('');
+  }));
   const h = d.homeland;
-  return `<h2>2. Homeland</h2>
+  return `<h2>Homeland</h2>
   ${intro('Where in the world your character comes from. It gives you a language. Choose freely, or roll d100 twice and pick one of the results.')}
   <div class="row"><button type="button" data-act="rollHomeland">🎲 Roll 2 × d100</button>${rolls.length ? `<span class="dice">${rolls.map((r) => die(r)).join('')}</span>` : ''}</div>
-  ${h ? `<div class="box hi"><h3>${esc(h.en)}</h3><p>${esc(h.blurb)}</p>
+  ${cardPicker('homeland', cards)}
+  ${h ? `<div class="box hi"><h3>${esc(h.en)}</h3>
     <p class="small"><b>Peoples:</b> ${esc(h.peoples)}<br><b>Faiths:</b> ${esc(h.religions)}${h.places ? `<br><b>Places:</b> ${esc(h.places)}` : ''}</p>
-    ${sourcesFor(d, STEP.homeland).map((x) => sourceHtml(x, d, s, { label: false })).join('')}</div>` : ''}
-  <div class="cards">${cards}</div>`;
+    ${sourcesFor(d, STEP.homeland).map((x) => sourceHtml(x, d, s, { label: false })).join('')}</div>` : ''}`;
 }
 
-// ——— 2 Background ———
+// ——— Background ———
 function background(s: CharState, d: Derived): string {
   const rolls = s.bgRolls ?? [];
   const list = view.showAllBackgrounds ? CONTENT.backgrounds : CONTENT.backgrounds.filter((b) => rolls.includes(b.n));
@@ -75,7 +89,7 @@ function background(s: CharState, d: Derived): string {
     )
     .join('');
   const pick = d.picks.find((p) => p.key === 'bg.p');
-  return `<h2>3. Background</h2>
+  return `<h2>Background</h2>
   ${intro('A piece of your past: a parent\'s trade, an earlier life. It is always rolled: d100 twice, then keep one. It gives one event-table roll, and you take two of its three skill options.')}
   <div class="row"><button type="button" class="${rolls.length ? '' : 'primary'}" data-act="rollBg">🎲 ${rolls.length ? 'Roll again' : 'Roll 2 × d100'}</button>
   ${rolls.length ? `<span class="dice">${rolls.map((r) => die(r)).join('')}</span>` : ''}
@@ -85,7 +99,7 @@ function background(s: CharState, d: Derived): string {
   ${sourcesFor(d, STEP.background).map((x) => sourceHtml(x, d, s)).join('')}`;
 }
 
-// ——— 3 People ———
+// ——— People ———
 function people(s: CharState, d: Derived): string {
   const fam = CONTENT.families[view.family];
   const list = CONTENT.peoples.filter((p) => p.family === view.family);
@@ -93,14 +107,15 @@ function people(s: CharState, d: Derived): string {
     view.family === 'manniska'
       ? `<div class="row"><button type="button" class="small" data-act="rollPeople">🎲 Roll d100 for a human people</button>${s.subRolls.people ? die(s.subRolls.people[0], 'small') : ''}</div>`
       : '';
-  const cards = list
-    .map((p) => {
-      const rolled = s.subRolls.people && p.lo !== undefined && s.subRolls.people[0] >= p.lo && s.subRolls.people[0] <= (p.hi ?? p.lo);
-      return `<button type="button" class="card ${s.people === p.id ? 'on' : ''} ${rolled ? 'rolled' : ''}" data-act="set" data-field="people" data-val="${p.id}">
+  const cards = list.map((p) => {
+    const rolled = s.subRolls.people && p.lo !== undefined && s.subRolls.people[0] >= p.lo && s.subRolls.people[0] <= (p.hi ?? p.lo);
+    return {
+      on: s.people === p.id,
+      html: `<button type="button" class="card ${s.people === p.id ? 'on' : ''} ${rolled ? 'rolled' : ''}" data-act="set" data-field="people" data-val="${p.id}">
       <span class="name">${p.lo !== undefined ? `<span class="num">${p.lo}–${p.hi}</span>` : ''}${esc(p.en)}${p.marvel ? ' <span class="tag">marvellous</span>' : ''}</span>
-      <span class="what">${esc(p.blurb)}</span></button>`;
-    })
-    .join('');
+      <span class="what">${esc(p.blurb)}</span></button>`,
+    };
+  });
   const p = d.people;
   let detail = '';
   if (p) {
@@ -108,7 +123,7 @@ function people(s: CharState, d: Derived): string {
     const attrs = p.attrs ?? famDef.attrs ?? [];
     const others = CONTENT.peoples.filter((x) => x.id !== p.id && (x.culture.length || x.picks.length));
     const needsCulture = !p.culture.length && !p.picks.length;
-    detail = `<div class="box hi"><h3>${esc(p.en)}</h3><p>${esc(p.blurb)}</p>${p.build ? `<p class="small muted">${esc(p.build)}</p>` : ''}
+    detail = `<div class="box hi"><h3>${esc(p.en)}</h3>${p.build ? `<p class="small muted">${esc(p.build)}</p>` : ''}
       <table class="t"><tr>${ATTRS.map((a) => `<th class="n">${esc(ATTR_EN[a].slice(0, 4))}</th>`).join('')}</tr>
       <tr>${attrs.map((v) => `<td class="n">${v}</td>`).join('')}</tr></table>
       <label class="field"><span>Raised by another people? (adoption or a mixed household: keep your attributes and innate traits, take the other people's culture)${needsCulture ? ' <b class="warn">— needed for this people</b>' : ''}</span>
@@ -123,89 +138,84 @@ function people(s: CharState, d: Derived): string {
         .map((r) => pickHtml(r, d, s))
         .join('')}`;
   }
-  return `<h2>4. People</h2>
+  const folded = !!p && p.family === view.family && !view.open.people;
+  return `<h2>People</h2>
   ${intro('Your people gives your starting attributes, innate and cultural traits and a language (if it is your homeland\'s language you get 1 free unit instead). Then choose two of its five optional traits. ★ marks a quick pick.')}
   <div class="chips">${FAMILY_ORDER.map((f) => `<button type="button" class="${view.family === f ? 'on' : ''}" data-act="family" data-val="${f}">${esc(CONTENT.families[f].en)}</button>`).join('')}</div>
-  <p class="small muted">${esc(fam.blurb)}</p>
+  ${folded ? '' : `<p class="small muted">${esc(fam.blurb)}</p>
   ${fam.innate.length ? `<p class="small"><b>All ${esc(fam.en.toLowerCase())}:</b> ${fam.innate.map((o) => `${esc(o.en)} (${grants(o.g)})`).join('; ')}</p>` : ''}
-  ${rollRow}
-  ${detail}
-  <div class="cards">${cards}</div>`;
+  ${rollRow}`}
+  ${cardPicker('people', cards)}
+  ${detail}`;
 }
 
-// ——— 4 Religion ———
+// ——— Religion ———
 function religion(s: CharState, d: Derived): string {
   if (d.godless) {
-    return `<h2>5. Religion</h2><div class="box hi"><p>Elves are <b>godless</b>: they live by the elven code of honour and skip this step.</p>
+    return `<h2>Religion</h2><div class="box hi"><p>Elves are <b>godless</b>: they live by the elven code of honour and skip this step.</p>
     <p class="small muted">An elf may still follow a faith but gets no doctrines. Take an optional trait such as Converts to have a real religion.</p></div>`;
   }
   const forced = d.forcedReligion;
-  const cards = CONTENT.religions
-    .map((r) => {
-      const parent = r.parent ? CONTENT.religions.find((x) => x.id === r.parent)?.en ?? 'Forbidden cults' : '';
-      const ok = !forced || forced.includes(r.id) || forced.includes(r.parent ?? '');
-      return `<button type="button" class="card ${s.religion === r.id ? 'on' : ''} ${ok ? '' : 'dim'}" data-act="set" data-field="religion" data-val="${r.id}">
+  const cards = CONTENT.religions.map((r) => {
+    const parent = r.parent ? CONTENT.religions.find((x) => x.id === r.parent)?.en ?? 'Forbidden cults' : '';
+    const ok = !forced || forced.includes(r.id) || forced.includes(r.parent ?? '');
+    return {
+      on: s.religion === r.id,
+      html: `<button type="button" class="card ${s.religion === r.id ? 'on' : ''} ${ok ? '' : 'dim'}" data-act="set" data-field="religion" data-val="${r.id}">
         <span class="name">${esc(r.en)}${parent ? ` <span class="tag">${esc(parent)}</span>` : ''}${r.ethnic ? ' <span class="tag">ethnic</span>' : ''}</span>
-        <span class="what">${esc(r.blurb)}</span></button>`;
-    })
-    .join('');
+        <span class="what">${esc(r.blurb)}</span></button>`,
+    };
+  });
   const picks = d.picks.filter((p) => p.step === STEP.religion);
-  return `<h2>5. Religion</h2>
+  return `<h2>Religion</h2>
   ${intro('Choose a faith (unless a trait already decided it). Then two doctrines, each from a list of two options. The same doctrine twice is fine, with different options. Ethnic faiths are only for their own people.')}
   ${forced ? `<div class="box hi"><p>A trait you chose ties you to <b>${forced.map((id) => esc(CONTENT.religions.find((r) => r.id === id)?.en ?? id)).join(' or ')}</b>.</p></div>` : ''}
   ${warningsHtml(d, STEP.religion)}
-  ${picks.map((r) => pickHtml(r, d, s)).join('')}
-  <div class="cards">${cards}</div>`;
+  ${cardPicker('religion', cards)}
+  ${picks.map((r) => pickHtml(r, d, s)).join('')}`;
 }
 
-// ——— 5 Archetype, environment, living standard ———
+const subSources = (d: Derived, s: CharState, key: string) => d.sources.filter((x) => x.key === key).map((x) => sourceHtml(x, d, s, { label: false })).join('');
+
+// ——— Archetype ———
 function archetype(s: CharState, d: Derived): string {
-  const arch = CONTENT.archetypes
-    .map(
-      (a, i) => `<button type="button" class="card ${s.archetype === a.id ? 'on' : ''} ${s.subRolls.arch?.[0] === i + 1 ? 'rolled' : ''}" data-act="set" data-field="archetype" data-val="${a.id}">
+  const cards = CONTENT.archetypes.map((a, i) => ({
+    on: s.archetype === a.id,
+    html: `<button type="button" class="card ${s.archetype === a.id ? 'on' : ''} ${s.subRolls.arch?.[0] === i + 1 ? 'rolled' : ''}" data-act="set" data-field="archetype" data-val="${a.id}">
       <span class="name"><span class="num">${i + 1}</span>${esc(a.en)}${a.mystic ? ' <span class="tag">mystic</span>' : ''}</span>
       <span class="what">${esc(a.blurb)}</span></button>`,
-    )
-    .join('');
-  const env = CONTENT.environments
-    .map(
-      (e, i) => `<button type="button" class="card ${s.environment === e.id ? 'on' : ''} ${s.subRolls.env?.[0] === i + 1 ? 'rolled' : ''}" data-act="set" data-field="environment" data-val="${e.id}">
-      <span class="name"><span class="num">${i + 1}</span>${esc(e.en)}</span><span class="what">${esc(e.blurb)}</span></button>`,
-    )
-    .join('');
-  const liv = CONTENT.living
-    .map(
-      (l) => `<button type="button" class="card ${s.living === l.id ? 'on' : ''}" data-act="set" data-field="living" data-val="${l.id}">
-      <span class="name">${esc(l.en)} <span class="tag">${l.silver.toLocaleString('en')} silver</span></span>
-      <span class="what">${esc(l.blurb)}</span></button>`,
-    )
-    .join('');
+  }));
   const a = d.archetype;
-  const e = d.environment;
-  const l = d.living;
-  const sub = (key: string) => d.sources.filter((x) => x.key === key).map((x) => sourceHtml(x, d, s, { label: false })).join('');
   const xa = d.picks.find((p) => p.key === 'arch.x');
-  const xe = d.picks.find((p) => p.key === 'env.x');
-  const occ = a && e ? a.occupations[e.id] : '';
-  return `<h2>6. Archetype, environment & living</h2>
-  ${intro('Your archetype is your path in life, your environment the world you lived and worked in. Together they make your occupation. Choose freely or roll.')}
-  <h3>Archetype</h3>
+  return `<h2>Archetype</h2>
+  ${intro('Your archetype is your path in life: what you trained for and spent your years doing. Choose freely or roll.')}
   <div class="row"><button type="button" class="small" data-act="rollSub" data-key="arch" data-sides="10">🎲 Roll d10</button>${s.subRolls.arch ? die(s.subRolls.arch[0], 'd10 small') : ''}<span class="small muted">(10 = roll again)</span></div>
-  ${a ? `<div class="box hi"><h3>${esc(a.en)}</h3>${sub('arch')}${(a.notes ?? []).map((n) => `<p class="small muted">${esc(n)}</p>`).join('')}</div>${xa ? pickHtml(xa, d, s) : ''}` : ''}
-  <div class="cards">${arch}</div>
-  <h3>Environment</h3>
-  <div class="row"><button type="button" class="small" data-act="rollSub" data-key="env" data-sides="10">🎲 Roll d10</button>${s.subRolls.env ? die(s.subRolls.env[0], 'd10 small') : ''}</div>
-  ${e ? `<div class="box hi"><h3>${esc(e.en)}</h3>${sub('env')}</div>${xe ? pickHtml(xe, d, s) : ''}` : ''}
-  <div class="cards">${env}</div>
-  <h3>Occupation</h3>
-  <label class="field"><span>Your occupation, from your archetype and environment${occ ? `: e.g. ${esc(occ)}` : ''}</span>
-  <input data-bind="occupation" value="${esc(s.occupation)}" placeholder="e.g. Art historian" /></label>
-  <h3>Living standard</h3>
-  ${l ? `<div class="box hi"><h3>${esc(l.en)}: ${l.silver.toLocaleString('en')} silver</h3><p class="small">${esc(l.clothes)}<br>${esc(l.lodging)}<br>${esc(l.monthly)}</p>${sub('liv')}</div>` : ''}
-  <div class="cards">${liv}</div>`;
+  ${cardPicker('archetype', cards)}
+  ${a ? `<div class="box hi"><h3>${esc(a.en)}: what you get</h3>${subSources(d, s, 'arch')}${(a.notes ?? []).map((n) => `<p class="small muted">${esc(n)}</p>`).join('')}</div>${xa ? pickHtml(xa, d, s) : ''}` : ''}`;
 }
 
-// ——— 6 Event tables ———
+// ——— Environment & occupation ———
+function environment(s: CharState, d: Derived): string {
+  const cards = CONTENT.environments.map((e, i) => ({
+    on: s.environment === e.id,
+    html: `<button type="button" class="card ${s.environment === e.id ? 'on' : ''} ${s.subRolls.env?.[0] === i + 1 ? 'rolled' : ''}" data-act="set" data-field="environment" data-val="${e.id}">
+      <span class="name"><span class="num">${i + 1}</span>${esc(e.en)}</span><span class="what">${esc(e.blurb)}</span></button>`,
+  }));
+  const a = d.archetype;
+  const e = d.environment;
+  const xe = d.picks.find((p) => p.key === 'env.x');
+  const occ = a && e ? a.occupations[e.id] : '';
+  return `<h2>Environment</h2>
+  ${intro('The world you lived and worked in. Together with your archetype it makes your occupation. Choose freely or roll.')}
+  <div class="row"><button type="button" class="small" data-act="rollSub" data-key="env" data-sides="10">🎲 Roll d10</button>${s.subRolls.env ? die(s.subRolls.env[0], 'd10 small') : ''}</div>
+  ${cardPicker('environment', cards)}
+  ${e ? `<div class="box hi"><h3>${esc(e.en)}: what you get</h3>${subSources(d, s, 'env')}</div>${xe ? pickHtml(xe, d, s) : ''}` : ''}
+  <div class="box"><h3>Occupation</h3>
+  <label class="field"><span>${a && e ? `${esc(a.en)} + ${esc(e.en)}${occ ? `: e.g. ${esc(occ)}` : ''}` : 'From your archetype and environment'}</span>
+  <input data-bind="occupation" value="${esc(s.occupation)}" placeholder="e.g. Art historian" /></label></div>`;
+}
+
+// ——— Event tables ———
 function events(s: CharState, d: Derived): string {
   const toStrike = d.sources.flatMap((x) => x.effects).reduce((n, e) => (e.k === 'stryk' ? n + e.n : n), 0);
   const rows = d.slots
@@ -250,7 +260,7 @@ function events(s: CharState, d: Derived): string {
     .join('');
   const empty = !CONTENT.tables.fa?.entries.length;
   const open = d.slots.filter((x) => x.needsRoll && x.table).length;
-  return `<h2>7. Event tables</h2>
+  return `<h2>Event tables</h2>
   ${intro('Your past, rolled up: travels, intrigues, battles, studies, miracles and sorcery. Your background, people, archetype and environment gave you these rolls. Some results give more rolls. You may re-roll <b>one</b> result you don\'t like.')}
   ${empty ? '<div class="box todo"><p class="warn">The event tables are still being written. Coming in the next update.</p></div>' : ''}
   ${warningsHtml(d, STEP.events)}
@@ -258,11 +268,17 @@ function events(s: CharState, d: Derived): string {
   ${rows || '<p class="muted">No rolls yet. They come from the earlier steps.</p>'}`;
 }
 
-// ——— 7 Attributes ———
+// ——— Attributes ———
 function attributes(s: CharState, d: Derived): string {
   const model = s.attrModel;
   const lumps = model && model !== 'fria' ? POINT_MODELS[model] : [];
   const usedLumps = new Set(Object.values(s.attrLump));
+  const p = d.attrPoints;
+  const extraSpent = ATTRS.reduce((n, a) => n + (s.attrExtra[a] ?? 0), 0);
+  const extraBudget = model === 'fria' ? p.total : p.extra;
+  // The extra-points column only shows when there is something to spend (keeps the table phone-narrow).
+  const showExtra = model === 'fria' || extraBudget > 0 || extraSpent !== 0;
+  const sgn = (n: number) => (n > 0 ? `+${n}` : `−${-n}`);
   const rows = d.attrs
     .map((a) => {
       const li = s.attrLump[a.attr];
@@ -272,19 +288,17 @@ function attributes(s: CharState, d: Derived): string {
             .join('')}</select>`
         : '';
       const ex = s.attrExtra[a.attr] ?? 0;
-      return `<tr><td>${esc(ATTR_EN[a.attr])}</td><td class="n">${a.base}</td><td class="n">${a.mods ? (a.mods > 0 ? `+${a.mods}` : `−${-a.mods}`) : ''}</td>
-        <td class="n">${sel}</td>
-        <td class="n"><span class="stepper"><button type="button" data-act="extra" data-attr="${a.attr}" data-d="-1">−</button><span class="v">${ex}</span><button type="button" data-act="extra" data-attr="${a.attr}" data-d="1">+</button></span></td>
-        <td class="n"><b>${a.value}</b></td><td class="n">${a.attr === 'Visdom' ? '–' : esc(diceText(a.dice))}</td></tr>`;
+      return `<tr><td>${esc(ATTR_EN[a.attr])}</td>
+        <td class="n">${a.base + a.mods}${a.mods ? `<span class="sub">${a.base}${sgn(a.mods)}</span>` : ''}</td>
+        ${lumps.length ? `<td class="n">${sel}</td>` : ''}
+        ${showExtra ? `<td class="n"><span class="stepper"><button type="button" data-act="extra" data-attr="${a.attr}" data-d="-1">−</button><span class="v">${ex}</span><button type="button" data-act="extra" data-attr="${a.attr}" data-d="1">+</button></span></td>` : ''}
+        <td class="n"><b>${a.value}</b><span class="sub">${a.attr === 'Visdom' ? '–' : esc(diceText(a.dice))}</span></td></tr>`;
     })
     .join('');
-  const p = d.attrPoints;
-  const extraSpent = ATTRS.reduce((n, a) => n + (s.attrExtra[a] ?? 0), 0);
-  const extraBudget = model === 'fria' ? p.total : p.extra;
   const w = d.wisdom;
   const modelBtn = (m: string, label: string, sub: string) =>
     `<button type="button" class="card ${model === m ? 'on' : ''}" data-act="model" data-val="${m}"><span class="name">${label}</span><span class="what">${sub}</span></button>`;
-  return `<h2>8. Attributes</h2>
+  return `<h2>Attributes</h2>
   ${intro(`Start from your people's values, add the changes from your environment and events, then spend 40 points. Use one of the two lump patterns: each lump goes on a different attribute. At most ${MAX_POINTS_PER_ATTR} points on one attribute, and every attribute must end at 4 or more. 12 is an average human.`)}
   <div class="cards">
     ${modelBtn('balanserad', 'Balanced', POINT_MODELS.balanserad.map((v) => `+${v}`).join(' '))}
@@ -292,8 +306,9 @@ function attributes(s: CharState, d: Derived): string {
     ${modelBtn('fria', 'Free points (optional rule)', '40 single points, spend freely')}
   </div>
   ${model ? `<div class="box">
-    <table class="t"><tr><th>Attribute</th><th class="n">People</th><th class="n">Mods</th><th class="n">${lumps.length ? 'Lump' : ''}</th><th class="n">${model === 'fria' ? 'Points' : 'Extra'}</th><th class="n">Value</th><th class="n">Dice</th></tr>${rows}</table>
-    <p class="small">${model === 'fria' ? `Points: ${extraSpent} / ${extraBudget}` : `Lumps placed: ${Object.keys(s.attrLump).length} / 8 · Extra points (from traits): ${extraSpent} / ${extraBudget}`}</p>
+    <table class="t fit"><tr><th>Attribute</th><th class="n">Start</th>${lumps.length ? '<th class="n">Lump</th>' : ''}${showExtra ? `<th class="n">${model === 'fria' ? 'Points' : 'Extra'}</th>` : ''}<th class="n">Value</th></tr>${rows}</table>
+    <p class="small">${model === 'fria' ? `Points: ${extraSpent} / ${extraBudget}` : `Lumps placed: ${Object.keys(s.attrLump).length} / 8${showExtra ? ` · Extra points (from traits): ${extraSpent} / ${extraBudget}` : ''}`}</p>
+    <p class="small muted">Start = your people's value plus changes from traits and events. Value shows the dice below it.</p>
   </div>` : ''}
   ${warningsHtml(d, STEP.attributes)}
   <div class="box"><h3>Derived</h3>
@@ -303,7 +318,7 @@ function attributes(s: CharState, d: Derived): string {
   }${w.extraUnits ? `, +${w.extraUnits} knowledge units` : ''}${w.expertise ? `, +${w.expertise} expertise units` : ''}. New knowledge in play costs ${w.newKnowledgeXp} experience.</p></div>`;
 }
 
-// ——— 8 Skills ———
+// ——— Skills ———
 const GROUP_ORDER = ['kunskap', 'mystik', 'rorelse', 'social', 'strid', 'vildmark', 'E', 'F', 'H', 'K'] as const;
 const GROUP_TITLE: Record<string, string> = { kunskap: 'Knowledge', mystik: 'Mystic', rorelse: 'Movement', social: 'Social', strid: 'Combat', vildmark: 'Wilderness', E: 'Expertises', F: 'Abilities', H: 'Crafts', K: 'Marks' };
 
@@ -325,6 +340,8 @@ function skills(s: CharState, d: Derived): string {
     `<span class="stepper"><button type="button" data-act="spend" data-pool="${pool}" data-target="${esc(target)}" data-d="-1" ${spent(target) ? '' : 'disabled'}>−</button><span class="v">${spent(target) || ''}</span><button type="button" data-act="spend" data-pool="${pool}" data-target="${esc(target)}" data-d="1" ${left > 0 && !capped(target) ? '' : 'disabled'}>+</button></span>`;
   const w = d.wisdom;
   const knowledge = SKILLS.filter((x) => x.group === 'kunskap');
+  // Wisdom choices go to the top until they are made.
+  const wisdomOpen = (typeof w.base1 === 'number' && s.wisdomBase.length < w.base1) || (typeof w.incompetent === 'number' && s.wisdomIncomp.length < w.incompetent);
   const wis =
     typeof w.base1 === 'number' && w.base1 > 0
       ? `<div class="box"><h3>Wisdom: base 1 in ${w.base1} knowledge skill${w.base1 === 1 ? '' : 's'}</h3><div class="chips">${knowledge
@@ -339,8 +356,8 @@ function skills(s: CharState, d: Derived): string {
           .map((k) => `<button type="button" class="${s.wisdomIncomp.includes(k.id) ? 'on' : ''}" data-act="wisdomIncomp" data-val="${esc(k.id)}">${esc(k.en)}</button>`)
           .join('')}</div></div>`
       : '';
-  const byId = new Map(d.skills.map((x) => [x.id, x]));
-  const groups = GROUP_ORDER.map((g) => {
+  const canBuyGroup = (g: string) => !!pool && SKILLS.some((x) => x.group === g && poolAllows(pool, x.id, CONTENT.skill));
+  const groupHtml = (g: (typeof GROUP_ORDER)[number]) => {
     const rows = d.skills.filter((x) => x.group === g);
     const buyable = pool && rows.some((r) => poolAllows(pool, r.id, CONTENT.skill));
     const specialist = g.length === 1;
@@ -352,18 +369,21 @@ function skills(s: CharState, d: Derived): string {
            <button type="button" class="small" data-act="addSpecial" data-group="${g}" data-pool="${pool}">Add</button></div>
            <datalist id="dl-add-${g}">${SKILLS.filter((x) => x.group === g).map((x) => `<option value="${esc(x.id.slice(2))}">${esc(x.en)}</option>`).join('')}</datalist>`
         : '';
-    return `<div class="box"><h3>${GROUP_TITLE[g]}</h3>
-      <table class="t"><tr><th>Skill</th><th class="n">Base</th><th class="n">Units</th><th class="n">Value</th><th class="n">Dice</th>${buyable || specialist ? '<th class="n">Spend</th>' : ''}</tr>
+    const from = (r: SkillRow) => (r.base && r.units ? `base ${r.base} + ${r.units}` : r.base ? 'base' : r.units ? `${r.units} unit${r.units === 1 ? '' : 's'}` : '');
+    return `<div class="box ${canBuyGroup(g) ? 'hi' : ''}"><h3>${GROUP_TITLE[g]}${canBuyGroup(g) ? ` <span class="tag">${esc(POOL_EN[pool] ?? pool)} units</span>` : ''}</h3>
+      <table class="t fit"><tr><th>Skill</th><th class="n">Value</th>${buyable || specialist ? '<th class="n">Spend</th>' : ''}</tr>
       ${visible
         .map((r) => {
           const can = pool && poolAllows(pool, r.id, CONTENT.skill);
-          return `<tr><td>${esc(r.en)}${r.talent ? '<span class="tag t">T</span>' : ''}${r.incompetent ? '<span class="tag i">I</span>' : ''}${r.blocked ? '<span class="tag i">B</span>' : ''}</td>
-          <td class="n">${r.base}</td><td class="n">${r.units || ''}</td><td class="n"><b>${r.value}</b></td><td class="n">${esc(diceText(r.dice))}</td>
+          return `<tr><td>${esc(r.en)}${r.talent ? '<span class="tag t">T</span>' : ''}${r.incompetent ? '<span class="tag i">I</span>' : ''}${r.blocked ? '<span class="tag i">B</span>' : ''}${from(r) ? `<span class="sub">${from(r)}</span>` : ''}</td>
+          <td class="n"><b>${r.value}</b><span class="sub">${esc(diceText(r.dice))}</span></td>
           ${buyable || specialist ? `<td class="n">${can ? stepper(r.id) : ''}</td>` : ''}</tr>`;
         })
         .join('')}</table>${add}</div>`;
-  }).join('');
-  void byId;
+  };
+  // The groups the chosen pool can buy come first, then the other things it buys, then the rest.
+  const first = GROUP_ORDER.filter(canBuyGroup);
+  const rest = GROUP_ORDER.filter((g) => !canBuyGroup(g));
   const extras: string[] = [];
   for (const cat of ['utsatthet', 'vald', 'overnaturligt'] as const) {
     const t = `avtr:${cat}`;
@@ -372,13 +392,16 @@ function skills(s: CharState, d: Derived): string {
   }
   if (pool && poolAllows(pool, 'sprak', CONTENT.skill)) extras.push(`<tr><td>Extra language</td><td class="n">${d.languages.picks}</td><td class="n">${stepper('sprak')}</td></tr>`);
   if (pool && poolAllows(pool, 'mysterier', CONTENT.skill)) extras.push(`<tr><td>Mystery</td><td class="n">${d.mysteries.n + d.mysteries.bought}</td><td class="n">${stepper('mysterier')}</td></tr>`);
-  return `<h2>9. Skills</h2>
+  return `<h2>Skills</h2>
   ${intro('Units tied to a skill are already in. Now spend the group units, then the free ones. Pick a pool below and tap + on what it can buy. Skills go to 8 at most (1 if incompetent). Extra units above the cap become free units automatically.')}
   <div class="pools">${poolBtns || '<span class="muted">No units yet.</span>'}</div>
   ${warningsHtml(d, STEP.skills)}
-  ${wis}${inc}
-  ${extras.length ? `<div class="box"><h3>Other things units can buy</h3><table class="t">${extras.join('')}</table></div>` : ''}
-  ${groups}
+  ${wisdomOpen ? wis + inc : ''}
+  ${first.map(groupHtml).join('')}
+  ${extras.length ? `<div class="box hi"><h3>Other things ${esc(POOL_EN[pool] ?? pool)} units can buy</h3><table class="t fit">${extras.join('')}</table></div>` : ''}
+  ${wisdomOpen ? '' : wis + inc}
+  <p class="small muted legend"><span class="tag t">T</span> Talent: in play you get +1D6 extra when you spend Focus on the skill. It doesn't raise the value. <span class="tag i">I</span> Incompetent: the skill can go no higher than 1. <span class="tag i">B</span> Blocked: no Focus on it, and it can't be raised in play.</p>
+  ${rest.map(groupHtml).join('')}
   <p class="small muted">${d.attuned ? 'You are attuned: you can learn mystic skills.' : 'You are not attuned. Spending a unit on Sensing attunes you (that unit becomes the base 1).'}</p>`;
 }
 
@@ -387,7 +410,7 @@ function stepperAvtr(s: CharState, cat: string): string {
   return `<span class="stepper"><button type="button" data-act="spend" data-pool="avtr" data-target="${cat}" data-d="-1" ${v ? '' : 'disabled'}>−</button><span class="v">${v || ''}</span><button type="button" data-act="spend" data-pool="avtr" data-target="${cat}" data-d="1">+</button></span>`;
 }
 
-// ——— 9 Languages & contacts ———
+// ——— Languages & contacts ———
 function languages(s: CharState, d: Derived): string {
   const L = d.languages;
   const chosen = [...s.languages.spoken.map((n) => ({ n, w: false })), ...s.languages.written.map((n) => ({ n, w: true }))];
@@ -399,7 +422,7 @@ function languages(s: CharState, d: Derived): string {
   const comps = d.companions
     .map((c) => `<label class="field"><span>Companion: ${esc(c.kind)}</span><input data-bind-map="companions" data-key="${esc(c.key)}" value="${esc(s.companions[c.key] ?? '')}" placeholder="Name and a line about them" /></label>`)
     .join('');
-  return `<h2>10. Languages & contacts</h2>
+  return `<h2>Languages & contacts</h2>
   ${intro('Languages you were given, plus free picks. A spoken language and a script are separate picks, though one script can serve several tongues. Circles are groups you have friends in. Companions are loyal people at your side.')}
   <div class="box"><h3>Languages</h3>
   <p><b>Speaks:</b> ${L.spoken.map((x) => esc(languageEn(x))).join(', ') || '–'}<br><b>Writes:</b> ${L.written.map((x) => esc(languageEn(x))).join(', ') || '–'}</p>
@@ -420,7 +443,7 @@ function scriptHint(spoken: string[], written: string[]): string {
   return can.length ? ` You can read and write: ${can.map(languageEn).join(', ')}.` : ' You can\'t read or write yet.';
 }
 
-// ——— 10 Drives ———
+// ——— Drives ———
 function drives(s: CharState, d: Derived): string {
   const rolls = s.subRolls.drives ?? [];
   const locked = d.rules.filter((r) => /as (one of your drives|a drive)/.test(r.text));
@@ -436,7 +459,7 @@ function drives(s: CharState, d: Derived): string {
     const rolled = rolls.some((r) => r >= x.lo && r <= x.hi);
     return `<button type="button" class="card ${on ? 'on' : ''} ${rolled ? 'rolled' : ''}" data-act="drive" data-val="${esc(x.sv)}"><span class="name"><span class="num">${x.lo}–${x.hi}</span>${esc(x.en)}</span><span class="what">${esc(x.blurb)}</span></button>`;
   }).join('');
-  return `<h2>11. Drives</h2>
+  return `<h2>Drives</h2>
   ${intro('Your primary drive is the core of who you are; the secondary one is easier to give up. Each has three levels of deeds, and fulfilling them restores Focus and Wellbeing and heals the mind. Choose freely, or roll four times and keep two.')}
   ${locked.length ? `<div class="box todo"><h3>Required by your past</h3>${locked.map((r) => `<p class="small">${esc(r.text)} <span class="muted">(${esc(r.from)})</span></p>`).join('')}</div>` : ''}
   ${box('Primary', s.drives.primary)}${box('Secondary', s.drives.secondary)}
@@ -445,11 +468,11 @@ function drives(s: CharState, d: Derived): string {
   <div class="cards">${cards}</div>`;
 }
 
-// ——— 11 Details ———
+// ——— Details ———
 function details(s: CharState): string {
   const f = (path: string, label: string, ph = '') => `<label class="field"><span>${label}</span><input data-bind="details.${path}" value="${esc((s.details as unknown as Record<string, string>)[path] ?? '')}" placeholder="${esc(ph)}" /></label>`;
   const t = (path: string, label: string, ph = '') => `<label class="field"><span>${label}</span><textarea data-bind="details.${path}" placeholder="${esc(ph)}">${esc((s.details as unknown as Record<string, string>)[path] ?? '')}</textarea></label>`;
-  return `<h2>12. Name & details</h2>
+  return `<h2>Name & details</h2>
   ${intro('The things that don\'t change the numbers but make the person.')}
   ${f('name', 'Name')}
   <div class="row"><div class="grow">${f('age', 'Age')}</div><div class="grow">${f('gender', 'Gender')}</div></div>
@@ -464,7 +487,7 @@ function details(s: CharState): string {
   ${t('story', 'Background story', 'Take inspiration from your event results.')}`;
 }
 
-// ——— 12 Equipment ———
+// ——— Equipment ———
 function equipment(s: CharState, d: Derived): string {
   const PACKAGES = ['Djur', 'Fiskeutrustning', 'Forskningsutrustning', 'Hantverksutrustning', 'Jaktutrustning', 'Medicinsk utrustning', 'Musikinstrument', 'Mystikutrustning', 'Skrivutrustning', 'Skönhetsutrustning', 'Tjuvutrustning', 'Underhållningsutrustning', 'Vildmarksutrustning', 'Vapenvårdsutrustning'];
   const PACKAGES_EN: Record<string, string> = { Djur: 'Animal', Fiskeutrustning: 'Fishing gear', Forskningsutrustning: 'Research gear', Hantverksutrustning: 'Craft tools', Jaktutrustning: 'Hunting gear', 'Medicinsk utrustning': 'Medical kit', Musikinstrument: 'Musical instrument', Mystikutrustning: 'Mystic gear', Skrivutrustning: 'Writing kit', Skönhetsutrustning: 'Beauty kit', Tjuvutrustning: "Thief's tools", Underhållningsutrustning: "Entertainer's kit", Vildmarksutrustning: 'Wilderness gear', Vapenvårdsutrustning: 'Weapon care kit' };
@@ -500,7 +523,7 @@ function equipment(s: CharState, d: Derived): string {
   ];
   const items = d.items.map((i) => `<li>${esc(i.text)} <span class="small muted">(${esc(i.from)})</span></li>`).join('');
   const spent = s.equipment.bought.reduce((n, b) => n + b.cost * b.qty, 0);
-  return `<h2>13. Equipment</h2>
+  return `<h2>Equipment</h2>
   ${intro('Equipment packages are bundles of the everyday things your character owns. Weapons and armour are picked up to the rarity you were given. Anything more is bought with silver.')}
   <div class="box"><h3>Packages</h3>${pk || '<p class="muted">None.</p>'}</div>
   <div class="box"><h3>Weapons</h3>${d.weapons.map((w) => slot('weapons', w.key, w.rarity)).join('') || '<p class="muted">None.</p>'}
@@ -515,7 +538,7 @@ function equipment(s: CharState, d: Derived): string {
   <label class="field"><span>Equipment notes</span><textarea data-bind="equipment.notes">${esc(s.equipment.notes)}</textarea></label>`;
 }
 
-// ——— 13 Mysticism ———
+// ——— Mysticism ———
 function magic(s: CharState, d: Derived): string {
   const total = d.mysteries.n + d.mysteries.bought;
   const any = total || d.mysteries.unlearned || d.mysticGear.length;
@@ -528,14 +551,14 @@ function magic(s: CharState, d: Derived): string {
     const learned = i < total;
     return `<label class="field"><span>Mystery ${i + 1}${learned ? '' : ' (written down, not yet learned)'}</span><input data-act-input="mystery" data-i="${i}" value="${esc(s.mysteries[i] ?? '')}" placeholder="Name of the mystery" /></label>`;
   }).join('');
-  return `<h2>14. Mysticism & magic</h2>
+  return `<h2>Mysticism & magic</h2>
   ${intro('Only for magicians, invokers and those who gained mysteries or mystic gear some other way. Mysteries can only be used if you are attuned and know the right mystic skills (Channelling for prayers, an aspect for spells).')}
   ${any ? '' : '<div class="box"><p class="muted">Nothing here for this character. You can skip this step.</p></div>'}
   ${gear ? `<div class="box"><h3>Mystic equipment</h3>${gear}</div>` : ''}
   ${slots ? `<div class="box"><h3>Mysteries</h3>${slots}<p class="small muted">The full list of mysteries per aspect and faith is coming in a later update.</p></div>` : ''}`;
 }
 
-export const STEP_RENDER: ((s: CharState, d: Derived) => string)[] = [prep, homeland, background, people, religion, archetype, events, attributes, skills, languages, drives, details, equipment, magic];
+export const STEP_RENDER: ((s: CharState, d: Derived) => string)[] = [prep, homeland, background, people, religion, archetype, environment, events, attributes, skills, languages, drives, details, equipment, magic];
 
 export function attrOrder(): Attr[] {
   return [...ATTRS];

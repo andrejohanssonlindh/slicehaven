@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { derive } from '../src/core/chargen/derive';
 import { parseGrants, tokenSkills, type Token } from '../src/core/chargen/grants';
-import { newChar, roll } from '../src/core/chargen/state';
+import { CHAR_VERSION, migrateChar, newChar, roll } from '../src/core/chargen/state';
 import { attrDice, baseArmour, baseDamage, diceText, skillDice, wisdomRow } from '../src/core/chargen/tables';
 import { CONTENT } from '../src/content/chargen';
 import { SKILL_BY_ID } from '../src/content/chargen/skills';
@@ -28,7 +28,6 @@ function allGrants(): { where: string; g: string }[] {
     out.push({ where: `env ${e.id}`, g: e.g });
     opts(`env ${e.id}`, e.extras.options);
   }
-  for (const l of CONTENT.living) out.push({ where: `living ${l.id}`, g: l.g });
   for (const t of Object.values(CONTENT.tables)) t?.entries.forEach((e) => out.push({ where: `${t.id} ${e.lo}`, g: e.g }));
   return out;
 }
@@ -158,11 +157,9 @@ describe('chargen derive', () => {
     s.picks['arch.x'] = ['avtr', 'skrift'];
     s.environment = 'stad';
     s.picks['env.x'] = ['smeten'];
-    s.living = 'valmaende';
     const d = derive(s, CONTENT);
     expect(d.people?.en).toBe('Marnakh tirak');
     expect(d.languages.spoken).toEqual(expect.arrayContaining(['Ashariska', 'Sakhra']));
-    expect(d.silver).toBe(100);
     // City gives +1 to Presence, Composure, Alertness, Wisdom.
     const presence = d.attrs.find((a) => a.attr === 'Intryck')!;
     expect(presence.base + presence.mods).toBe(9);
@@ -188,6 +185,35 @@ describe('chargen derive', () => {
     const d = derive(s, CONTENT);
     expect(d.attuned).toBe(true);
     expect(d.skills.find((x) => x.id === 'Förnimma')?.value).toBe(1);
+  });
+
+  it('the first unit spent on Sensing becomes its base 1 (not 2)', () => {
+    const s = newChar(5);
+    s.background = 100;
+    s.picks['bg.p'] = ['0', '1'];
+    s.archetype = 'krigare';
+    s.alloc.valfri = { Förnimma: 1 };
+    let d = derive(s, CONTENT);
+    expect(d.attuned).toBe(true);
+    expect(d.skills.find((x) => x.id === 'Förnimma')?.value).toBe(1);
+    s.alloc.valfri = { Förnimma: 2 };
+    d = derive(s, CONTENT);
+    expect(d.skills.find((x) => x.id === 'Förnimma')?.value).toBe(2);
+  });
+
+  it('a mystic adds spent Sensing units on top of base 1', () => {
+    const s = newChar(6);
+    s.archetype = 'magiker';
+    s.alloc.mystik = { Förnimma: 1 };
+    expect(derive(s, CONTENT).skills.find((x) => x.id === 'Förnimma')?.value).toBe(2);
+  });
+
+  it('old saves lose the living standard and keep their place in the steps', () => {
+    const old = { ...newChar(7), v: 1, step: 7, living: 'rik' } as ReturnType<typeof newChar> & { living?: string };
+    const m = migrateChar(old);
+    expect(m.v).toBe(CHAR_VERSION);
+    expect(m.step).toBe(8);
+    expect('living' in m).toBe(false);
   });
 
   it('units above the skill cap turn into free units', () => {

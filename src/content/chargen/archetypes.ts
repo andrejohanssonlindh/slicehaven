@@ -1,6 +1,6 @@
-import type { Archetype, Environment, LivingStandard, Opt, PickGroup } from '../../core/chargen/types';
+import type { Archetype, Environment, Opt, PickGroup } from '../../core/chargen/types';
 
-/** Archetypes (24 units + 3 event rolls each), environments (16 units + 3 rolls) and living standards. */
+/** Archetypes (24 units + 3 event rolls each) and environments (16 units + 3 rolls). */
 
 const o = (id: string, en: string, g: string, star?: boolean, note?: string): Opt => ({ id, sv: '', en, g, star, note });
 const two = (...options: Opt[]): PickGroup => ({ id: 'x', sv: 'Välj två', en: 'Choose two extras', pick: 2, repeat: true, options });
@@ -280,13 +280,4 @@ export const ENVIRONMENTS: Environment[] = [
       o('slagruta', 'Dowsing rod', 'foremal:A dowsing rod (+1D6 on all rolls to find water and precious minerals).'),
     ),
   },
-];
-
-export const LIVING: LivingStandard[] = [
-  { id: 'utblottad', sv: 'Utblottad', en: 'Destitute', silver: 1, g: '', blurb: 'Among the poorest in the world: beggars, tramps, refugees, slaves.', lodging: 'A cave, a shack, a poorhouse, a sewer, an alley…', clothes: 'One badly worn set of clothes.', monthly: 'About 10 silver a month, no surplus.' },
-  { id: 'fattig', sv: 'Fattig', en: 'Poor', silver: 10, g: '', blurb: 'Hard up, but it could be worse: servants, farmhands, cottagers, labourers.', lodging: 'A tiny croft, a shared room, a hovel…', clothes: 'Two sets of patched clothes, a few bright ribbons.', monthly: 'About 30 silver a month, 3 surplus.' },
-  { id: 'enkel', sv: 'Enkel', en: 'Modest', silver: 30, g: 'regel:You can borrow up to 50 silver from your family.', blurb: 'The broad middle: journeymen, freeholders, small traders, most monks and nuns.', lodging: 'Your own room, a small farm; perhaps a servant.', clothes: 'Two everyday sets, one fine set, a cloak; jewellery worth about 50 silver.', monthly: 'About 80 silver a month, 8 surplus.' },
-  { id: 'valmaende', sv: 'Välmående', en: 'Comfortable', silver: 100, g: 'regel:You can borrow up to 1,000 silver from your family.', blurb: 'Well off and respected: guild members, rich farmers, merchants, bureaucrats, priests.', lodging: 'A town house, a floor in a fine quarter, a large farm; a few servants.', clothes: 'Five everyday sets, some richly decorated fine sets; jewellery worth about 300 silver.', monthly: 'About 260 silver a month, 15 surplus.' },
-  { id: 'rik', sv: 'Rik', en: 'Rich', silver: 1000, g: 'regel:You can borrow up to 10,000 silver from your family.', blurb: 'The upper classes: councillors, officials, nobles, magnates.', lodging: 'A fine house in the best quarter or a large estate; a dozen servants.', clothes: 'Half a dozen fine everyday sets and rich festive clothes; jewellery worth 1,000 silver or more.', monthly: 'About 800 silver a month, 100 surplus.' },
-  { id: 'formogen', sv: 'Förmögen', en: 'Wealthy', silver: 10000, g: 'regel:You can borrow almost without limit while the family name is clean.', blurb: 'The very elite: merchant princes, great nobles, royalty.', lodging: 'At least one palace; servants beyond counting.', clothes: 'More than you know of; jewellery worth over 5,000 silver.', monthly: 'About 2,700 silver a month, 300+ surplus.' },
 ];

@@ -54,19 +54,19 @@ function render(): void {
   nameEl.textContent = charLabel(s);
   stepsNav.innerHTML = STEPS.map((name, i) => {
     const open = d.openByStep[i] > 0;
-    return `<button type="button" class="${i === s.step ? 'on' : ''}" data-act="goto" data-val="${i}" title="${esc(name)}">${i + 1}. ${esc(short(name))}${open ? '<span class="dot"></span>' : ''}</button>`;
+    return `<button type="button" class="${i === s.step ? 'on' : ''}" data-act="goto" data-val="${i}" title="${esc(name)}">${esc(short(name))}${open ? '<span class="dot"></span>' : ''}</button>`;
   }).join('');
   app.innerHTML = s.step === STEP.sheet ? `<h2>Character sheet</h2>${sheetHtml(s, d)}` : STEP_RENDER[s.step](s, d);
   prevBtn.disabled = s.step === 0;
   nextBtn.disabled = s.step === STEPS.length - 1;
   nextBtn.textContent = s.step === STEPS.length - 2 ? 'Sheet →' : 'Next →';
   const open = d.openByStep[s.step];
-  stepInfo.textContent = open ? `${open} to do here` : `Step ${s.step + 1} of ${STEPS.length}`;
+  stepInfo.textContent = s.step === STEP.sheet ? '' : open ? `${open} to do here` : '✓ done here';
   stepsNav.querySelector('.on')?.scrollIntoView({ block: 'nearest', inline: 'center' });
 }
 
 function short(name: string): string {
-  return { 'Archetype & environment': 'Archetype', 'Languages & contacts': 'Languages', 'Name & details': 'Details', 'Mysticism & magic': 'Magic', 'Character sheet': 'Sheet', 'Event tables': 'Events' }[name] ?? name;
+  return { 'Languages & contacts': 'Languages', 'Name & details': 'Details', 'Mysticism & magic': 'Magic', 'Character sheet': 'Sheet', 'Event tables': 'Events' }[name] ?? name;
 }
 
 function commit(rerender = true): void {
@@ -144,19 +144,29 @@ app.parentElement!.addEventListener('click', (ev) => {
     case 'goto':
       return goto(Number(a.val));
     case 'set': {
-      const f = a.field as 'homeland' | 'people' | 'religion' | 'archetype' | 'environment' | 'living' | 'background';
+      const f = a.field as 'homeland' | 'people' | 'religion' | 'archetype' | 'environment' | 'background';
       const v = f === 'background' ? Number(a.val) : a.val;
       (s as unknown as Record<string, unknown>)[f] = (s as unknown as Record<string, unknown>)[f] === v && f !== 'background' ? undefined : v;
+      // A fresh choice folds the list down to it.
+      delete view.open[f];
       return commit();
     }
+    case 'fold':
+      view.open[key] = !view.open[key];
+      return render();
     case 'family':
       view.family = a.val as Family;
+      view.open.people = true;
       return render();
     case 'rollHomeland':
       return void withRoll(100, 2, () => {
+        view.open.homeland = true;
         s.homelandRolls = [roll(s, 100), roll(s, 100)];
         const hit = CONTENT.homelands.filter((h) => s.homelandRolls!.some((r) => r >= h.lo && r <= h.hi));
-        if (hit.length === 1) s.homeland = hit[0].id;
+        if (hit.length === 1) {
+          s.homeland = hit[0].id;
+          delete view.open.homeland;
+        }
       });
     case 'rollBg':
       return void withRoll(100, 2, () => {
@@ -170,6 +180,7 @@ app.parentElement!.addEventListener('click', (ev) => {
         s.subRolls.people = [r];
         const p = CONTENT.peoples.find((x) => x.family === 'manniska' && x.lo !== undefined && r >= x.lo && r <= (x.hi ?? x.lo));
         if (p) s.people = p.id;
+        delete view.open.people;
       });
     case 'rollSub':
       return void withRoll(Number(a.sides), 1, () => {
@@ -178,6 +189,7 @@ app.parentElement!.addEventListener('click', (ev) => {
         s.subRolls[key] = [r];
         if (key === 'arch') s.archetype = CONTENT.archetypes[r - 1]?.id;
         if (key === 'env') s.environment = CONTENT.environments[r - 1]?.id;
+        delete view.open[key === 'arch' ? 'archetype' : 'environment'];
       });
     case 'rollPick':
       return void withRoll(Number(a.sides), Number(a.times), () => {

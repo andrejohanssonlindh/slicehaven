@@ -110,15 +110,6 @@ export interface Environment extends Named {
   blurb: string;
 }
 
-export interface LivingStandard extends Named {
-  silver: number;
-  g: string;
-  blurb: string;
-  lodging: string;
-  clothes: string;
-  monthly: string;
-}
-
 export interface EventEntry {
   lo: number;
   hi: number;

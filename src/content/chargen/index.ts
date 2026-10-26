@@ -1,5 +1,5 @@
 import type { Content } from '../../core/chargen/derive';
-import { ARCHETYPES, ENVIRONMENTS, LIVING } from './archetypes';
+import { ARCHETYPES, ENVIRONMENTS } from './archetypes';
 import { BACKGROUNDS } from './backgrounds';
 import { EVENT_TABLES } from './events';
 import { HOMELANDS } from './homelands';
@@ -15,7 +15,6 @@ export const CONTENT: Content = {
   religions: RELIGIONS,
   archetypes: ARCHETYPES,
   environments: ENVIRONMENTS,
-  living: LIVING,
   tables: EVENT_TABLES,
   skill: skillDef,
   skills: SKILLS,
