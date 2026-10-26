@@ -293,7 +293,7 @@ function attributes(s: CharState, d: Derived): string {
       return `<tr><td>${esc(ATTR_EN[a.attr])}</td>
         <td class="n">${a.base + a.mods}${a.mods ? `<span class="sub">${a.base}${sgn(a.mods)}</span>` : ''}</td>
         ${lumps.length ? `<td class="n">${sel}</td>` : ''}
-        ${showExtra ? `<td class="n"><span class="stepper"><button type="button" data-act="extra" data-attr="${a.attr}" data-d="-1">−</button><span class="v">${ex}</span><button type="button" data-act="extra" data-attr="${a.attr}" data-d="1">+</button></span></td>` : ''}
+        ${showExtra ? `<td class="n"><span class="stepper"><button type="button" data-act="extra" data-attr="${a.attr}" data-d="-1">−</button><span class="v">${ex}</span><button type="button" data-act="extra" data-attr="${a.attr}" data-d="1" ${extraSpent >= extraBudget ? 'disabled' : ''}>+</button></span></td>` : ''}
         <td class="n"><b>${a.value}</b><span class="sub">${a.attr === 'Visdom' ? '–' : esc(diceText(a.dice))}</span></td></tr>`;
     })
     .join('');

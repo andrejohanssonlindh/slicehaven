@@ -11,6 +11,7 @@ Effort: **S** under an hour · **M** a session · **L** several sessions, split 
 | ✅ | Craft tools etc. showed in Swedish on the sheet and the equipment list | One shared English name table for the 14 packages (`PACKAGES_EN`). |
 | ✅ | "At most 10 points on Vitality" read like a special rule | Now: "*X* has *n* points added; at most 10 can be added to any one attribute." |
 | ✅ | No warning when attribute points, trait points or skill units are left unspent | Attributes step says how many lumps / extra points / points are left; Skills step lists units left per pool. |
+| ✅ | You could assign 5 trait points with only 1 to give | The + button stops at the points you have. |
 | ✅ | "A trait requires the Vontar faith" with no clue where to pick | Warning now says to pick it in the Religion step, and also shows when no religion is chosen yet. |
 
 ## Character creator — still open
@@ -20,7 +21,6 @@ Ranked.
 |---|---|---|---|
 | 1 | **Explain the event cards.** "Intrigues & Misdeeds · from Leader · 45 · Inspires trust · Social units (2) · Choose one: Honest Air (8) / Honest Face (8)" is unreadable even to a veteran. Needs a plain-language card: *Where it came from*, *what happened* (one line), *what you get*, *what you choose* — and "(8)" explained. | M (design + Haiku fill-in; handover in [Creator next](creator-next.md)) | It's the step with the most choices and the least understanding. Blocks trusting the creator. |
 | 2 | **Pre-set characters** (companions, NPCs, scripted starts): lock people, drive, archetype… and let the player decide the rest. | M | The creator will be used several times with fixed parts; the shape of "locks" affects everything else. Do before more polish. |
-| 3 | **Check "5/1 extra points from traits"**: the trait points can be piled on one attribute with no limit besides the 10 cap. Is there a per-attribute limit for trait points? | S once answered (Q17) | Possible rule hole. Needs the director's call or a look at the source. |
 | 4 | **Life events as a searchable list with hooks** (every roll result gets a tag and a description and is saved on the sheet as a "major event"). | L (data) / S (the saved list) | Long-term payoff (game hooks), but the saved list also helps with rank 1. |
 | 5 | Religion step: when a trait fixes the religion to one choice, **offer to preselect** it. | S | Nice, not urgent. The warning now explains. |
 | 6 | Package contents (what's in "Thief's tools" etc.) as real items with skill bonuses | M | Needed for gear-choice on skill use (skill web step 7). |

@@ -292,7 +292,11 @@ app.parentElement!.addEventListener('click', (ev) => {
       return commit();
     case 'extra': {
       const at = a.attr as Attr;
-      s.attrExtra[at] = Math.max(-10, (s.attrExtra[at] ?? 0) + Number(a.d));
+      const delta = Number(a.d);
+      const spentNow = Object.values(s.attrExtra).reduce((n, v) => n + (v ?? 0), 0);
+      const budget = s.attrModel === 'fria' ? d.attrPoints.total : d.attrPoints.extra;
+      if (delta > 0 && spentNow >= budget) return render(); // no points left to add
+      s.attrExtra[at] = Math.max(-10, (s.attrExtra[at] ?? 0) + delta);
       if (!s.attrExtra[at]) delete s.attrExtra[at];
       return commit();
     }

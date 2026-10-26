@@ -69,7 +69,7 @@ Every result gets `tags`: who or what it concerns (`family`, `enemy`, `faith`, `
 Rank: A is small and also helps the card work; B and C come later. See [Skill web](skill-web.md) for the reaction layer these hooks would plug into.
 
 ## 4. Smaller notes from the review
-- **Extra points from traits** ("apoang N"): today they're free-for-all within the 10 cap. Open question Q17 on whether trait points have a per-attribute limit. Unspent/overspent points now warn.
+- **Extra points from traits** ("apoang N"): you could assign more than you had. Fixed: the + stops at the points you have; unspent or overspent points warn.
 - **"At most 10 points on Vitality"**: reworded (not a Vitality rule). Done.
 - **Religion forced by a trait**: warning now says where to pick. Idea: preselect when the trait names exactly one religion.
 - **Packages** now have English names. Their *contents* are still names only; make them items so skill-web gear choices can use them.

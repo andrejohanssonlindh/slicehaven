@@ -4,14 +4,6 @@ Newest on top. Answer in chat (just reference the number, e.g. "Q11: option B").
 
 ---
 
-### Q17 — Extra attribute points from traits: any limit per attribute?
-Some traits give "+2 / +4 / +6 extra attribute points". Today you can put them all on one attribute (only the cap of 10 added per attribute applies), and the 5/1 split you spotted is allowed. Is that intended?
-- **A)** Free, as now. **B)** At most 2 on any one attribute. **C)** Another limit you know of.
-*Surfaced by your review; see [creator next](design/creator-next.md).*
-
-### Q18 — Does a failed social try have a lasting cost?
-When Argue (or Charm…) fails on an NPC, do they remember it next time (this scene / for good), or is each try fresh? Affects the [skill web](design/skill-web.md). My suggestion: remembered for the scene, reset when you leave.
-
 ### Q11 — Private repo, but testable from anywhere *(you asked: can it be private?)*
 Short version: **a private repo does not make the site private.** GitHub Pages sites are public even when the repo is private, unless the account is on GitHub Enterprise Cloud. So there are three ways, and I haven't changed anything yet:
 
@@ -27,6 +19,8 @@ Tell me A or B and I'll do the rest. I won't change repo visibility without your
 - **Story (was Q5).** Which war killed the shepherd's father: left until the engine work is further along ([your notes](vision/2026-10-25-director-notes.md) and the [world notes](world/eon-notes.md) have what's needed).
 
 ## Answered
+- **Q17 Trait points per attribute?** → it was a bug: you could assign 5 with only 1 to give. The + button now stops at the points you have (and the move is refused in code). No per-attribute limit was needed. *(2026-10-26)*
+- **Q18 Does a failed social try linger?** → yes, in several ways: interactions with most characters are limited in number, and the outcome of an Argue colours the next attempt. Written into the [skill web](design/skill-web.md). *(2026-10-26)*
 - **Q3 Dice per turn?** → outdated, removed. The old dice-as-cards idea is gone from the design. *(2026-10-26)*
 - **Q10 English or Swedish terms?** → English. Groundwork so it *can* be translated: `src/i18n/` (a `t(key, 'English text')` function and an empty English file). Nothing is moved into it yet. *(2026-10-26)*
 - **Q12 Starting silver?** → A: the game engine will hand out silver its own way. *(2026-10-26)*

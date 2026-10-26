@@ -84,6 +84,12 @@ Once step 1 exists, a content session can fill one skill at a time. For each ski
 
 Keep each skill in its own file under `src/content/skillweb/` so sessions don't collide. Test: every hook names a real skill and a real thing kind.
 
+## Memory: social tries linger (director, 2026-10-26)
+- **Limited interactions.** Most characters can only be talked to a limited number of times (per scene, and some for good). The count is part of the NPC's state; when it runs out they won't engage, with a line saying so.
+- **Outcome colours the next try.** Each social try leaves a **mood** on the NPC toward you (e.g. wary, warmed up, insulted) that modifies the next roll and which intentions work. It also decides what tokens or lasting effects the outcome leaves.
+- Stored as plain JSON on the NPC in scene state: `{ talks: n, mood: [...], lastOutcome }`. Reset rules (per scene, per day, never) are per NPC.
+- Build: part of step 3 (humanoid social set), together with advantage tokens.
+
 ## Open questions (to the director, see [questions](../questions.md))
-- Does a failed Argue on a humanoid have a lasting cost (they remember), or is it per scene only?
 - Should "strong success" be only for rolls with 2+ extra successes, or a separate roll-over threshold?
+- How many talks is the usual limit, and is it shown to the player (a visible patience meter) or hidden?

@@ -7,7 +7,7 @@ Quick fixes done:
 - "Game master" / "GM allows" removed from the creator and the event texts.
 - Equipment package names (Craft tools etc.) are English on the sheet and in the list.
 - Attribute cap message reworded (no longer reads like a Vitality rule); warnings for unspent attribute lumps, trait points and skill units; religion warning says where to pick.
-- New questions Q17 (trait points per attribute) and Q18 (do failed social tries linger).
+- Q17 turned out to be a bug (assigning more trait points than you had): fixed. Q18 answered: social tries linger (limited talks, mood from the last outcome), added to the skill web.
 
 ## 2026-10-26 — Session 9: clean-up
 
