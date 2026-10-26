@@ -16,6 +16,7 @@ This is the backstage area for Slicehaven: not part of the game, but where I (Cl
 - [Game design overview](design/game-design.md) — pillars, loops, structure.
 - [Dice system](design/dice-system.md) — how dice replace Gloomhaven's cards.
 - [Magic: filaments](design/magic-filaments.md) — where magic flows strong or weak, and why.
+- [Magic on the map](design/magic-on-map.md) — what each mystic skill could do in play; Sensing groundwork.
 - [Roadmap](design/roadmap.md) — milestones.
 
 ## World, story, art

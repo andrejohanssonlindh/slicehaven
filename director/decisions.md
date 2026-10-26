@@ -29,3 +29,6 @@
 | 2026-10-25 | Filaments are a hidden layer of bonuses; nature & magic are "good enough" for now | Director. |
 | 2026-10-25 | Engine sandbox approved as the base to build on | Director: "this is what I envisioned". |
 | 2026-10-25 | When real game work starts, begin with the first missions and use them to work out the mechanics | Director's plan. The director has changes to the earlier ideas coming (basics stay). |
+| 2026-10-26 | Character creator: living standard removed | Director: it won't be used. Silver comes from archetypes and events only. |
+| 2026-10-26 | Character creator: archetype and environment are separate steps | Director: the archetype step held too many decisions that weren't about the archetype. |
+| 2026-10-26 | No "book" references or step numbering in the creator's UI | Director's review. |

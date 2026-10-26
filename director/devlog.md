@@ -1,5 +1,20 @@
 # Devlog
 
+## 2026-10-26 — Session 7: character creator, first review fixes
+
+From the director's notes on the first playable creator:
+- **No more "like the book"** text or step numbers in headings and the step bar. The footer just says what's left to do.
+- **Archetype and Environment are now two steps.** The occupation sits with the environment.
+- **Choice lists fold up** once you've chosen (homeland, people, religion, archetype, environment), so what the choice gives you and asks of you is right under it, not under the whole list. "Change" opens the list again.
+- **Living standard removed.** Silver now comes only from archetypes and events. Old saves are moved over automatically.
+- **Attributes and skills fit a phone screen:** fewer columns, with dice shown under the value.
+- **Skills:** the unit pool you pick moves its skills to the top, with "other things these units can buy" right under them. A legend explains T, I and B.
+- **Talent:** checked against the rules. It doesn't raise the value. In play it gives **+1D6 extra when you spend Focus** on the skill. (Only a *double* talent gives +2 units.)
+- **Sensing bug fixed:** spending your first unit on Sensing attunes you and becomes its base 1. It wrongly gave 2 before.
+- **Name & details:** name suggestions for your naming culture (tap to use, or roll one), gender chips, typical height and weight for your people with "use typical" and "roll a build", and checks: a name is needed, and a 4 m missla gets a friendly warning.
+- **Armoury:** a real chooser for weapons, shields and armour. Browse by type. Each weapon shows damage already including your base damage, whether you're strong enough one- or two-handed, rarity and culture, length, weight, price, and what each property does. The same view is used for buying. Every weapon has a slot for a picture later.
+- **Magic on the map, groundwork:** Sensing's rules for the map (reach and clarity grow with the roll) in `core/sensing.ts`, plus a note on what the other mystic skills could do: [Magic on the map](design/magic-on-map.md).
+
 ## 2026-10-26 — Session 6: the character creator
 
 **New direction:** recreate the tabletop ruleset, starting with a freestanding character creator. [Open it](https://andrejohanssonlindh.github.io/slicehaven/chargen/) (also "Hero" in the game's top bar). Plan and status: [Character creator](design/character-creator.md).

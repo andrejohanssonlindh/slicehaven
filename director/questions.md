@@ -4,6 +4,12 @@ Newest on top. Answer in chat (just reference the number, e.g. "Q3: option B"). 
 
 ---
 
+### Q12 — Starting silver without living standards
+With living standards gone, most characters start with little or no silver (a scholar has 0). Buying gear needs silver. Options: **A)** fine, the game engine will hand out silver its own way; **B)** a flat starting purse for everyone (e.g. 30 silver); **C)** a purse by archetype. I'd go with A for now and decide when the campaign economy exists.
+
+### Q13 — Ages and name lists
+Age has no rule in the source, so I made our own guidance per family (humans usually 16–50, elves 25–400, dwarves 30–150, tirak 14–40, missla 18–60), with a warning only far outside it. Name suggestions are a selection of 8 per list, not the full lists, to keep book material in the public repo small. OK, or do you want more names?
+
 ### Q10 — Character creator: English or Swedish terms?
 You know the ruleset in Swedish after 25 years. The game is English (Q4), so I'm writing the creator in English with my own translations (e.g. *Vaksamhet* → Perception, *Avtrubbning* → Desensitization, *Kretsar* → Circles). If you'd rather have the **Swedish terms** in the creator, tell me early. Switching later means retranslating a lot of data.
 
