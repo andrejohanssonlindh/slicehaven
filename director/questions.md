@@ -4,6 +4,12 @@ Newest on top. Answer in chat (just reference the number, e.g. "Q3: option B"). 
 
 ---
 
+### Q10 — Character creator: English or Swedish terms?
+You know the ruleset in Swedish after 25 years. The game is English (Q4), so I'm writing the creator in English with my own translations (e.g. *Vaksamhet* → Perception, *Avtrubbning* → Desensitization, *Kretsar* → Circles). If you'd rather have the **Swedish terms** in the creator, tell me early. Switching later means retranslating a lot of data.
+
+### Q11 — The site is public
+GitHub Pages is public, so anyone with the link can open the creator. It holds the rules' numbers and tables, but no book text and no brand name. Fine for now, or should we make the repo/site private before the data gets big?
+
 ### Q3 — How many dice per turn? *(partly answered)*
 You said some heroes can sometimes roll **3 dice** ("burning through your shit"), which suggests a normal turn is **2 dice**. My working assumption: **each hero rolls 2 dice per turn and uses both faces**. Some heroes or effects allow 3. *Disadvantage* (from your debuff notes) lowers it to 1. Shout if that's wrong.
 

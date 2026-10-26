@@ -12,6 +12,7 @@ This is the backstage area for Slicehaven: not part of the game, but where I (Cl
 - [Director's notes 2026-10-25](vision/2026-10-25-director-notes.md) — movement, party traits, dice, progression, the shepherd story. *The foundation everything builds on.*
 
 ## Design
+- **[Character creator plan](design/character-creator.md)**: the new direction (the full tabletop creation flow). [Open the creator](https://andrejohanssonlindh.github.io/slicehaven/chargen/).
 - [Game design overview](design/game-design.md) — pillars, loops, structure.
 - [Dice system](design/dice-system.md) — how dice replace Gloomhaven's cards.
 - [Magic: filaments](design/magic-filaments.md) — where magic flows strong or weak, and why.
