@@ -81,5 +81,5 @@ Then: **Character sheet**, 4 sections like the book's (person, attributes & skil
 
 ## Things I'll simplify at first
 - Special abilities from traits and events are shown as **rule notes** on the sheet. They aren't enforced, because there's no play engine yet.
-- The game master's permission (e.g. a culture's weapons) becomes a "GM allows" toggle.
+- No game master in the creator (director, 2026-10-26): no "GM allows" text. Presets with locked choices are planned instead, see [next design pass](creator-next.md).
 - Options that need other books (e.g. fighting styles) are listed but marked as such.

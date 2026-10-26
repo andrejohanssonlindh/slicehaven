@@ -8,6 +8,9 @@
 - Character creator.
 - Gate scene: skills on the world, social conflicts, things bigger than one hex.
 
+## Next up
+See the [ranked backlog](backlog.md): skill web shape + Search fix, then creator event cards and pre-set characters, then humanoid social skills.
+
 ## Candidate vignettes
 - **A fight** under the ruleset: initiative, actions, damage, Focus. What does a round feel like with D6 pools?
 - **Tapping the ground:** a small menu (walk / look / use a skill) and look lines for every ground type and prop (the "almost everything is clickable" principle).

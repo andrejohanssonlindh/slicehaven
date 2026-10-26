@@ -20,5 +20,5 @@ export const HOMELANDS: Homeland[] = [
   { id: 'takalorr', sv: 'Takalorr', en: 'Takalorr', lo: 88, hi: 91, language: 'Sakhra', peoples: 'Tirak, mostly Bazirk; Henéa elves', religions: 'Mahktah worship', blurb: 'Volcanic jungle islands, home of the tirak. Pirates, traders and a great temple.' },
   { id: 'thalamur', sv: 'Thalamur', en: 'Thalamur', lo: 92, hi: 95, language: 'Thalaska', peoples: 'Thalasks; Raunlanders, Sanari elves, Drezin dwarves', religions: 'Antitheism', blurb: 'A closed realm ruled by nine magocrats. Religion is banned.' },
   { id: 'vastmark', sv: 'Västmark', en: 'Västmark', lo: 96, hi: 99, language: 'Ashariska', peoples: 'Västmarkers; Bazirk and Marnakh tirak', religions: 'Arachna\'s folk, the Daak church, Samorism', blurb: 'A small, rough republic of swamps, charcoal and mines.' },
-  { id: 'ovriga', sv: 'Övriga riken', en: 'Another realm', lo: 100, hi: 100, language: '?', peoples: 'Varies', religions: 'Varies', blurb: 'One of the many smaller or distant realms (agree with the game master). Name its language yourself.' },
+  { id: 'ovriga', sv: 'Övriga riken', en: 'Another realm', lo: 100, hi: 100, language: '?', peoples: 'Varies', religions: 'Varies', blurb: 'One of the many smaller or distant realms. Name its language yourself.' },
 ];

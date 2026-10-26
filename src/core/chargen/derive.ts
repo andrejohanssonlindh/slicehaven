@@ -496,12 +496,16 @@ export function derive(state: CharState, c: Content): Derived {
 
   // 4 — Religion
   const religion = c.religions.find((r) => r.id === state.religion);
+  const forcedNames = forcedReligion?.map((id) => c.religions.find((r) => r.id === id)?.en ?? id).join(' or ');
   if (religion && !godless) {
     if (forcedReligion && !forcedReligion.includes(religion.id) && !forcedReligion.includes(religion.parent ?? '')) {
-      warnings.push({ step: STEP.religion, text: `A trait you chose requires ${forcedReligion.map((id) => c.religions.find((r) => r.id === id)?.en ?? id).join(' or ')}.` });
+      warnings.push({ step: STEP.religion, text: `A trait you chose requires ${forcedNames}. Pick it below, or change the trait.` });
     }
     addSource('rel', STEP.religion, religion.en, '');
-  } else if (!religion && !godless) pending.push({ k: 'option', key: 'religion', step: STEP.religion, label: 'Choose a religion', options: [] });
+  } else if (!religion && !godless) {
+    pending.push({ k: 'option', key: 'religion', step: STEP.religion, label: 'Choose a religion', options: [] });
+    if (forcedReligion) warnings.push({ step: STEP.religion, text: `A trait you chose requires ${forcedNames}. Pick it below.` });
+  }
 
   // 5 — Archetype and environment
   if (archetype) {
@@ -613,8 +617,18 @@ export function derive(state: CharState, c: Content): Derived {
   });
   if (state.attrModel) {
     for (const a of attrs) {
-      if (a.points > MAX_POINTS_PER_ATTR) warnings.push({ step: STEP.attributes, text: `At most ${MAX_POINTS_PER_ATTR} points on ${ATTR_EN[a.attr]}.` });
+      if (a.points > MAX_POINTS_PER_ATTR) warnings.push({ step: STEP.attributes, text: `${ATTR_EN[a.attr]} has ${a.points} points added; at most ${MAX_POINTS_PER_ATTR} can be added to any one attribute.` });
       if (a.value < MIN_ATTR) warnings.push({ step: STEP.attributes, text: `${ATTR_EN[a.attr]} must end at ${MIN_ATTR} or more.` });
+    }
+    if (state.attrModel === 'fria') {
+      if (attrPoints.spent < attrPoints.total) warnings.push({ step: STEP.attributes, text: `${attrPoints.total - attrPoints.spent} point${attrPoints.total - attrPoints.spent === 1 ? '' : 's'} left to spend.` });
+      else if (attrPoints.spent > attrPoints.total) warnings.push({ step: STEP.attributes, text: `${attrPoints.spent - attrPoints.total} point${attrPoints.spent - attrPoints.total === 1 ? '' : 's'} too many spent.` });
+    } else {
+      const placed = Object.keys(state.attrLump).length;
+      if (placed < 8) warnings.push({ step: STEP.attributes, text: `${8 - placed} lump${placed === 7 ? '' : 's'} still to place.` });
+      const extraSpent = ATTRS.reduce((n, a) => n + (state.attrExtra[a] ?? 0), 0);
+      if (extraSpent < extraPoints) warnings.push({ step: STEP.attributes, text: `${extraPoints - extraSpent} extra point${extraPoints - extraSpent === 1 ? '' : 's'} from your traits still to spend.` });
+      else if (extraSpent > extraPoints) warnings.push({ step: STEP.attributes, text: `${extraSpent - extraPoints} extra point${extraSpent - extraPoints === 1 ? '' : 's'} too many spent (you have ${extraPoints}).` });
     }
   }
   const attrOf = (a: Attr) => attrs.find((x) => x.attr === a)!.value;
@@ -715,6 +729,7 @@ export function derive(state: CharState, c: Content): Derived {
     const spent = Object.values(state.alloc[pool] ?? {}).reduce((a, b) => a + (b || 0), 0);
     poolRows.push({ pool, total, spent });
     if (spent > total) warnings.push({ step: STEP.skills, text: `Too many ${POOL_EN[pool] ?? pool} units spent (${spent}/${total}).` });
+    else if (spent < total) warnings.push({ step: STEP.skills, text: `${total - spent} ${POOL_EN[pool] ?? pool} unit${total - spent === 1 ? '' : 's'} still to spend.` });
   }
   for (const pool of Object.keys(state.alloc)) if (!pools.has(pool) && Object.values(state.alloc[pool]).some((n) => n > 0)) warnings.push({ step: STEP.skills, text: `No ${POOL_EN[pool] ?? pool} units to spend.` });
 

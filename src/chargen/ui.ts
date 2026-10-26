@@ -2,6 +2,7 @@
 import { ATTR_EN, describe, NUMB_EN, POOL_EN, RARITY_EN, TABLE_EN, type Derived, type Effect, type Pending, type PickRec, type SourceRec } from '../core/chargen/derive';
 import type { CharState } from '../core/chargen/state';
 import { CONTENT } from '../content/chargen';
+import { packageEn } from '../content/chargen/equipment';
 import { PICKABLE_TABLES } from '../content/chargen/events';
 import { languageEn, SCRIPTS, SPOKEN } from '../content/chargen/languages';
 import { ASPECTS, SKILLS } from '../content/chargen/skills';
@@ -62,7 +63,7 @@ export function effectText(e: Effect, s: CharState): string {
     case 'rustning':
       return `a ${RARITY_EN[e.rarity]} armour`;
     case 'paket':
-      return e.name === '?' ? 'an equipment package' : `equipment: ${e.name}`;
+      return e.name === '?' ? 'an equipment package' : `equipment: ${esc(packageEn(e.name))}`;
     case 'mystikutr':
       return 'a set of mystic equipment';
     case 'silver':

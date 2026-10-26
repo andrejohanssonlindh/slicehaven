@@ -51,7 +51,7 @@ export function checkDetails(d: { name: string; age: string; gender: string; hei
     if (!text.trim()) return;
     const v = readNumber(text, metres);
     if (Number.isNaN(v)) out.push({ field, text: `${cap(field)} should be a number${unit ? ` (${unit})` : ''}.` });
-    else if (v < lo || v > hi) out.push({ field, text: `${cap(field)} ${v}${unit ? ` ${unit}` : ''} is far from usual for your people (about ${lo}–${hi}${unit ? ` ${unit}` : ''}). Fine if it's on purpose; check with your game master.` });
+    else if (v < lo || v > hi) out.push({ field, text: `${cap(field)} ${v}${unit ? ` ${unit}` : ''} is far from usual for your people (about ${lo}–${hi}${unit ? ` ${unit}` : ''}). Fine if it's on purpose.` });
   };
   if (body?.age) num('age', d.age, '', body.age.min, body.age.max);
   else num('age', d.age, '', 1, 2000);

@@ -55,7 +55,7 @@ export const INTRIGUES = table('ii', 'Intriger & illgärningar', 'Intrigues & Mi
   [48, 48, 'Insikt i undre världen', 'Knows the underworld', 'Skumraskaffärer 2; talang:Skumraskaffärer; välj(E:Kloaksystem 4 | E:Takvägar 4)'],
   [49, 49, 'Inställsam', 'Ingratiating', `attr:Intryck 2; K:Inställsam 4; talang:@social; ${LOCKED('Pacifism, Submission or the like')}`],
   [50, 50, 'Kidnappad', 'Kidnapped', 'attr:Förflyttning -1; avtr:utsatthet 2; slag:vf 1', 'Roll for your kidnapper or a fellow captive; you learned their skills.'],
-  [51, 51, 'Kontrakt', 'A contract', 'valfri 4; regel:A contract: agree with the game master what it covers. It must benefit all parties.'],
+  [51, 51, 'Kontrakt', 'A contract', 'valfri 4; regel:A contract: what it covers is set later. It must benefit all parties.'],
   [52, 52, 'Korrumperad', 'Corrupted', `grp:social 4; avtr:utsatthet 2; ${LOCKED('Power, Wealth, Lust or the like')}`],
   [53, 53, 'Känslokall', 'Cold-hearted', 'K:Stenhjärta 8; avtr:valfri 3'],
   [54, 54, 'Lek på liv och död', 'A game of life and death', `välj(Prey:: attr:Förflyttning 2, grp:rorelse 4, Vildmarksvana 2, avtr:utsatthet 1, avtr:vald 1, regel:Disorder: revulsion. | Hunter:: grp:strid 4, Rida 2, avtr:vald 2, regel:You must take Cruelty as one of your drives as a locked weakness.)`, 'Bored nobles hunted people for sport, and you were the hunter or the hunted.'],

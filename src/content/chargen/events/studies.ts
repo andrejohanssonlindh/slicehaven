@@ -40,7 +40,7 @@ export const STUDIES = table('sl', 'Studier & lärande', 'Studies & Learning', [
   [34, 34, 'Gastronomiska studier', 'Gastronomy', 'Kulturkännedom 2; F:Luktsinne 4; sprak 1; välj(E:Provsmakare 4 | E:Vinkonnässör 4 | E:Ölkännare 4)'],
   [35, 35, 'Givmild beskyddare', 'A generous patron', 'grp:kunskap 4; regel:You have a wealthy patron who can give support and help.'],
   [36, 36, 'Grupparbete', 'Group work', 'grp:kunskap 2; Ledarskap 2; välj(K:Förfinad vokabulär 4 | E:Utskällningar 4)'],
-  [37, 37, 'Går i sömnen', 'Sleepwalker', 'grp:kunskap 2; valfri 4; regel:Unless tied or locked in, you may wake somewhere other than where you went to sleep (once per session, the game master decides).'],
+  [37, 37, 'Går i sömnen', 'Sleepwalker', 'grp:kunskap 2; valfri 4; regel:Unless tied or locked in, you may wake somewhere other than where you went to sleep (once per session).'],
   [38, 38, 'Hederstitel', 'An honorary title', 'attr:Intryck 2; krets:?; foremal:A signet ring, diploma or the like showing your honorary membership.'],
   [39, 39, 'Hemligt bibliotek', 'A secret library', 'E:Bibliotekskunskap 2; regel:A secret library: +1 Control in the challenge Research there (+1 more on taboo subjects). Bring it in when it fits.'],
   [40, 40, 'Historiker', 'Historian', 'Berättarkonst 2; Historia 2; talang:Historia; välj(E:Kända krigare 4 | E:Legender & myter 4)'],

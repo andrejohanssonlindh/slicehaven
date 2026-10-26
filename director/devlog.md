@@ -1,5 +1,14 @@
 # Devlog
 
+## 2026-10-26 — Session 10: director's review turned into a plan
+
+Plans written, not built: [ranked backlog](design/backlog.md), [skill web](design/skill-web.md) (standard / object / quest hooks, intentions, gear, people, drives, terrain), [creator next pass](design/creator-next.md) (pre-set characters with locks, clearer event cards, life events as searchable hooks, handover for a content pass).
+Quick fixes done:
+- "Game master" / "GM allows" removed from the creator and the event texts.
+- Equipment package names (Craft tools etc.) are English on the sheet and in the list.
+- Attribute cap message reworded (no longer reads like a Vitality rule); warnings for unspent attribute lumps, trait points and skill units; religion warning says where to pick.
+- New questions Q17 (trait points per attribute) and Q18 (do failed social tries linger).
+
 ## 2026-10-26 — Session 9: clean-up
 
 We're in a design stage, building the engine in vignettes; nothing is finished and the final art style isn't set.

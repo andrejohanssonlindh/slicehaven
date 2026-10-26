@@ -12,7 +12,7 @@ import { languageEn, SCRIPTS, SPOKEN } from '../content/chargen/languages';
 import { DWARF_HOUSES, nameCultureOf } from '../content/chargen/names';
 import { SKILLS } from '../content/chargen/skills';
 import { armouryHtml, armouryView, slotSummary } from './armoury';
-import { itemEn } from '../content/chargen/equipment';
+import { itemEn, PACKAGES, packageEn } from '../content/chargen/equipment';
 import { die, esc, grants, pendingHtml, pickHtml, sourceHtml } from './ui';
 
 /** UI-only state (not saved). */
@@ -50,8 +50,8 @@ function warningsHtml(d: Derived, step: number): string {
 // ——— Preparation ———
 function prep(s: CharState): string {
   return `<h2>Preparation</h2>
-  ${intro('Talk with your game master and the other players before you start: what kind of adventures, any limits on what you may play, and how the characters know each other.')}
-  <label class="field"><span>Campaign notes, restrictions, the group's agreements</span>
+  ${intro('Note down anything fixed before you start: what kind of adventure this is, any limits on what you may play, and how the characters know each other.')}
+  <label class="field"><span>Notes, restrictions, agreements</span>
   <textarea data-bind="prep" placeholder="e.g. A campaign in Asharien; no pyromancers; we all serve the same merchant house…">${esc(s.prep)}</textarea></label>
   <div class="box"><h3>How this works</h3>
   <p>Some things you choose, some you roll for: tap a die button and the result is kept. Everything you pick feeds the later steps, and you can go back and change things. The later steps update by themselves.</p>
@@ -95,7 +95,7 @@ function background(s: CharState, d: Derived): string {
   ${intro('A piece of your past: a parent\'s trade, an earlier life. It is always rolled: d100 twice, then keep one. It gives one event-table roll, and you take two of its three skill options.')}
   <div class="row"><button type="button" class="${rolls.length ? '' : 'primary'}" data-act="rollBg">🎲 ${rolls.length ? 'Roll again' : 'Roll 2 × d100'}</button>
   ${rolls.length ? `<span class="dice">${rolls.map((r) => die(r)).join('')}</span>` : ''}
-  <button type="button" class="link small" data-act="toggleView" data-flag="showAllBackgrounds">${view.showAllBackgrounds ? 'show only rolled' : 'GM allows a free choice: show all 100'}</button></div>
+  <button type="button" class="link small" data-act="toggleView" data-flag="showAllBackgrounds">${view.showAllBackgrounds ? 'show only rolled' : 'show all 100'}</button></div>
   <div class="cards">${cards}</div>
   ${pick ? pickHtml(pick, d, s, `${d.background?.en}: take two`) : ''}
   ${sourcesFor(d, STEP.background).map((x) => sourceHtml(x, d, s)).join('')}`;
@@ -525,14 +525,12 @@ function details(s: CharState, d: Derived): string {
 
 // ——— Equipment ———
 function equipment(s: CharState, d: Derived): string {
-  const PACKAGES = ['Djur', 'Fiskeutrustning', 'Forskningsutrustning', 'Hantverksutrustning', 'Jaktutrustning', 'Medicinsk utrustning', 'Musikinstrument', 'Mystikutrustning', 'Skrivutrustning', 'Skönhetsutrustning', 'Tjuvutrustning', 'Underhållningsutrustning', 'Vildmarksutrustning', 'Vapenvårdsutrustning'];
-  const PACKAGES_EN: Record<string, string> = { Djur: 'Animal', Fiskeutrustning: 'Fishing gear', Forskningsutrustning: 'Research gear', Hantverksutrustning: 'Craft tools', Jaktutrustning: 'Hunting gear', 'Medicinsk utrustning': 'Medical kit', Musikinstrument: 'Musical instrument', Mystikutrustning: 'Mystic gear', Skrivutrustning: 'Writing kit', Skönhetsutrustning: 'Beauty kit', Tjuvutrustning: "Thief's tools", Underhållningsutrustning: "Entertainer's kit", Vildmarksutrustning: 'Wilderness gear', Vapenvårdsutrustning: 'Weapon care kit' };
   const pk = d.packages
     .map(
       (p) => `<label class="field"><span>Package${p.name !== '?' ? '' : ' (your choice)'}</span>${
         p.name !== '?'
-          ? `<b>${esc(PACKAGES_EN[p.name] ?? p.name)}</b>`
-          : `<select data-act-change="equip" data-kind="packages" data-key="${esc(p.key)}"><option value="">Choose…</option>${PACKAGES.map((x) => `<option value="${x}" ${s.equipment.packages[p.key] === x ? 'selected' : ''}>${esc(PACKAGES_EN[x])}</option>`).join('')}</select>`
+          ? `<b>${esc(packageEn(p.name))}</b>`
+          : `<select data-act-change="equip" data-kind="packages" data-key="${esc(p.key)}"><option value="">Choose…</option>${PACKAGES.map((x) => `<option value="${x}" ${s.equipment.packages[p.key] === x ? 'selected' : ''}>${esc(packageEn(x))}</option>`).join('')}</select>`
       }</label>`,
     )
     .join('');

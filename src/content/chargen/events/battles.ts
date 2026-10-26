@@ -39,7 +39,7 @@ export const BATTLES = table('sd', 'Strider & drabbningar', 'Battles & Skirmishe
   [32, 32, 'Gladiatorkamp', 'Gladiator fight', 'attr:Intryck 1; grp:social 2; grp:strid 2'],
   [33, 33, 'God kondition', 'Good stamina', 'attr:Förflyttning 2; attr:Livskraft 1'],
   [34, 34, 'Hederskodex', 'Code of honour', 'attr:Självkontroll 4; regel:You have a drive tied to your code of honour, as a locked weakness. Replacing it (other than briefly) means abandoning the code.'],
-  [35, 35, 'Hemsökt av gast', 'Haunted by a ghost', 'grp:strid 2; Ockultism 2; avtr:overnaturligt 2; slag:vfn 1; regel:A ghost haunts you until you do it three services (the game master decides which).'],
+  [35, 35, 'Hemsökt av gast', 'Haunted by a ghost', 'grp:strid 2; Ockultism 2; avtr:overnaturligt 2; slag:vfn 1; regel:A ghost haunts you until you do it three services.'],
   [36, 36, 'Hårdhudad', 'Thick-skinned', 'grundrustning 2; regel:+2D6 on all amputation and break-risk rolls.'],
   [37, 37, 'Karavanvakt', 'Caravan guard', 'E:Kränga 4; Marsch 2; Speja 2; inkomp:Berättarkonst'],
   [38, 38, 'Kommenderat skepp', 'Commanded a ship', 'grp:social 4; Sjömannaskap 2'],

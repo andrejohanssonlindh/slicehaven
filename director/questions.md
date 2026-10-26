@@ -4,6 +4,14 @@ Newest on top. Answer in chat (just reference the number, e.g. "Q11: option B").
 
 ---
 
+### Q17 — Extra attribute points from traits: any limit per attribute?
+Some traits give "+2 / +4 / +6 extra attribute points". Today you can put them all on one attribute (only the cap of 10 added per attribute applies), and the 5/1 split you spotted is allowed. Is that intended?
+- **A)** Free, as now. **B)** At most 2 on any one attribute. **C)** Another limit you know of.
+*Surfaced by your review; see [creator next](design/creator-next.md).*
+
+### Q18 — Does a failed social try have a lasting cost?
+When Argue (or Charm…) fails on an NPC, do they remember it next time (this scene / for good), or is each try fresh? Affects the [skill web](design/skill-web.md). My suggestion: remembered for the scene, reset when you leave.
+
 ### Q11 — Private repo, but testable from anywhere *(you asked: can it be private?)*
 Short version: **a private repo does not make the site private.** GitHub Pages sites are public even when the repo is private, unless the account is on GitHub Enterprise Cloud. So there are three ways, and I haven't changed anything yet:
 

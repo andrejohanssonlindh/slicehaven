@@ -316,3 +316,8 @@ export function physiqueCheck(need: string, physique: Dice): { penalty: number }
 export function itemEn(sv: string): string {
   return WEAPONS.find((x) => x.sv === sv)?.en ?? SHIELDS.find((x) => x.sv === sv)?.en ?? ARMOUR.find((x) => x.sv === sv)?.en ?? sv;
 }
+
+/** Equipment packages: the source key and its English name. */
+export const PACKAGES_EN: Record<string, string> = { Djur: 'Animal', Fiskeutrustning: 'Fishing gear', Forskningsutrustning: 'Research gear', Hantverksutrustning: 'Craft tools', Jaktutrustning: 'Hunting gear', 'Medicinsk utrustning': 'Medical kit', Musikinstrument: 'Musical instrument', Mystikutrustning: 'Mystic gear', Skrivutrustning: 'Writing kit', Skönhetsutrustning: 'Beauty kit', Tjuvutrustning: "Thief's tools", Underhållningsutrustning: "Entertainer's kit", Vildmarksutrustning: 'Wilderness gear', Vapenvårdsutrustning: 'Weapon care kit' };
+export const PACKAGES = Object.keys(PACKAGES_EN);
+export const packageEn = (sv: string): string => PACKAGES_EN[sv] ?? sv;

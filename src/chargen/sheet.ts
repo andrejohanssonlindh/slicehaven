@@ -2,7 +2,7 @@
 import { ATTR_EN, NUMB_EN, TABLE_EN, type Derived } from '../core/chargen/derive';
 import type { CharState } from '../core/chargen/state';
 import { diceText, ENCUMBRANCE } from '../core/chargen/tables';
-import { ARMOUR, DAMAGE_TYPE_EN, itemEn, propsEn, SHIELDS, WEAPONS, withBaseDamage } from '../content/chargen/equipment';
+import { ARMOUR, DAMAGE_TYPE_EN, itemEn, packageEn, propsEn, SHIELDS, WEAPONS, withBaseDamage } from '../content/chargen/equipment';
 import { CONTENT } from '../content/chargen';
 import { DRIVES } from '../content/chargen/drives';
 import { languageEn } from '../content/chargen/languages';
@@ -91,7 +91,7 @@ export function sheetHtml(s: CharState, d: Derived): string {
   const scripts = [...d.languages.written, ...s.languages.written];
   const circles = d.circles.map((c) => s.circles[c.key] || (c.name !== '?' ? c.name : '')).filter(Boolean);
   const companions = d.companions.map((c) => `${esc(c.kind)}${s.companions[c.key] ? `: ${esc(s.companions[c.key])}` : ''}`);
-  const packages = d.packages.map((p) => esc(p.name !== '?' ? p.name : s.equipment.packages[p.key] || '(package, not chosen)'));
+  const packages = d.packages.map((p) => esc(packageEn(p.name !== '?' ? p.name : s.equipment.packages[p.key]) || '(package, not chosen)'));
   const spent = s.equipment.bought.reduce((n, b) => n + b.cost * b.qty, 0);
   const events = d.slots
     .filter((x) => x.results.length)

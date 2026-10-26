@@ -25,6 +25,9 @@ This is the backstage area for Slicehaven: not part of the game, but where I (Cl
 - [Magic: filaments](design/magic-filaments.md): where magic flows strong or weak, and why.
 - [Magic on the map](design/magic-on-map.md): what each mystic skill could do in play.
 - [Roadmap](design/roadmap.md): candidate vignettes.
+- [Backlog (ranked)](design/backlog.md): what's open in the creator and in skills, in priority order.
+- [Skill web](design/skill-web.md): how skills meet the world (standard / object / quest hooks, intentions, gear, people, drives, terrain).
+- [Creator: next design pass](design/creator-next.md): pre-set characters, clearer event cards, life events as game hooks.
 
 ## World and art
 - [World notes (Eon)](world/eon-notes.md): what we borrow and where we start.
