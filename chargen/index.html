@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#1a1420" />
+    <title>Character Creator</title>
+    <link rel="stylesheet" href="/src/chargen/chargen.css" />
+  </head>
+  <body>
+    <header id="top">
+      <a class="back" href="../" aria-label="Back to the game">←</a>
+      <div class="title">
+        <strong>Character Creator</strong>
+        <span id="char-name"></span>
+      </div>
+      <button type="button" id="btn-menu" aria-label="Characters">☰</button>
+    </header>
+    <nav id="steps" aria-label="Steps"></nav>
+    <main id="app"></main>
+    <footer id="nav">
+      <button type="button" id="btn-prev">← Back</button>
+      <span id="step-info"></span>
+      <button type="button" id="btn-next" class="primary">Next →</button>
+    </footer>
+    <dialog id="menu"></dialog>
+    <div id="toast" hidden></div>
+    <script type="module" src="/src/chargen/main.ts"></script>
+  </body>
+</html>

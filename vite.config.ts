@@ -10,6 +10,7 @@ export default defineConfig({
         game: 'index.html',
         director: 'director/index.html',
         artlab: 'artlab/index.html',
+        chargen: 'chargen/index.html',
       },
     },
   },
