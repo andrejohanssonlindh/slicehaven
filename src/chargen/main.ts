@@ -322,6 +322,23 @@ app.parentElement!.addEventListener('click', (ev) => {
       else s.languages.written.splice(i - s.languages.spoken.length, 1);
       return commit();
     }
+    case 'rollDrives':
+      return void withRoll(100, 4, () => {
+        s.subRolls.drives = Array.from({ length: 4 }, () => roll(s, 100));
+      });
+    case 'drive': {
+      const v = a.val as string;
+      if (s.drives.primary === v) s.drives.primary = undefined;
+      else if (s.drives.secondary === v) s.drives.secondary = undefined;
+      else if (!s.drives.primary) s.drives.primary = v;
+      else if (!s.drives.secondary) s.drives.secondary = v;
+      else return toast('You already have two drives: remove one first.');
+      return commit();
+    }
+    case 'dropDrive':
+      if (s.drives.primary === a.val) s.drives.primary = undefined;
+      if (s.drives.secondary === a.val) s.drives.secondary = undefined;
+      return commit();
     case 'armRoll':
       return void withRoll(10, 1, () => {
         s.details.armRoll = roll(s, 10);

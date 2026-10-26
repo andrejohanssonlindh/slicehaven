@@ -57,7 +57,7 @@ Then: **Character sheet**, 4 sections like the book's (person, attributes & skil
 | Archetypes (9), environments (10), living standards (6) | ✅ |
 | Event tables: 6 × 100 + Friends & Foes (roll twice, keep one) | ✅ |
 | Languages (43 tongues, 14 scripts, "can read" hint) | ✅ |
-| Drives (step 11) | ⏳ free text for now: list of drives and levels still to add |
+| Drives (step 11): 45 drives with three levels, roll 4 keep 2, locked drives from events shown | ✅ |
 | Equipment: packages, weapon & armour lists with stats, prices | ⏳ names only for now |
 | Mystic gear and the mystery lists | ⏳ free text for now |
 | Name suggestions per culture | ⏳ not started |

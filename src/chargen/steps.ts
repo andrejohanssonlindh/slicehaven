@@ -6,6 +6,7 @@ import { diceText, MAX_POINTS_PER_ATTR, POINT_MODELS } from '../core/chargen/tab
 import type { Family } from '../core/chargen/types';
 import { CONTENT } from '../content/chargen';
 import { FAMILY_ORDER } from '../content/chargen/peoples';
+import { DRIVE_REWARDS, DRIVES } from '../content/chargen/drives';
 import { languageEn, SCRIPTS, SPOKEN } from '../content/chargen/languages';
 import { SKILLS } from '../content/chargen/skills';
 import { die, esc, grants, pendingHtml, pickHtml, sourceHtml } from './ui';
@@ -418,12 +419,28 @@ function scriptHint(spoken: string[], written: string[]): string {
 }
 
 // ——— 10 Drives ———
-function drives(s: CharState): string {
+function drives(s: CharState, d: Derived): string {
+  const rolls = s.subRolls.drives ?? [];
+  const locked = d.rules.filter((r) => /as (one of your drives|a drive)/.test(r.text));
+  const chosen = (sv?: string) => DRIVES.find((x) => x.sv === sv);
+  const box = (label: string, sv?: string) => {
+    const dr = chosen(sv);
+    if (!sv) return `<div class="box todo"><h3>${label}</h3><p class="muted small">Tap a drive below.</p></div>`;
+    return `<div class="box hi"><div class="row spread"><h3 style="margin:0">${label}: ${esc(dr?.en ?? sv)}</h3><button type="button" class="link small" data-act="dropDrive" data-val="${esc(sv)}">remove</button></div>
+      ${dr ? `<p class="small muted">${esc(dr.blurb)}</p><ol class="small">${dr.levels.map((l) => `<li>${esc(l)}</li>`).join('')}</ol>` : ''}</div>`;
+  };
+  const cards = DRIVES.map((x) => {
+    const on = s.drives.primary === x.sv || s.drives.secondary === x.sv;
+    const rolled = rolls.some((r) => r >= x.lo && r <= x.hi);
+    return `<button type="button" class="card ${on ? 'on' : ''} ${rolled ? 'rolled' : ''}" data-act="drive" data-val="${esc(x.sv)}"><span class="name"><span class="num">${x.lo}–${x.hi}</span>${esc(x.en)}</span><span class="what">${esc(x.blurb)}</span></button>`;
+  }).join('');
   return `<h2>11. Drives</h2>
-  ${intro('Your primary drive is the core of who you are; the secondary one is easier to give up. Each has three levels of deeds. Fulfilling them restores Focus and Wellbeing and heals the mind.')}
-  <label class="field"><span>Primary drive</span><input data-bind="drives.primary" value="${esc(s.drives.primary ?? '')}" placeholder="e.g. Thirst for knowledge" /></label>
-  <label class="field"><span>Secondary drive</span><input data-bind="drives.secondary" value="${esc(s.drives.secondary ?? '')}" placeholder="e.g. Joy of creation" /></label>
-  <p class="small muted">The list of drives with their levels is coming in a later update.</p>`;
+  ${intro('Your primary drive is the core of who you are; the secondary one is easier to give up. Each has three levels of deeds, and fulfilling them restores Focus and Wellbeing and heals the mind. Choose freely, or roll four times and keep two.')}
+  ${locked.length ? `<div class="box todo"><h3>Required by your past</h3>${locked.map((r) => `<p class="small">${esc(r.text)} <span class="muted">(${esc(r.from)})</span></p>`).join('')}</div>` : ''}
+  ${box('Primary', s.drives.primary)}${box('Secondary', s.drives.secondary)}
+  <div class="box"><p class="small">${DRIVE_REWARDS.map(esc).join('<br>')}</p></div>
+  <div class="row"><button type="button" data-act="rollDrives">🎲 Roll 4 × d100</button>${rolls.length ? `<span class="dice">${rolls.map((r) => die(r, 'small')).join('')}</span>` : ''}</div>
+  <div class="cards">${cards}</div>`;
 }
 
 // ——— 11 Details ———

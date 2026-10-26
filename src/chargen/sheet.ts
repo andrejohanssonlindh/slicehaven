@@ -3,6 +3,7 @@ import { ATTR_EN, NUMB_EN, RARITY_EN, TABLE_EN, type Derived } from '../core/cha
 import type { CharState } from '../core/chargen/state';
 import { diceText } from '../core/chargen/tables';
 import { CONTENT } from '../content/chargen';
+import { DRIVES } from '../content/chargen/drives';
 import { languageEn } from '../content/chargen/languages';
 import { esc } from './ui';
 
@@ -85,7 +86,13 @@ export function sheetHtml(s: CharState, d: Derived): string {
     ])}</div>
   </div>
   ${doctrines.length ? `<p><b>Doctrines:</b> ${doctrines.join('; ')}</p>` : ''}
-  ${s.drives.primary || s.drives.secondary ? `<p><b>Drives:</b> ${esc(s.drives.primary ?? '')}${s.drives.secondary ? ` (primary) · ${esc(s.drives.secondary)} (secondary)` : ''}</p>` : ''}
+  ${[['Primary drive', s.drives.primary], ['Secondary drive', s.drives.secondary]]
+    .filter(([, v]) => v)
+    .map(([label, v]) => {
+      const dr = DRIVES.find((x) => x.sv === v);
+      return `<p><b>${label}: ${esc(dr?.en ?? v)}</b>${dr ? `<br><span class="note">I ${esc(dr.levels[0])} · II ${esc(dr.levels[1])} · III ${esc(dr.levels[2])}</span>` : ''}</p>`;
+    })
+    .join('')}
   ${D.appearance ? `<p><b>Appearance:</b> ${esc(D.appearance)}</p>` : ''}
 
   <h2>Attributes & skills</h2>
