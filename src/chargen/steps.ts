@@ -1,5 +1,5 @@
 /** Renderers for each creation step. Pure string templates; main.ts wires the actions. */
-import { ATTR_EN, NUMB_EN, POOL_EN, poolAllows, RARITY_EN, STEP, TABLE_EN, type Derived, type SourceRec } from '../core/chargen/derive';
+import { ATTR_EN, baseTable, NUMB_EN, POOL_EN, poolAllows, rollsTwice, RARITY_EN, STEP, TABLE_EN, type Derived, type SourceRec } from '../core/chargen/derive';
 import { ATTRS, type Attr } from '../core/chargen/grants';
 import type { CharState } from '../core/chargen/state';
 import { diceText, MAX_POINTS_PER_ATTR, POINT_MODELS } from '../core/chargen/tables';
@@ -206,7 +206,7 @@ function events(s: CharState, d: Derived): string {
   const toStrike = d.sources.flatMap((x) => x.effects).reduce((n, e) => (e.k === 'stryk' ? n + e.n : n), 0);
   const rows = d.slots
     .map((slot, i) => {
-      const t = slot.table ? CONTENT.tables[slot.table] : undefined;
+      const t = slot.table ? CONTENT.tables[baseTable(slot.table)] : undefined;
       const tablePick = d.pending.find((p) => p.key === `${slot.key}.t`);
       const vals = slot.rec?.values ?? [];
       const results = slot.results
@@ -218,14 +218,25 @@ function events(s: CharState, d: Derived): string {
             ${r.again ? '<p class="small warn">…and roll this one again.</p>' : ''}</div>`;
         })
         .join('');
-      const canReroll = !s.rerollUsed && slot.results.length > 0;
+      const offer = s.rolls[slot.key]?.offer;
+      const offerHtml = offer
+        ? `<div class="pending"><div class="label">Rolled twice: keep one</div><div class="cards">${offer
+            .map((v) => {
+              const e = t?.entries.find((x) => v >= x.lo && v <= x.hi);
+              const g = slot.table === 'vf' ? grants(e?.g ?? '') : slot.table === 'vfk' ? 'a circle named after them' : '';
+              return `<button type="button" class="card" data-act="keepOffer" data-key="${esc(slot.key)}" data-val="${v}"><span class="name"><span class="num">${v}</span>${esc(e?.en ?? '')}</span>${g ? `<span class="what">${g}</span>` : ''}</button>`;
+            })
+            .join('')}</div></div>`
+        : '';
+      const rerollTaken = !!s.rerollUsed && d.slots.some((x) => x.key === s.rerollUsed && x.results.length > 0);
+      const canReroll = !rerollTaken && slot.results.length > 0;
       return `<div class="box ${slot.needsRoll || tablePick ? 'todo' : ''}">
         <div class="row spread"><strong>${i + 1}. ${t ? esc(t.en) : 'Any table'}</strong><span class="small muted">from ${esc(slot.from)}</span></div>
         ${slot.struck ? `<p class="muted">Given up. <button type="button" class="link small" data-act="strike" data-key="${esc(slot.key)}">take it back</button></p>` : `
         ${tablePick ? pendingHtml(tablePick) : slot.table && s.choices[`${slot.key}.t`] ? `<button type="button" class="link small" data-act="unchooseKey" data-key="${esc(slot.key)}.t">change table</button>` : ''}
-        ${results}
+        ${results}${offerHtml}
         <div class="row">
-          ${slot.needsRoll ? `<button type="button" class="primary" data-act="rollSlot" data-key="${esc(slot.key)}">🎲 Roll d100</button>` : ''}
+          ${slot.needsRoll && !offer ? `<button type="button" class="primary" data-act="rollSlot" data-key="${esc(slot.key)}">🎲 Roll ${rollsTwice(slot.table) ? '2 × ' : ''}d100</button>` : ''}
           ${canReroll ? `<button type="button" class="small" data-act="reroll" data-key="${esc(slot.key)}">Re-roll (once per character)</button>` : ''}
           ${s.rerollUsed === slot.key ? '<span class="small muted">re-rolled</span>' : ''}
           ${toStrike ? `<button type="button" class="link small" data-act="strike" data-key="${esc(slot.key)}">give up this roll</button>` : ''}

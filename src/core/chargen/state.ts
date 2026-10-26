@@ -12,6 +12,8 @@ export interface RollRec {
   table: TableId;
   /** All d100 results in order; the last one counts (a re-roll appends). */
   values: number[];
+  /** Tables rolled twice (Friends & Foes): the two results waiting for the player to keep one. */
+  offer?: number[];
 }
 
 export interface CharState {

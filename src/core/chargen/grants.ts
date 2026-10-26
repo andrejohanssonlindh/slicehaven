@@ -22,6 +22,7 @@
  *   sprak N              free language picks;  tal:<name>  skrift:<name>  (a spoken/written language)
  *   avtr:<c> N           hardening crosses (utsatthet vald overnaturligt valfri)
  *   talang:<skill>[/..]  talent;  inkomp:<skill>[/..]  incompetence;  block:<skill>
+ *                        (a skill may be @group = any skill in that group, or * = any skill)
  *   omstopt              becomes attuned (base 1 in Förnimma)
  *   krets:<name|?>       a circle;  foljeslagare:<kind>  a companion
  *   vapen:<r> N  rustning:<r> N   weapon/armour picks of rarity vanlig/ovanlig/sallsynt
@@ -39,7 +40,11 @@
  *   grund:<skill> N      the skill's base value becomes N
  */
 
-export const TABLES = ['fa', 'ii', 'mu', 'sd', 'sl', 'th', 'vf', 'valfri'] as const;
+/**
+ * Event tables. vf = Friends & Foes (you get the person's two skills), vfn = a person
+ * from that table without the skills, vfk = a circle named after the person.
+ */
+export const TABLES = ['fa', 'ii', 'mu', 'sd', 'sl', 'th', 'vf', 'vfn', 'vfk', 'valfri'] as const;
 export type TableId = (typeof TABLES)[number];
 export const ATTRS = ['Förflyttning', 'Intryck', 'Kroppsbyggnad', 'Livskraft', 'Reaktion', 'Självkontroll', 'Vaksamhet', 'Visdom'] as const;
 export type Attr = (typeof ATTRS)[number];
@@ -230,6 +235,6 @@ export function parseGrants(src: string): Item[] {
 
 /** Every skill id a token refers to (for validation). */
 export function tokenSkills(t: Token): string[] {
-  if (t.k === 'skill' || t.k === 'talang' || t.k === 'inkomp' || t.k === 'block') return t.skill;
+  if (t.k === 'skill' || t.k === 'talang' || t.k === 'inkomp' || t.k === 'block') return t.skill.filter((x) => x !== '*' && !x.startsWith('@'));
   return [];
 }

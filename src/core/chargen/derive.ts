@@ -303,9 +303,14 @@ export function derive(state: CharState, c: Content): Derived {
       pending.push({ k: 'alt', key, step, label, options: names, what });
       return undefined;
     };
+    const expand = (list: string[]) =>
+      list.flatMap((x) =>
+        x === '*' ? c.skills.filter((k) => k.group.length > 1).map((k) => k.id) : x.startsWith('@') ? c.skills.filter((k) => k.group === x.slice(1)).map((k) => k.id) : [x],
+      );
     switch (t.k) {
       case 'skill': {
-        const s = alt(t.skill, 'skill', t.skill.map((x) => c.skill(x)?.en ?? x));
+        const list = expand(t.skill);
+        const s = alt(list, 'skill', list.map((x) => c.skill(x)?.en ?? x));
         if (s) out.push({ k: 'skill', skill: s, n: t.n });
         return;
       }
@@ -343,7 +348,8 @@ export function derive(state: CharState, c: Content): Derived {
           else pending.push({ k: 'name', key, step, label, kind: nm[1], n: 0 });
           return;
         }
-        const s = alt(t.skill, 'skill', t.skill.map((x) => c.skill(x)?.en ?? x));
+        const list = expand(t.skill);
+        const s = alt(list, 'skill', list.map((x) => c.skill(x)?.en ?? x));
         if (s) out.push({ k: t.k, skill: s });
         return;
       }
@@ -554,20 +560,22 @@ export function derive(state: CharState, c: Content): Derived {
         slots.push(slot);
         continue;
       }
+      const t = table ? c.tables[baseTable(table)] : undefined;
       if (slot.rec && table) {
-        const t = c.tables[table];
         for (const v of slot.rec.values) {
           const entry = t?.entries.find((x) => v >= x.lo && v <= x.hi);
           if (!entry) break;
           slot.results.push(entry);
           const idx = slot.results.length - 1;
-          addSource(`${e.slot}:${idx}`, STEP.events, `${t?.en ?? table} ${v}: ${entry.en}`, entry.g);
+          // Friends & Foes: the person's skills, just the person, or a circle named after them.
+          const g = table === 'vfn' ? '' : table === 'vfk' ? `krets:${entry.en}` : entry.g;
+          addSource(`${e.slot}:${idx}`, STEP.events, `${t?.en ?? table} ${v}: ${entry.en}`, g);
           if (!entry.again) break;
         }
         const last = slot.results[slot.results.length - 1];
         slot.needsRoll = !last || !!last.again;
       }
-      if (slot.needsRoll && table) pending.push({ k: 'roll', key: e.slot, step: STEP.events, label: `${c.tables[table]?.en ?? table} (from ${from})`, table });
+      if (slot.needsRoll && table) pending.push({ k: 'roll', key: e.slot, step: STEP.events, label: `${t?.en ?? table} (from ${from})`, table });
       slots.push(slot);
     }
   }
@@ -780,6 +788,16 @@ export function derive(state: CharState, c: Content): Derived {
   return derived;
 }
 
+/** The real table behind a table id (the Friends & Foes variants share one). */
+export function baseTable(t: TableId): TableId {
+  return t === 'vfn' || t === 'vfk' ? 'vf' : t;
+}
+
+/** Tables that are rolled twice, keeping one of the two. */
+export function rollsTwice(t: TableId | undefined): boolean {
+  return t === 'vf' || t === 'vfn' || t === 'vfk';
+}
+
 function needsAttunementInfo(def: SkillInfo): boolean {
   return def.group === 'mystik' && def.id !== 'Ceremoni';
 }
@@ -798,6 +816,8 @@ const TABLE_EN: Record<TableId, string> = {
   sl: 'Studies & Learning',
   th: 'Sorcery & Witchcraft',
   vf: 'Friends & Foes',
+  vfn: 'Friends & Foes',
+  vfk: 'Friends & Foes (as a circle)',
   valfri: 'any table',
 };
 export const POOL_EN: Record<string, string> = {

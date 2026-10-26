@@ -1,7 +1,7 @@
 /** Character creator page: state, saving, actions and rendering. */
-import { derive, STEP, STEPS, type Derived } from '../core/chargen/derive';
+import { derive, rollsTwice, STEP, STEPS, type Derived } from '../core/chargen/derive';
 import type { Attr, TableId } from '../core/chargen/grants';
-import { exportChar, importChar, loadRoster, newChar, roll, saveRoster, type CharState, type Roster } from '../core/chargen/state';
+import { exportChar, importChar, loadRoster, newChar, roll, saveRoster, type CharState, type RollRec, type Roster } from '../core/chargen/state';
 import type { PointModel } from '../core/chargen/tables';
 import type { Family } from '../core/chargen/types';
 import { CONTENT } from '../content/chargen';
@@ -126,8 +126,10 @@ function setPath(path: string, value: string): void {
 function rollSlot(key: string): void {
   const slot = d.slots.find((x) => x.key === key);
   if (!slot?.table) return;
-  const rec = s.rolls[key] && s.rolls[key].table === slot.table ? s.rolls[key] : { table: slot.table, values: [] };
-  rec.values = [...slot.results.map((_, i) => rec.values[i]), roll(s, 100)];
+  const rec: RollRec = s.rolls[key] && s.rolls[key].table === slot.table ? s.rolls[key] : { table: slot.table, values: [] };
+  rec.values = slot.results.map((_, i) => rec.values[i]);
+  if (rollsTwice(slot.table)) rec.offer = [roll(s, 100), roll(s, 100)];
+  else rec.values.push(roll(s, 100));
   s.rolls[key] = rec;
 }
 
@@ -233,7 +235,7 @@ app.parentElement!.addEventListener('click', (ev) => {
         // Roll until nothing more is open (results may add slots).
         for (let i = 0; i < 50; i++) {
           const dd = derive(s, CONTENT);
-          const next = dd.slots.find((x) => x.needsRoll && x.table);
+          const next = dd.slots.find((x) => x.needsRoll && x.table && !s.rolls[x.key]?.offer);
           if (!next) break;
           d = dd;
           rollSlot(next.key);
@@ -241,13 +243,23 @@ app.parentElement!.addEventListener('click', (ev) => {
       });
     }
     case 'reroll':
-      if (s.rerollUsed) return toast('You have already used your one re-roll.');
+      if (s.rerollUsed && d.slots.some((x) => x.key === s.rerollUsed && x.results.length)) return toast('You have already used your one re-roll.');
       return void withRoll(100, 1, () => {
         const rec = s.rolls[key];
         if (!rec) return;
-        rec.values = [...rec.values.slice(0, -1), roll(s, 100)];
+        if (rollsTwice(rec.table)) {
+          rec.values = rec.values.slice(0, -1);
+          rec.offer = [roll(s, 100), roll(s, 100)];
+        } else rec.values = [...rec.values.slice(0, -1), roll(s, 100)];
         s.rerollUsed = key;
       });
+    case 'keepOffer': {
+      const rec = s.rolls[key];
+      if (!rec?.offer) return;
+      rec.values.push(Number(a.val));
+      delete rec.offer;
+      return commit();
+    }
     case 'strike':
       if (s.choices[`strike:${key}`] === 1) delete s.choices[`strike:${key}`];
       else s.choices[`strike:${key}`] = 1;
