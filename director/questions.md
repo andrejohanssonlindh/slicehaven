@@ -4,6 +4,15 @@ Newest on top. Answer in chat (just reference the number, e.g. "Q3: option B"). 
 
 ---
 
+### Q14 — The gate: should "useful here" be shown? *(new)*
+Right now **Use a skill** flags the skills that would work on a thing ("✓ Useful here": Climb on the boulder, Search on the cart). That's friendly on a phone, but it gives the puzzle away. Options: **A)** keep flagging (what it does now); **B)** flag only after you've *looked* at the thing; **C)** never flag, and let a Sensing/Alertness roll hint at it. I'd go with A while we test, then B.
+
+### Q15 — Talking: one approach, or switch mid-conversation? *(new)*
+Now you pick bribe, threaten *or* sweet-talk and stay with it for all three rolls. The rules would also allow mixing (e.g. a bribe, then a threat). Mixing is more flexible, but the "three directions" feel gets muddier. **A)** one approach per try (now); **B)** switch freely, each roll judged by the approach you choose for it.
+
+### Q16 — Gold or silver? *(new)*
+You said gold, so the gate scene uses gold (100 to start). The character creator uses silver, like the rules. Should the game's money be **gold** or **silver**, or both (silver for everyday, gold for big sums)?
+
 ### Q12 — Starting silver without living standards
 With living standards gone, most characters start with little or no silver (a scholar has 0). Buying gear needs silver. Options: **A)** fine, the game engine will hand out silver its own way; **B)** a flat starting purse for everyone (e.g. 30 silver); **C)** a purse by archetype. I'd go with A for now and decide when the campaign economy exists.
 

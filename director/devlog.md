@@ -1,5 +1,19 @@
 # Devlog
 
+## 2026-10-26 — Session 8: the village gate (skills and talking)
+
+The director's first test of skills and talking to the world. [Play it](https://andrejohanssonlindh.github.io/slicehaven/scene/) ("Gate" in the sandbox top bar). Design and rules: [Exploration scenes](design/exploration-scenes.md).
+
+- **New scene:** a village gate at night. There's a palisade, a guard with a torch, a big ivy-grown boulder, a handcart, travellers round a campfire, and cottages behind the wall. Four ways in: argue (bribe / threaten / sweet-talk), climb the ivy (Climb 15, two tries before the guard notices), search the cart for a trader's pass, or sleep by the fire and wake up robbed of 70% of your gold. You start with 100.
+- **Things bigger than one hex:** the boulder covers three hexes, the cart and gate two. Units can have a shape too (for big monsters later): they block every hex they cover and only move where they fit.
+- **Use a skill, anywhere:** every thing has it. Skills that would work are flagged "useful here". Anything else gets a line and no roll.
+- **Social conflicts** after the rules: three rounds, Control, locked roll, −2D6 for repeats, situation ±2, and the guard cancels your Control with his. Each approach has its own reasonable skills.
+- **Real dice:** open-ended D6 pools with the rolls shown in full.
+- **Console** at the bottom: the last two lines, tap to open the whole log.
+- **Your own hero:** the scene plays your current creator character (or a default shepherd). Tap your hero to see your dice or switch.
+- New art: palisade, gate (shut and open), ivy boulder, handcart, campfire (lit and out), cottages with lit windows, a guard and three travellers.
+- 19 new tests (80 in total). Fuzz-tested in the browser with random taps: no errors, nothing stuck.
+
 ## 2026-10-26 — Session 7: character creator, first review fixes
 
 From the director's notes on the first playable creator:

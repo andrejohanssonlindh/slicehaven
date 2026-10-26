@@ -53,7 +53,49 @@ const SHEPHERD_BODY = [
 export const VILLAGER_COLORS: Record<string, Record<string, string>> = {
   shepherd: {},
   herbalist: { H: '#79a85a', h: '#4f7a3c', d: '#2f4f28', w: '#e2d4ac', W: '#b8a882', s: '#e8b88e', S: '#b88460' },
+  // Gate guard: steel coif, red tabard.
+  guard: { H: '#a8aebb', h: '#6e7484', d: '#41455a', w: '#a8322c', W: '#6e1e1e', b: '#2a1a12', p: '#4a4038', s: '#e0a882', S: '#a87458' },
+  tinker: { H: '#7a5a8a', h: '#56406a', d: '#382a48', w: '#a8824f', W: '#7a5a38' },
+  crone: { H: '#6e6a74', h: '#4c4852', d: '#2e2c36', w: '#5a6e7a', W: '#3c4c58', s: '#e8c0a0', S: '#b08870' },
+  youth: { H: '#4b7d40', h: '#36623a', d: '#1c3326', w: '#c9a66b', W: '#a8824f', s: '#d8a078', S: '#a07050' },
 };
+
+/** What a villager holds in the right hand. */
+type Tool = 'crook' | 'spear' | 'stick';
+
+function makeTool(tool: Tool): Pix {
+  const staff = new Pix(20, 31);
+  if (tool === 'spear') {
+    // Tall shaft with a steel head.
+    for (let y = 5; y < 31; y++) staff.set(17, y, y % 6 === 0 ? '#5a4028' : '#8a6a44');
+    for (const [x, y, c] of [[17, 0, '#e8ecf0'], [17, 1, '#bcc2cc'], [16, 2, '#8e93a1'], [17, 2, '#bcc2cc'], [18, 2, '#686b7b'],
+      [16, 3, '#8e93a1'], [17, 3, '#bcc2cc'], [18, 3, '#686b7b'], [17, 4, '#4b4c5b']] as const) staff.set(x, y, c);
+  } else if (tool === 'stick') {
+    for (let y = 8; y < 31; y++) staff.set(17 - (y < 12 ? 1 : 0), y, '#86613c');
+  } else {
+    // 1px shaft; the hook curls over to the left at the top.
+    for (let y = 7; y < 31; y++) staff.set(17, y, y % 5 === 0 ? '#7a5a38' : '#b08a5a');
+    for (const [x, y] of [[17, 6], [16, 5], [15, 5], [14, 6], [14, 7], [14, 8]] as const) staff.set(x, y, '#b08a5a');
+  }
+  return staff.outlined(OUTLINE);
+}
+
+/** Villager body in a palette and with a tool (guard, travellers…). */
+export function makeVillager(variant: string, tool: Tool = 'crook'): Sprite {
+  const body = sprite(SHEPHERD_BODY, {
+    o: OUTLINE,
+    H: '#a7773f', h: '#7a532c', d: '#50351d',
+    s: '#f2cba2', S: '#c99570', e: OUTLINE,
+    w: '#eee6d4', W: '#bdb29c',
+    b: '#3a2618', p: '#5c5248', P: '#3f3832',
+    ...VILLAGER_COLORS[variant],
+  });
+  const p = makeTool(tool);
+  p.blit(body, 2, 8);
+  return breathe(p, 21, 10, 31, 14);
+}
+
+export const makeGuard = (): Sprite => makeVillager('guard', 'spear');
 
 export function makeShepherd(variant = 'shepherd'): Sprite {
   const body = sprite(SHEPHERD_BODY, {

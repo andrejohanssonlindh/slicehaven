@@ -19,6 +19,7 @@ Gloomhaven-style campaign game where Slice & Dice-style **dice replace cards**. 
 - The director turned the project toward recreating the tabletop ruleset. First piece: the character creator at `/chargen/` (`src/core/chargen`, `src/content/chargen`, `src/chargen`).
 - **Never write the brand name** of the ruleset in the repo, UI or commits. World names are fine (decision Q1). Data is mechanics plus our own short summaries, never copied prose.
 - Status, what's left and handover notes: `director/design/character-creator.md`. Extracted book text lives in `reference/` (gitignored).
+- Exploration scenes (skills, talking, multi-hex things) at `/scene/`: see `director/design/exploration-scenes.md`. Debug hooks on `window.scene` (`interact(id)`, `tapHex(col,row)`, `isBusy()`, `state`).
 
 ## Tech
 - Vite + TypeScript (strict), **own canvas engine** (no Phaser: dropped 2026-10-25, our art and lighting are per-pixel anyway). Vitest for tests. `marked` for the Director's Room.

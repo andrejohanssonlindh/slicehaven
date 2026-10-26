@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#1a1420" />
+    <title>Slicehaven · The village gate</title>
+    <link rel="stylesheet" href="/src/ui/style.css" />
+    <link rel="stylesheet" href="/src/scene/scene.css" />
+  </head>
+  <body>
+    <div id="topbar">
+      <a class="btn" href="../" aria-label="Back to the sandbox">←</a>
+      <span class="logo">SLICEHAVEN</span>
+      <span class="tag">the village gate</span>
+      <span class="spacer"></span>
+      <a class="btn" href="../chargen/">Hero</a>
+      <a class="btn" href="../director/">Director</a>
+    </div>
+    <div id="stage">
+      <canvas id="view"></canvas>
+      <div id="zoom">
+        <button type="button" data-zoom="1" aria-label="Zoom in">+</button>
+        <button type="button" data-zoom="-1" aria-label="Zoom out">−</button>
+        <button type="button" data-zoom="0" aria-label="Fit map">⤢</button>
+      </div>
+      <div id="sheet" hidden></div>
+    </div>
+    <div id="panel">
+      <div id="info"></div>
+    </div>
+    <section id="console"></section>
+    <script type="module" src="/src/scene/main.ts"></script>
+  </body>
+</html>

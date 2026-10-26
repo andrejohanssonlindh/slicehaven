@@ -11,6 +11,7 @@ export default defineConfig({
         director: 'director/index.html',
         artlab: 'artlab/index.html',
         chargen: 'chargen/index.html',
+        scene: 'scene/index.html',
       },
     },
   },

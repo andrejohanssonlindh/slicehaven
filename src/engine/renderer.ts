@@ -1,11 +1,12 @@
 import type { Battle, Unit } from '../core/battle';
+import { cover } from '../core/footprint';
 import { type Hex, hexKey, hexToOffset, offsetToHex } from '../core/hex';
 import { Rng } from '../core/rng';
 import { cloudShade } from '../core/world';
 import { tinyText } from '../art/icons';
 import { EDGE, TILE_CENTER, TILE_DEPTH, TILE_H, TILE_STEP_Y, TILE_W, inHex, tileOrigin } from '../art/hexTile';
 import type { MobKind } from '../art/mapScene';
-import { makeRat, makeShepherd, makeSkeleton, makeWolf } from '../art/mobs';
+import { makeGuard, makeRat, makeShepherd, makeSkeleton, makeVillager, makeWolf } from '../art/mobs';
 import { SHADOW } from '../art/palette';
 import { Pix } from '../art/pix';
 import {
@@ -51,7 +52,33 @@ interface CellVis {
   cy: number;
 }
 
+/** How a unit kind is drawn. */
+export interface MobDef {
+  sprite: MobKind;
+  /** Palette swap. */
+  variant?: string;
+  /** For villagers: what they hold. */
+  tool?: 'crook' | 'spear' | 'stick';
+}
+
+/** A campfire or torch: sparks and a flickering light. */
+interface Flame {
+  x: number;
+  y: number;
+  /** 1 = a campfire, smaller for a torch. */
+  size: number;
+}
+
+interface Glow {
+  x: number;
+  y: number;
+  r: number;
+  color: [number, number, number];
+}
+
 interface WindSprite {
+  /** Scenery id, for tapping big things. */
+  id?: string;
   x: number;
   y: number;
   cell: string;
@@ -100,6 +127,10 @@ export class Renderer {
   private burnt = new Set<string>();
   private decals: { x: number; y: number }[] = [];
   private corpses: { x: number; y: number; sprite: Sprite }[] = [];
+  private flames = new Map<string, Flame>();
+  private glows = new Map<string, Glow>();
+  /** Last frame's drawn sprites with ids, front-most last (for tapping). */
+  private picks: { id: string; x: number; y: number; pix: Pix }[] = [];
   /**
    * Sway/idle animation clock in frames. Accumulated per frame (rate depends on
    * wind), so a change in wind changes the speed instead of jumping the phase.
@@ -107,7 +138,7 @@ export class Renderer {
   private animClock = 0;
   private lastUpdate = 0;
 
-  constructor(cells: SandboxCell[], private battle: Battle) {
+  constructor(cells: SandboxCell[], private battle: Battle, private kinds: Record<string, MobDef> = STATS) {
     const cols = Math.max(...cells.map((c) => c.col + (c.row & 1 ? 1.5 : 1)));
     const rows = Math.max(...cells.map((c) => c.row)) + 1;
     this.width = Math.ceil(cols * TILE_W) + PAD_SIDE * 2;
@@ -145,8 +176,71 @@ export class Renderer {
     for (const u of battle.units) this.addUnit(u);
   }
 
-  private addThing(x: number, y: number, cell: string, make: (w: number) => Sprite, survivesFire: boolean, rng: Rng): void {
-    this.things.push({ x, y, cell, make, sets: new Map(), phase: rng.int(FRAMES), survivesFire });
+  private addThing(x: number, y: number, cell: string, make: (w: number) => Sprite, survivesFire: boolean, rng: Rng, id?: string): void {
+    this.things.push({ id, x, y, cell, make, sets: new Map(), phase: rng.int(FRAMES), survivesFire });
+  }
+
+  /**
+   * Scenery that may cover several hexes. One sprite for the whole footprint,
+   * anchored at the middle of it on the front row's feet line (so depth sorting
+   * puts things behind it behind, and in front in front). `perHex` draws one
+   * sprite on each hex instead (walls).
+   */
+  addProp(id: string, hexes: Hex[], make: (wind: number) => Sprite, perHex = false): { x: number; y: number } {
+    const rng = Rng.fromSeed(id.length * 97 + hexes.length);
+    const vis = hexes.map((h) => this.cells.get(hexKey(h))).filter((c): c is CellVis => !!c);
+    if (perHex) {
+      for (const cv of vis) this.addThing(cv.cx, cv.cy + 2, hexKey(offsetToHex(cv.art.col, cv.art.row)), make, true, rng, id);
+    } else {
+      const p = this.footprintFeet(hexes);
+      this.addThing(p.x, p.y + 1, hexKey(hexes[0]), make, true, rng, id);
+    }
+    return this.footprintFeet(hexes);
+  }
+
+  /** Change how a prop looks (a gate swinging open). */
+  setPropArt(id: string, make: (wind: number) => Sprite): void {
+    for (const th of this.things) {
+      if (th.id !== id) continue;
+      th.make = make;
+      th.sets.clear();
+    }
+  }
+
+  /** Middle of a footprint at its front row's feet line. */
+  footprintFeet(hexes: Hex[]): { x: number; y: number } {
+    const ps = hexes.map((h) => this.feet(h));
+    const xs = ps.map((p) => p.x);
+    return { x: Math.round((Math.min(...xs) + Math.max(...xs)) / 2), y: Math.max(...ps.map((p) => p.y)) };
+  }
+
+  /** A campfire or a torch at a world pixel: sparks, smoke and a flickering light. */
+  setFlame(id: string, x: number, y: number, size = 1): void {
+    this.flames.set(id, { x, y, size });
+  }
+
+  removeFlame(id: string): void {
+    this.flames.delete(id);
+  }
+
+  /** A steady light (a lit window). */
+  setGlow(id: string, x: number, y: number, r: number, color: [number, number, number]): void {
+    this.glows.set(id, { x, y, r, color });
+  }
+
+  removeGlow(id: string): void {
+    this.glows.delete(id);
+  }
+
+  /** The id of the scenery or unit drawn at a world pixel (front-most), if any. */
+  pick(x: number, y: number): string | undefined {
+    for (let i = this.picks.length - 1; i >= 0; i--) {
+      const p = this.picks[i];
+      const px = Math.floor(x - p.x);
+      const py = Math.floor(y - p.y);
+      if (p.pix.alpha(px, py) > 0) return p.id;
+    }
+    return undefined;
   }
 
   rebuildGround(): void {
@@ -191,14 +285,19 @@ export class Renderer {
 
   // --- units & animation ------------------------------------------------------
 
+  /** Where a unit stands with its anchor on `at` (the middle of its footprint if it's big). */
+  private standAt(u: Unit, at: Hex): { x: number; y: number } {
+    return u.shape && u.shape.length > 1 ? this.footprintFeet(cover(at, u.shape)) : this.feet(at);
+  }
+
   addUnit(u: Unit): void {
-    const p = this.feet(u.at);
+    const p = this.standAt(u, u.at);
     this.units.set(u.id, { x: p.x, y: p.y, flip: false, flashUntil: 0 });
   }
 
   private mobSprite(u: Unit, flip: boolean, white = false): Sprite {
-    const s = STATS[u.kind];
-    const key = `${s.sprite}:${s.variant ?? ''}:${flip}:${white}`;
+    const s = this.kinds[u.kind];
+    const key = `${s.sprite}:${s.variant ?? ''}:${s.tool ?? ''}:${flip}:${white}`;
     let sp = this.spriteCache.get(key);
     if (!sp) {
       if (white) {
@@ -210,6 +309,7 @@ export class Renderer {
       } else {
         sp = {
           shepherd: () => makeShepherd(s.variant), wolf: makeWolf, rat: makeRat, skeleton: makeSkeleton,
+          guard: makeGuard, villager: () => makeVillager(s.variant ?? 'shepherd', s.tool),
         }[s.sprite]();
       }
       this.spriteCache.set(key, sp);
@@ -220,7 +320,7 @@ export class Renderer {
   private face(u: Unit, v: UnitVis, dx: number): void {
     if (Math.abs(dx) < 0.5) return;
     const wantsLeft = dx < 0;
-    const drawnLeft = !!FACES_LEFT[STATS[u.kind].sprite];
+    const drawnLeft = !!FACES_LEFT[this.kinds[u.kind].sprite];
     v.flip = wantsLeft !== drawnLeft;
   }
 
@@ -228,7 +328,7 @@ export class Renderer {
   animateMove(u: Unit, hexes: Hex[], jump: boolean): Promise<void> {
     const v = this.units.get(u.id);
     if (!v || hexes.length === 0) return Promise.resolve();
-    const points = [{ x: v.x, y: v.y }, ...(jump ? [hexes[hexes.length - 1]] : hexes).map((h) => this.feet(h))];
+    const points = [{ x: v.x, y: v.y }, ...(jump ? [hexes[hexes.length - 1]] : hexes).map((h) => this.standAt(u, h))];
     this.face(u, v, points[points.length - 1].x - points[0].x);
     v.anim?.resolve(); // a new move replaces an unfinished one
     return new Promise((resolve) => {
@@ -239,6 +339,17 @@ export class Renderer {
         arc: jump ? 16 : 0,
         resolve,
       };
+    });
+  }
+
+  /** Move through world pixel points (e.g. up a rock and over a wall). Jumps arc. */
+  animatePoints(u: Unit, pts: { x: number; y: number }[], ms: number, arc = 0): Promise<void> {
+    const v = this.units.get(u.id);
+    if (!v || pts.length === 0) return Promise.resolve();
+    this.face(u, v, pts[pts.length - 1].x - v.x);
+    v.anim?.resolve();
+    return new Promise((resolve) => {
+      v.anim = { points: [{ x: v.x, y: v.y }, ...pts], start: performance.now(), duration: ms, arc, resolve };
     });
   }
 
@@ -320,6 +431,17 @@ export class Renderer {
     }
     void weather;
 
+    // Campfires and torches.
+    for (const f of this.flames.values()) {
+      const n = f.size >= 1 ? 2 : Math.random() < 0.6 ? 1 : 0;
+      for (let i = 0; i < n; i++) {
+        effects.emit('fire', f.x + (Math.random() - 0.5) * 7 * f.size, f.y - Math.random() * 3, (Math.random() - 0.5) * 0.2,
+          -0.35 - Math.random() * 0.5 * f.size, 5 + Math.random() * 8 * f.size);
+      }
+      if (f.size >= 1 && Math.random() < 0.25) effects.emit('smoke', f.x + (Math.random() - 0.5) * 4, f.y - 10, 0, -0.35, 30 + Math.random() * 20);
+      if (Math.random() < 0.06 * f.size) effects.emit('ember', f.x + (Math.random() - 0.5) * 6, f.y - 6, (Math.random() - 0.5) * 1.2, -1, 18);
+    }
+
     // Fire: particles from burning cells, embers from fresh ash.
     for (const [key, c] of Object.entries(this.battle.cells)) {
       const cv = this.cells.get(key);
@@ -348,6 +470,12 @@ export class Renderer {
         if (v && u.hp > 0 && u.team === 'party') out.push({ x: v.x, y: v.y - 6, r: 24, color: [0.55 * darkness, 0.42 * darkness, 0.22 * darkness] });
       }
     }
+    for (const f of this.flames.values()) {
+      const flicker = 0.85 + Math.sin(now / 70 + f.x) * 0.08 + Math.random() * 0.1;
+      const r = f.size >= 1 ? 56 : 30;
+      out.push({ x: f.x, y: f.y - 3, r, color: [1.5 * flicker * f.size ** 0.5, 0.9 * flicker * f.size ** 0.5, 0.4 * flicker] });
+    }
+    for (const g of this.glows.values()) out.push(g);
     for (const [key, c] of Object.entries(battle.cells)) {
       if (c.fire !== 'burning') continue;
       const cv = this.cells.get(key);
@@ -356,7 +484,7 @@ export class Renderer {
       out.push({ x: cv.cx, y: cv.cy - 4, r: 46, color: [1.5 * flicker, 0.9 * flicker, 0.4 * flicker] });
     }
     for (const u of battle.units) {
-      if (u.hp > 0 && STATS[u.kind].sprite === 'skeleton') {
+      if (u.hp > 0 && this.kinds[u.kind].sprite === 'skeleton') {
         const v = this.units.get(u.id);
         if (v) out.push({ x: v.x, y: v.y - 20, r: 9, color: [0.3, 0.9, 1.1] });
       }
@@ -382,7 +510,7 @@ export class Renderer {
     const windLevel = Math.round(Math.min(1, weather.wind) * 2) / 2;
     const mirror = weather.wx < -0.2 && windLevel > 0;
     const setKey = `${windLevel}:${mirror ? 'L' : 'R'}`;
-    const draws: { y: number; x: number; sprite: Sprite; f: number; unit?: Unit }[] = [];
+    const draws: { y: number; x: number; sprite: Sprite; f: number; unit?: Unit; id?: string }[] = [];
     for (const th of this.things) {
       const burnt = this.burnt.has(th.cell);
       if (burnt && !th.survivesFire) continue;
@@ -399,7 +527,7 @@ export class Renderer {
         }
         sp = s;
       }
-      draws.push({ x: th.x, y: th.y, sprite: sp, f: (frame + th.phase) % FRAMES });
+      draws.push({ x: th.x, y: th.y, sprite: sp, f: (frame + th.phase) % FRAMES, id: th.id });
     }
     for (const c of this.corpses) draws.push({ x: Math.round(c.x), y: Math.round(c.y), sprite: c.sprite, f: 0 });
     for (const u of this.battle.units) {
@@ -423,7 +551,7 @@ export class Renderer {
         }
       }
       const sp = this.mobSprite(u, v.flip, now < v.flashUntil);
-      draws.push({ x: Math.round(x), y: Math.round(y - lift), sprite: sp, f: (frame + u.id.length) % FRAMES, unit: u });
+      draws.push({ x: Math.round(x), y: Math.round(y - lift), sprite: sp, f: (frame + u.id.length) % FRAMES, unit: u, id: u.id });
       // Ground shadow stays on the ground during jumps.
       ellipse(out, x + 2, y, sp.shadow / 2, Math.max(2, sp.shadow / 6), SHADOW);
     }
@@ -445,6 +573,9 @@ export class Renderer {
     this.mask.fill(0);
     draws.sort((a, b) => a.y - b.y);
     for (const d of draws) this.blitMasked(out, d.sprite.frames[d.f], d.x - d.sprite.ax, d.y - d.sprite.ay);
+    this.picks = draws.filter((d) => d.id).map((d) => ({
+      id: d.id!, x: d.x - d.sprite.ax, y: d.y - d.sprite.ay, pix: d.sprite.frames[d.f],
+    }));
 
     effects.drawParticles(out);
 
@@ -606,7 +737,7 @@ export class Renderer {
 
   private hpBar(out: Pix, u: Unit): void {
     const v = this.units.get(u.id);
-    if (!v || u.hp <= 0) return;
+    if (!v || u.hp <= 0 || u.team === 'npc') return;
     const sp = this.mobSprite(u, false);
     const w = 14;
     const x0 = Math.round(v.x - w / 2);

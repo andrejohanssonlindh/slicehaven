@@ -1,6 +1,6 @@
 import { Rng } from '../core/rng';
 import { TILE_CENTER, TILE_DEPTH, TILE_H, TILE_STEP_Y, TILE_W, tileOrigin } from './hexTile';
-import { makeShepherd, makeRat, makeSkeleton, makeWolf } from './mobs';
+import { makeGuard, makeShepherd, makeRat, makeSkeleton, makeVillager, makeWolf } from './mobs';
 import { SHADOW } from './palette';
 import { Pix } from './pix';
 import {
@@ -9,7 +9,7 @@ import {
 import { type TileArt, type WaterPx, paintTile, paintWater } from './terrain';
 
 export type PropKind = 'tree' | 'pine' | 'rock' | 'thicket' | 'mushrooms';
-export type MobKind = 'shepherd' | 'rat' | 'wolf' | 'skeleton';
+export type MobKind = 'shepherd' | 'rat' | 'wolf' | 'skeleton' | 'guard' | 'villager';
 
 export interface CellArt extends TileArt {
   col: number;
@@ -28,7 +28,8 @@ interface Thing {
 }
 
 const MOB_MAKERS: Record<MobKind, () => Sprite> = {
-  shepherd: makeShepherd, rat: makeRat, wolf: makeWolf, skeleton: makeSkeleton,
+  shepherd: makeShepherd, rat: makeRat, wolf: makeWolf, skeleton: makeSkeleton, guard: makeGuard,
+  villager: () => makeVillager('tinker', 'stick'),
 };
 
 /** Renders a little hex diorama: static ground once, then water + sprites per frame. */
