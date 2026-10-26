@@ -14,6 +14,7 @@ import {
   type TableId,
   type Token,
 } from './grants';
+import { checkDetails, type Body } from './details';
 import type { CharState, RollRec } from './state';
 import {
   attrDice,
@@ -61,6 +62,8 @@ export interface Content {
   tables: Partial<Record<TableId, EventTable>>;
   skill(id: string): SkillInfo | undefined;
   skills: SkillInfo[];
+  /** Typical body and age for a people (for checking the details). */
+  body(peopleId: string | undefined, family: Family | undefined): Body | undefined;
 }
 
 /** The creation steps in order; the last one is the finished sheet. */
@@ -781,6 +784,7 @@ export function derive(state: CharState, c: Content): Derived {
     warnings,
     openByStep: [],
   };
+  for (const w of checkDetails(state.details, c.body(people?.id, people?.family))) warnings.push({ step: STEP.details, text: w.text });
   derived.openByStep = STEPS.map((_, i) => pending.filter((p) => p.step === i).length + warnings.filter((w) => w.step === i).length);
   return derived;
 }

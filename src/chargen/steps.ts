@@ -1,6 +1,7 @@
 /** Renderers for each creation step. Pure string templates; main.ts wires the actions. */
 import { ATTR_EN, baseTable, NUMB_EN, POOL_EN, poolAllows, rollsTwice, RARITY_EN, STEP, TABLE_EN, type Derived, type SkillRow, type SourceRec } from '../core/chargen/derive';
 import { ATTRS, type Attr, type Rarity } from '../core/chargen/grants';
+import { checkDetails, genderKey, typical } from '../core/chargen/details';
 import type { CharState } from '../core/chargen/state';
 import { diceText, MAX_POINTS_PER_ATTR, POINT_MODELS } from '../core/chargen/tables';
 import type { Family } from '../core/chargen/types';
@@ -9,6 +10,7 @@ import { FAMILY_ORDER } from '../content/chargen/peoples';
 import { DRIVE_REWARDS, DRIVES } from '../content/chargen/drives';
 import { ARMOUR, rarityRank, SHIELDS, weaponRank, WEAPONS } from '../content/chargen/equipment';
 import { languageEn, SCRIPTS, SPOKEN } from '../content/chargen/languages';
+import { DWARF_HOUSES, nameCultureOf } from '../content/chargen/names';
 import { SKILLS } from '../content/chargen/skills';
 import { die, esc, grants, pendingHtml, pickHtml, sourceHtml } from './ui';
 
@@ -469,19 +471,53 @@ function drives(s: CharState, d: Derived): string {
 }
 
 // ——— Details ———
-function details(s: CharState): string {
-  const f = (path: string, label: string, ph = '') => `<label class="field"><span>${label}</span><input data-bind="details.${path}" value="${esc((s.details as unknown as Record<string, string>)[path] ?? '')}" placeholder="${esc(ph)}" /></label>`;
-  const t = (path: string, label: string, ph = '') => `<label class="field"><span>${label}</span><textarea data-bind="details.${path}" placeholder="${esc(ph)}">${esc((s.details as unknown as Record<string, string>)[path] ?? '')}</textarea></label>`;
+function details(s: CharState, d: Derived): string {
+  const D = s.details as unknown as Record<string, string>;
+  const p = d.people;
+  const body = CONTENT.body(p?.id, p?.family);
+  const checks = checkDetails(s.details, body);
+  const warn = (field: string) => checks.filter((c) => c.field === field).map((c) => `<span class="warn small">⚠ ${esc(c.text)}</span>`).join('');
+  const f = (path: string, label: string, ph = '', mode = '') =>
+    `<label class="field"><span>${label}</span><input data-bind="details.${path}" value="${esc(D[path] ?? '')}" placeholder="${esc(ph)}" ${mode ? `inputmode="${mode}"` : ''} />${warn(path)}</label>`;
+  const t = (path: string, label: string, ph = '') => `<label class="field"><span>${label}</span><textarea data-bind="details.${path}" placeholder="${esc(ph)}">${esc(D[path] ?? '')}</textarea></label>`;
+  const chip = (field: string, val: string, label = val) => `<button type="button" class="${D[field] === val ? 'on' : ''}" data-act="detail" data-key="${field}" data-val="${esc(val)}">${esc(label)}</button>`;
+
+  // Names: suggestions for your culture (the people that raised you).
+  const raisedBy = CONTENT.peoples.find((x) => x.id === s.cultureFrom) ?? p;
+  const nc = nameCultureOf(raisedBy?.id, raisedBy?.family);
+  const g = genderKey(s.details.gender);
+  const lists = nc ? ([g !== 'm' && nc.f ? ['Women', nc.f] : null, g !== 'f' && nc.m ? ['Men', nc.m] : null, nc.n ? ['Any', nc.n] : null].filter(Boolean) as [string, string[]][]) : [];
+  const fams = nc?.family ?? (raisedBy?.family === 'dvarg' ? DWARF_HOUSES[raisedBy.id] : undefined);
+  const names = nc
+    ? `<div class="box"><h3>${esc(nc.en)} names</h3><p class="small muted">${esc(nc.custom)}</p>
+      ${lists.map(([label, ns]) => `<p class="small"><b>${label}:</b></p><div class="chips">${ns.map((n) => chip('name', n)).join('')}</div>`).join('')}
+      ${fams ? `<p class="small"><b>${raisedBy?.family === 'dvarg' ? 'Houses' : 'Families and houses'}:</b></p><div class="chips">${fams.map((x) => `<button type="button" data-act="nameAdd" data-val="${esc(x)}">+ ${esc(x)}</button>`).join('')}</div>` : ''}
+      <div class="row"><button type="button" class="small" data-act="randName">🎲 Random name</button><span class="small muted">Tap a name to use it, then edit it as you like.</span></div></div>`
+    : p ? '' : '<p class="small muted">Choose a people first to get name suggestions.</p>';
+
+  // Height and weight: what is typical, and a quick way to fill them in.
+  let size = '';
+  if (body) {
+    const [h, w] = typical(body, s.details.gender);
+    const sameBoth = body.f[0] === body.m[0] && body.f[1] === body.m[1];
+    size = `<p class="small muted">Typical for ${esc(p?.en ?? '')}: ${sameBoth ? `about ${body.f[0]} cm and ${body.f[1]} kg` : `women about ${body.f[0]} cm, ${body.f[1]} kg; men about ${body.m[0]} cm, ${body.m[1]} kg`}.</p>
+      <div class="row"><button type="button" class="small" data-act="body" data-h="${h}" data-w="${w}">Use typical (${h} cm, ${w} kg)</button><button type="button" class="small" data-act="body" data-roll="1">🎲 Roll a build</button></div>`;
+  }
+  const age = body?.age;
   return `<h2>Name & details</h2>
   ${intro('The things that don\'t change the numbers but make the person.')}
   ${f('name', 'Name')}
-  <div class="row"><div class="grow">${f('age', 'Age')}</div><div class="grow">${f('gender', 'Gender')}</div></div>
-  ${f('home', 'Home town or region')}
-  <div class="row"><div class="grow">${f('height', 'Height')}</div><div class="grow">${f('weight', 'Weight')}</div></div>
+  ${names}
+  <label class="field"><span>Gender</span><div class="chips">${chip('gender', 'Woman')}${chip('gender', 'Man')}${chip('gender', 'Non-binary')}</div>
+  <input data-bind="details.gender" value="${esc(D.gender ?? '')}" placeholder="or write your own" /></label>
+  ${f('age', 'Age', age ? `usually ${age.typical[0]}–${age.typical[1]}` : '', 'numeric')}
+  ${f('home', 'Home town or region', d.homeland?.places ? `e.g. ${d.homeland.places.split(/[,;]/)[0].trim()}` : '')}
+  <div class="row top"><div class="grow">${f('height', 'Height (cm)', body ? String(typical(body, s.details.gender)[0]) : '', 'numeric')}</div><div class="grow">${f('weight', 'Weight (kg)', body ? String(typical(body, s.details.gender)[1]) : '', 'numeric')}</div></div>
+  ${size}
   <div class="box"><h3>Weapon arm</h3><div class="row"><button type="button" class="small" data-act="armRoll">🎲 Roll d10</button>${s.details.armRoll ? die(s.details.armRoll, 'd10 small') : ''}
   <span class="chips"><button type="button" class="${s.details.arm === 'höger' ? 'on' : ''}" data-act="arm" data-val="höger">Right</button><button type="button" class="${s.details.arm === 'vänster' ? 'on' : ''}" data-act="arm" data-val="vänster">Left</button></span></div>
   <p class="small muted">On a 10 you are left-handed.</p></div>
-  ${t('appearance', 'Appearance and quirks')}
+  ${t('appearance', 'Appearance and quirks', p?.build ?? '')}
   ${t('family', 'Family', 'Mother, father, siblings, the rest of the family…')}
   ${t('relations', 'Relations to the other characters')}
   ${t('story', 'Background story', 'Take inspiration from your event results.')}`;

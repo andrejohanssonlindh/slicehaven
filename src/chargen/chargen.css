@@ -194,3 +194,5 @@ table.t .sub { display: block; font-size: 0.75rem; color: var(--muted); font-wei
   .sheet .cols { grid-template-columns: 1fr 1fr; }
   .sheet h2 { break-after: avoid; }
 }
+.row.top { align-items: flex-start; }
+label.field > .warn { display: block; margin-top: 3px; }

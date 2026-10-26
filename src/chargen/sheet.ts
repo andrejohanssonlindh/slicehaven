@@ -136,7 +136,7 @@ export function sheetHtml(s: CharState, d: Derived): string {
       ['Background', d.background ? esc(d.background.en) : ''],
       ['Archetype', d.archetype ? esc(d.archetype.en) : ''],
       ['Environment', d.environment ? esc(d.environment.en) : ''],
-      ['Height / weight', [D.height, D.weight].filter(Boolean).map(esc).join(' / ')],
+      ['Height / weight', [[D.height, 'cm'], [D.weight, 'kg']].filter(([v]) => v).map(([v, u]) => esc(/^\d+$/.test(v.trim()) ? `${v.trim()} ${u}` : v)).join(' / ')],
       ['Weapon arm', D.arm ? (D.arm === 'höger' ? 'Right' : 'Left') : ''],
     ])}</div>
   </div>

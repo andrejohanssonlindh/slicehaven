@@ -3,7 +3,9 @@ import { derive } from '../src/core/chargen/derive';
 import { parseGrants, tokenSkills, type Token } from '../src/core/chargen/grants';
 import { CHAR_VERSION, migrateChar, newChar, roll } from '../src/core/chargen/state';
 import { attrDice, baseArmour, baseDamage, diceText, skillDice, wisdomRow } from '../src/core/chargen/tables';
+import { checkDetails, genderKey, typical } from '../src/core/chargen/details';
 import { CONTENT } from '../src/content/chargen';
+import { nameCultureOf } from '../src/content/chargen/names';
 import { SKILL_BY_ID } from '../src/content/chargen/skills';
 
 /** Every grant line in the content, with where it came from. */
@@ -231,5 +233,30 @@ describe('chargen derive', () => {
     const a = newChar(99);
     const b = newChar(99);
     expect([roll(a, 100), roll(a, 100), roll(a, 10)]).toEqual([roll(b, 100), roll(b, 100), roll(b, 10)]);
+  });
+});
+
+describe('chargen details', () => {
+  const blank = { name: 'Rhuz', age: '', gender: '', height: '', weight: '' };
+  it('asks for a name', () => {
+    expect(checkDetails({ ...blank, name: ' ' }, undefined).map((c) => c.field)).toEqual(['name']);
+  });
+
+  it('flags a missla four metres tall but not a typical one', () => {
+    const body = CONTENT.body('missla', 'missla');
+    expect(checkDetails({ ...blank, height: '400', weight: '30' }, body).map((c) => c.field)).toEqual(['height']);
+    expect(checkDetails({ ...blank, height: '1.2 m', weight: '32 kg', age: '30' }, body)).toEqual([]);
+  });
+
+  it('uses the right size for the gender', () => {
+    const body = CONTENT.body('kragg-eyrener', 'manniska')!;
+    expect(typical(body, 'Woman')).toEqual([195, 95]);
+    expect(typical(body, 'man')).toEqual([205, 115]);
+    expect(genderKey('Non-binary')).toBeUndefined();
+  });
+
+  it('every people has a body size and a naming culture', () => {
+    const missing = CONTENT.peoples.filter((p) => !CONTENT.body(p.id, p.family) || !nameCultureOf(p.id, p.family)).map((p) => p.id);
+    expect(missing).toEqual([]);
   });
 });

@@ -5,6 +5,8 @@ import { exportChar, importChar, loadRoster, newChar, roll, saveRoster, type Cha
 import type { PointModel } from '../core/chargen/tables';
 import type { Family } from '../core/chargen/types';
 import { CONTENT } from '../content/chargen';
+import { nameCultureOf } from '../content/chargen/names';
+import { genderKey, typical } from '../core/chargen/details';
 import { ARMOUR, SHIELDS, WEAPONS } from '../content/chargen/equipment';
 import { sheetHtml } from './sheet';
 import { STEP_RENDER, view } from './steps';
@@ -357,6 +359,39 @@ app.parentElement!.addEventListener('click', (ev) => {
         s.details.armRoll = roll(s, 10);
         s.details.arm = s.details.armRoll === 10 ? 'vänster' : 'höger';
       });
+    case 'detail':
+      (s.details as unknown as Record<string, string>)[key] = a.val ?? '';
+      return commit();
+    case 'nameAdd': {
+      const first = s.details.name.trim().split(/\s+/)[0] ?? '';
+      s.details.name = [first, a.val].filter(Boolean).join(' ');
+      return commit();
+    }
+    case 'randName': {
+      const raisedBy = CONTENT.peoples.find((x) => x.id === s.cultureFrom) ?? d.people;
+      const nc = nameCultureOf(raisedBy?.id, raisedBy?.family);
+      const g = genderKey(s.details.gender);
+      const pool = nc ? [...(g !== 'm' ? nc.f ?? [] : []), ...(g !== 'f' ? nc.m ?? [] : []), ...(nc.n ?? [])] : [];
+      if (!pool.length) return;
+      s.details.name = pool[Math.floor(Math.random() * pool.length)];
+      return commit();
+    }
+    case 'body': {
+      if (a.roll) {
+        // A build around the typical one: a little taller or shorter, heavier or lighter.
+        const body = CONTENT.body(d.people?.id, d.people?.family);
+        if (!body) return;
+        const [h, w] = typical(body, s.details.gender);
+        const r = () => (Math.random() + Math.random() + Math.random()) / 3 - 0.5;
+        const hh = Math.round(h * (1 + r() * 0.14));
+        s.details.height = String(hh);
+        s.details.weight = String(Math.round(w * (hh / h) ** 2 * (1 + r() * 0.3)));
+      } else {
+        s.details.height = a.h ?? '';
+        s.details.weight = a.w ?? '';
+      }
+      return commit();
+    }
     case 'arm':
       s.details.arm = a.val as 'höger' | 'vänster';
       return commit();
@@ -409,6 +444,8 @@ app.addEventListener('change', (ev) => {
     s.mysticGear[a.key as string] = el.value;
     return commit();
   }
+  // Details are checked once you leave the field.
+  if (a.bind?.startsWith('details.')) return render();
   if (a.actInput === 'choiceText' && el.value.trim()) {
     setChoice(a.key as string, el.value.trim());
     return commit();
