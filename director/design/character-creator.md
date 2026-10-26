@@ -49,6 +49,29 @@ Then: **Character sheet**, 4 sections like the book's (person, attributes & skil
 8. Equipment and magic.
 9. Full sheet, polish, fuzz test (random characters in a loop to catch dead ends).
 
+## Status (2026-10-26)
+| Part | State |
+|---|---|
+| Rules engine (grants, choices, pools, attributes, skills, Wisdom, event chains) | ✅ done, tested |
+| Homelands, backgrounds (100), all peoples (42 + tirak sizes, clanless), religions (26) | ✅ |
+| Archetypes (9), environments (10), living standards (6) | ✅ |
+| Event tables: 6 × 100 + Friends & Foes (roll twice, keep one) | ✅ |
+| Languages (43 tongues, 14 scripts, "can read" hint) | ✅ |
+| Drives (step 11) | ⏳ free text for now: list of drives and levels still to add |
+| Equipment: packages, weapon & armour lists with stats, prices | ⏳ names only for now |
+| Mystic gear and the mystery lists | ⏳ free text for now |
+| Name suggestions per culture | ⏳ not started |
+| Companion details (types, pros/cons) | ⏳ name only |
+
+## Handover notes (for the next session)
+- **Read first:** `src/core/chargen/grants.ts` (the grant mini-language, documented at the top) and `src/core/chargen/derive.ts` (everything is derived from `CharState`).
+- **Source text:** extracted page by page into `reference/p/NNN.txt` (gitignored). PDF page = book page + 3. Remaining chapters: drives p.203–210 (PDF 206–213), names p.211–218 (PDF 214–221), equipment p.219–248 (PDF 222–251), mystic gear & mysteries p.249–320 (PDF 252–323). `reference/ev.py A B` extracts "N. Name: … [grants]" entries from a page range.
+- **Data keys are the source's own terms** (skill names, attributes), so data can be checked against the book; the UI shows English via `skills.ts`, `ATTR_EN` etc. A Swedish UI toggle would mostly be a lookup swap (see Q10).
+- **Tests:** `tests/chargen.test.ts` checks that every grant line parses, names real skills/religions/peoples, that tables cover 1–100, unit totals per archetype/environment, plus rule maths.
+- **Browser check:** `reference/tools/fuzz.js` (local only): random taps through all 15 steps against `npx vite --port 5199`, reports page errors. It needs `playwright-core` installed in `/tmp/pw` and the cached Chromium in `~/Library/Caches/ms-playwright`. `window.chargen` exposes `state`, `derived`, `render()`.
+- **Choice keys:** `source#item[.token]` for in-grant choices, pick groups by key in `state.picks`, event slots `…@n`. Changing an early choice keeps later choices whose keys still exist.
+- **Rule texts** (`regel:`) are shown on the sheet as special traits and not enforced (there's no play engine yet).
+
 ## Things I'll simplify at first
 - Special abilities from traits and events are shown as **rule notes** on the sheet. They aren't enforced, because there's no play engine yet.
 - The game master's permission (e.g. a culture's weapons) becomes a "GM allows" toggle.

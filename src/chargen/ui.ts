@@ -3,6 +3,7 @@ import { ATTR_EN, describe, NUMB_EN, POOL_EN, RARITY_EN, TABLE_EN, type Derived,
 import type { CharState } from '../core/chargen/state';
 import { CONTENT } from '../content/chargen';
 import { PICKABLE_TABLES } from '../content/chargen/events';
+import { languageEn, SCRIPTS, SPOKEN } from '../content/chargen/languages';
 import { ASPECTS, SKILLS } from '../content/chargen/skills';
 
 export function esc(s: string | number | undefined | null): string {
@@ -92,17 +93,19 @@ export function effectText(e: Effect, s: CharState): string {
 
 /** Display name for a language (data keeps the source names). */
 export function langName(sv: string): string {
-  return sv;
+  return languageEn(sv);
 }
 
 function suggestions(kind: string): string[] {
   if (kind === 'Aspekt') return ASPECTS.map(([sv]) => sv);
-  if (kind === 'tal' || kind === 'skrift') return [];
+  if (kind === 'tal') return SPOKEN.map((l) => l.sv);
+  if (kind === 'skrift') return SCRIPTS.map((l) => l.sv);
   return SKILLS.filter((x) => x.group === kind).map((x) => x.id.slice(2));
 }
 
 function suggestionLabel(kind: string, v: string): string {
   if (kind === 'Aspekt') return ASPECTS.find(([sv]) => sv === v)?.[1] ?? v;
+  if (kind === 'tal' || kind === 'skrift') return languageEn(v);
   return CONTENT.skill(`${kind}:${v}`)?.en ?? v;
 }
 

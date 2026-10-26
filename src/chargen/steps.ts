@@ -6,6 +6,7 @@ import { diceText, MAX_POINTS_PER_ATTR, POINT_MODELS } from '../core/chargen/tab
 import type { Family } from '../core/chargen/types';
 import { CONTENT } from '../content/chargen';
 import { FAMILY_ORDER } from '../content/chargen/peoples';
+import { languageEn, SCRIPTS, SPOKEN } from '../content/chargen/languages';
 import { SKILLS } from '../content/chargen/skills';
 import { die, esc, grants, pendingHtml, pickHtml, sourceHtml } from './ui';
 
@@ -398,14 +399,22 @@ function languages(s: CharState, d: Derived): string {
   return `<h2>10. Languages & contacts</h2>
   ${intro('Languages you were given, plus free picks. A spoken language and a script are separate picks, though one script can serve several tongues. Circles are groups you have friends in. Companions are loyal people at your side.')}
   <div class="box"><h3>Languages</h3>
-  <p><b>Speaks:</b> ${L.spoken.map(esc).join(', ') || '–'}<br><b>Writes:</b> ${L.written.map(esc).join(', ') || '–'}</p>
+  <p><b>Speaks:</b> ${L.spoken.map((x) => esc(languageEn(x))).join(', ') || '–'}<br><b>Writes:</b> ${L.written.map((x) => esc(languageEn(x))).join(', ') || '–'}</p>
   <p class="small">Free picks: <b>${chosen.length} / ${L.picks}</b>${L.boughtWithUnits ? ` (${L.boughtWithUnits} bought with units)` : ''}</p>
-  <ul class="plain">${chosen.map((c, i) => `<li class="row spread"><span>${c.w ? 'Writes' : 'Speaks'} ${esc(c.n)}</span><button type="button" class="link small" data-act="dropLang" data-i="${i}">remove</button></li>`).join('')}</ul>
-  ${chosen.length < L.picks ? `<div class="row"><input class="grow" id="lang-name" placeholder="Language or script name" /><button type="button" class="small" data-act="addLang" data-w="0">+ Spoken</button><button type="button" class="small" data-act="addLang" data-w="1">+ Written</button></div>` : ''}
+  <ul class="plain">${chosen.map((c, i) => `<li class="row spread"><span>${c.w ? 'Writes' : 'Speaks'} ${esc(languageEn(c.n))}</span><button type="button" class="link small" data-act="dropLang" data-i="${i}">remove</button></li>`).join('')}</ul>
+  ${chosen.length < L.picks ? `<div class="row"><input class="grow" id="lang-name" list="dl-langs" placeholder="Language or script" /><button type="button" class="small" data-act="addLang" data-w="0">+ Spoken</button><button type="button" class="small" data-act="addLang" data-w="1">+ Written</button></div>
+  <datalist id="dl-langs">${SPOKEN.map((l) => `<option value="${esc(l.sv)}">${esc(l.en)}, ${esc(l.where)}${l.scripts.length ? `, written in ${l.scripts.map(languageEn).join(' / ')}` : ', no script'}</option>`).join('')}${SCRIPTS.map((x) => `<option value="${esc(x.sv)}">${esc(x.en)} (script)</option>`).join('')}</datalist>` : ''}
+  <p class="small muted">To read and write you need both a script and a spoken language written in it.${scriptHint(L.spoken.concat(s.languages.spoken), L.written.concat(s.languages.written))}</p>
   ${chosen.length > L.picks ? '<p class="warn small">More languages than picks.</p>' : ''}
   </div>
   <div class="box"><h3>Circles</h3>${circles || '<p class="muted">None from your choices.</p>'}</div>
   <div class="box"><h3>Companions</h3>${comps || '<p class="muted">None from your choices.</p>'}</div>`;
+}
+
+/** Which of your spoken languages you can also read, given your scripts. */
+function scriptHint(spoken: string[], written: string[]): string {
+  const can = spoken.filter((sp) => SPOKEN.find((l) => l.sv === sp)?.scripts.some((x) => written.includes(x)));
+  return can.length ? ` You can read and write: ${can.map(languageEn).join(', ')}.` : ' You can\'t read or write yet.';
 }
 
 // ——— 10 Drives ———

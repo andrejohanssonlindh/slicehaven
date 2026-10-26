@@ -15,6 +15,11 @@ Gloomhaven-style campaign game where Slice & Dice-style **dice replace cards**. 
   - The director's own vision notes → `director/vision/` (original text kept verbatim, plus an English digest). **Read these before designing anything.** They're ambitions to build on, not a checklist to do right away.
 - The Eon 5 PDFs in the project root are **copyrighted reference for the world only** (ignore the RPG rules). Never commit them, never paste their text into the repo. Write our own prose. See `director/world/eon-notes.md`.
 
+## Current focus: the character creator
+- The director turned the project toward recreating the tabletop ruleset. First piece: the character creator at `/chargen/` (`src/core/chargen`, `src/content/chargen`, `src/chargen`).
+- **Never write the brand name** of the ruleset in the repo, UI or commits. World names are fine (decision Q1). Data is mechanics plus our own short summaries, never copied prose.
+- Status, what's left and handover notes: `director/design/character-creator.md`. Extracted book text lives in `reference/` (gitignored).
+
 ## Tech
 - Vite + TypeScript (strict), **own canvas engine** (no Phaser: dropped 2026-10-25, our art and lighting are per-pixel anyway). Vitest for tests. `marked` for the Director's Room.
 - `npm run dev` (also on LAN with `--host`), `npm test`, `npm run build`.

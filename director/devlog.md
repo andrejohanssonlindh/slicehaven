@@ -1,5 +1,17 @@
 # Devlog
 
+## 2026-10-26 — Session 6: the character creator
+
+**New direction:** recreate the tabletop ruleset, starting with a freestanding character creator. [Open it](https://andrejohanssonlindh.github.io/slicehaven/chargen/) (also "Hero" in the game's top bar). Plan and status: [Character creator](design/character-creator.md).
+
+- All 14 steps of the book's flow as a phone-first wizard, with a step bar showing red dots where something is left to do. It saves itself, keeps several characters, and can export/import.
+- Dice where the book rolls: homeland (2×d100, optional), background (2×d100, keep one), human people, archetype/environment (d10), field disturbances and spirit animals, all event tables (d100, one free re-roll), Friends & Foes (roll twice, keep one), weapon arm (d10).
+- Data: 18 homelands, 100 backgrounds, every people (humans, marvellous peoples, 6 elf tribes, 4 dwarf clans + clanless, 3 tirak houses × 3 sizes + houseless, misslor), 26 religions and cults with doctrines, 9 archetypes, 10 environments, 6 living standards, 7 event tables, 43 languages and 14 scripts, about 400 skills.
+- Rules: attributes (balanced/focused lumps or free points), Wisdom's effect on knowledge skills, unit pools with what each may buy, the skill cap and overflow, talents/incompetence/blocks, attunement, hardening, base armour and damage.
+- Character sheet in four parts, one column on the phone, two on PC, printable.
+- No brand name anywhere; descriptions are my own short summaries.
+- Still to come: drives list, weapon/armour lists with stats, mystic gear and mysteries, name suggestions.
+
 ## 2026-10-25 — Session 5b: radiation you can feel, Turns/Flow
 
 - **Fire:** next to a burning hex is now **+1** (was 0), between two fires +2, two away −1. Inside a blaze it's still +3. (The flames and the heat around them now have separate caps.)

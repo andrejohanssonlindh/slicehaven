@@ -3,6 +3,7 @@ import { ATTR_EN, NUMB_EN, RARITY_EN, TABLE_EN, type Derived } from '../core/cha
 import type { CharState } from '../core/chargen/state';
 import { diceText } from '../core/chargen/tables';
 import { CONTENT } from '../content/chargen';
+import { languageEn } from '../content/chargen/languages';
 import { esc } from './ui';
 
 const GROUPS: [string, string][] = [
@@ -99,8 +100,8 @@ export function sheetHtml(s: CharState, d: Derived): string {
     ])}
     <h3>Hardening</h3>${dl((['utsatthet', 'vald', 'overnaturligt'] as const).map((c) => [NUMB_EN[c], String(d.numb[c])]))}
     <h3>Languages</h3>${dl([
-      ['Speaks', langs.map(esc).join(', ')],
-      ['Writes', scripts.map(esc).join(', ') || '–'],
+      ['Speaks', langs.map((l) => esc(languageEn(l))).join(', ')],
+      ['Writes', scripts.map((l) => esc(languageEn(l))).join(', ') || '–'],
     ])}
     ${circles.length ? `<h3>Circles</h3><ul>${circles.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>` : ''}
     ${companions.length ? `<h3>Companions</h3><ul>${companions.map((c) => `<li>${c}</li>`).join('')}</ul>` : ''}
