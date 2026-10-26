@@ -1,7 +1,8 @@
 /** The finished character sheet: four parts like the paper form, readable on phone, PC and paper. */
-import { ATTR_EN, NUMB_EN, RARITY_EN, TABLE_EN, type Derived } from '../core/chargen/derive';
+import { ATTR_EN, NUMB_EN, TABLE_EN, type Derived } from '../core/chargen/derive';
 import type { CharState } from '../core/chargen/state';
-import { diceText } from '../core/chargen/tables';
+import { diceText, ENCUMBRANCE } from '../core/chargen/tables';
+import { ARMOUR, DAMAGE_TYPE_EN, propsEn, SHIELDS, WEAPONS } from '../content/chargen/equipment';
 import { CONTENT } from '../content/chargen';
 import { DRIVES } from '../content/chargen/drives';
 import { languageEn } from '../content/chargen/languages';
@@ -19,6 +20,63 @@ const GROUPS: [string, string][] = [
   ['H', 'Crafts'],
   ['K', 'Marks'],
 ];
+
+/** Weapon damage with your base damage added: "G+2T6+1" + 2D6+2 → "4D6+3". */
+function totalDmg(dmg: string, bd: { n: number; mod: number }): string {
+  if (!/^G|T6|^\d/.test(dmg)) return dmg;
+  let n = 0;
+  let mod = 0;
+  let rest = dmg;
+  if (rest.startsWith('G')) {
+    n += bd.n;
+    mod += bd.mod;
+    rest = rest.slice(1);
+  }
+  for (const m of rest.matchAll(/([+-]?)(\d+)(T6)?/g)) {
+    const v = Number(m[2]) * (m[1] === '-' ? -1 : 1);
+    if (m[3]) n += v;
+    else mod += v;
+  }
+  return diceText({ n, mod });
+}
+
+function combatHtml(s: CharState, d: Derived): string {
+  const skill = (id: string) => d.skills.find((x) => x.id === id);
+  const bd = d.derived.damage;
+  const owned = [...Object.values(s.equipment.weapons), ...s.equipment.bought.map((b) => b.name)].filter(Boolean);
+  const weapons = owned.map((n) => WEAPONS.find((w) => w.sv === n)).filter((w): w is NonNullable<typeof w> => !!w);
+  const shields = owned.map((n) => SHIELDS.find((w) => w.sv === n)).filter((w): w is NonNullable<typeof w> => !!w);
+  const free = Object.values(s.equipment.weapons).filter((n) => n && !WEAPONS.some((w) => w.sv === n) && !SHIELDS.some((w) => w.sv === n));
+  const brawl = skill('Slagsmål');
+  const rows = [
+    `<tr><td>Unarmed</td><td class="n">${brawl ? esc(diceText(brawl.dice)) : ''}</td><td class="n">–</td><td class="n">${esc(diceText(bd))}</td><td class="n">–</td><td class="note">Limited, Unarmed, Quick</td></tr>`,
+    ...weapons.map((w) => {
+      const sk = skill(w.skill);
+      const dmg = (x: string) => (x === '–' ? '–' : esc(totalDmg(x, bd)));
+      const cells = w.melee
+        ? `<td class="n">${dmg(w.melee.hugg)}</td><td class="n">${dmg(w.melee.kross)}</td><td class="n">${dmg(w.melee.stick)}</td>`
+        : `<td colspan="3" class="n">${esc(w.ranged!.range)} · ${esc(DAMAGE_TYPE_EN[w.ranged!.type] ?? w.ranged!.type)} ${dmg(w.ranged!.dmg)}</td>`;
+      return `<tr><td>${esc(w.en)}<br><span class="note">${esc(CONTENT.skill(w.skill)?.en ?? w.skill)} · 1H ${esc(w.h1.replace('T6', 'D6'))} / 2H ${esc(w.h2.replace('T6', 'D6'))}</span></td><td class="n">${sk ? esc(diceText(sk.dice)) : ''}</td>${cells}<td class="note">${esc(propsEn(w.props))}</td></tr>`;
+    }),
+  ];
+  const armourOwned = [...Object.values(s.equipment.armour), ...s.equipment.bought.map((b) => b.name)].map((n) => ARMOUR.find((a) => a.sv === n)).filter((a): a is NonNullable<typeof a> => !!a);
+  const best = armourOwned.sort((a, b) => b.h + b.k + b.s - (a.h + a.k + a.s))[0];
+  const dwarf = d.people?.family === 'dvarg';
+  const load = best ? Math.max(0, best.load - (dwarf ? 8 : 0)) : 0;
+  const enc = [...ENCUMBRANCE].find((e) => load <= e.max) ?? ENCUMBRANCE[ENCUMBRANCE.length - 1];
+  const A = d.derived.armour;
+  return `<h3>Weapons</h3><table><tr><th>Weapon</th><th class="n">Skill</th><th class="n">Cut</th><th class="n">Crush</th><th class="n">Thrust</th><th>Properties</th></tr>${rows.join('')}</table>
+    ${free.length ? `<p class="note">Also: ${free.map(esc).join(', ')}</p>` : ''}
+    ${shields.length ? `<h3>Shields</h3><ul>${shields.map((x) => `<li>${esc(x.en)}: melee ${esc(x.melee.replace('T6', 'D6'))}, ranged ${esc(x.ranged.replace('T6', 'D6'))}, cover ${esc(x.cover)}${x.props ? ` · ${esc(propsEn(x.props))}` : ''}</li>`).join('')}</ul>` : ''}
+    <h3>Armour</h3>
+    ${best ? `<p>${esc(best.en)} (full suit)</p>` : '<p class="note">No armour.</p>'}
+    ${dl([
+      ['Protection (cut/crush/thrust)', `${(best?.h ?? 0) + A} / ${(best?.k ?? 0) + A} / ${(best?.s ?? 0) + A}`],
+      ['Load', `${load}${dwarf && best ? ' (dwarf −8)' : ''}`],
+      ['Encumbrance', `${enc.penalty} on Speed, Reaction and movement · base fatigue ${enc.baseFatigue}`],
+    ])}
+    <p class="note">Damage includes your base damage (${esc(diceText(bd))}); protection includes base armour ${A}.</p>`;
+}
 
 const dl = (rows: [string, string | undefined][]) =>
   `<dl>${rows
@@ -52,8 +110,6 @@ export function sheetHtml(s: CharState, d: Derived): string {
   const scripts = [...d.languages.written, ...s.languages.written];
   const circles = d.circles.map((c) => s.circles[c.key] || (c.name !== '?' ? c.name : '')).filter(Boolean);
   const companions = d.companions.map((c) => `${esc(c.kind)}${s.companions[c.key] ? `: ${esc(s.companions[c.key])}` : ''}`);
-  const weapons = d.weapons.map((w) => `${esc(s.equipment.weapons[w.key] || `(${RARITY_EN[w.rarity]} weapon, not chosen)`)}`);
-  const armour = d.armour.map((w) => `${esc(s.equipment.armour[w.key] || `(${RARITY_EN[w.rarity]} armour, not chosen)`)}`);
   const packages = d.packages.map((p) => esc(p.name !== '?' ? p.name : s.equipment.packages[p.key] || '(package, not chosen)'));
   const spent = s.equipment.bought.reduce((n, b) => n + b.cost * b.qty, 0);
   const events = d.slots
@@ -120,8 +176,7 @@ export function sheetHtml(s: CharState, d: Derived): string {
 
   <h2>Combat & magic</h2>
   <div class="cols">
-    <div><h3>Weapons</h3><ul><li>Brawling (unarmed)</li>${weapons.map((w) => `<li>${w}</li>`).join('')}</ul>
-    <h3>Armour</h3>${armour.length ? `<ul>${armour.map((w) => `<li>${w}</li>`).join('')}</ul>` : '<p class="note">None.</p>'}</div>
+    <div>${combatHtml(s, d)}</div>
     <div>${gear.length ? `<h3>Mystic equipment</h3><ul>${gear.map((g) => `<li>${g}</li>`).join('')}</ul>` : ''}
     ${mysteries.length ? `<h3>Mysteries</h3><ul>${mysteries.map((m) => `<li>${esc(m)}</li>`).join('')}</ul>` : ''}</div>
   </div>

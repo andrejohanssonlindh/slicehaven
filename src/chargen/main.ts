@@ -5,6 +5,7 @@ import { exportChar, importChar, loadRoster, newChar, roll, saveRoster, type Cha
 import type { PointModel } from '../core/chargen/tables';
 import type { Family } from '../core/chargen/types';
 import { CONTENT } from '../content/chargen';
+import { ARMOUR, SHIELDS, WEAPONS } from '../content/chargen/equipment';
 import { sheetHtml } from './sheet';
 import { STEP_RENDER, view } from './steps';
 import { esc, lendView, toast } from './ui';
@@ -352,6 +353,14 @@ app.parentElement!.addEventListener('click', (ev) => {
       const c = Number((document.getElementById('buy-cost') as HTMLInputElement).value) || 0;
       if (!n) return;
       s.equipment.bought.push({ name: n, cost: c, qty: 1 });
+      return commit();
+    }
+    case 'buyList': {
+      const v = (document.getElementById('buy-list') as HTMLSelectElement).value;
+      const [kind, name] = [v.slice(0, 1), v.slice(2)];
+      const item = kind === 'w' ? WEAPONS.find((x) => x.sv === name) : kind === 'h' ? SHIELDS.find((x) => x.sv === name) : ARMOUR.find((x) => x.sv === name);
+      if (!item) return;
+      s.equipment.bought.push({ name: item.sv, cost: item.price, qty: 1 });
       return commit();
     }
     case 'dropBuy':

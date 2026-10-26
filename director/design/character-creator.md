@@ -58,7 +58,8 @@ Then: **Character sheet**, 4 sections like the book's (person, attributes & skil
 | Event tables: 6 × 100 + Friends & Foes (roll twice, keep one) | ✅ |
 | Languages (43 tongues, 14 scripts, "can read" hint) | ✅ |
 | Drives (step 11): 45 drives with three levels, roll 4 keep 2, locked drives from events shown | ✅ |
-| Equipment: packages, weapon & armour lists with stats, prices | ⏳ names only for now |
+| Equipment: 70 weapons, 5 shields, 11 armours with stats and prices; rarity limits (cultural weapons rare outside their people); buying; sheet shows damage with base damage, protection, encumbrance | ✅ |
+| Equipment packages' contents, other gear lists (clothes, food, tents…), poisons & drugs | ⏳ packages are names only |
 | Mystic gear and the mystery lists | ⏳ free text for now |
 | Name suggestions per culture | ⏳ not started |
 | Companion details (types, pros/cons) | ⏳ name only |
