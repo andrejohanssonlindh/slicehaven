@@ -6,7 +6,8 @@ import { type Hero, canRoll, diceOf } from '../core/hero';
 import { Rng } from '../core/rng';
 import {
   type CheckDef, type Effect, type ObjectDef, type SceneApproach, type SceneDef, type SceneEvent, type SceneState,
-  apply, approachOpen, artOf, attempt, blocks, checkFor, lookText, met, newSceneState, openChecks, talkFor, usefulSkills,
+  apply, approachOpen, artOf, attempt, blocks, checkFor, checksHere, hintsNear, lookText, met, newSceneState, openChecks,
+  talkFor, usefulSkills,
 } from '../core/scene';
 import {
   type Conflict, ROUNDS, allowed, conflictOver, mustUseLocked, newConflict, outcome, playRound, pooled,
@@ -15,7 +16,7 @@ import { diceText } from '../core/chargen/tables';
 import { SCENE_ART } from '../art/sceneArt';
 import type { Ground } from '../art/terrain';
 import type { PropKind } from '../art/mapScene';
-import { rollableName } from '../content/rollables';
+import { SKILL_SETS, byGroup, rollableName } from '../content/rollables';
 import type { SandboxCell } from '../content/sandbox';
 import { GameConsole, type LogTone } from '../ui/console';
 import { Sheet, type SheetOption, type SheetSection, esc } from '../ui/sheet';
@@ -43,6 +44,7 @@ const LEGEND: Record<string, { ground: Ground; prop?: PropKind; obstacle?: boole
 
 const TIME_LABEL = { night: 'Night', dawn: 'Dawn', day: 'Day' } as const;
 const HERO_ID = 'hero';
+const HINTS_KEY = 'slicehaven.hints';
 
 const toHex = ([c, r]: [number, number]): Hex => offsetToHex(c, r);
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -133,6 +135,28 @@ export function startScene(def: SceneDef, kinds: Record<string, MobDef>, startHe
 
   let busy = false;
   let focus: Hex[] = [];
+  /** Flag skills that would do something ("✓ Useful here"). A test aid; the real game will hide them. */
+  let hints = localStorage.getItem(HINTS_KEY) !== '0';
+
+  const bar = document.getElementById('scene-bar')!;
+  barButton('Use a skill', 'Here, where you stand', () => {
+    if (!busy) skillHere();
+  });
+  const hintBtn = barButton('', 'Mark useful skills', () => {
+    hints = !hints;
+    localStorage.setItem(HINTS_KEY, hints ? '1' : '0');
+    say(hints ? 'Hints on: useful skills are marked.' : 'Hints off: nothing is marked.', 'info');
+    refreshInfo();
+  });
+
+  function barButton(label: string, sub: string, onClick: () => void): HTMLButtonElement {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.innerHTML = `<b>${esc(label)}</b><small>${esc(sub)}</small>`;
+    b.addEventListener('click', onClick);
+    bar.appendChild(b);
+    return b;
+  }
 
   const camera = new Camera(canvas, renderer.width, renderer.height, (wx, wy) => void safe(() => onTap(wx, wy)));
 
@@ -151,8 +175,10 @@ export function startScene(def: SceneDef, kinds: Record<string, MobDef>, startHe
   }
 
   function refreshInfo(): void {
-    info.innerHTML = `<b>${esc(hero.name)}</b> · <span class="gold">${state.gold} gold</span> · ${TIME_LABEL[state.time]}`
+    info.innerHTML = `<b>${esc(hero.name)}</b> · <span class="silver">${state.silver} silver</span> · ${TIME_LABEL[state.time]}`
       + `<br><span>${state.ended ? 'You made it in. Look around, or play again.' : 'Tap something to look, talk or use a skill. Tap the ground to walk.'}</span>`;
+    hintBtn.querySelector('b')!.textContent = hints ? 'Hints: on' : 'Hints: off';
+    hintBtn.classList.toggle('on', hints);
   }
 
   // --- input ----------------------------------------------------------------------
@@ -289,37 +315,94 @@ export function startScene(def: SceneDef, kinds: Record<string, MobDef>, startHe
     return d.n > 0 ? diceText(d) : '—';
   }
 
-  function skillMenu(o: ObjectDef): void {
-    const useful = usefulSkills(o, state);
-    const usefulOpts: SheetOption[] = useful.map((id) => {
-      const c = checkFor(o, state, id)!;
+  /**
+   * The skill list: every skill you have, in fold-out groups (attributes, movement,
+   * social… then expertise, marks, crafts, abilities). With hints on, skills that
+   * would do something are flagged and also listed on top. `useful` maps a skill
+   * to what it would try.
+   */
+  function skillPicker(o: ObjectDef | undefined, title: string, useful: Map<string, string>, pick: (id: string) => void): void {
+    const opt = (id: string, top: boolean): SheetOption => {
       const can = canRoll(hero, id);
+      const flag = hints && useful.has(id);
       return {
-        label: rollableName(id),
-        sub: can ? `${c.label} · ${difficultyName(c.difficulty)} (${c.difficulty})` : 'Would work here, but you don\'t have it',
+        label: (flag && !top ? '✓ ' : '') + rollableName(id),
+        sub: flag ? (can ? useful.get(id) : 'Would work here, but you don\'t have it') : undefined,
         tag: diceTag(diceOf(hero, id)),
         disabled: !can,
-        style: can ? 'good' : 'muted',
-        onPick: () => void safe(() => rollCheck(o, c, id)),
+        style: flag ? (can ? 'good' : 'muted') : undefined,
+        onPick: () => pick(id),
       };
-    });
-    const others = Object.keys(hero.dice)
-      .filter((id) => !useful.includes(id) && canRoll(hero, id))
-      .sort((a, b) => rollableName(a).localeCompare(rollableName(b)));
-    const otherOpts: SheetOption[] = others.map((id) => ({
-      label: rollableName(id),
-      tag: diceTag(diceOf(hero, id)),
-      onPick: () => {
-        const line = (o.noUse ?? 'You can\'t see how {skill} would help here.').replace('{skill}', rollableName(id));
-        say(line, 'info');
-        open(o, { title: rollableName(id), body: `<p>${esc(line)}</p>`, sections: [{ options: [{ label: 'Back', onPick: () => skillMenu(o) }] }] });
-      },
-    }));
+    };
     const sections: SheetSection[] = [];
-    if (usefulOpts.length) sections.push({ title: '✓ Useful here', options: usefulOpts });
-    else sections.push({ options: [{ label: 'Nothing obvious to try here', sub: 'You can still try any skill below', disabled: true, onPick: () => {} }] });
-    sections.push({ title: `Your other skills (${otherOpts.length})`, folded: usefulOpts.length > 0, options: otherOpts });
-    open(o, { title: `Use a skill: ${o.name}`, sections });
+    if (hints && useful.size) sections.push({ title: '✓ Useful here', options: [...useful.keys()].map((id) => opt(id, true)) });
+    const owned = Object.keys(hero.dice).filter((id) => canRoll(hero, id));
+    for (const g of byGroup(owned)) sections.push({ title: `${g.label} (${g.ids.length})`, folded: true, options: g.ids.map((id) => opt(id, false)) });
+    open(o, { title, body: hints ? undefined : '<p class="hint">Pick a skill. Hints are off, so nothing is marked.</p>', sections });
+  }
+
+  const checkLine = (c: CheckDef): string => `${c.label} · ${difficultyName(c.difficulty)} (${c.difficulty})`;
+
+  function skillMenu(o: ObjectDef): void {
+    const useful = new Map(usefulSkills(o, state).map((id) => [id, checkLine(checkFor(o, state, id)!)]));
+    skillPicker(o, `Use a skill: ${o.name}`, useful, (id) => {
+      const c = checkFor(o, state, id);
+      if (c) return void safe(() => rollCheck(o, c, id));
+      const line = (o.noUse ?? 'You can\'t see how {skill} would help here.').replace('{skill}', rollableName(id));
+      say(line, 'info');
+      open(o, { title: rollableName(id), body: `<p>${esc(line)}</p>`, sections: [{ options: [{ label: 'Back', onPick: () => skillMenu(o) }] }] });
+    });
+  }
+
+  const nextToHero = (o: ObjectDef): boolean => gap(unitHexes(heroUnit), hexesOf(o)) <= 1;
+
+  /** Use a skill where you stand: on whatever's next to you, or look around. */
+  function skillHere(): void {
+    const useful = new Map<string, string>();
+    for (const o of def.objects) {
+      if (state.removed.includes(o.id) || !nextToHero(o)) continue;
+      for (const id of usefulSkills(o, state)) if (!useful.has(id)) useful.set(id, checkLine(checkFor(o, state, id)!));
+    }
+    for (const id of SKILL_SETS.search) if (!useful.has(id)) useful.set(id, 'Look around for anything interesting');
+    skillPicker(undefined, 'Use a skill here', useful, (id) => {
+      const here = checksHere(def.objects, state, id, nextToHero);
+      if (here.length === 1) return void safe(() => rollCheck(here[0].o, here[0].c, id));
+      if (here.length > 1) {
+        open(undefined, {
+          title: `${rollableName(id)}: on what?`,
+          sections: [{ options: here.map(({ o, c }) => ({ label: o.name, sub: checkLine(c), onPick: () => void safe(() => rollCheck(o, c, id)) })) }],
+        });
+        return;
+      }
+      if ((SKILL_SETS.search as readonly string[]).includes(id)) return lookAround(id);
+      const line = `There's nothing right here to use ${rollableName(id)} on. Stand next to something and try again.`;
+      say(line, 'info');
+      open(undefined, { title: rollableName(id), body: `<p>${esc(line)}</p>`, sections: [{ options: [{ label: 'Back', onPick: skillHere }] }] });
+    });
+  }
+
+  /** Searching with nothing to search right here: what's worth a closer look nearby. */
+  function lookAround(id: string): void {
+    const found = hintsNear(def.objects, state, (o) => gap(unitHexes(heroUnit), hexesOf(o)), 5);
+    say(`You: ${rollableName(id)}, looking around.`, 'you');
+    const lines = found.map((f) => `${directionTo(hexesOf(f.o))}: ${f.hint}`);
+    if (!lines.length) lines.push('You look around carefully. Nothing nearby catches your eye.');
+    for (const l of lines) say(l, 'info');
+    open(undefined, {
+      title: 'You look around',
+      body: lines.map((l) => `<p>${esc(l)}</p>`).join(''),
+      sections: [{ options: [{ label: 'Continue', style: 'primary', onPick: () => sheet.close() }] }],
+    });
+  }
+
+  /** "To the north-east" from the hero to a footprint, as seen on screen. */
+  function directionTo(hexes: Hex[]): string {
+    const a = renderer.feet(heroUnit.at);
+    const b = renderer.footprintFeet(hexes);
+    const ang = Math.atan2(-(b.y - a.y), b.x - a.x);
+    const names = ['east', 'north-east', 'north', 'north-west', 'west', 'south-west', 'south', 'south-east'];
+    const name = names[(Math.round(ang / (Math.PI / 4)) + 8) % 8];
+    return `To the ${name}`;
   }
 
   async function rollCheck(o: ObjectDef, c: CheckDef, skill: string): Promise<void> {
@@ -462,9 +545,9 @@ export function startScene(def: SceneDef, kinds: Record<string, MobDef>, startHe
     const events = apply(state, eff);
     for (const e of events) {
       if (e.kind === 'say') say(e.text, e.tone as LogTone);
-      else if (e.kind === 'gold') {
-        say(`${e.amount} gold (${e.why}). ${state.gold} left.`, 'bad');
-        floatOverHero(`${e.amount}g`, '#f2c94c');
+      else if (e.kind === 'silver') {
+        say(`${e.amount} silver (${e.why}). ${state.silver} left.`, 'bad');
+        floatOverHero(`${e.amount}s`, '#d8dce4');
       } else if (e.kind === 'time') {
         weather.setTime(e.time === 'night' ? 'night' : e.time === 'dawn' ? 'dusk' : 'day');
         say(`${TIME_LABEL[e.time]}.`, 'info');
@@ -539,7 +622,7 @@ export function startScene(def: SceneDef, kinds: Record<string, MobDef>, startHe
     refreshInfo();
     open(undefined, {
       title: 'You\'re in',
-      body: `<p>${esc(state.ended ?? '')}</p><p class="score">Gold left: <b>${state.gold}</b> of ${def.start.gold}</p>`,
+      body: `<p>${esc(state.ended ?? '')}</p><p class="score">Silver left: <b>${state.silver}</b> of ${def.start.silver}</p>`,
       sections: [{
         options: [
           { label: 'Play again', style: 'primary', onPick: () => location.reload() },
@@ -573,7 +656,7 @@ export function startScene(def: SceneDef, kinds: Record<string, MobDef>, startHe
     }));
     open(undefined, {
       title: hero.name,
-      body: `<p>${esc(hero.from)} · ${state.gold} gold${state.flags.hasPass ? ' · a trader\'s pass' : ''}</p>`,
+      body: `<p>${esc(hero.from)} · ${state.silver} silver${state.flags.hasPass ? ' · a trader\'s pass' : ''}</p>`,
       sections: [
         { title: 'Play as…', folded: true, options: choices },
         { title: 'Attributes', options: attrs.map(row) },

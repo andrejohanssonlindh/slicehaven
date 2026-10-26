@@ -1,7 +1,7 @@
 import { ATTR_EN, type Derived } from '../core/chargen/derive';
 import { attrDice, skillDice } from '../core/chargen/tables';
 import type { Hero } from '../core/hero';
-import { SKILL_BY_ID } from './chargen/skills';
+import { GROUP_EN, SKILL_BY_ID } from './chargen/skills';
 
 /**
  * Skill sets: which skills are reasonable for a kind of task. Scenes build
@@ -30,6 +30,25 @@ export const SKILL_SETS = {
 export function rollableName(id: string): string {
   if (id.startsWith('attr:')) return ATTR_EN[id.slice(5) as keyof typeof ATTR_EN] ?? id.slice(5);
   return SKILL_BY_ID.get(id)?.en ?? id;
+}
+
+/** Skill groups in the order lists show them: attributes, the six groups, then expertise, marks, crafts, abilities. */
+const GROUP_ORDER: { key: string; label: string }[] = [
+  { key: 'attr', label: 'Attributes' },
+  ...(['rorelse', 'social', 'vildmark', 'kunskap', 'strid', 'mystik'] as const).map((k) => ({ key: k, label: GROUP_EN[k] })),
+  { key: 'E', label: 'Expertise' },
+  { key: 'K', label: 'Marks' },
+  { key: 'H', label: 'Crafts' },
+  { key: 'F', label: 'Abilities' },
+];
+
+export const groupOf = (id: string): string => (id.startsWith('attr:') ? 'attr' : SKILL_BY_ID.get(id)?.group ?? 'F');
+
+/** Ids sorted into their skill groups (empty groups left out), names A–Z within a group. */
+export function byGroup(ids: string[]): { key: string; label: string; ids: string[] }[] {
+  return GROUP_ORDER
+    .map((g) => ({ ...g, ids: ids.filter((id) => groupOf(id) === g.key).sort((a, b) => rollableName(a).localeCompare(rollableName(b))) }))
+    .filter((g) => g.ids.length > 0);
 }
 
 /** Does this id name a real skill or attribute? (Checked by a test for every scene.) */

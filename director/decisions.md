@@ -32,3 +32,10 @@
 | 2026-10-26 | Character creator: living standard removed | Director: it won't be used. Silver comes from archetypes and events only. |
 | 2026-10-26 | Character creator: archetype and environment are separate steps | Director: the archetype step held too many decisions that weren't about the archetype. |
 | 2026-10-26 | No "book" references or step numbering in the creator's UI | Director's review. |
+| 2026-10-26 | Money is **silver** | Director (Q16). Matches the rules and the character creator. |
+| 2026-10-26 | "Useful here" skill marks are a **Hints** setting; the standard game will likely hide them | Director (Q14): both are useful. Hidden by default later; searching nearby gives in-world hints instead. |
+| 2026-10-26 | Skill lists grouped by skill group in fold-outs; expertise, marks, crafts, abilities last | Director (Q14). |
+| 2026-10-26 | One approach per try in social conflicts, each approach with several reasonable skills | Director (Q15): simplicity, but an approach can still mix e.g. Argue and Charm. |
+| 2026-10-26 | Scenes aren't linear: finishing one route must not close the others | Director: e.g. after bribing your way in you can still sleep at the fire. Write conditions on what *you've done*, not on which route is "the" one. |
+| 2026-10-26 | Almost everything is clickable (flowers, ground…), with Use a skill on all of it; most attempts just do nothing | Director. Not needed in the gate scene; the direction for scenes from now on. |
+| 2026-10-26 | **Use a skill where you stand**, no need to tap a thing: it acts on what's next to you; Search looks around and describes what's interesting nearby | Director. Built in the gate scene. |

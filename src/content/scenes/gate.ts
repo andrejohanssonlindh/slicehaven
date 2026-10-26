@@ -22,7 +22,7 @@ export const GATE_KINDS: Record<string, { sprite: MobKind; variant?: string; too
 const REST: Effect[] = [
   { say: 'You sit down with the travellers. Someone hands you a heel of bread. The fire crackles, and your eyes close…' },
   { time: 'dawn' },
-  { loseGold: 0.7, why: 'stolen while you slept' },
+  { loseSilver: 0.7, why: 'stolen while you slept' },
   { remove: 'travellers' },
   { set: 'rested' },
   { set: 'gateOpen' },
@@ -36,7 +36,7 @@ export const GATE_SCENE: SceneDef = {
   title: 'The village gate',
   intro: [
     'Night has fallen by the time you reach the village. The gate is shut, a torch burns beside it, and a guard leans on his spear.',
-    'You have 100 gold and nowhere to sleep.',
+    'You have 100 silver and nowhere to sleep.',
   ],
   // Offset coords, 10 × 12. Row 3 is the palisade. Legend: see engine/scene.ts.
   layout: [
@@ -53,7 +53,7 @@ export const GATE_SCENE: SceneDef = {
     'fgggpgggPT',
     'TPggpgwTPT',
   ],
-  start: { time: 'night', gold: 100, hero: [4, 11] },
+  start: { time: 'night', silver: 100, hero: [4, 11] },
   objects: [
     {
       id: 'palisade',
@@ -128,7 +128,7 @@ export const GATE_SCENE: SceneDef = {
             id: 'bribe',
             label: 'Bribe him',
             pitch: 'You let a few coins clink in your palm. "Cold night for it. Surely a man on watch could use something for a hot meal?"',
-            why: 'Coin talks: +2 Control. If he takes it, it costs 20% of your gold.',
+            why: 'Coin talks: +2 Control. If he takes it, it costs 20% of your silver.',
             when: { none: NOT_NOW },
             skills: [...SKILL_SETS.bribe],
             locked: 'Handel',
@@ -141,7 +141,7 @@ export const GATE_SCENE: SceneDef = {
             ],
             success: [
               { say: 'He weighs the coins, pockets them, and lifts the bar just far enough. "Didn\'t see you."', tone: 'speech' },
-              { loseGold: 0.2, why: 'the bribe' },
+              { loseSilver: 0.2, why: 'the bribe' },
               { set: 'paidBribe' },
               { set: 'gateOpen' },
             ],
@@ -213,6 +213,7 @@ export const GATE_SCENE: SceneDef = {
           label: 'Climb the ivy and go over the palisade',
           skills: [...SKILL_SETS.climb],
           difficulty: 15,
+          hint: 'The ivy on the boulder is thick as rope, and the top of the rock is close to the palisade points. Someone could climb that.',
           tries: 2,
           success: [
             { say: 'Hand over hand through the ivy, along the top of the rock, and you drop over the points into the dark on the other side.', tone: 'good' },
@@ -242,6 +243,7 @@ export const GATE_SCENE: SceneDef = {
           label: 'Search the cart',
           skills: [...SKILL_SETS.search],
           difficulty: DIFFICULTY.tricky,
+          hint: 'The handcart\'s tarp is tied down over more than turnips, by the look of it. Worth a closer search.',
           when: { none: ['hasPass'] },
           success: [
             { say: 'Under the tarp, between sacks of turnips, a folded letter with a wax seal: a trader\'s pass, good for "the bearer and his goods". That could open a gate.', tone: 'good' },
@@ -263,7 +265,8 @@ export const GATE_SCENE: SceneDef = {
         { text: 'A small fire of sticks in a ring of stones. Three travellers sit around it in their cloaks, waiting for the gate to open.' },
       ],
       actions: [
-        { id: 'rest', label: 'Rest by the fire until dawn', sub: 'Sleep, and go in when the gate opens', when: { none: ['rested', 'gateOpen'] }, effects: REST },
+        // Open even after you've got the gate open: the scene doesn't force an order.
+        { id: 'rest', label: 'Rest by the fire until dawn', sub: 'Sleep, and go in when the gate opens', when: { none: ['rested'] }, effects: REST },
       ],
       noUse: 'You can\'t see how {skill} would help with a campfire.',
     },
@@ -277,7 +280,7 @@ export const GATE_SCENE: SceneDef = {
         {
           line: '"Gate won\'t open till sunrise," says the tinker. "Sit, warm yourself. Plenty of room by the fire."',
           options: [
-            { label: 'Rest by the fire until dawn', when: { none: ['gateOpen'] }, effects: REST },
+            { label: 'Rest by the fire until dawn', when: { none: ['rested'] }, effects: REST },
             { label: 'Maybe later' },
           ],
         },
@@ -288,6 +291,7 @@ export const GATE_SCENE: SceneDef = {
           label: 'Size them up',
           skills: [...SKILL_SETS.readPeople],
           difficulty: DIFFICULTY.hard,
+          hint: 'One of the travellers keeps glancing your way. You could try to size them up.',
           tries: 1,
           when: { none: ['readThem'] },
           success: [
@@ -316,7 +320,7 @@ export const GATE_SCENE: SceneDef = {
   ],
   exits: [
     { hexes: [[4, 3], [5, 3]], when: { all: ['gateOpen', 'rested'] },
-      effects: [{ enter: 'You walked in at dawn behind the first carts. The travellers, and most of your gold, were long gone.' }] },
+      effects: [{ enter: 'You walked in at dawn behind the first carts. The travellers, and most of your silver, were long gone.' }] },
     { hexes: [[4, 3], [5, 3]], when: { all: ['gateOpen', 'paidBribe'] },
       effects: [{ enter: 'You bought your way in. The guard is a little richer, and so is your knowledge of how things work here.' }] },
     { hexes: [[4, 3], [5, 3]], when: { all: ['gateOpen', 'scaredGuard'] },

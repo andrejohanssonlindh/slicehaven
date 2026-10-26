@@ -7,12 +7,12 @@ Night at a village gate. The palisade can't be passed. Four ways in:
 
 | Way in | How | Cost |
 |---|---|---|
-| **Argue with the guard** | Talk → "Argue your way in" → bribe, threaten or sweet-talk. A social conflict, three rolls. | Bribe: 20% of your gold if he takes it. A failed threat makes him refuse to talk at all. |
+| **Argue with the guard** | Talk → "Argue your way in" → bribe, threaten or sweet-talk. A social conflict, three rolls. | Bribe: 20% of your silver if he takes it. A failed threat makes him refuse to talk at all. |
 | **Climb the ivy** | Use a skill on the boulder: Climb, Hard (15). | Two failures and the guard hears you and keeps watch. |
 | **Search the handcart** | Use a skill on the cart: Search, Tricky (10). You find a trader's pass; show it to the guard. | Nothing. |
-| **Sleep by the fire** | Rest with the travellers until dawn, when the gate opens. | You wake up robbed: 70% of your gold. |
+| **Sleep by the fire** | Rest with the travellers until dawn, when the gate opens. | You wake up robbed: 70% of your silver. Still possible after you've got the gate open some other way. |
 
-You start with 100 gold. The scene plays **your current character from the creator** if you have one, otherwise a default shepherd. Tap your hero to see your dice or switch who you play.
+You start with 100 silver. The scene plays **your current character from the creator** if you have one, otherwise a default shepherd. Tap your hero to see your dice or switch who you play.
 
 Extra: you can *Size up* the travellers (Insight, Hard 14) and notice the young man eyeing your purse.
 
@@ -26,9 +26,13 @@ Any thing can cover several hexes: the boulder covers three, the cart and the ga
 - It's drawn as one picture over its footprint, sorted by its front row, so people behind it are hidden and people in front aren't.
 
 ### "Use a skill" is always there
-Every thing has **Use a skill…**. The list shows:
-- **✓ Useful here**: the skills that would do something, with what you'd try and how hard it is. Skills you don't have are shown greyed, so you can see what *would* have worked.
-- **Your other skills**, folded away. Trying one gives a short line ("You can't see how Charm would help with a rock.") and no roll.
+Two ways to use a skill:
+- **The Use a skill button** (under the map) works **where you stand**, so you don't need to tap anything. It acts on whatever is next to you: Climb next to the boulder climbs it, Search next to the cart searches it. If two things next to you could take the same skill, it asks which. **Search** or **Alertness** with nothing to search right next to you **looks around** instead: it describes interesting things within a few steps, with a direction ("To the east: the ivy on the boulder is thick as rope… Someone could climb that."). Any other skill with nothing to use it on gets a short line.
+- **Tap a thing → Use a skill…** does the same, aimed at that thing.
+
+The skill list is **grouped by skill group** in fold-outs: Attributes, Movement, Social, Wilderness, Knowledge, Combat, Mystic, then Expertise, Marks, Crafts and Abilities at the end.
+
+**Hints** (switch under the map, on by default while we test): with hints on, skills that would do something are marked ✓ and listed on top under "Useful here", with what you'd try and how hard it is. Skills you don't have show greyed, so you can see what *would* have worked. With hints off, nothing is marked. The standard game will likely play with hints off, and looking around is the in-world way to find things.
 
 What counts as "reasonable" comes from **skill sets** defined once (`climb`, `search`, `readPeople`, `sweetTalk`, `threaten`, `bribe`) and reused by every scene. Each skill set mixes base skills, expertise, marks and attributes. For example, *climb* = Climb, Acrobatics, Ape-footed, Strong Grip.
 
@@ -44,10 +48,17 @@ Rolls follow the rules: open-ended D6 (a six is replaced by two new dice), **1 C
 All rolls are shown in full in the sheet and the log, e.g. `6↺ · 3 · 4 +2 = 9`. The ↺ marks a six that rolled two more dice.
 
 ### The console
-The bottom bar shows the last two lines. Tap it to open the whole log: what you looked at, what was said, every roll, and gold gained and lost.
+The bottom bar shows the last two lines. Tap it to open the whole log: what you looked at, what was said, every roll, and silver gained and lost.
 
 ### Scenes are data
-A scene is a map, a list of things (with their hexes, art, look text, talk, checks, actions and conversations) and exits. Effects are small: say something, set a flag, lose a share of gold, change the time, remove someone, enter. The rules live in `core/scene.ts` and `core/social.ts`. The gate is `content/scenes/gate.ts`. A test checks that every skill a scene names really exists.
+A scene is a map, a list of things (with their hexes, art, look text, talk, checks, actions and conversations) and exits. Effects are small: say something, set a flag, lose a share of silver, change the time, remove someone, enter. The rules live in `core/scene.ts` and `core/social.ts`. The gate is `content/scenes/gate.ts`. A test checks that every skill a scene names really exists.
+
+## Principles for future scenes (director, 2026-10-26)
+- **Not linear.** Getting through one way must not close the others. After a bribe you can still sleep at the fire. Conditions should depend on what you've *done*, not on which route counts as "the" one. (The gate scene now follows this.)
+- **Almost everything is clickable.** Flowers, the ground, a fence post: you can look at any of them and use a skill on any of them. Most attempts just do nothing. *Not built yet:* today only the scene's things react, and tapping the ground walks. Plan: tapping ground opens a small menu (walk here / look / use a skill), and every ground type and prop gets a look line and a few generic skill reactions (Nature Lore on flowers, Tracking on a path).
+- **No need to tap things.** Standing next to something and using a skill is enough (built).
+- **One approach per try** in conversations. Each approach still mixes several skills (sweet talk can use both Argue and Charm).
+- **Money is silver.**
 
 ## Simplifications for now
 - The guard always spends his Control cancelling yours. He doesn't buy consequences of his own yet: the rules' table of social consequences (secrets, changed opinions…) is for later.

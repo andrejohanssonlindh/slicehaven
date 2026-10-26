@@ -3,11 +3,10 @@ import { type Battle, type Unit, fit, unitAt, walkReach } from '../src/core/batt
 import { advantages, modify, rollOpen, test } from '../src/core/checks';
 import { SHAPES, around, cover, gap } from '../src/core/footprint';
 import { hex, hexKey } from '../src/core/hex';
-import { defaultHero } from '../src/content/rollables';
-import { isRollable } from '../src/content/rollables';
+import { byGroup, defaultHero, isRollable } from '../src/content/rollables';
 import { Rng } from '../src/core/rng';
 import {
-  apply, approachOpen, attempt, blocks, checkFor, met, newSceneState, openChecks, talkFor, usefulSkills,
+  apply, approachOpen, attempt, blocks, checkFor, checksHere, hintsNear, met, newSceneState, openChecks, talkFor, usefulSkills,
 } from '../src/core/scene';
 import {
   type Approach, allowed, exchange, mustUseLocked, newConflict, outcome, playRound, pooled,
@@ -188,25 +187,54 @@ describe('the village gate scene', () => {
     expect(blocks(obj('gate'), s)).toBe(false);
   });
 
-  it('resting by the fire costs 70% of your gold and opens the gate at dawn', () => {
+  it('resting by the fire costs 70% of your silver and opens the gate at dawn', () => {
     const s = newSceneState(GATE_SCENE);
-    expect(s.gold).toBe(100);
+    expect(s.silver).toBe(100);
     apply(s, obj('campfire').actions![0].effects);
-    expect(s.gold).toBe(30);
+    expect(s.silver).toBe(30);
     expect(s.time).toBe('dawn');
     expect(s.flags.gateOpen).toBe(true);
     expect(s.removed).toContain('travellers');
   });
 
-  it('a successful bribe costs 20%; a failed threat closes every approach', () => {
+  it('a successful bribe costs 20%, and you can still rest by the fire after', () => {
     const guard = obj('guard');
     const bribe = guard.social!.approaches.find((a) => a.id === 'bribe')!;
     const s = newSceneState(GATE_SCENE);
     apply(s, bribe.success);
-    expect(s.gold).toBe(80);
+    expect(s.silver).toBe(80);
+    const rest = obj('campfire').actions![0];
+    expect(met(s, rest.when)).toBe(true);
+    apply(s, rest.effects);
+    expect(s.silver).toBe(24);
+  });
+
+  it('a failed threat closes every approach', () => {
+    const guard = obj('guard');
     const s2 = newSceneState(GATE_SCENE);
     apply(s2, guard.social!.approaches.find((a) => a.id === 'threaten')!.failure);
     expect(guard.social!.approaches.filter((a) => approachOpen(a, s2))).toHaveLength(0);
+  });
+
+  it('using a skill where you stand finds the check on the thing next to you', () => {
+    const s = newSceneState(GATE_SCENE);
+    const nextToCart = (o: { id: string }) => o.id === 'cart';
+    expect(checksHere(GATE_SCENE.objects, s, 'Genomsöka', nextToCart).map((x) => x.c.id)).toEqual(['search']);
+    expect(checksHere(GATE_SCENE.objects, s, 'Klättra', nextToCart)).toEqual([]);
+  });
+
+  it('looking around turns up hints from nearby open checks, nearest first', () => {
+    const s = newSceneState(GATE_SCENE);
+    const dist: Record<string, number> = { rock: 2, cart: 4, travellers: 9 };
+    const found = hintsNear(GATE_SCENE.objects, s, (o) => dist[o.id] ?? 99, 5);
+    expect(found.map((f) => f.o.id)).toEqual(['rock', 'cart']);
+    s.flags.hasPass = true; // the cart's search is done: no more hint
+    expect(hintsNear(GATE_SCENE.objects, s, (o) => dist[o.id] ?? 99, 5).map((f) => f.o.id)).toEqual(['rock']);
+  });
+
+  it('skills are grouped with attributes first and expertise and marks last', () => {
+    const groups = byGroup(['K:Starka nypor', 'Charm', 'E:Muta', 'attr:Intryck', 'Klättra']).map((g) => g.label);
+    expect(groups).toEqual(['Attributes', 'Movement', 'Social', 'Expertise', 'Marks']);
   });
 
   it('the default hero can roll every locked skill', () => {

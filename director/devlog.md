@@ -1,5 +1,15 @@
 # Devlog
 
+## 2026-10-26 — Session 8b: the gate, after the director's answers
+
+- **Silver, not gold** (Q16).
+- **Use a skill where you stand:** a button under the map. It acts on what's next to you (Climb by the boulder, Search by the cart). Search or Alertness with nothing right there **looks around** and tells you what's worth a closer look nearby, and in which direction.
+- **Skills grouped** by skill group in fold-outs, with expertise, marks, crafts and abilities last (Q14).
+- **Hints on/off** switch for the "✓ Useful here" marks (Q14). On while we test; the standard game will likely have them off.
+- **Not linear:** you can still sleep at the fire after getting the gate open another way.
+- Written down for later: almost everything should be clickable (flowers, ground), with Use a skill on all of it. See [Exploration scenes](design/exploration-scenes.md).
+- 84 tests.
+
 ## 2026-10-26 — Session 8: the village gate (skills and talking)
 
 The director's first test of skills and talking to the world. [Play it](https://andrejohanssonlindh.github.io/slicehaven/scene/) ("Gate" in the sandbox top bar). Design and rules: [Exploration scenes](design/exploration-scenes.md).

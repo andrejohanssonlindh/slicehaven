@@ -26,8 +26,8 @@ export type Effect =
   | { say: string; tone?: Tone }
   | { set: string }
   | { unset: string }
-  /** Lose a share of your gold (0.2 = 20%). */
-  | { loseGold: number; why: string }
+  /** Lose a share of your silver (0.2 = 20%). */
+  | { loseSilver: number; why: string }
   | { time: SceneTime }
   /** Take a thing (or person) out of the scene. */
   | { remove: string }
@@ -41,6 +41,8 @@ export interface CheckDef {
   /** Reasonable skills (and attr:… ids). */
   skills: string[];
   difficulty: number;
+  /** What searching nearby tells you about this (in-world, instead of flagging skills). */
+  hint?: string;
   when?: Cond;
   /** Failures allowed before the check closes (default: unlimited). */
   tries?: number;
@@ -132,14 +134,14 @@ export interface SceneDef {
   intro: string[];
   /** Offset-coord ground map, one char per hex (see the scene's legend). */
   layout: string[];
-  start: { time: SceneTime; gold: number; hero: [number, number] };
+  start: { time: SceneTime; silver: number; hero: [number, number] };
   objects: ObjectDef[];
   exits: ExitDef[];
 }
 
 export interface SceneState {
   time: SceneTime;
-  gold: number;
+  silver: number;
   flags: Record<string, boolean>;
   /** Failed attempts per check id. */
   fails: Record<string, number>;
@@ -149,7 +151,7 @@ export interface SceneState {
 }
 
 export const newSceneState = (def: SceneDef): SceneState => ({
-  time: def.start.time, gold: def.start.gold, flags: {}, fails: {}, removed: [],
+  time: def.start.time, silver: def.start.silver, flags: {}, fails: {}, removed: [],
 });
 
 export function met(s: SceneState, c?: Cond): boolean {
@@ -189,7 +191,33 @@ export function usefulSkills(o: ObjectDef, s: SceneState): string[] {
 export const checkFor = (o: ObjectDef, s: SceneState, skill: string): CheckDef | undefined =>
   openChecks(o, s).find((c) => c.skills.includes(skill));
 
-export const approachOpen = (a: SceneApproach, s: SceneState): boolean => met(s, a.when) && !s.flags[`tried:${a.id}`];
+/**
+ * Using a skill where you stand: every open check, on the things next to you,
+ * that this skill would attempt. (Several means: ask which.)
+ */
+export function checksHere(objects: ObjectDef[], s: SceneState, skill: string, isNext: (o: ObjectDef) => boolean): { o: ObjectDef; c: CheckDef }[] {
+  const out: { o: ObjectDef; c: CheckDef }[] = [];
+  for (const o of objects) {
+    if (s.removed.includes(o.id) || !isNext(o)) continue;
+    const c = checkFor(o, s, skill);
+    if (c) out.push({ o, c });
+  }
+  return out;
+}
+
+/** What a look around turns up: hints from open checks on things within reach, nearest first. */
+export function hintsNear(objects: ObjectDef[], s: SceneState, distance: (o: ObjectDef) => number, range: number): { o: ObjectDef; hint: string; d: number }[] {
+  const out: { o: ObjectDef; hint: string; d: number }[] = [];
+  for (const o of objects) {
+    if (s.removed.includes(o.id)) continue;
+    const d = distance(o);
+    if (d > range) continue;
+    for (const c of openChecks(o, s)) if (c.hint) out.push({ o, hint: c.hint, d });
+  }
+  return out.sort((a, b) => a.d - b.d);
+}
+
+export const approachOpen =(a: SceneApproach, s: SceneState): boolean => met(s, a.when) && !s.flags[`tried:${a.id}`];
 
 /** Roll a check and work out what happens (effects are applied by the caller). */
 export function attempt(s: SceneState, c: CheckDef, dice: Dice, rng: Rng): { result: TestResult; effects: Effect[] } {
@@ -204,7 +232,7 @@ export function attempt(s: SceneState, c: CheckDef, dice: Dice, rng: Rng): { res
 export type SceneEvent =
   | { kind: 'say'; text: string; tone: Tone }
   | { kind: 'flag'; flag: string; on: boolean }
-  | { kind: 'gold'; amount: number; why: string }
+  | { kind: 'silver'; amount: number; why: string }
   | { kind: 'time'; time: SceneTime }
   | { kind: 'remove'; id: string }
   | { kind: 'enter'; text: string; via: 'climb' | 'gate'; to?: [number, number] };
@@ -219,10 +247,10 @@ export function apply(s: SceneState, effects: Effect[]): SceneEvent[] {
     } else if ('unset' in e) {
       delete s.flags[e.unset];
       out.push({ kind: 'flag', flag: e.unset, on: false });
-    } else if ('loseGold' in e) {
-      const lost = Math.min(s.gold, Math.round(s.gold * e.loseGold));
-      s.gold -= lost;
-      out.push({ kind: 'gold', amount: -lost, why: e.why });
+    } else if ('loseSilver' in e) {
+      const lost = Math.min(s.silver, Math.round(s.silver * e.loseSilver));
+      s.silver -= lost;
+      out.push({ kind: 'silver', amount: -lost, why: e.why });
     } else if ('time' in e) {
       s.time = e.time;
       out.push({ kind: 'time', time: e.time });
