@@ -8,10 +8,11 @@ import type { Family } from '../core/chargen/types';
 import { CONTENT } from '../content/chargen';
 import { FAMILY_ORDER } from '../content/chargen/peoples';
 import { DRIVE_REWARDS, DRIVES } from '../content/chargen/drives';
-import { ARMOUR, rarityRank, SHIELDS, weaponRank, WEAPONS } from '../content/chargen/equipment';
 import { languageEn, SCRIPTS, SPOKEN } from '../content/chargen/languages';
 import { DWARF_HOUSES, nameCultureOf } from '../content/chargen/names';
 import { SKILLS } from '../content/chargen/skills';
+import { armouryHtml, armouryView, slotSummary } from './armoury';
+import { itemEn } from '../content/chargen/equipment';
 import { die, esc, grants, pendingHtml, pickHtml, sourceHtml } from './ui';
 
 /** UI-only state (not saved). */
@@ -38,7 +39,6 @@ function cardPicker(field: string, cards: { on: boolean; html: string }[]): stri
   return `<div class="cards">${chosen.map((c) => c.html).join('')}</div>
     <div class="row"><button type="button" class="small" data-act="fold" data-key="${field}">▼ Change (show all ${cards.length})</button></div>`;
 }
-const skillLabel = (id: string) => CONTENT.skill(id)?.en ?? id;
 const sourcesFor = (d: Derived, step: number, skip: (s: SourceRec) => boolean = () => false) =>
   d.sources.filter((x) => x.step === step && !d.picks.some((p) => x.key.startsWith(`${p.key}.`)) && !skip(x));
 
@@ -537,39 +537,31 @@ function equipment(s: CharState, d: Derived): string {
     )
     .join('');
   const upgrade = d.sources.some((x) => x.effects.some((e) => e.k === 'flagga' && e.name === 'vapenhojning'));
-  const pid = d.people?.id;
-  const fam = d.people?.family;
-  const slot = (kind: 'weapons' | 'armour', key: string, rarity: Rarity) => {
-    const max = rarityRank(rarity) + (upgrade && kind === 'weapons' ? 1 : 0);
-    const cur = s.equipment[kind][key] ?? '';
-    const opts =
-      kind === 'weapons'
-        ? [
-            ...WEAPONS.filter((w) => weaponRank(w, pid, fam) <= max).map((w) => [w.sv, `${w.en} (${skillLabel(w.skill)}${w.culture ? ', cultural' : ''})`]),
-            ...SHIELDS.filter((x) => rarityRank(x.rarity) <= max).map((x) => [x.sv, `${x.en} (shield)`]),
-          ]
-        : ARMOUR.filter((x) => rarityRank(x.rarity) <= max).map((x) => [x.sv, `${x.en} (${x.h}/${x.k}/${x.s}, load ${x.load})`]);
-    return `<label class="field"><span>${kind === 'weapons' ? 'Weapon' : 'Armour (full suit, cut/crush/thrust)'}: ${esc(RARITY_EN[rarity])} or lower${upgrade && kind === 'weapons' ? ', one step higher allowed' : ''}</span>
-      <select data-act-change="equip" data-kind="${kind}" data-key="${esc(key)}"><option value="">Choose…</option>${opts.map(([v, l]) => `<option value="${esc(v)}" ${cur === v ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
-  };
-  const shop = [
-    ...WEAPONS.filter((w) => w.price > 0).map((w) => [`w:${w.sv}`, `${w.en}: ${w.price} s`]),
-    ...SHIELDS.map((x) => [`h:${x.sv}`, `${x.en}: ${x.price} s`]),
-    ...ARMOUR.map((x) => [`a:${x.sv}`, `${x.en} (full suit): ${x.price} s`]),
-  ];
-  const items = d.items.map((i) => `<li>${esc(i.text)} <span class="small muted">(${esc(i.from)})</span></li>`).join('');
   const spent = s.equipment.bought.reduce((n, b) => n + b.cost * b.qty, 0);
+  const left = d.silver - spent;
+  const slot = (kind: 'weapons' | 'armour', key: string, rarity: Rarity, n: number) => {
+    const cur = s.equipment[kind][key];
+    const open = armouryView.slot === key;
+    const label = `${kind === 'weapons' ? 'Weapon' : 'Armour'} ${n}: ${esc(RARITY_EN[rarity])} or lower${upgrade && kind === 'weapons' ? ' (one step higher allowed)' : ''}`;
+    return `<div class="slot ${cur ? '' : 'empty'}"><div class="small muted">${label}</div>
+      <div class="row spread"><span class="row">${slotSummary(cur, d)}</span>
+      <span class="row">${cur ? `<button type="button" class="link small" data-act="armClear" data-kind="${kind}" data-key="${esc(key)}">remove</button>` : ''}
+      <button type="button" class="small ${cur ? '' : 'primary'}" data-act="armOpen" data-kind="${kind}" data-key="${esc(key)}">${open ? 'Close' : cur ? 'Change' : 'Choose'}</button></span></div>
+      ${open ? armouryHtml(s, d, { kind, rarity, upgrade, left }) : ''}</div>`;
+  };
+  const items = d.items.map((i) => `<li>${esc(i.text)} <span class="small muted">(${esc(i.from)})</span></li>`).join('');
   return `<h2>Equipment</h2>
   ${intro('Equipment packages are bundles of the everyday things your character owns. Weapons and armour are picked up to the rarity you were given. Anything more is bought with silver.')}
   <div class="box"><h3>Packages</h3>${pk || '<p class="muted">None.</p>'}</div>
-  <div class="box"><h3>Weapons</h3>${d.weapons.map((w) => slot('weapons', w.key, w.rarity)).join('') || '<p class="muted">None.</p>'}
+  <div class="box"><h3>Weapons</h3>${d.weapons.map((w, i) => slot('weapons', w.key, w.rarity, i + 1)).join('') || '<p class="muted">None.</p>'}
   <p class="small muted">Bows and crossbows come with a quiver of 20 arrows or bolts; a thrown weapon means three of them. Cultural weapons count as rare unless they belong to your people.</p></div>
-  <div class="box"><h3>Armour</h3>${d.armour.map((w) => slot('armour', w.key, w.rarity)).join('') || '<p class="muted">None.</p>'}</div>
+  <div class="box"><h3>Armour</h3>${d.armour.map((w, i) => slot('armour', w.key, w.rarity, i + 1)).join('') || '<p class="muted">None.</p>'}</div>
   ${items ? `<div class="box"><h3>Items from your past</h3><ul>${items}</ul></div>` : ''}
   <div class="box"><h3>Purchases</h3>
-  <p>Silver: <b>${d.silver - spent}</b> of ${d.silver}</p>
-  <ul class="plain">${s.equipment.bought.map((b, i) => `<li class="row spread"><span>${b.qty > 1 ? `${b.qty}× ` : ''}${esc(b.name)} (${b.cost * b.qty} silver)</span><button type="button" class="link small" data-act="dropBuy" data-i="${i}">remove</button></li>`).join('')}</ul>
-  <div class="row"><select class="grow" id="buy-list"><option value="">Weapons and armour…</option>${shop.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select><button type="button" class="small" data-act="buyList">Buy</button></div>
+  <p>Silver: <b>${left}</b> of ${d.silver}${d.silver ? '' : ' <span class="small muted">(silver comes from your archetype and events)</span>'}</p>
+  <ul class="plain">${s.equipment.bought.map((b, i) => `<li class="row spread"><span>${b.qty > 1 ? `${b.qty}× ` : ''}${esc(itemEn(b.name))} (${b.cost * b.qty} silver)</span><button type="button" class="link small" data-act="dropBuy" data-i="${i}">remove</button></li>`).join('')}</ul>
+  <div class="row"><button type="button" class="small" data-act="armOpen" data-kind="buy" data-key="shop">${armouryView.slot === 'shop' ? 'Close the armoury' : '⚔ Browse weapons and armour to buy'}</button></div>
+  ${armouryView.slot === 'shop' ? armouryHtml(s, d, { kind: 'buy', left }) : ''}
   <div class="row"><input class="grow" id="buy-name" placeholder="Other item" /><input id="buy-cost" type="number" min="0" style="width:90px" placeholder="Silver" /><button type="button" class="small" data-act="buy">Buy</button></div></div>
   <label class="field"><span>Equipment notes</span><textarea data-bind="equipment.notes">${esc(s.equipment.notes)}</textarea></label>`;
 }

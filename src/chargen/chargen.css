@@ -196,3 +196,23 @@ table.t .sub { display: block; font-size: 0.75rem; color: var(--muted); font-wei
 }
 .row.top { align-items: flex-start; }
 label.field > .warn { display: block; margin-top: 3px; }
+
+/* ——— Armoury (weapon / armour chooser) ——— */
+.slot { border-top: 1px dotted var(--line); padding: 8px 0; }
+.slot:first-of-type { border-top: none; }
+.slot.empty > .row .muted { color: var(--warn); }
+.armoury { background: var(--bg); border: 2px solid var(--accent); padding: 8px; margin: 8px 0; }
+.armoury .chips button small { color: var(--muted); margin-left: 3px; }
+.wcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 8px; margin-top: 8px; }
+.wcard { background: var(--panel); border: 2px solid #000; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
+.wcard.on { border-color: var(--accent); background: #3a2c1c; }
+.wcard.dim { opacity: 0.55; }
+.whead { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+/* Placeholder for weapon art (Weapon.art), sized like a future 32×32 sprite at 1.5×. */
+.wart { flex: 0 0 auto; width: 48px; height: 48px; display: inline-flex; align-items: center; justify-content: center; font-size: 26px; background: var(--panel-hi); border: 2px solid #000; image-rendering: pixelated; }
+.slot .wart { width: 34px; height: 34px; font-size: 18px; }
+table.dmg { text-align: center; }
+table.dmg th, table.dmg td { text-align: center; }
+.chips.props { margin: 2px 0; gap: 4px; }
+.prop { font-size: 0.75rem; padding: 1px 6px; border: 1px solid var(--line); color: var(--muted); }
+ul.pinfo li { border-bottom: none; padding: 2px 0; }

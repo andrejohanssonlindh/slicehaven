@@ -6,6 +6,7 @@ import { attrDice, baseArmour, baseDamage, diceText, skillDice, wisdomRow } from
 import { checkDetails, genderKey, typical } from '../src/core/chargen/details';
 import { CONTENT } from '../src/content/chargen';
 import { nameCultureOf } from '../src/content/chargen/names';
+import { physiqueCheck, propList, SHIELDS, WEAPONS, withBaseDamage } from '../src/content/chargen/equipment';
 import { SKILL_BY_ID } from '../src/content/chargen/skills';
 
 /** Every grant line in the content, with where it came from. */
@@ -258,5 +259,25 @@ describe('chargen details', () => {
   it('every people has a body size and a naming culture', () => {
     const missing = CONTENT.peoples.filter((p) => !CONTENT.body(p.id, p.family) || !nameCultureOf(p.id, p.family)).map((p) => p.id);
     expect(missing).toEqual([]);
+  });
+});
+
+describe('chargen equipment', () => {
+  it('adds base damage to weapon damage', () => {
+    expect(withBaseDamage('G+2T6+1', { n: 2, mod: 2 })).toBe('4D6+3');
+    expect(withBaseDamage('4T6+2', { n: 2, mod: 2 })).toBe('4D6+2');
+    expect(withBaseDamage('special', { n: 2, mod: 2 })).toBe('special');
+  });
+
+  it('checks Physique needs', () => {
+    expect(physiqueCheck('–', { n: 3, mod: 0 })).toBeUndefined();
+    expect(physiqueCheck('0', { n: 1, mod: 0 })?.penalty).toBe(0);
+    expect(physiqueCheck('5T6', { n: 3, mod: 2 })?.penalty).toBe(2);
+  });
+
+  it('every weapon property has an explanation with its number filled in', () => {
+    const props = [...WEAPONS.map((w) => w.props), ...SHIELDS.map((x) => x.props)].flatMap(propList);
+    expect(props.filter((p) => !p.info).map((p) => p.sv)).toEqual([]);
+    expect(propList('Bräcklig 4')[0].info).toContain('4 advantage');
   });
 });

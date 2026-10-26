@@ -2,7 +2,7 @@
 import { ATTR_EN, NUMB_EN, TABLE_EN, type Derived } from '../core/chargen/derive';
 import type { CharState } from '../core/chargen/state';
 import { diceText, ENCUMBRANCE } from '../core/chargen/tables';
-import { ARMOUR, DAMAGE_TYPE_EN, propsEn, SHIELDS, WEAPONS } from '../content/chargen/equipment';
+import { ARMOUR, DAMAGE_TYPE_EN, itemEn, propsEn, SHIELDS, WEAPONS, withBaseDamage } from '../content/chargen/equipment';
 import { CONTENT } from '../content/chargen';
 import { DRIVES } from '../content/chargen/drives';
 import { languageEn } from '../content/chargen/languages';
@@ -21,25 +21,6 @@ const GROUPS: [string, string][] = [
   ['K', 'Marks'],
 ];
 
-/** Weapon damage with your base damage added: "G+2T6+1" + 2D6+2 → "4D6+3". */
-function totalDmg(dmg: string, bd: { n: number; mod: number }): string {
-  if (!/^G|T6|^\d/.test(dmg)) return dmg;
-  let n = 0;
-  let mod = 0;
-  let rest = dmg;
-  if (rest.startsWith('G')) {
-    n += bd.n;
-    mod += bd.mod;
-    rest = rest.slice(1);
-  }
-  for (const m of rest.matchAll(/([+-]?)(\d+)(T6)?/g)) {
-    const v = Number(m[2]) * (m[1] === '-' ? -1 : 1);
-    if (m[3]) n += v;
-    else mod += v;
-  }
-  return diceText({ n, mod });
-}
-
 function combatHtml(s: CharState, d: Derived): string {
   const skill = (id: string) => d.skills.find((x) => x.id === id);
   const bd = d.derived.damage;
@@ -52,7 +33,7 @@ function combatHtml(s: CharState, d: Derived): string {
     `<tr><td>Unarmed</td><td class="n">${brawl ? esc(diceText(brawl.dice)) : ''}</td><td class="n">–</td><td class="n">${esc(diceText(bd))}</td><td class="n">–</td><td class="note">Limited, Unarmed, Quick</td></tr>`,
     ...weapons.map((w) => {
       const sk = skill(w.skill);
-      const dmg = (x: string) => (x === '–' ? '–' : esc(totalDmg(x, bd)));
+      const dmg = (x: string) => (x === '–' ? '–' : esc(withBaseDamage(x, bd)));
       const cells = w.melee
         ? `<td class="n">${dmg(w.melee.hugg)}</td><td class="n">${dmg(w.melee.kross)}</td><td class="n">${dmg(w.melee.stick)}</td>`
         : `<td colspan="3" class="n">${esc(w.ranged!.range)} · ${esc(DAMAGE_TYPE_EN[w.ranged!.type] ?? w.ranged!.type)} ${dmg(w.ranged!.dmg)}</td>`;
@@ -186,7 +167,7 @@ export function sheetHtml(s: CharState, d: Derived): string {
       ['Silver', `${d.silver - spent}`],
       ['Packages', packages.join(', ')],
     ])}
-    ${d.items.length || s.equipment.bought.length ? `<h3>Belongings</h3><ul>${d.items.map((i) => `<li>${esc(i.text)}</li>`).join('')}${s.equipment.bought.map((b) => `<li>${b.qty > 1 ? `${b.qty}× ` : ''}${esc(b.name)}</li>`).join('')}</ul>` : ''}
+    ${d.items.length || s.equipment.bought.length ? `<h3>Belongings</h3><ul>${d.items.map((i) => `<li>${esc(i.text)}</li>`).join('')}${s.equipment.bought.map((b) => `<li>${b.qty > 1 ? `${b.qty}× ` : ''}${esc(itemEn(b.name))}</li>`).join('')}</ul>` : ''}
     ${s.equipment.notes ? `<p>${esc(s.equipment.notes)}</p>` : ''}</div>
     <div>${events.length ? `<h3>Life events</h3><ul>${events.join('')}</ul>` : ''}</div>
   </div>

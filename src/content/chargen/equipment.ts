@@ -3,6 +3,7 @@
  * source's notation: G = your base damage, T6 = D6 (converted for display).
  */
 import type { Rarity } from '../../core/chargen/grants';
+import { diceText, type Dice } from '../../core/chargen/tables';
 
 export interface Weapon {
   sv: string;
@@ -22,6 +23,8 @@ export interface Weapon {
   length: string;
   weight: string;
   price: number;
+  /** Picture of the weapon, for later (sprite path under public/assets). Until then a drawn placeholder per type is shown. */
+  art?: string;
 }
 
 type M = [sv: string, en: string, rarity: Rarity | '–', culture: string, h1: string, h2: string, hugg: string, kross: string, stick: string, props: string, length: string, weight: string, price: number];
@@ -208,4 +211,108 @@ export function weaponRank(w: Weapon, peopleId?: string, family?: string): numbe
 
 export function rarityRank(r: Rarity): number {
   return RANK[r];
+}
+
+/** Weapon types in display order: the combat skill they use, an English label and a placeholder glyph. */
+export const WEAPON_TYPES: { skill: string; en: string; glyph: string; ranged?: boolean }[] = [
+  { skill: 'Svärd', en: 'Swords', glyph: '🗡' },
+  { skill: 'Yxa', en: 'Axes', glyph: '🪓' },
+  { skill: 'Dolk', en: 'Daggers & knives', glyph: '🔪' },
+  { skill: 'Spjut', en: 'Spears & polearms', glyph: '🔱' },
+  { skill: 'Stav', en: 'Staffs', glyph: '🦯' },
+  { skill: 'Kedjevapen', en: 'Whips & flails', glyph: '⛓' },
+  { skill: 'Klubba', en: 'Clubs & hammers', glyph: '🔨' },
+  { skill: 'Slagsmål', en: 'Brawling', glyph: '👊' },
+  { skill: 'Kastvapen', en: 'Thrown', glyph: '🎯', ranged: true },
+  { skill: 'Blåsrör', en: 'Blowpipes', glyph: '🎋', ranged: true },
+  { skill: 'Armborst', en: 'Crossbows', glyph: '🏹', ranged: true },
+  { skill: 'Båge', en: 'Bows', glyph: '🏹', ranged: true },
+];
+
+/** What each weapon property does, in short (our own words). */
+export const PROP_INFO: Record<string, string> = {
+  Avväpnande: 'Good for tearing weapons and shields out of hands: disarming costs X less.',
+  Begränsad: 'Short reach: against big creatures you roll twice on the turn table and take the worse.',
+  Blåsrör: 'Made for poison darts: a hit that deals fatigue gives a serious poisoning.',
+  Brutal: 'Never leaves light wounds: when it deals fatigue, add X more.',
+  Bräcklig: 'Wood or other weak material: an enemy can break it by spending X advantage.',
+  Bågpil: 'With a quiver at hand you can draw an arrow for 1 fatigue instead of an action.',
+  Böjlig: 'Bends around guards: the defender gets −1D6 (not when dodging).',
+  Diskret: 'Easy to hide: finding it takes a search roll against X.',
+  Dubbelfattning: 'Grips for two hands: +2 damage when used two-handed.',
+  Fångar: 'Barbs or snares: a hit leaves the target grappled.',
+  Genomslag: "Punches through armour: the target's protection against that damage type drops by X.",
+  Giftränna: 'Poison grooves: a poisoned blade stays poisoned all fight.',
+  Kontrande: 'Quick to strike back: counter-attacks without a penalty.',
+  Kraftfull: 'Deadly with a full swing: +1D6 damage on powerful attacks.',
+  Lättsiktad: 'Easy to aim, even untrained: aiming gives +1D6 instead of +2.',
+  Magasin: 'A magazine: X shots before reloading (if you meet the Physique need).',
+  Måttande: 'Easy to place: precise hits cost X less.',
+  Obeväpnad: 'A natural weapon: serious wounds use the brawling table.',
+  Omladdning: 'Slow to reload: a full round and a skill roll against X.',
+  Otymplig: 'Big and heavy: no quick attacks.',
+  Precis: 'Finds gaps in armour: exploiting an opening costs X less.',
+  Ryttarbåge: 'Made for horseback: no Physique penalty when shooting from the saddle.',
+  Ryttarvapen: 'Made for horseback: a cavalry charge gives +2D6 instead of +1D6.',
+  Räckvidd: 'Long reach: +XD6 on the reaction roll when a fight starts.',
+  Sargande: 'Leaves terrible wounds: +X on the injury and turn tables.',
+  Skärande: 'Cruel against the unarmoured: counts as piercing X (cut and thrust) when they wear no armour.',
+  Snabb: 'Fast and balanced: quick attacks cost no fatigue.',
+  Snabbdragen: 'Drawn in a blink: no action and no penalty to draw it.',
+  Snabbskjuten: 'Light draw: drawing an arrow costs no action and no fatigue.',
+  Snärjande: 'Catches arms and legs: tripping costs X less.',
+  Splittrande: 'Heavy enough to smash shields and weak weapons: breaking costs X less.',
+  Svag: 'Poor for parrying: −1D6 defending against armed attacks.',
+  Säker: "Strapped on: you can't drop it, and disarming you costs 1 more.",
+  Utmanövrerande: 'Good against many foes: group attacks without a penalty.',
+  Versatil: 'Works both in melee and thrown.',
+  Vådlig: 'Lethal in the right hands: increased damage gives +1D6 instead of +2.',
+  Ytlig: 'Hard to drive deep: deals only fatigue, never serious wounds.',
+};
+
+/** Split "Bräcklig 4, Precis 1" into [{ sv: 'Bräcklig', en: 'Fragile 4', info }]. */
+export function propList(props: string): { sv: string; en: string; info: string }[] {
+  return props
+    .split(/,\s*/)
+    .filter(Boolean)
+    .map((p) => {
+      const sv = /^[A-ZÅÄÖ][a-zåäö]+/.exec(p)?.[0] ?? p;
+      const x = /(\d+(?:–\d+)?)\s*$/.exec(p)?.[1];
+      const info = PROP_INFO[sv] ?? '';
+      return { sv, en: propsEn(p), info: x ? info.replace(/X/g, x) : info };
+    });
+}
+
+/** Weapon damage with your base damage added: "G+2T6+1" + 2D6+2 → "4D6+3". Non-dice text is returned as it is. */
+export function withBaseDamage(dmg: string, bd: Dice): string {
+  if (!/^G|T6|^\d/.test(dmg)) return dmg;
+  let n = 0;
+  let mod = 0;
+  let rest = dmg;
+  if (rest.startsWith('G')) {
+    n += bd.n;
+    mod += bd.mod;
+    rest = rest.slice(1);
+  }
+  for (const m of rest.matchAll(/([+-]?)(\d+)(T6)?/g)) {
+    const v = Number(m[2]) * (m[1] === '-' ? -1 : 1);
+    if (m[3]) n += v;
+    else mod += v;
+  }
+  return diceText({ n, mod });
+}
+
+/**
+ * Physique need for one or two hands, against your Physique dice.
+ * undefined = can't be used that way; otherwise the penalty in D6 (0 = none).
+ */
+export function physiqueCheck(need: string, physique: Dice): { penalty: number } | undefined {
+  if (need === '–') return undefined;
+  const req = need === '0' ? 0 : Number(/(\d+)T6/.exec(need)?.[1] ?? 0);
+  return { penalty: Math.max(0, req - physique.n) };
+}
+
+/** English name for a weapon, shield or armour key; other text as it is. */
+export function itemEn(sv: string): string {
+  return WEAPONS.find((x) => x.sv === sv)?.en ?? SHIELDS.find((x) => x.sv === sv)?.en ?? ARMOUR.find((x) => x.sv === sv)?.en ?? sv;
 }
