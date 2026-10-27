@@ -2,6 +2,7 @@ import { ABILITIES } from './abilities';
 import { CRAFTS } from './crafts';
 import { LEFTOVERS } from './leftovers';
 import { MARKS } from './marks';
+import { MYSTIC } from './mystic';
 
 /**
  * Per-skill tables: for a skill, the kinds of effort (tags) it suits and 2–3 examples of each.
@@ -11,4 +12,4 @@ import { MARKS } from './marks';
  */
 export type BySkill = Record<string, Record<string, string[]>>;
 
-export const PER_SKILL: BySkill = { ...MARKS, ...CRAFTS, ...ABILITIES, ...LEFTOVERS };
+export const PER_SKILL: BySkill = { ...MARKS, ...CRAFTS, ...ABILITIES, ...LEFTOVERS, ...MYSTIC };

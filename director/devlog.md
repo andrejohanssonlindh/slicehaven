@@ -9,8 +9,9 @@
 - Expertise pass (about 65 of 70 tagged, with examples): new kinds of effort **perform, comfort, provoke**; expertise added to most existing efforts (lore, travel, ask, deceive, streetwise…). Also filled the examples that were missing for weapon skills and the Charming-smile / Honest-impression marks. Every tagged pair now has examples, and a test says so.
 - Director's answer: marks and crafts are skills, tagged like skills but narrow (a Scary mark when threatening; bread knowledge to impress innkeepers). Skills tied to types of people and situations come after the skill map. Logged in decisions.
 - **Marks, crafts, abilities and the leftover expertise** are written per skill (tags and examples side by side) in `skillweb/marks.ts`, `crafts.ts`, `abilities.ts`, `leftovers.ts`, merged by `byskill.ts`. New effort **craft** (Make & mend). Crafts get one or two side uses (bake bread, impress; bowyer, impress; locksmith, steal…).
-- New test: every skill outside the mystic group has at least one tag. Only the 25 mystic skills are left, for the magic pass.
-- 176 tests.
+- **Checked everything against the book's descriptions** and fixed the mismatches: Fine Hands (looks, not nimble), Battlefield Eye (blank stare), Quick Tongue, Creaking Joints (cracking knuckles), Smith's Fists, Pointed Ears, Well-fed, Tunnel Vision, Stone Heart and others among the marks; Superstition also threatens; Soldier/Student/Monastic/Service life also help to infiltrate (deceive); Diplomacy persuades; Harbour Lore is streetwise; Traps help to search; Rooftops climb.
+- **Mystic skills** (`mystic.ts`): the five basic ones (Ceremony, Sensing, Unravelling, Harmonizing, Channelling) and the 20 aspects get their plain, non-casting uses (an aspect lends an element-flavoured hand at everyday tasks).
+- New test: **every** skill has at least one tag. 176 tests.
 
 ## 2026-10-27 — Session 15b: weapons, ways of use, links
 

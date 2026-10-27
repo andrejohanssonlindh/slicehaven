@@ -150,9 +150,9 @@ describe('the skill map', () => {
   });
 
   it('tells linked from unlinked skills', () => {
-    const linked = linkedSkills(['Charm', 'Ceremoni'], cx);
+    const linked = linkedSkills(['Charm', 'Not a skill'], cx);
     expect(linked.has('Charm')).toBe(true);
-    expect(linked.has('Ceremoni')).toBe(false); // mystic skills wait for the magic pass
+    expect(linked.has('Not a skill')).toBe(false);
   });
 });
 
@@ -184,8 +184,8 @@ describe('examples per skill and kind of effort', () => {
     expect(examplesOf('attr:Kroppsbyggnad').find((e) => e.tag === 'impress')!.ways.join(' ')).toMatch(/lift something heavy/);
   });
 
-  it('every skill outside the mystic group carries at least one tag', () => {
-    const bare = [...SKILL_BY_ID].filter(([id, s]) => s.group !== 'mystik' && tagsOf(id).length === 0).map(([id]) => id);
+  it('every skill carries at least one tag', () => {
+    const bare = [...SKILL_BY_ID].filter(([id]) => tagsOf(id).length === 0).map(([id]) => id);
     expect(bare).toEqual([]);
   });
 
