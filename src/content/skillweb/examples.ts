@@ -22,6 +22,7 @@ export const EXAMPLES: Examples = {
     Ledarskap: ['Speak as someone used to being followed.', 'Present it as a plan the whole group is already behind.'],
     'attr:Intryck': ['Be sincere and hold their gaze.', 'Ask plainly, like someone who expects a yes.'],
     'E:Vädja': ['Plead in plain words and let your voice crack once.', 'Kneel, so the refusal looks cruel.'],
+    'E:Diplomati': ['Find the wording both sides can live with.', 'Let each side win a little and lose a little.'],
   },
   impress: {
     Charm: ['Ask about their day and mean it.', 'Pay a compliment that is specific and true.'],
@@ -43,7 +44,7 @@ export const EXAMPLES: Examples = {
     Slagsmål: ['Win a bout and help the loser up.', 'Wrap your hands slowly before a bout, where all can see.'],
     'K:Charmerande leende': ['Smile as if you only just noticed them.', 'Let the smile reach your eyes.'],
     'K:Hederligt intryck': ['Look people in the eye and say your name.', 'Return the lost coin with no fuss.'],
-    'E:Behaga': ['Remember what they like and bring it up.', 'Agree with the opinion they hold most dear.'],
+    'E:Behaga': ['Be the courtesan\'s favourite guest at every salon.', 'Make a companion feel like the only person present.'],
     'E:Skryta': ['Tell the tale of your best day, and make it a little bigger.', 'Let someone else discover you are famous.'],
     'E:Ryttarkonster': ['Ride standing on the saddle for a few strides.', 'Pick a scarf up from the ground at a gallop.'],
     'E:Vapenkata': ['Flow through a weapon form slowly and exactly.', 'Show a stance that has a name and a history.'],
@@ -58,7 +59,7 @@ export const EXAMPLES: Examples = {
     'attr:Intryck': ['Be warm and unhurried, as though you had all day.', 'Make them feel they are being let in on something.'],
     'Sång & musik': ['Hum a tune from their homeland as you work.', 'Offer a verse that makes them smile.'],
     'E:Flörta': ['Compliment something they chose themselves.', 'Make the request sound like a private joke.'],
-    'E:Behaga': ['Notice their new hat.', 'Ask what they would do in your place.'],
+    'E:Behaga': ['Attend to what they like, and do it without being asked.', 'Make them feel looked after.'],
     'K:Charmerande leende': ['Smile first and ask second.', 'Hold the smile a little longer than expected.'],
     'K:Hederligt intryck': ['Speak plainly and let them see you mean it.', 'Admit a small fault before you ask.'],
   },
@@ -122,6 +123,7 @@ export const EXAMPLES: Examples = {
     'E:Tortyr': ['Turn the conversation to what pain does to people.', 'Lay out the tools without a word.'],
     'E:Utskällningar': ['Dress them down in front of their own men.', 'Name every failing, loudly and in order.'],
     'E:Örfila': ['Slap the table so they flinch.', 'Cuff the nearest of their friends.'],
+    'E:Vidskepelse': ['Mention what the old folk say happens to those who anger it.', 'Make a sign against the evil eye, pointedly, at them.'],
   },
   etiquette: {
     Hovliv: ['Give the right bow for the right rank.', 'Address the household by title and know who speaks first.', 'Know where each guest is seated, and why.'],
@@ -138,6 +140,7 @@ export const EXAMPLES: Examples = {
     'E:Tigga': ['Know which corner pays best, and who owns it.', 'Know which beggars see everything.'],
     'E:Skugglandsvana': ['Know the sign that says this street is not safe.', 'Move through the dark quarter without a second glance.'],
     'E:Områdeskännedom': ['Know who rules this block, and what he charges.', 'Know where the watch never goes.'],
+    'E:Hamnkunskap': ['Find the right person to ask about a ship or a job.', 'Swear in six tongues and be taken for a regular.'],
     'E:Supa': ['Know which cellar pours without asking.', 'Hold your drink and hear what is said at the next table.'],
   },
   'read-people': {
@@ -149,12 +152,14 @@ export const EXAMPLES: Examples = {
     Genomsöka: ['Lift the tarp and check under the sacks.', 'Run a hand along the seam for a hidden pocket.'],
     'attr:Vaksamhet': ['Spot the one thing that is out of place at a glance.', 'Notice fresh scratches on an old lock.'],
     'E:Gravplundring': ['Probe the earth for a hollow under the stones.', 'Tell a robbed tomb from an untouched one.'],
+    'E:Fällor': ['Spot the trip wire across the path.', 'Notice the loose floorboard that does not belong.'],
   },
   climb: {
     Klättra: ['Use the ivy as a rope.', 'Find hand- and footholds in rough stone.'],
     'E:Akrobatik': ['Swing from a beam to the next ledge.', 'Vault a low wall and keep going.'],
     'K:Apfotad': ['Use your feet like hands.', 'Scramble up a trunk without slowing down.'],
     'K:Starka nypor': ['Hold on by the fingertips and pull.', 'Haul yourself up a sheer edge.'],
+    'E:Takvägar': ['Scale the drainpipe to the roof ridge.', 'Pull yourself over the eaves in one smooth motion.'],
   },
   deceive: {
     Dupera: ['Tell a small lie with a straight face and a true detail in it.', 'Back the story up with a forged-looking paper.'],
@@ -171,6 +176,10 @@ export const EXAMPLES: Examples = {
     'E:Härma': ['Copy the captain\'s voice and give an order.', 'Mimic a local accent from the next valley.'],
     'E:Buktaleri': ['Make the voice come from behind the door.', 'Make the corpse "answer".'],
     'E:Förskingra': ['Shift a sum between two ledgers.', 'Skim a little from every sale.'],
+    'E:Soldatliv': ['Fall in with a patrol and curse the sergeant with them.', 'Know the passwords and the slang of the barracks.'],
+    'E:Studentliv': ['Pass for a fresh student at the lecture.', 'Complain about the exams with the right group.'],
+    'E:Klosterliv': ['Keep the hours and the silence like a novice.', 'Bow your head and join the procession unnoticed.'],
+    'E:Tjänsteliv': ['Carry a tray and be invisible to the guests.', 'Pass the servants\' door with a bow and a basket.'],
   },
   rally: {
     Ledarskap: ['Give one clear order and take the first step yourself.', 'Name each person\'s task so no one hesitates.'],
@@ -279,6 +288,7 @@ export const EXAMPLES: Examples = {
     'E:Heraldik': ['Read a shield to tell whose household rode here.', 'Spot a forged coat of arms from the wrong colours.'],
     'E:Monsterkunskap': ['Tell what beast made those claw marks.', 'Know the one thing that a troll cannot stand.'],
     'E:Vidskepelse': ['Know what a horseshoe over a door is for.', 'Say which omens the villagers will not ignore.'],
+    'E:Politik': ['Tell which lord owes which, and why.', 'Know whose interests lie behind the new decree.'],
     'E:Astrologi': ['Name what the stars say about tonight.', 'Read what a birth chart is supposed to promise.'],
     'E:Bergskunskap': ['Tell which seam of ore the mine was after.', 'Know where a cave-in is most likely.'],
     'E:Bibliotekskunskap': ['Know which shelf holds the old chronicles.', 'Tell a rare book from a common copy.'],
@@ -322,6 +332,7 @@ export const EXAMPLES: Examples = {
     Historia: ['Cite an old ruling that supports the claim.', 'Remember when the border was last fixed by treaty.'],
     'E:Politik': ['Know which lord\'s word outweighs the sheriff\'s.', 'Tell who gains if the verdict goes one way.'],
     'E:Diplomati': ['Offer the neutral wording both sides can sign.', 'Know which concessions sound large and cost little.'],
+    'E:Bokhållning': ['Know which office stamps which paper.', 'Find the rule that says the tax is not due yet.'],
   },
   teach: {
     Undervisa: ['Break the problem into three small steps.', 'Use an everyday picture to explain a hard idea.'],
@@ -364,6 +375,8 @@ export const EXAMPLES: Examples = {
     Dupera: ['Plant a false insult on their lips.', 'Spread a story that makes the crowd turn on them.'],
   },
   survey: {
+    'E:Bakhåll': ['Spot the thicket that is too neatly placed.', 'Notice that the road has gone suddenly quiet.'],
+    'E:Flyktvägar': ['Note the nearest exit as you enter.', 'Spot the window, the back door and the roof hatch.'],
     Genomsöka: ['Comb the ground nearby for signs of passage.', 'Check the edges of the place for anything left behind.'],
     Speja: ['Watch the road from a high spot.', 'Count who comes and goes, and when.'],
     Orientering: ['Take your bearings from the stars and the landmarks.', 'Work out which way the road bends before you see it.'],

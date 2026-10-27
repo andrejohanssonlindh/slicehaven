@@ -110,6 +110,7 @@ export const ABILITIES: BySkill = {
   'F:Luftförnimmelse': {
     survey: ['Taste the wind and read what it carries.', 'Know who passed upwind.'],
     track: ['Tell from the wind what happened in the east.', 'Follow a scent a wind has carried.'],
+    lore: ['Listen to the wind and catch a glimpse of recent events.', 'Learn from the breeze who passed that way.'],
   },
   'F:Luktsinne': {
     track: ['Follow a trail by smell.', 'Tell which way the stag went.'],

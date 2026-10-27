@@ -36,7 +36,7 @@ export const MARKS: BySkill = {
   },
   'K:Blek & kall': {
     threaten: ['Stand very still in the dark.', 'Say it quietly, with ice in your voice.'],
-    provoke: ['Make them uneasy by looking too long.', 'Smile slightly at the wrong moment.'],
+    hide: ['Lie still and pass for dead.', 'Hold your breath while a hand feels for a pulse.'],
   },
   'K:Bollsinne': {
     impress: ['Catch whatever is thrown, without looking.', 'Keep a ball in the air with your knee.'],
@@ -64,23 +64,23 @@ export const MARKS: BySkill = {
   },
   'K:Djurvän': {
     ride: ['Win a strange horse\'s trust at a touch.', 'Make a nervous mule follow you.'],
-    forage: ['Follow a bird to water.', 'Let a hunting dog lead you to game.'],
+    sneak: ['Hush a guard dog with a low word.', 'Pass the geese without a honk.'],
   },
   'K:Djärva visioner': {
     rally: ['Paint a picture of what could be, and make them want it.', 'Say "why not us?" and mean it.'],
     persuade: ['Sell a wild plan as an opportunity.', 'Put the idea so big it makes the small objections shrink.'],
   },
   'K:Finlemmade händer': {
-    steal: ['Slip a ring off a finger unnoticed.', 'Reach into a pocket and out again.'],
-    escape: ['Slide a thin wrist out of the shackle.', 'Work a tiny pick into the lock.'],
+    impress: ['Let a hand rest on the table where all can see it.', 'Pour the wine with a slow, graceful motion.'],
+    etiquette: ['Offer a hand to be kissed, perfectly held.', 'Handle the fine cup as one used to fine cups.'],
   },
   'K:Flamboyant': {
     impress: ['Sweep in with a grand gesture.', 'Wear something no one has seen before.'],
     perform: ['Make a speech into a show.', 'Add a twirl to the bow.'],
   },
   'K:Flink tunga': {
-    'sweet-talk': ['Have a quick answer for every objection.', 'Turn a refusal into a compliment.'],
-    provoke: ['Win the war of words in front of a crowd.', 'Fire back an insult before they have finished theirs.'],
+    impress: ['Tie a cherry stem in a knot with your tongue.', 'Roll a tongue-twister off at speed, three times.'],
+    'sweet-talk': ['Let a quick tongue make it sound like an offer.', 'Tease them with a very nimble remark.'],
   },
   'K:Folklig uppsyn': {
     'sweet-talk': ['Chat as one of the village.', 'Share a joke about the weather and the lord.'],
@@ -92,7 +92,7 @@ export const MARKS: BySkill = {
   },
   'K:Fräknar': {
     'sweet-talk': ['Look so open that people want to help.', 'Be mistaken for a farm lad or lass, and used to it.'],
-    deceive: ['Look younger and more innocent than you are.', 'Be underestimated as a bumpkin.'],
+    impress: ['Be called charming the moment you step in the light.', 'Get a smile from a stern shopkeeper.'],
   },
   'K:Ful i mun': {
     provoke: ['Curse so inventively that they stare.', 'Call them what everyone else is thinking.'],
@@ -116,7 +116,7 @@ export const MARKS: BySkill = {
   },
   'K:Gestikulerande': {
     perform: ['Tell the story with the whole body.', 'Act out the argument with both hands.'],
-    distract: ['Wave your hands so wide that no one sees the other hand.', 'Point madly at the sky.'],
+    etiquette: ['Give the greeting of three nations, each correctly.', 'Make a deep, dignified bow that suits the rank.'],
   },
   'K:God lyssnare': {
     ask: ['Say nothing, nod, and let them fill the silence.', 'Repeat the last thing they said, as a question.'],
@@ -148,7 +148,7 @@ export const MARKS: BySkill = {
   },
   'K:Inställsam': {
     'sweet-talk': ['Agree before they finish speaking.', 'Fetch the chair, the cup, the cushion.'],
-    ask: ['Make the request as a favour you would repay.', 'Hover close until they offer.'],
+    persuade: ['Plant the idea so that it becomes theirs.', 'Steer from behind the throne and take no credit.'],
   },
   'K:Isande tystnad': {
     threaten: ['Stay silent until they cannot bear it.', 'Let the quiet say what you intend.'],
@@ -168,7 +168,7 @@ export const MARKS: BySkill = {
   },
   'K:Kroppssmycken': {
     impress: ['Jingle in with rings, studs and chains.', 'Show off a piece with a story.'],
-    distract: ['Flash a jewel and let it glitter.', 'Let them stare at the glint.'],
+    streetwise: ['Read a stranger\'s family and rank from their piercings.', 'Wear the ring that tells locals who you are.'],
   },
   'K:Luktar gott': {
     'sweet-talk': ['Draw people closer without knowing why.', 'Be pleasant to stand next to for long.'],
@@ -188,7 +188,7 @@ export const MARKS: BySkill = {
   },
   'K:Monoton stämma': {
     deceive: ['Lie in a flat voice that gives nothing away.', 'Say it without the tells of feeling.'],
-    threaten: ['Say it plainly, as if reading a list.', 'Describe the harm in a bored drone.'],
+    etiquette: ['Drone like a clerk, and be taken for one.', 'Fit in at the office by sounding exactly like it.'],
   },
   'K:Musa': {
     perform: ['Be the one an artist is inspired by.', 'Turn a song into an event.'],
@@ -244,35 +244,35 @@ export const MARKS: BySkill = {
   },
   'K:Skamlös': {
     provoke: ['Do the outrageous thing in front of them.', 'Ask the question nobody would dare.'],
-    deceive: ['Lie with no hint of shame.', 'Sit in the host\'s chair and look at ease.'],
+    distract: ['Strip off to bathe in the middle of the street.', 'Shrug when your secret is read aloud.'],
   },
   'K:Skrämmande utseende': {
     threaten: ['Loom out of the dark.', 'Make children hide.'],
     provoke: ['Step in close and say nothing.', 'Be a thing no one wants near.'],
   },
   'K:Slagfältsblick': {
-    analyse: ['See where the line will break.', 'Spot the weak flank on a glance.'],
-    survey: ['Pick the best ground in a minute.', 'See at a glance how many fighters wait.'],
+    threaten: ['Stare through them at something far away.', 'Go still and distant, and let them wonder what you see.'],
+    comfort: ['Sit beside a veteran and share the silence.', 'Draw the pity of an old soldier.'],
   },
   'K:Smednävar': {
-    threaten: ['Close a hand around a bar and bend it.', 'Rest a huge fist on the table.'],
-    impress: ['Crush a walnut in your palm.', 'Hammer a nail in with one blow.'],
+    travel: ['Walk the stony path barefoot.', 'Ignore the nettles and the midges.'],
+    impress: ['Lift the hot iron lid with a bare hand.', 'Pick up a coal and set it back.'],
   },
   'K:Snusförnuftig': {
     teach: ['Explain, patiently, how it is done.', 'Tell them the right way to do it.'],
     provoke: ['Correct their grammar in the middle of a quarrel.', 'Say "actually" and take a deep breath.'],
   },
   'K:Spetsöra': {
-    search: ['Hear the faint scratch in the wall.', 'Pick up a whisper two rooms away.'],
-    survey: ['Catch the sound of hooves long before they come.', 'Tell the mood of a crowd by its murmur.'],
+    deceive: ['Pass for part-elf among the elves.', 'Sweep the hair back to show the ears at the right moment.'],
+    impress: ['Be admired as a beauty among elves and half-elves.', 'Be welcomed by a stranger who sees the ears.'],
   },
   'K:Stenansikte': {
     gamble: ['Show nothing, win or lose.', 'Bluff with no tells.'],
     deceive: ['Look blank while you lie.', 'Take bad news without a flicker.'],
   },
   'K:Stenhjärta': {
-    threaten: ['Look unmoved by tears.', 'Say you will do it, and be believed.'],
     bribe: ['Refuse to be moved by their plea.', 'Name a hard price and not blink.'],
+    gamble: ['Take the pot from a tearful opponent.', 'Raise, unmoved by the sob story.'],
   },
   'K:Stolt hållning': {
     impress: ['Stand with your chin up when others stoop.', 'Never lower your eyes.'],
@@ -299,16 +299,16 @@ export const MARKS: BySkill = {
     ask: ['Ask without causing offence.', 'Come to the point by a gentle road.'],
   },
   'K:Tandglugg': {
-    'sweet-talk': ['Grin and be disarming.', 'Whistle through the gap and make them smile.'],
-    distract: ['Do a trick with the gap and a pea.', 'Spit and hit the mark every time.'],
+    'sweet-talk': ['Grin and be disarming.', 'Wear the gap as if it were a charm.'],
+    perform: ['Whistle a sharp tune through the gap.', 'Spit a cherry stone across the room.'],
   },
   'K:Tatuering': {
     impress: ['Show the mark that tells where you have been.', 'Roll up a sleeve and let them read it.'],
     threaten: ['Show the sign of a feared company.', 'Let them see which gang you belong to.'],
   },
   'K:Tunnelseende': {
-    search: ['Go through the pile one item at a time.', 'Focus on one corner and miss nothing in it.'],
-    track: ['Follow a single set of marks and nothing else.', 'Stay on the trail where others lose it.'],
+    analyse: ['Lose yourself in the problem and surface with the answer.', 'Ignore the noise and finish the proof.'],
+    craft: ['Work through the night on a single piece.', 'Notice nothing but the detail under your hands.'],
   },
   'K:Uppkäftig': {
     provoke: ['Answer back to the sergeant.', 'Say what the others only think.'],
@@ -339,16 +339,16 @@ export const MARKS: BySkill = {
     persuade: ['Make an appeal that moves them to pity.', 'Let the sadness in your voice carry the plea.'],
   },
   'K:Vildhjärna': {
-    perform: ['Improvise a tale with odd turns.', 'Draw the wildest picture they have seen.'],
-    distract: ['Do something so strange no one can look away.', 'Propose a plan that sounds mad and delightful.'],
+    escape: ['Keep a cool head when the whole room erupts.', 'Dodge, duck and talk at once.'],
+    distract: ['Juggle three problems and an argument at once.', 'Keep a crowd busy while a friend works.'],
   },
   'K:Välformad kropp': {
     impress: ['Strip to the waist for the wrestling and win cheers.', 'Show a body made by work.'],
     distract: ['Pose and let eyes slide off the task.', 'Wear less than the weather calls for.'],
   },
   'K:Välgödd': {
-    'sweet-talk': ['Look prosperous enough to be trusted.', 'Laugh with the whole belly.'],
-    bribe: ['Pay in a way that suggests more to come.', 'Look like someone with a full purse.'],
+    travel: ['Sleep out in the cold without a shiver.', 'Walk on through a lean week.'],
+    impress: ['Be welcomed at a feast, a hearty laugh at the head.', 'Be admired by those who have been hungry.'],
   },
   'K:Välkomnande leende': {
     'sweet-talk': ['Greet them as if they were expected.', 'Make a stranger feel invited.'],
@@ -364,6 +364,6 @@ export const MARKS: BySkill = {
   },
   'K:Ögon i nacken': {
     search: ['Notice the tail you did not see.', 'Feel a gaze on your back and turn.'],
-    survey: ['Sense who enters the room behind you.', 'Spot the one who is following.'],
+    poison: ['Sniff the cup before you drink.', 'Eat only what you saw being cooked.'],
   },
 };

@@ -27,7 +27,7 @@ export const LEFTOVERS: BySkill = {
   },
   'E:Perversiteter': {
     provoke: ['Say the shocking thing with a calm smile.', 'Make the prim blush and the bold look away.'],
-    ask: ['Learn their secret desires and offer a trade.', 'Win a confession by naming the thing they hide.'],
+    streetwise: ['Know which houses cater to what tastes.', 'Be at home among the decadent and the jaded.'],
   },
   'E:Soldatliv': {
     rally: ['Share the old marching jokes and the mood lifts.', 'Know how to make a tired squad keep going.'],
@@ -53,13 +53,16 @@ export const LEFTOVERS: BySkill = {
     threaten: ['Bang the sword on the shield.', 'Lock shields and advance as one.'],
     escape: ['Cover your head and bull through the crowd.', 'Hold a doorway with the shield at the front.'],
   },
+  'K:Knakande leder': {
+    threaten: ['Crack your knuckles slowly, one by one.', 'Let your neck pop as you step forward.'],
+    provoke: ['Let the joints creak loudly in the quiet.', 'Stretch and crack where they can all hear.'],
+  },
+  'K:Starka nypor': {
+    impress: ['Give a handshake no one forgets.', 'Hold on to a horse that bolts.'],
+  },
   'K:Födelsemärke': {
     impress: ['Show the mark that proves your descent.', 'Let a mark on the neck start a rumour.'],
     deceive: ['Claim the mark as proof of a noble birth.', 'Pass for a long-lost heir.'],
-  },
-  'K:Knakande leder': {
-    travel: ['Feel the rain coming in your knees.', 'Know the weather turns by the ache.'],
-    survey: ['Warn the party of the coming storm.', 'Say "it will snow by morning" and be right.'],
   },
   'F:Gudomlig motståndskraft': {
     lore: ['Stand calm while a cleric curses.', 'Know what a god\'s wrath feels like.'],

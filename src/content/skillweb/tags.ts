@@ -52,7 +52,7 @@ export const TAG_INFO: Record<string, { label: string; what: string }> = {
 };
 
 export const TAGGED: Record<string, string[]> = {
-  persuade: ['Argumentera', 'Berättarkonst', 'Ledarskap', 'E:Vädja', 'attr:Intryck'],
+  persuade: ['Argumentera', 'Berättarkonst', 'Ledarskap', 'E:Vädja', 'E:Diplomati', 'attr:Intryck'],
   impress: [
     'Charm', 'Sång & musik', 'Dansa', 'E:Flörta', 'E:Akrobatik', 'K:Charmerande leende', 'K:Hederligt intryck',
     'E:Behaga', 'E:Skryta', 'E:Ryttarkonster', 'E:Vapenkata', 'E:Hålla bjudningar',
@@ -75,18 +75,19 @@ export const TAGGED: Record<string, string[]> = {
   bribe: ['Handel', 'E:Muta', 'Skumraskaffärer', 'Argumentera', 'Dupera', 'E:Lova', 'E:Kränga', 'E:Korrumpera'],
   threaten: [
     'attr:Kroppsbyggnad', 'Injaga fruktan', 'Slagsmål', 'Ledarskap', 'Dupera',
-    'K:Hotfull stämma', 'K:Stark stämma', 'E:Tortyr', 'E:Utskällningar', 'E:Örfila',
+    'K:Hotfull stämma', 'K:Stark stämma', 'E:Tortyr', 'E:Utskällningar', 'E:Örfila', 'E:Vidskepelse',
     // Weapon skills: the weapon in the hand is the threat.
     'Svärd', 'Yxa', 'Spjut', 'Stav', 'Dolk', 'Klubba', 'Kedjevapen', 'Båge', 'Armborst', 'Kastvapen', 'Blåsrör',
   ],
   etiquette: ['Hovliv', 'E:Duellera', 'E:Hålla bjudningar', 'E:Tjänsteliv', 'E:Klosterliv'],
-  streetwise: ['Skumraskaffärer', 'Charm', 'Handel', 'E:Tigga', 'E:Skugglandsvana', 'E:Områdeskännedom', 'E:Supa', 'attr:Intryck'],
+  streetwise: ['Skumraskaffärer', 'Charm', 'Handel', 'E:Tigga', 'E:Skugglandsvana', 'E:Områdeskännedom', 'E:Hamnkunskap', 'E:Supa', 'attr:Intryck'],
   'read-people': ['Genomskåda', 'E:Läppläsning', 'attr:Vaksamhet'],
-  search: ['Genomsöka', 'E:Gravplundring', 'attr:Vaksamhet'],
-  climb: ['Klättra', 'E:Akrobatik', 'K:Apfotad', 'K:Starka nypor'],
+  search: ['Genomsöka', 'E:Gravplundring', 'E:Fällor', 'attr:Vaksamhet'],
+  climb: ['Klättra', 'E:Akrobatik', 'E:Takvägar', 'K:Apfotad', 'K:Starka nypor'],
   deceive: [
     'Dupera', 'Charm', 'Berättarkonst', 'Argumentera', 'E:Skådespel', 'E:Förklädnad', 'E:Simulant',
     'E:Undvika ansvar', 'E:Härma', 'E:Buktaleri', 'E:Förskingra',
+    'E:Soldatliv', 'E:Studentliv', 'E:Klosterliv', 'E:Tjänsteliv',
     'K:Smort munläder', 'K:Ärligt ansikte', 'attr:Intryck',
   ],
   rally: ['Ledarskap', 'Sång & musik', 'Berättarkonst', 'E:Ingjuta mod', 'K:Stark stämma', 'attr:Intryck'],
@@ -108,12 +109,12 @@ export const TAGGED: Record<string, string[]> = {
     'Historia', 'Kulturkännedom', 'Teologi', 'Ockultism', 'Filosofi', 'Geografi', 'Teoretisk magi',
     'E:Heraldik', 'E:Monsterkunskap', 'E:Vidskepelse', 'E:Astrologi', 'E:Bergskunskap', 'E:Bibliotekskunskap',
     'E:Hamnkunskap', 'E:Kända krigare', 'E:Legender & myter', 'E:Sjömanshistorier', 'E:Områdeskännedom',
-    'E:Språklära', 'E:Tolka religiösa skrifter', 'E:Väderkännedom',
+    'E:Språklära', 'E:Tolka religiösa skrifter', 'E:Väderkännedom', 'E:Politik',
   ],
   analyse: ['Kalkylera', 'Krigföring', 'Filosofi', 'Teoretisk magi', 'E:Bokhållning', 'E:Chiffer', 'E:Gåtor', 'E:Logistik', 'E:Språklära'],
   heal: ['Läkekonst', 'E:Kirurgi', 'E:Anatomi', 'E:Huskurer', 'E:Massage', 'E:Trösta', 'Naturlära'],
   poison: ['Gifter & droger', 'E:Provsmakare', 'Läkekonst', 'Naturlära'],
-  law: ['Lagkunskap', 'Historia', 'E:Politik', 'E:Diplomati'],
+  law: ['Lagkunskap', 'Historia', 'E:Politik', 'E:Diplomati', 'E:Bokhållning'],
   teach: ['Undervisa', 'Berättarkonst', 'Ledarskap', 'Filosofi', 'E:Barnuppfostran'],
   perform: [
     'Sång & musik', 'Dansa', 'Berättarkonst', 'E:Skådespel', 'E:Gyckla', 'E:Komponera musik', 'E:Poesi',
@@ -124,7 +125,7 @@ export const TAGGED: Record<string, string[]> = {
     'E:Utskällningar', 'E:Häda', 'E:Skryta', 'E:Undergräva självförtroende', 'E:Äckla', 'E:Uppvigla',
     'E:Peka ut syndabockar', 'E:Örfila', 'Dupera',
   ],
-  survey: ['Genomsöka', 'Speja', 'Orientering', 'Naturlära', 'Spåra', 'F:Mörkersyn', 'F:Nattsyn', 'attr:Vaksamhet'],
+  survey: ['Genomsöka', 'Speja', 'Orientering', 'Naturlära', 'Spåra', 'E:Bakhåll', 'E:Flyktvägar', 'F:Mörkersyn', 'F:Nattsyn', 'attr:Vaksamhet'],
 };
 
 // Narrow skills (marks, crafts, abilities) are written per skill; fold them into the tags.
