@@ -37,7 +37,7 @@ One file per effort in `content/skillweb/hooks/` (21 efforts have hooks).
 
 ### Hooks still to write
 The list lives in code: **`PLANNED` in `content/skillweb/hooks/index.ts`**, 18 efforts, each with what it acts on (person, thing, place, group, self) and a note. A test keeps it honest both ways. In short:
-- **On a person** (ready to write, same pattern as `ask.ts`): deceive (needs a hidden read of whether they believed it), gamble, teach, law. Done in session 20: sweet-talk, comfort, provoke, steal. **Bribe** waits for a decision on how bribing works outside the gate guard's conflict approach.
+- **On a person** (ready to write, same pattern as `ask.ts`): deceive (needs a hidden read of whether they believed it). Done in session 20: sweet-talk, comfort, provoke, steal, gamble, teach, law. **Bribe** waits for a decision on how bribing works outside the gate guard's conflict approach.
 - **On a group** (perform, rally) and **on a place** (sneak, hide, travel) need a new rule in core first (see §2 rules). Survey is a challenge, not a hook. Ride needs a mount kind, analyse needs document/machine kinds, escape is a check on the hero.
 - **Mystic skills** have tags and examples for their plain uses only. Casting, the filaments and dissipation are in [magic on the map](magic-on-map.md) and are not started.
 

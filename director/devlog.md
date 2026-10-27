@@ -4,6 +4,7 @@
 
 - Four more efforts have hooks by type of person (recipe in the skills handover §4): **sweet-talk** (19), **comfort** (12), **provoke** (17, a success is a deliberate rise: they get angrier and you keep a social advantage) and **steal** (12, not a talk, so it costs no patience; it spends the `steal` advantage that distract earns; success sets `stolen:{id}`, failure sets `suspicious:{id}` and turns them hostile).
 - They are off the planned list. Still planned for people: **deceive** (needs a hidden "did they believe it"), bribe, gamble, teach, law.
+- Later the same session: **gamble** (12; a loss costs a share of silver, a win has no purse yet so it earns goodwill), **teach** (11) and **law** (11; officials and courts concede, most others shrug) were added the same way. Still planned for people: deceive and bribe.
 - Nothing in the gate scene changed. All text is plain English, unbalanced first guesses.
 
 ## 2026-10-27 — Session 19: browser tests for the gate scene
