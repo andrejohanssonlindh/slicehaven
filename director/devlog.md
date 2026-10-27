@@ -5,7 +5,9 @@
 - Four more efforts have hooks by type of person (recipe in the skills handover §4): **sweet-talk** (19), **comfort** (12), **provoke** (17, a success is a deliberate rise: they get angrier and you keep a social advantage) and **steal** (12, not a talk, so it costs no patience; it spends the `steal` advantage that distract earns; success sets `stolen:{id}`, failure sets `suspicious:{id}` and turns them hostile).
 - They are off the planned list. Still planned for people: **deceive** (needs a hidden "did they believe it"), bribe, gamble, teach, law.
 - Later the same session: **gamble** (12; a loss costs a share of silver, a win has no purse yet so it earns goodwill), **teach** (11) and **law** (11; officials and courts concede, most others shrug) were added the same way. Still planned for people: deceive and bribe.
-- Nothing in the gate scene changed. All text is plain English, unbalanced first guesses.
+- **Deceive** (20 variants, a hidden roll): you are never told whether a lie held. Success and failure say exactly the same words (a test checks) and differ only in a silent flag, `deceived:{id}` or `doubted:{id}`. After that the person is easier (−2 difficulty, +1 Control in a conflict) or harder to deal with, with "they took your word" / "they doubt your word" in the roll log, and a successful size-up tells you which (a failed one says the opposite). One lie per person. New `believed()` in `core/skillweb.ts`. Placed after distract in the list, because Dupera carries both tags and the first matching check wins.
+- Only **bribe** is still planned for people. 243 unit tests and the 20 browser tests pass.
+- Gate scene: the guard and drifter now also offer a lie (the hook applies to anyone humanoid); the rest is unchanged. All text is plain English, unbalanced first guesses.
 
 ## 2026-10-27 — Session 19: browser tests for the gate scene
 

@@ -15,6 +15,7 @@ import { PICK } from './pick';
 import { POISON } from './poison';
 import { READ_PEOPLE } from './read-people';
 import { SEARCH } from './search';
+import { DECEIVE } from './deceive';
 import { GAMBLE } from './gamble';
 import { LAW } from './law';
 import { TEACH } from './teach';
@@ -34,7 +35,7 @@ import { TRACK } from './track';
  */
 export const HOOKS: HookDef[] = [
   ...READ_PEOPLE, ...HEAL,
-  ...PERSUADE, ...IMPRESS, ...SWEET_TALK, ...COMFORT, ...DISTRACT, ...ASK, ...ETIQUETTE, ...THREATEN, ...PROVOKE, ...STEAL, ...GAMBLE, ...LAW, ...TEACH,
+  ...PERSUADE, ...IMPRESS, ...SWEET_TALK, ...COMFORT, ...DISTRACT, ...DECEIVE, ...ASK, ...ETIQUETTE, ...THREATEN, ...PROVOKE, ...STEAL, ...GAMBLE, ...LAW, ...TEACH,
   ...CLIMB, ...SEARCH, ...LORE_HOOKS, ...CRAFT, ...FORCE, ...PICK, ...FORAGE, ...TAME, ...POISON, ...SWIM, ...JUMP, ...TRACK,
 ];
 
@@ -54,7 +55,6 @@ export type Target = 'person' | 'thing' | 'place' | 'group' | 'self';
  * - self: done to yourself or your gear; usually a challenge, not a hook.
  */
 export const PLANNED: Record<string, { on: Target; note: string }> = {
-  deceive: { on: 'person', note: 'A lie that holds. Needs a hidden "did they believe it" (like size-up).' },
   bribe: { on: 'person', note: 'Decide first how bribing works outside the gate guard\'s conflict approach (Q in the handover).' },
   perform: { on: 'group', note: 'An audience, not one person. Earns social advantages against everyone present.' },
   rally: { on: 'group', note: 'Heart or orders to a group; for companions and fights.' },

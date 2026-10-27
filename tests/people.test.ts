@@ -9,7 +9,7 @@ import { FACETS, FACET_LIST, LEANINGS, PEOPLE_LIBRARY, backgroundFacet, peopleFa
 import { defaultHero, isRollable } from '../src/content/rollables';
 import { KIND_PARENTS, LIBRARY } from '../src/content/skillweb';
 import { TAG_INFO } from '../src/content/skillweb/tags';
-import { expandObject, situation } from '../src/core/skillweb';
+import { expandObject, readPerson, situation } from '../src/core/skillweb';
 import { newSceneState } from '../src/core/scene';
 import { GATE_SCENE } from '../src/content/scenes/gate';
 import type { CheckDef } from '../src/core/scene';
@@ -285,6 +285,33 @@ describe('outcomes by type of person', () => {
     expect(pick(['job-soldier'], 'steal').id).toBe('steal-martial');
     expect(pick(['drunk'], 'comfort').id).toBe('comfort-drunk');
     expect(pick([], 'sweet-talk').id).toBe('sweet-talk');
+  });
+
+  it('a lie is a hidden roll: success and failure read the same, and only a silent flag tells them apart', () => {
+    const lies = LIBRARY.hooks.filter((h) => h.effort === 'deceive');
+    expect(lies.length).toBeGreaterThan(10);
+    for (const h of lies) {
+      expect(h.hidden, h.id).toBe(true);
+      const words = (es: typeof h.success) => es.filter((e) => 'say' in e).map((e) => JSON.stringify(e));
+      expect(words(h.success), h.id).toEqual(words(h.failure));
+      expect(h.success.every((e) => 'say' in e || ('set' in e && e.set === 'deceived:{id}')), h.id).toBe(true);
+      expect(h.failure.every((e) => 'say' in e || ('set' in e && e.set === 'doubted:{id}')), h.id).toBe(true);
+    }
+    expect(pick(['child'], 'deceive').difficulty).toBeLessThan(pick(['job-soldier'], 'deceive').difficulty);
+  });
+
+  it('whether they believed you shows later: in the roll, and in a sound size-up', () => {
+    const o = expandObject({ id: 'p', name: 'Marn', kind: 'human', tags: [], at: [0, 0] } as never, LIBRARY);
+    const s = newSceneState(GATE_SCENE);
+    const check = o.checks!.find((c) => c.talk)!;
+    const base = situation(s, check, o, defaultHero(), LIBRARY, undefined, check.skills[0]).shift;
+    s.flags['deceived:p'] = true;
+    expect(situation(s, check, o, defaultHero(), LIBRARY, undefined, check.skills[0]).shift).toBe(base - 2);
+    expect(readPerson(o, s, defaultHero(), LIBRARY, undefined, true).join(' ')).toContain('taken your word');
+    expect(readPerson(o, s, defaultHero(), LIBRARY, undefined, false).join(' ')).toContain('not sure they believe');
+    delete s.flags['deceived:p'];
+    s.flags['doubted:p'] = true;
+    expect(situation(s, check, o, defaultHero(), LIBRARY, undefined, check.skills[0]).shift).toBe(base + 2);
   });
 
   it('a person gets one hook per intention, the best match', () => {

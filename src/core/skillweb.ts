@@ -253,9 +253,11 @@ export function situation(s: SceneState, c: CheckDef, o: ObjectDef, who: Visitor
   const rel = disposition(o, who, lib, place);
   const spend: Token[] = [];
   const notes: string[] = [...lean.notes];
-  let shift = 0 - 2 * (mood + rel.v + lean.v);
+  const lie = believed(s, c.talk.who);
+  let shift = 0 - 2 * (mood + rel.v + lean.v + lie);
   if (mood) notes.push(mood > 0 ? 'they like you' : 'they are wary of you');
   if (rel.v && rel.why) notes.push(rel.why);
+  if (lie) notes.push(lie > 0 ? 'they took your word' : 'they doubt your word');
   for (const t of s.tokens) {
     if (!(c.wants ?? []).includes(t.kind) || (t.against !== undefined && t.against !== c.talk.who)) continue;
     spend.push(t);
@@ -276,9 +278,11 @@ export function conflictBonus(
   const mood = s.social[o.id]?.mood ?? 0;
   const rel = disposition(o, who, lib, place);
   const notes: string[] = [];
-  let control = Math.max(-MAX_RECEPTION, Math.min(MAX_RECEPTION, mood + rel.v));
+  const lie = believed(s, o.id);
+  let control = Math.max(-MAX_RECEPTION, Math.min(MAX_RECEPTION, mood + rel.v)) + lie;
   if (mood) notes.push(mood > 0 ? 'they like you' : 'they are wary of you');
   if (rel.v && rel.why) notes.push(rel.why);
+  if (lie) notes.push(lie > 0 ? 'they took your word' : 'they doubt your word');
   // The people library, for the approach's kind of effort (leanings that name particular skills need a roll, so they wait for the single rolls).
   const lean = leanOf(o, who, lib, place, effort);
   control += lean.v;
@@ -289,6 +293,14 @@ export function conflictBonus(
     notes.push(`+${t.n} advantage: ${t.label}`);
   }
   return { control, notes, spend };
+}
+
+/**
+ * Whether a lie to this person took (deceive is a hidden roll, so only these flags remember): +1 they
+ * believed you, −1 they doubted you, 0 you have not lied. Believed wins if both are somehow set.
+ */
+export function believed(s: SceneState, id: string): number {
+  return s.flags[`deceived:${id}`] ? 1 : s.flags[`doubted:${id}`] ? -1 : 0;
 }
 
 /** What sizing someone up tells you: how they feel, how they see your people, how much they will take. */
@@ -302,6 +314,8 @@ export function readPerson(o: ObjectDef, s: SceneState, who: Visitor, lib: Libra
     out.push(moodLine(o.name, mem, patience) ?? `${o.name} ${moodWord(0)}.`);
     if (rel.v !== 0 && rel.why) out.push(`It shows: ${rel.why}.`);
     if (left !== undefined && left > 0 && left <= 1) out.push('You would not push it much further.');
+    const lie = believed(s, o.id);
+    if (lie) out.push(lie > 0 ? `${o.name} seems to have taken your word.` : `${o.name} is not sure they believe you.`);
     return out;
   }
   // A misreading: a plausible picture that is wrong in every part, so nothing marks it as wrong.
@@ -310,6 +324,8 @@ export function readPerson(o: ObjectDef, s: SceneState, who: Visitor, lib: Libra
   if (rel.v < 0) out.push('They seem quite at ease with your sort.');
   else if (rel.v > 0) out.push('It shows: they are not sure about your sort.');
   if (left !== undefined) out.push(left > 0 && left <= 1 ? 'They look as if they could talk all night.' : 'You would not push it much further.');
+  const lie = believed(s, o.id);
+  if (lie) out.push(lie > 0 ? `${o.name} is not sure they believe you.` : `${o.name} seems to have taken your word.`);
   return out;
 }
 
