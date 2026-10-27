@@ -53,12 +53,11 @@ const OBJECT_HOOKS: HookDef[] = [
     label: 'Size up {name}',
     skills: [...SKILL_SETS.readPeople],
     difficulty: DIFFICULTY.hard,
-    success: [
-      { say: 'You watch {name} closely and get a feel for how they carry themselves.', tone: 'good' },
-      { set: 'read:{id}' },
-    ],
-    failure: [{ say: '{Name} gives nothing away.' }],
-    strong: [{ say: 'You catch a small tell: something {name} would rather keep to themselves.', tone: 'good' }],
+    hidden: true,
+    // The reading itself comes from readPerson: true on success, a plausible wrong one on failure.
+    // Nothing here may tell success from failure.
+    success: [{ set: 'read:{id}' }],
+    failure: [{ set: 'read:{id}' }],
   },
   // Layer 2, object related: a rock can always be climbed or studied, useful or not.
   {
@@ -81,8 +80,10 @@ const OBJECT_HOOKS: HookDef[] = [
     // Geology isn't a skill in our list; Nature Lore stands in.
     skills: ['Naturlära'],
     difficulty: DIFFICULTY.tricky,
-    success: [{ say: 'You look at the {name} with a trained eye. Nothing remarkable, but you know what it is made of.' }],
-    failure: [{ say: 'Stone is stone. You learn nothing from the {name}.' }],
+    hidden: true,
+    // You get an answer either way; whether it is right is the thing you do not know.
+    success: [{ say: 'You study the {name} with a trained eye. {lore}' }],
+    failure: [{ say: 'You study the {name} with a trained eye. {lore}' }],
   },
 ];
 

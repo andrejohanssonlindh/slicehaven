@@ -1,5 +1,13 @@
 # Devlog
 
+## 2026-10-27 — Session 13: hidden reads, real conflicts, challenges
+
+See the third-pass status in [Skill web](design/skill-web.md).
+- Size up and Study are now hidden 50/50 reads: no verdict, failure gives a believable wrong answer, one try.
+- The guard conflict now alternates who leads (you, him, you) and he picks his skills at random from what fits yours.
+- New: challenges (three rolls against a difficulty, counted in Control, with result lists), with **Survey the area** as the first. Darkvision/night vision is reasonable at night and gives +2 Control. Results are scene specific (the gate's best results tell you how the guard stands his watch).
+- 143 tests. Not checked in a browser.
+
 ## 2026-10-27 — Session 12: the humanoid social set
 
 See the status section in [Skill web](design/skill-web.md). Short version:

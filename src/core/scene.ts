@@ -1,3 +1,4 @@
+import type { ChallengeDef } from './challenge';
 import { type Dice, type TestResult, DIFFICULTY, test } from './checks';
 import type { Rng } from './rng';
 import type { Approach } from './social';
@@ -33,6 +34,8 @@ export type Effect =
   | { remove: string }
   /** The hero gets in; the text closes the scene. Climbing lands on `to` (offset col,row). */
   | { enter: string; via?: 'climb' | 'gate'; to?: [number, number] }
+  /** Show what is worth a look within this many hexes (a thorough look around). */
+  | { reveal: number }
   /** How someone feels about you (−3..+3), added to. `who` is the thing's id, `name` what to call them. */
   | { mood: number; who?: string; name?: string }
   /** Keep advantages for a later roll of this kind, optionally only against one person (see Token). */
@@ -80,6 +83,11 @@ export interface CheckDef {
   talk?: { who: string; patience: number };
   /** Kinds of kept advantage (Token.kind) this check can spend. */
   wants?: string[];
+  /**
+   * Knowledge and insight: you are not told how it went. Success gives the truth and failure a
+   * plausible wrong answer, so you cannot just take the opposite, and a failure is never "nothing".
+   */
+  hidden?: boolean;
   when?: Cond;
   /** Failures allowed before the check closes (default: unlimited). */
   tries?: number;
@@ -130,6 +138,8 @@ export interface SocialDef {
   cost: number;
   /** The other side's pools by skill id. */
   dice: Record<string, Dice>;
+  /** His fitting answers to a skill of yours (he picks one at random); anything else uses the approach's `answers`. */
+  responses?: Record<string, string[]>;
   approaches: SceneApproach[];
 }
 
@@ -144,6 +154,8 @@ export interface ObjectDef {
   artWhen?: { flag: string; art: string }[];
   /** Offset (col,row) hexes it covers. */
   hexes: [number, number][];
+  /** What a studied thing is really like, and a plausible wrong idea of it (for hidden knowledge rolls). */
+  lore?: { true: string; false: string };
   /** How many social tries they put up with (default comes from the kind). */
   patience?: number;
   /** What kind of thing it is (content/skillweb kinds); library hooks for that kind apply. */
@@ -184,6 +196,8 @@ export interface SceneDef {
   majority?: string;
   objects: ObjectDef[];
   exits: ExitDef[];
+  /** Efforts against the place itself (survey it, find your way…): three rolls against a difficulty. */
+  challenges?: ChallengeDef[];
 }
 
 export interface SceneState {
@@ -230,7 +244,7 @@ export const talkFor = (o: ObjectDef, s: SceneState): TalkDef | undefined => o.t
 export const talksLeft = (s: SceneState, who: string, patience: number): number => patience - (s.social[who]?.talks ?? 0);
 
 export const checkOpen = (c: CheckDef, s: SceneState): boolean =>
-  met(s, c.when) && (c.tries === undefined || (s.fails[c.id] ?? 0) < c.tries) && (!c.talk || talksLeft(s, c.talk.who, c.talk.patience) > 0);
+  met(s, c.when) && !(c.hidden && s.flags[`tried:${c.id}`]) && (c.tries === undefined || (s.fails[c.id] ?? 0) < c.tries) && (!c.talk || talksLeft(s, c.talk.who, c.talk.patience) > 0);
 
 /** Checks you can try on this thing right now. */
 export const openChecks = (o: ObjectDef, s: SceneState): CheckDef[] => (o.checks ?? []).filter((c) => checkOpen(c, s));
@@ -338,6 +352,8 @@ export function attempt(
   for (const tk of sit.spend) s.tokens.splice(s.tokens.indexOf(tk), 1);
   const mem = c.talk ? (s.social[c.talk.who] ??= { talks: 0, mood: 0 }) : undefined;
   if (mem) mem.talks++;
+  // You cannot tell how a hidden roll went, so you cannot roll it again to compare.
+  if (c.hidden) s.flags[`tried:${c.id}`] = true;
   if (!result.success) {
     s.fails[c.id] = (s.fails[c.id] ?? 0) + 1;
     if (mem) mem.last = 'fail';
@@ -355,6 +371,7 @@ export type SceneEvent =
   | { kind: 'flag'; flag: string; on: boolean }
   | { kind: 'silver'; amount: number; why: string }
   | { kind: 'time'; time: SceneTime }
+  | { kind: 'reveal'; range: number }
   | { kind: 'remove'; id: string }
   | { kind: 'enter'; text: string; via: 'climb' | 'gate'; to?: [number, number] };
 
@@ -378,6 +395,8 @@ export function apply(s: SceneState, effects: Effect[]): SceneEvent[] {
     } else if ('remove' in e) {
       if (!s.removed.includes(e.remove)) s.removed.push(e.remove);
       out.push({ kind: 'remove', id: e.remove });
+    } else if ('reveal' in e) {
+      out.push({ kind: 'reveal', range: e.reveal });
     } else if ('mood' in e) {
       const who = e.who ?? '';
       const mem = (s.social[who] ??= { talks: 0, mood: 0 });

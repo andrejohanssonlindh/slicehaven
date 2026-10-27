@@ -4,6 +4,11 @@
 
 Effort: **S** under an hour · **M** a session · **L** several sessions, split into vignettes.
 
+## Done 2026-10-27 (third pass)
+| ✅ | Knowledge/insight reads are hidden 50/50 (plausible wrong answer on failure, one try) | Size up, Study. |
+| ✅ | Social conflict follows the rules: alternating lead, random fitting answers | Gate guard. |
+| ✅ | Challenges against the place + Survey the area with darkvision/night vision | `core/challenge.ts`. |
+
 ## Done 2026-10-27 (later)
 | ✅ | Humanoid social set: persuade, impress, distract, ask, intimidate, court manners; human → guard, outcast; patience, mood, kept advantages | Skill web steps 3 and 6. |
 | ✅ | People-vs-people reception table (Control in conflicts, difficulty in single rolls), kin by context, rural kind, "stranger here" | Skill web step 8, the people half. |

@@ -2,6 +2,7 @@ import type { MobKind } from '../../art/mapScene';
 import { DIFFICULTY } from '../../core/checks';
 import type { Effect, SceneDef } from '../../core/scene';
 import { SKILL_SETS } from '../rollables';
+import { surveyChallenge } from '../skillweb/challenges';
 
 /**
  * Test scene: the village gate at night. Four ways in:
@@ -128,6 +129,19 @@ export const GATE_SCENE: SceneDef = {
           'attr:Vaksamhet': { n: 2, mod: 3 },
           'attr:Kroppsbyggnad': { n: 3, mod: 1 },
         },
+        // What he might answer with, by what you lead with. He picks one of these at random.
+        responses: {
+          Handel: ['Handel', 'Genomskåda'],
+          'E:Muta': ['Genomskåda', 'attr:Självkontroll'],
+          Skumraskaffärer: ['Genomskåda', 'attr:Vaksamhet', 'attr:Självkontroll'],
+          Dupera: ['Genomskåda', 'attr:Vaksamhet'],
+          Argumentera: ['Genomskåda', 'attr:Självkontroll', 'Handel'],
+          Charm: ['Genomskåda', 'attr:Självkontroll'],
+          Berättarkonst: ['Genomskåda', 'attr:Vaksamhet'],
+          'Injaga fruktan': ['attr:Självkontroll', 'Injaga fruktan'],
+          Ledarskap: ['attr:Självkontroll', 'Injaga fruktan', 'attr:Kroppsbyggnad'],
+          Slagsmål: ['attr:Kroppsbyggnad', 'Injaga fruktan'],
+        },
         approaches: [
           {
             id: 'bribe',
@@ -139,6 +153,7 @@ export const GATE_SCENE: SceneDef = {
             locked: 'Handel',
             situation: 2,
             answers: ['Handel', 'Genomskåda', 'attr:Självkontroll'],
+            moves: ['Genomskåda', 'Handel', 'attr:Självkontroll'],
             retorts: [
               '"A hot meal? That buys a cold one."',
               '"And when the sergeant asks who let you in?"',
@@ -162,6 +177,7 @@ export const GATE_SCENE: SceneDef = {
             locked: 'attr:Kroppsbyggnad',
             situation: -2,
             answers: ['attr:Självkontroll', 'Injaga fruktan', 'attr:Kroppsbyggnad'],
+            moves: ['Injaga fruktan', 'attr:Kroppsbyggnad', 'attr:Vaksamhet'],
             retorts: [
               '"Is that so."',
               'He shifts his grip on the spear.',
@@ -187,6 +203,7 @@ export const GATE_SCENE: SceneDef = {
             locked: 'attr:Intryck',
             situation: 0,
             answers: ['Genomskåda', 'attr:Självkontroll', 'attr:Vaksamhet'],
+            moves: ['Genomskåda', 'attr:Vaksamhet', 'attr:Självkontroll'],
             retorts: [
               '"Everyone\'s got an aunt."',
               '"What\'s her name, then, this aunt?"',
@@ -207,6 +224,10 @@ export const GATE_SCENE: SceneDef = {
       id: 'rock',
       name: 'Ivy-covered boulder',
       kind: 'rock',
+      lore: {
+        true: 'It is sound old granite, set deep; the ivy only decorates it.',
+        false: 'It is crumbling at the foot, and mostly held together by the ivy.',
+      },
       art: 'ivy-rock',
       hexes: [[7, 4], [8, 4], [7, 5]],
       look: [
@@ -303,6 +324,7 @@ export const GATE_SCENE: SceneDef = {
         {
           id: 'read-travellers',
           intention: 'size-up',
+          hidden: true,
           label: 'Size them up',
           skills: [...SKILL_SETS.readPeople],
           difficulty: DIFFICULTY.hard,
@@ -341,6 +363,34 @@ export const GATE_SCENE: SceneDef = {
       hexes: [[6, 1], [7, 1]],
       look: 'A cottage inside the palisade, thatch thick with moss.',
     },
+  ],
+  challenges: [
+    surveyChallenge({
+      intro: 'You stop at the edge of the torchlight and take your time with the place: the wall, the road, the people, the dark between them.',
+      results: [
+        { atLeast: 0, text: 'You blunder about in the dark, trip over a root, and the guard\'s torch swings your way.', effects: [{ set: 'guardWatching' }] },
+        { atLeast: 1, text: 'Shapes and shadows, and the cold feeling that something out there is watching you back. You learn nothing.', effects: [] },
+        { atLeast: 2, text: 'You make out the palisade, the gate and the fire. Nothing you did not know.', effects: [] },
+        { atLeast: 3, text: 'You pick out the things nearest you that are worth a closer look.', effects: [{ reveal: 5 }] },
+        {
+          atLeast: 4,
+          text: 'You take in the whole place, and watch the guard long enough to learn how he stands his watch.',
+          effects: [
+            { reveal: 99 },
+            { token: { kind: 'social', n: 1, against: 'guard', label: 'you know how the guard stands his watch' } },
+          ],
+        },
+        {
+          atLeast: 6,
+          text: 'You see all of it, and you see the pattern: when the torch burns low he looks into it, and not at the road.',
+          effects: [
+            { reveal: 99 },
+            { token: { kind: 'social', n: 1, against: 'guard', label: 'you know how the guard stands his watch' } },
+            { token: { kind: 'sneak', n: 1, against: 'guard', label: 'you know when the guard looks away' } },
+          ],
+        },
+      ],
+    }),
   ],
   exits: [
     { hexes: [[4, 3], [5, 3]], when: { all: ['gateOpen', 'rested'] },

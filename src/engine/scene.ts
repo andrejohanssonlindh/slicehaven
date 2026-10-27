@@ -1,4 +1,8 @@
 import { type Battle, type Unit, cellAt, unitAt, unitHexes, walkReach, pathFromReach } from '../core/battle';
+import {
+  type Challenge, challengeAllowed, challengeOpen, challengeOutcome, challengePool, challengeSkills, difficultyAt, edgeControl,
+  mustLock, newChallenge, rollChallenge, timesRolled, CHALLENGE_ROLLS, challengeOver, type ChallengeDef,
+} from '../core/challenge';
 import { type Dice, difficultyName, rollText } from '../core/checks';
 import { around, gap } from '../core/footprint';
 import { type Hex, hexEquals, hexKey, offsetToHex, parseHexKey } from '../core/hex';
@@ -6,11 +10,11 @@ import { type Hero, canRoll, diceOf } from '../core/hero';
 import { Rng } from '../core/rng';
 import {
   type CheckDef, type Effect, type ObjectDef, type SceneApproach, type SceneDef, type SceneEvent, type SceneState,
-  apply, approachOpen, artOf, attempt, blocks, checkFor, checksHere, lookAround as rollLookAround, lookText, met, moodLine, newSceneState, openChecks,
+  apply, approachOpen, artOf, attempt, blocks, checkFor, checksHere, hintsNear, lookAround as rollLookAround, lookText, met, moodLine, newSceneState, openChecks,
   talkFor, usefulSkills,
 } from '../core/scene';
 import {
-  type Conflict, ROUNDS, allowed, conflictOver, mustUseLocked, newConflict, outcome, playRound, pooled,
+  type Conflict, ROUNDS, allowed, conflictOver, leadOf, mustUseLocked, newConflict, outcome, playRound, pooled, theirMove,
 } from '../core/social';
 import { diceText } from '../core/chargen/tables';
 import { SCENE_ART } from '../art/sceneArt';
@@ -326,7 +330,7 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
    * would do something are flagged and also listed on top. `useful` maps a skill
    * to what it would try.
    */
-  function skillPicker(o: ObjectDef | undefined, title: string, useful: Map<string, string>, pick: (id: string) => void): void {
+  function skillPicker(o: ObjectDef | undefined, title: string, useful: Map<string, string>, pick: (id: string) => void, extra: SheetSection[] = []): void {
     const opt = (id: string, top: boolean): SheetOption => {
       const can = canRoll(hero, id);
       const flag = hints && useful.has(id);
@@ -339,7 +343,7 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
         onPick: () => pick(id),
       };
     };
-    const sections: SheetSection[] = [];
+    const sections: SheetSection[] = [...extra];
     if (hints && useful.size) sections.push({ title: '✓ Useful here', options: [...useful.keys()].map((id) => opt(id, true)) });
     const owned = Object.keys(hero.dice).filter((id) => canRoll(hero, id));
     for (const g of byGroup(owned)) sections.push({ title: `${g.label} (${g.ids.length})`, folded: true, options: g.ids.map((id) => opt(id, false)) });
@@ -372,6 +376,10 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
       for (const id of usefulSkills(o, state)) if (!useful.has(id)) useful.set(id, checkLine(checkFor(o, state, id)!));
     }
     for (const id of SKILL_SETS.search) if (!useful.has(id)) useful.set(id, 'Look around for anything interesting');
+    const bigger = (def.challenges ?? []).filter((d) => challengeOpen(d, state));
+    const extra: SheetSection[] = bigger.length
+      ? [{ title: 'Bigger efforts', options: bigger.map((d) => ({ label: d.label, sub: `Three rolls against ${difficultyName(difficultyAt(d, state.time))} (${difficultyAt(d, state.time)}): ${d.goal}`, style: 'good' as const, onPick: () => challengeSheet(d, newChallenge(d.id)) })) }]
+      : [];
     skillPicker(undefined, 'Use a skill here', useful, (id) => {
       const here = checksHere(def.objects, state, id, nextToHero);
       if (here.length === 1) return void safe(() => rollCheck(here[0].o, here[0].c, id));
@@ -386,7 +394,81 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
       const line = `There's nothing right here to use ${rollableName(id)} on. Stand next to something and try again.`;
       say(line, 'info');
       open(undefined, { title: rollableName(id), body: `<p>${esc(line)}</p>`, sections: [{ options: [{ label: 'Back', onPick: skillHere }] }] });
+    }, extra);
+  }
+
+  // --- challenges (against the place itself) ---------------------------------------------
+
+  function challengeSheet(d: ChallengeDef, c: Challenge): void {
+    if (challengeOver(c)) return void safe(() => endChallenge(d, c));
+    const time = state.time;
+    const n = c.rolls.length;
+    const must = mustLock(d, c);
+    const edge = edgeControl(d, time, (id) => canRoll(hero, id));
+    const difficulty = difficultyAt(d, time);
+    const opts: SheetOption[] = challengeSkills(d, time).map((id) => {
+      const base = diceOf(hero, id);
+      const dice = challengePool(c, id, base);
+      const ok = challengeAllowed(d, c, id, time);
+      const locked = d.locked.includes(id);
+      const has = base.n > 0;
+      const used = timesRolled(c, id);
+      const notes = [
+        locked ? (must.includes(id) && must.length >= CHALLENGE_ROLLS - n ? 'Must be rolled now' : 'Locked: must be rolled once') : '',
+        used ? `Used ${used}×: −${2 * used}D6` : '',
+        !has ? (locked ? 'You lack it: rolls 0' : 'You don\'t have this') : '',
+        edge.notes.length && d.edges?.some((e) => e.skill === id) && has ? edge.notes[0] : '',
+      ].filter(Boolean).join(' · ');
+      return {
+        label: rollableName(id),
+        sub: notes || undefined,
+        tag: diceTag(dice),
+        disabled: !ok || (!has && !locked),
+        style: ok && (has || locked) ? (locked ? 'primary' : 'good') : 'muted',
+        onPick: () => void safe(() => {
+          const r = rollChallenge(d, c, id, base, time, rng);
+          say(`${d.label}, roll ${c.rolls.length}: ${rollableName(r.skill)} ${diceText(r.dice)} vs ${r.difficulty} → ${rollText(r.roll)}`
+            + `${r.control ? `, +${r.control} Control` : ', no Control'}.`, 'roll');
+          challengeSheet(d, c);
+        }),
+      };
     });
+    const last = c.rolls[c.rolls.length - 1];
+    const prev = last
+      ? `<p class="roll ${last.control ? 'success' : 'failure'}">${esc(rollableName(last.skill))} ${diceText(last.dice)}: <b>${last.roll.total}</b> vs ${last.difficulty} · ${last.control ? `+${last.control} Control` : 'no Control'}<br><small>${esc(rollText(last.roll))}</small></p>`
+      : `<p class="you">${esc(d.intro)}</p>`;
+    const got = c.rolls.reduce((s, r) => s + r.control, 0);
+    const sit = edge.control ? ` · situation ${edge.control > 0 ? '+' : '−'}${Math.abs(edge.control)}` : '';
+    open(undefined, {
+      title: `${d.label} · roll ${n + 1} of ${CHALLENGE_ROLLS}`,
+      body: `${prev}<p class="score">Control <b>${got}</b>${sit} · difficulty ${difficulty} (${difficultyName(difficulty)})`
+        + `${edge.notes.length ? `<br><small>${esc(edge.notes.join(' '))}</small>` : ''}</p>`
+        + `<p class="hint">A roll at ${difficulty} or more gives 1 Control, +1 per 5 over. Locked: ${d.locked.map((id) => `<b>${esc(rollableName(id))}</b>`).join(', ')}. Using a skill again costs −2D6.</p>`,
+      sections: [{ title: 'Pick a skill', options: opts }],
+      closable: false,
+    });
+  }
+
+  async function endChallenge(d: ChallengeDef, c: Challenge): Promise<void> {
+    const edge = edgeControl(d, state.time, (id) => canRoll(hero, id));
+    const res = challengeOutcome(d, c, edge.control);
+    state.flags[`done:${d.id}`] = true;
+    say(`${d.label}: ${res.earned} Control${edge.control ? ` ${edge.control > 0 ? '+' : '−'} ${Math.abs(edge.control)} situation` : ''} = ${res.control}.`, 'roll');
+    say(res.result.text, res.control >= 3 ? 'good' : 'bad');
+    sheet.close();
+    const events = await run(res.result.effects, undefined, true);
+    const text = events.filter((e) => e.kind === 'say').map((e) => `<p>${esc((e as { text: string }).text)}</p>`).join('');
+    open(undefined, {
+      title: d.label,
+      body: `<p class="roll"><b>${res.control}</b> Control (${res.earned} earned${edge.control ? `, ${edge.control > 0 ? '+' : '−'}${Math.abs(edge.control)} situation` : ''})</p><p>${esc(res.result.text)}</p>${text}`,
+      sections: [{ options: [{ label: 'Continue', style: 'primary', onPick: () => sheet.close() }] }],
+    });
+  }
+
+  /** What is worth a look within `range`, as notes with directions. */
+  function revealLines(range: number): string[] {
+    const found = hintsNear(def.objects, state, (o) => gap(unitHexes(heroUnit), hexesOf(o)), range);
+    return found.length ? found.map((f) => `${directionTo(hexesOf(f.o))}: ${f.hint}`) : ['Nothing nearby catches your eye.'];
   }
 
   /** Searching with nothing to search right here: a roll decides what you notice nearby. */
@@ -422,9 +504,28 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
     return `To the ${name}`;
   }
 
+  /** Knowledge and insight: you get an answer and are not told whether it is right. */
+  async function hiddenCheck(o: ObjectDef, c: CheckDef, skill: string): Promise<void> {
+    const dice = diceOf(hero, skill);
+    const { result, effects: eff } = attempt(state, c, dice, rng, situation(state, c, o, hero, LIBRARY, def));
+    say(`You: ${rollableName(skill)}, ${c.label.toLowerCase()}.`, 'you');
+    // The rolled dice stay behind the curtain; the log only keeps what you were told.
+    const events = await run(eff.filter((e) => !('set' in e && e.set.startsWith('read:'))), o, true);
+    const lines: string[] = [];
+    if (c.intention === 'size-up') {
+      lines.push(...readPerson(o, state, hero, LIBRARY, def, result.success));
+      state.flags[`read:${o.id}`] = true;
+    }
+    for (const l of lines) say(l, 'info');
+    const text = [...events.filter((e) => e.kind === 'say').map((e) => (e as { text: string }).text), ...lines]
+      .map((t) => `<p>${esc(t)}</p>`).join('');
+    open(o, { title: c.label, body: text, sections: [{ options: [{ label: 'Continue', style: 'primary', onPick: () => sheet.close() }] }] });
+  }
+
   async function rollCheck(o: ObjectDef, c: CheckDef, skill: string): Promise<void> {
     sheet.close();
     const dice = diceOf(hero, skill);
+    if (c.hidden) return hiddenCheck(o, c, skill);
     const sit = situation(state, c, o, hero, LIBRARY, def);
     const { result, effects: eff, difficulty } = attempt(state, c, dice, rng, sit);
     const name = rollableName(skill);
@@ -511,13 +612,20 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
     const r = c.rounds[c.rounds.length - 1];
     if (!r) return '';
     const who = r.mine && r.theirs ? 'A tie: 1 Control each.' : r.mine ? `You win: +${r.mine} Control.` : `He wins: +${r.theirs} Control to him.`;
-    return `<p class="roll">${esc(rollableName(r.skill))} ${diceText(r.dice)}: <b>${r.roll.total}</b> vs his ${esc(rollableName(r.answer))} `
+    const lead = r.lead === 'me' ? 'You lead' : 'He led';
+    return `<p class="roll">${lead}. ${esc(rollableName(r.skill))} ${diceText(r.dice)}: <b>${r.roll.total}</b> vs his ${esc(rollableName(r.answer))} `
       + `${diceText(r.answerDice)}: <b>${r.answerRoll.total}</b>. ${who}<br><small>You: ${esc(rollText(r.roll))} · Him: ${esc(rollText(r.answerRoll))}</small></p>`;
   }
 
-  function conflictSheet(o: ObjectDef, a: SceneApproach, c: Conflict): void {
+  function conflictSheet(o: ObjectDef, a: SceneApproach, c: Conflict, attack?: string): void {
     if (conflictOver(c)) return void safe(() => endConflict(o, a, c));
     const n = c.rounds.length;
+    // In his round he picks a skill (at random among what fits) and you answer it.
+    const heLeads = leadOf(n) === 'them';
+    if (heLeads && !attack) {
+      attack = theirMove(c, a, rng);
+      say(`He leads with ${rollableName(attack)}.`, 'info');
+    }
     const retort = n > 0 ? a.retorts[n - 1] : '';
     const forced = mustUseLocked(c, a);
     const opts: SheetOption[] = a.skills.map((id) => {
@@ -539,8 +647,8 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
         disabled: !ok || (!has && !locked),
         style: ok && (has || locked) ? (locked ? 'primary' : 'good') : 'muted',
         onPick: () => void safe(() => {
-          const r = playRound(c, a, id, (k) => diceOf(hero, k), (k) => o.social!.dice[k] ?? { n: 2, mod: 0 }, rng);
-          say(`Round ${c.rounds.length}: ${rollableName(r.skill)} ${diceText(r.dice)} → ${rollText(r.roll)} vs guard's `
+          const r = playRound(c, a, id, (k) => diceOf(hero, k), (k) => o.social!.dice[k] ?? { n: 2, mod: 0 }, rng, o.social!.responses, attack);
+          say(`Round ${c.rounds.length} (${r.lead === 'me' ? 'you lead' : 'he leads'}): ${rollableName(r.skill)} ${diceText(r.dice)} → ${rollText(r.roll)} vs guard's `
             + `${rollableName(r.answer)} ${diceText(r.answerDice)} → ${rollText(r.answerRoll)}. `
             + (r.mine && r.theirs ? 'Tie, 1 Control each.' : r.mine ? `+${r.mine} Control to you.` : `+${r.theirs} Control to him.`), 'roll');
           conflictSheet(o, a, c);
@@ -548,10 +656,13 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
       };
     });
     const intro = n === 0 ? `<p class="you">${esc(a.pitch)}</p>` : `${roundText(c)}<p class="speech">${esc(retort)}</p>`;
+    const turn = heLeads
+      ? `<p><b>His turn:</b> he leads with <b>${esc(rollableName(attack!))}</b>. Answer with a skill that fits.</p>`
+      : '<p><b>Your turn:</b> lead with a skill. He will answer with one that fits, and you cannot tell which.</p>';
     open(o, {
       title: `${a.label} · round ${n + 1} of ${ROUNDS}`,
-      body: `${intro}${score(c, a)}<p class="hint">Locked roll: <b>${esc(rollableName(a.locked))}</b>. Using a skill again costs −2D6.</p>`,
-      sections: [{ title: 'Pick a skill', options: opts }],
+      body: `${intro}${score(c, a)}${turn}<p class="hint">Locked roll: <b>${esc(rollableName(a.locked))}</b>. Using a skill again costs −2D6.</p>`,
+      sections: [{ title: heLeads ? 'Answer with' : 'Lead with', options: opts }],
       closable: false,
     });
   }
@@ -581,6 +692,7 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
   /** Apply effects, show them, and return what happened. `quiet` leaves "say" lines for the caller's sheet. */
   async function run(eff: Effect[], from?: ObjectDef, quiet = false): Promise<SceneEvent[]> {
     const events = apply(state, eff);
+    const extra: SceneEvent[] = []; // lines for the caller's sheet that are already in the log
     for (const e of events) {
       if (e.kind === 'say') say(e.text, e.tone as LogTone);
       else if (e.kind === 'silver') {
@@ -597,10 +709,16 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
           battle.units = battle.units.filter((x) => x !== u);
           renderer.removeUnit(u.id);
         }
+      } else if (e.kind === 'reveal') {
+        for (const l of revealLines(e.range)) {
+          say(l, 'info');
+          extra.push({ kind: 'say', tone: 'info', text: l });
+        }
       } else if (e.kind === 'enter' && e.via === 'climb') {
         await climbOver(from, e.to);
       }
     }
+    events.push(...extra);
     syncWorld();
     refreshInfo();
     const entered = events.find((e) => e.kind === 'enter');

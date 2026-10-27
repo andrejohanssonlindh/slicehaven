@@ -37,6 +37,8 @@ The skill list is **grouped by skill group** in fold-outs: Attributes, Movement,
 What counts as "reasonable" comes from **skill sets** defined once (`climb`, `search`, `readPeople`, `sweetTalk`, `threaten`, `bribe`) and reused by every scene. Each skill set mixes base skills, expertise, marks and attributes. For example, *climb* = Climb, Acrobatics, Ape-footed, Strong Grip.
 
 ### Social conflicts (after the rules' challenges & conflicts chapter)
+*Updated 2026-10-27: the lead alternates (you, him, you) and his skills are drawn at random from the ones that fit; mood, reception and kept advantages add situation Control. See [Skill web](skill-web.md). The description below is the older simpler version.*
+
 Your idea of three directions is the core of it. Each **approach** (bribe, threaten, sweet-talk) has:
 - **Reasonable skills**: only those can be picked.
 - A **locked roll** that must be used once: Trade for a bribe, Physique for a threat, Presence for sweet talk. If you haven't used it by round 3, round 3 must be it. Lacking it entirely rolls 0, as in the rules.

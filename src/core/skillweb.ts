@@ -44,6 +44,8 @@ export interface HookDef {
   social?: boolean;
   /** Kept advantages (Token.kind) this hook can spend. */
   wants?: string[];
+  /** Knowledge/insight: the result is hidden, and failure gives a plausible wrong answer (see CheckDef.hidden). */
+  hidden?: boolean;
 }
 
 /** How one people sees another: −3 (hostile) … +3 (kin). */
@@ -102,8 +104,8 @@ export function hooksFor(o: Pick<ObjectDef, 'kind' | 'tags'>, lib: Library): Hoo
 const fill = (text: string, o: ObjectDef): string => text.replaceAll('{name}', o.name.toLowerCase()).replaceAll('{Name}', o.name);
 
 /** Texts and flags in a library effect can use {name}, {Name} and {id} for the thing. */
-function fillEffect(e: Effect, o: ObjectDef): Effect {
-  if ('say' in e) return { ...e, say: fill(e.say, o) };
+function fillEffect(e: Effect, o: ObjectDef, truth = true): Effect {
+  if ('say' in e) return { ...e, say: fill(e.say, o).replaceAll('{lore}', o.lore?.[truth ? 'true' : 'false'] ?? 'You cannot make much of it.') };
   if ('set' in e) return { set: e.set.replaceAll('{id}', o.id) };
   if ('unset' in e) return { unset: e.unset.replaceAll('{id}', o.id) };
   if ('mood' in e) return { mood: e.mood, who: o.id, name: o.name };
@@ -201,18 +203,24 @@ export function conflictBonus(
 }
 
 /** What sizing someone up tells you: how they feel, how they see your people, how much they will take. */
-export function readPerson(o: ObjectDef, s: SceneState, who: Visitor, lib: Library, place?: Setting): string[] {
+export function readPerson(o: ObjectDef, s: SceneState, who: Visitor, lib: Library, place?: Setting, truthful = true): string[] {
   const out: string[] = [];
-  const mem = s.social[o.id];
+  const mem = s.social[o.id] ?? { talks: 0, mood: 0 };
   const patience = patienceOf(o, lib);
-  out.push(moodLine(o.name, mem ?? { talks: 0, mood: 0 }, patience) ?? `${o.name} ${moodWord(0)}.`);
   const rel = disposition(o, who, lib, place);
-  if (rel.v < 0 && rel.why) out.push(`It shows: ${rel.why}.`);
-  else if (rel.v > 0 && rel.why) out.push(`It shows: ${rel.why}.`);
-  if (patience !== undefined) {
-    const left = patience - (mem?.talks ?? 0);
-    if (left <= 1 && left > 0) out.push('You would not push it much further.');
+  const left = patience === undefined ? undefined : patience - mem.talks;
+  if (truthful) {
+    out.push(moodLine(o.name, mem, patience) ?? `${o.name} ${moodWord(0)}.`);
+    if (rel.v !== 0 && rel.why) out.push(`It shows: ${rel.why}.`);
+    if (left !== undefined && left > 0 && left <= 1) out.push('You would not push it much further.');
+    return out;
   }
+  // A misreading: a plausible picture that is wrong in every part, so nothing marks it as wrong.
+  const fake = mem.mood > 0 ? -1 : mem.mood < 0 ? 1 : (s.social[o.id]?.talks ?? 0) % 2 === 0 ? 1 : -1;
+  out.push(`${o.name} ${moodWord(fake)}.`);
+  if (rel.v < 0) out.push('They seem quite at ease with your sort.');
+  else if (rel.v > 0) out.push('It shows: they are not sure about your sort.');
+  if (left !== undefined) out.push(left > 0 && left <= 1 ? 'They look as if they could talk all night.' : 'You would not push it much further.');
   return out;
 }
 
@@ -229,9 +237,10 @@ export function instantiate(h: HookDef, o: ObjectDef, lib?: Library): CheckDef {
     difficulty: h.difficulty,
     when: h.when,
     tries: h.tries,
-    success: h.success.map((e) => fillEffect(e, o)),
-    failure: h.failure.map((e) => fillEffect(e, o)),
-    strong: h.strong?.map((e) => fillEffect(e, o)),
+    success: h.success.map((e) => fillEffect(e, o, true)),
+    failure: h.failure.map((e) => fillEffect(e, o, false)),
+    strong: h.strong?.map((e) => fillEffect(e, o, true)),
+    ...(h.hidden ? { hidden: true } : {}),
     fromLibrary: true,
   };
 }
