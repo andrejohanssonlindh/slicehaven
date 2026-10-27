@@ -1,5 +1,11 @@
 # Devlog
 
+## 2026-10-27 — Session 20: person hooks for sweet-talk, comfort, provoke, steal
+
+- Four more efforts have hooks by type of person (recipe in the skills handover §4): **sweet-talk** (19), **comfort** (12), **provoke** (17, a success is a deliberate rise: they get angrier and you keep a social advantage) and **steal** (12, not a talk, so it costs no patience; it spends the `steal` advantage that distract earns; success sets `stolen:{id}`, failure sets `suspicious:{id}` and turns them hostile).
+- They are off the planned list. Still planned for people: **deceive** (needs a hidden "did they believe it"), bribe, gamble, teach, law.
+- Nothing in the gate scene changed. All text is plain English, unbalanced first guesses.
+
 ## 2026-10-27 — Session 19: browser tests for the gate scene
 
 - Playwright is installed (dev dependency, Chromium in your home cache, no sudo). `npm run test:e2e` starts a Vite server, opens `/scene/` at phone size (400×720) and runs 20 tests in `e2e/scene.e2e.ts`: loads cleanly and paints; Use a skill sheet, hints switch, difficulty, log, hero sheet; walking and blocked tiles; every thing's menu; talking to the guard and the three-roll conflict across seeds; Climb and Search rolls across seeds; sleeping by the fire and walking in; and three seeded random-action fuzz runs (random taps, menus, skills; fails on any console error or if `isBusy()` sticks). Screenshots land in `e2e/out/` (gitignored).

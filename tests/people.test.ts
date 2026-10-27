@@ -270,6 +270,23 @@ describe('outcomes by type of person', () => {
     expect(pick([], 'ask').success.some((e) => 'set' in e && e.set === 'asked:{id}')).toBe(true);
   });
 
+  it('provoking is a rise on purpose, stealing is not a talk and ends in loot or in trouble', () => {
+    for (const h of LIBRARY.hooks.filter((x) => x.effort === 'provoke')) {
+      expect(h.success.some((e) => 'mood' in e && e.mood < 0), h.id).toBe(true);
+    }
+    const steals = LIBRARY.hooks.filter((x) => x.effort === 'steal');
+    expect(steals.length).toBeGreaterThan(5);
+    for (const h of steals) {
+      expect(h.social, h.id).toBeFalsy();
+      expect(h.wants, h.id).toEqual(['steal']);
+      expect(h.success.some((e) => 'set' in e && e.set === 'stolen:{id}'), h.id).toBe(true);
+      expect(h.failure.some((e) => 'set' in e && e.set === 'suspicious:{id}'), h.id).toBe(true);
+    }
+    expect(pick(['job-soldier'], 'steal').id).toBe('steal-martial');
+    expect(pick(['drunk'], 'comfort').id).toBe('comfort-drunk');
+    expect(pick([], 'sweet-talk').id).toBe('sweet-talk');
+  });
+
   it('a person gets one hook per intention, the best match', () => {
     const hooks = hooksFor(person(['job-soldier', 'drunk', 'tavern']), LIBRARY);
     const intentions = hooks.map((h) => h.intention);

@@ -15,7 +15,11 @@ import { PICK } from './pick';
 import { POISON } from './poison';
 import { READ_PEOPLE } from './read-people';
 import { SEARCH } from './search';
+import { STEAL } from './steal';
+import { SWEET_TALK } from './sweet-talk';
 import { SWIM } from './swim';
+import { COMFORT } from './comfort';
+import { PROVOKE } from './provoke';
 import { TAME } from './tame';
 import { THREATEN } from './threaten';
 import { TRACK } from './track';
@@ -27,7 +31,7 @@ import { TRACK } from './track';
  */
 export const HOOKS: HookDef[] = [
   ...READ_PEOPLE, ...HEAL,
-  ...PERSUADE, ...IMPRESS, ...DISTRACT, ...ASK, ...ETIQUETTE, ...THREATEN,
+  ...PERSUADE, ...IMPRESS, ...SWEET_TALK, ...COMFORT, ...DISTRACT, ...ASK, ...ETIQUETTE, ...THREATEN, ...PROVOKE, ...STEAL,
   ...CLIMB, ...SEARCH, ...LORE_HOOKS, ...CRAFT, ...FORCE, ...PICK, ...FORAGE, ...TAME, ...POISON, ...SWIM, ...JUMP, ...TRACK,
 ];
 
@@ -47,12 +51,8 @@ export type Target = 'person' | 'thing' | 'place' | 'group' | 'self';
  * - self: done to yourself or your gear; usually a challenge, not a hook.
  */
 export const PLANNED: Record<string, { on: Target; note: string }> = {
-  'sweet-talk': { on: 'person', note: 'Smooth words. Variants by facet like persuade.' },
-  comfort: { on: 'person', note: 'Calm or steady someone; best on the grieving, afraid, ill, child.' },
   deceive: { on: 'person', note: 'A lie that holds. Needs a hidden "did they believe it" (like size-up).' },
-  provoke: { on: 'person', note: 'Get a rise. Success should anger them (state "angry") on purpose.' },
   bribe: { on: 'person', note: 'Decide first how bribing works outside the gate guard\'s conflict approach (Q in the handover).' },
-  steal: { on: 'person', note: 'Pickpocket; spends the `steal` advantage that distract earns.' },
   gamble: { on: 'person', note: 'Play for stakes; silver changes hands.' },
   teach: { on: 'person', note: 'Pass something on; mostly for companions later.' },
   law: { on: 'person', note: 'Officials and courtrooms; leanings exist already.' },
