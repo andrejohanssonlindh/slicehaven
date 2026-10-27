@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MAX_LEAN, coversSkill, effortOf, facetChain, kinFor, leaningFor, leaningsForSkill } from '../src/core/people';
 import { conflictBonus, expandScene, hooksFor, kindChain, leanOf } from '../src/core/skillweb';
 import { OUTCOME_HOOKS } from '../src/content/skillweb/outcomes';
+import { ASK_HOOKS, TALK_HOOKS } from '../src/content/skillweb/outcomes-talk';
 import { BACKGROUNDS } from '../src/content/chargen/backgrounds';
 import { HOMELANDS } from '../src/content/chargen/homelands';
 import { PEOPLES } from '../src/content/chargen/peoples';
@@ -249,16 +250,45 @@ describe('outcomes by type of person', () => {
   const person = (tags: string[], kind = 'human') => ({ kind, tags });
   const pick = (tags: string[], intention: string, kind?: string) => hooksFor(person(tags, kind), LIBRARY).find((h) => h.intention === intention)!;
 
+  const ALL = [...OUTCOME_HOOKS, ...TALK_HOOKS];
+
   it('every outcome hook targets a real facet and replaces a general hook of the same intention', () => {
-    for (const h of OUTCOME_HOOKS) {
+    for (const h of ALL) {
       expect(FACETS[h.facet!], h.id).toBeDefined();
-      expect(['impress', 'intimidate'], h.id).toContain(h.intention);
+      expect(['impress', 'intimidate', 'ask', 'persuade', 'distract'], h.id).toContain(h.intention);
+      expect(LIBRARY.hooks.some((g) => !g.facet && g.kind === 'humanoid' && g.intention === h.intention), h.id).toBe(true);
+      expect(h.id.startsWith(`${h.intention}-`), h.id).toBe(true);
       expect(h.success.length, h.id).toBeGreaterThan(0);
       expect(h.failure.length, h.id).toBeGreaterThan(0);
       for (const e of [...h.success, ...h.failure]) if ('token' in e) expect(e.token.n, h.id).toBeGreaterThan(0);
     }
-    const ids = OUTCOME_HOOKS.map((h) => h.id);
+    const ids = ALL.map((h) => h.id);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('however a person answers, asking still sets what the scene waits for', () => {
+    for (const h of ASK_HOOKS) expect(h.success.some((e) => 'set' in e && e.set === 'asked:{id}'), h.id).toBe(true);
+    // And the general hook does too.
+    expect(pick([], 'ask').success.some((e) => 'set' in e && e.set === 'asked:{id}')).toBe(true);
+  });
+
+  it('a person gets one hook per intention, the best match', () => {
+    const hooks = hooksFor(person(['job-soldier', 'drunk', 'tavern']), LIBRARY);
+    const intentions = hooks.map((h) => h.intention);
+    expect(new Set(intentions).size).toBe(intentions.length);
+    // A particular hook does not push the general ones around: the list keeps the library's order (sizing up first).
+    expect(intentions[0]).toBe('size-up');
+    expect(intentions).toEqual(hooksFor(person([]), LIBRARY).map((h) => h.intention).filter((i) => intentions.includes(i)));
+    expect(pick(['job-soldier', 'drunk'], 'ask').id).toBe('ask-drunk'); // a state beats who they are
+    expect(pick(['job-soldier'], 'ask').id).toBe('ask-martial');
+    expect(pick(['job-soldier'], 'persuade').id).toBe('persuade-martial');
+    expect(pick(['job-soldier'], 'distract').id).toBe('distract-martial');
+  });
+
+  it('the same try, a different reply: six people ask, six answers', () => {
+    const say = (h: ReturnType<typeof pick>) => (h.success.find((e) => 'say' in e) as { say: string }).say;
+    const lines = new Set(['nobility', 'clergy', 'martial', 'merchant', 'servile', 'underworld'].map((f) => say(pick([f], 'ask'))));
+    expect(lines.size).toBe(6);
   });
 
   it('a person without any of these facets gets the general hook', () => {

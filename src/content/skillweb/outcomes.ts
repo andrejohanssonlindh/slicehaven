@@ -12,10 +12,10 @@ import { SKILL_SETS } from '../rollables';
  * One file per kind of effort would be tidier later; for now impress and threaten, the two the
  * weapons and marks feed most. Every other kind of effort still answers with its general hook.
  */
-const social = { layer: 1 as const, social: true, kind: 'humanoid', wants: ['social'] };
+export const social = { layer: 1 as const, social: true, kind: 'humanoid', wants: ['social'] };
 
-const say = (text: string, tone?: 'good' | 'bad'): Effect => ({ say: text, tone });
-const keep = (kind: string, n: number, label: string): Effect => ({ token: { kind, n, against: '{id}', label } });
+export const say = (text: string, tone?: 'good' | 'bad'): Effect => ({ say: text, tone });
+export const keep = (kind: string, n: number, label: string): Effect => ({ token: { kind, n, against: '{id}', label } });
 
 /** Winning someone over, differently for each kind of person. */
 const impress = (

@@ -126,7 +126,11 @@ export function hooksFor(o: Pick<ObjectDef, 'kind' | 'tags'>, lib: Library, plac
     seen.add(h.intention);
     out.push(h);
   }
-  return out;
+  // The match decides which hook answers an intention; the library's own order of intentions decides
+  // the order of the list, so a particular hook does not push the general ones around.
+  const rank = new Map<string, number>();
+  lib.hooks.forEach((h, i) => rank.set(h.intention, Math.min(rank.get(h.intention) ?? i, i)));
+  return out.sort((a, b) => (rank.get(a.intention) ?? 0) - (rank.get(b.intention) ?? 0));
 }
 
 const fill = (text: string, o: ObjectDef): string => text.replaceAll('{name}', o.name.toLowerCase()).replaceAll('{Name}', o.name);
