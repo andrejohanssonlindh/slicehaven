@@ -41,6 +41,7 @@ export const TAG_INFO: Record<string, { label: string; what: string }> = {
   poison: { label: 'Poisons & drugs', what: 'Brewing, spotting and countering what harms or dulls.' },
   law: { label: 'Law', what: 'Knowing the rules of the realm and how to use them.' },
   teach: { label: 'Teach', what: 'Passing on what you know so that it sticks.' },
+  craft: { label: 'Make & mend', what: 'Making, repairing and judging made things.' },
   survey: { label: 'Survey', what: 'Taking in a whole place.' },
   deceive: { label: 'Deceive', what: 'Lying, bluffing and wearing a false face.' },
   rally: { label: 'Rally', what: 'Giving heart or orders to a group.' },

@@ -1,3 +1,4 @@
+import { CRAFTS } from './crafts';
 import { MARKS } from './marks';
 
 /**
@@ -8,4 +9,4 @@ import { MARKS } from './marks';
  */
 export type BySkill = Record<string, Record<string, string[]>>;
 
-export const PER_SKILL: BySkill = { ...MARKS };
+export const PER_SKILL: BySkill = { ...MARKS, ...CRAFTS };
