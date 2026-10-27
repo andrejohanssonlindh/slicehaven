@@ -24,6 +24,9 @@ export const TAG_INFO: Record<string, { label: string; what: string }> = {
   search: { label: 'Search', what: 'Finding what is hidden or out of place.' },
   climb: { label: 'Climb', what: 'Getting up and over things.' },
   survey: { label: 'Survey', what: 'Taking in a whole place.' },
+  deceive: { label: 'Deceive', what: 'Lying, bluffing and wearing a false face.' },
+  rally: { label: 'Rally', what: 'Giving heart or orders to a group.' },
+  gamble: { label: 'Gamble', what: 'Playing for stakes, and playing the other players.' },
 };
 
 export const TAGGED: Record<string, string[]> = {
@@ -38,8 +41,8 @@ export const TAGGED: Record<string, string[]> = {
     'attr:Intryck', 'Charm', 'Berättarkonst', 'Argumentera', 'Sång & musik',
     'E:Flörta', 'E:Lova', 'K:Charmerande leende', 'K:Smort munläder', 'K:Hederligt intryck',
   ],
-  distract: ['Charm', 'Berättarkonst', 'Sång & musik', 'Dupera', 'attr:Intryck', 'attr:Kroppsbyggnad'],
-  ask: ['Argumentera', 'Charm', 'Berättarkonst', 'attr:Intryck'],
+  distract: ['Charm', 'Berättarkonst', 'Sång & musik', 'Dupera', 'Spel & dobbel', 'attr:Intryck', 'attr:Kroppsbyggnad'],
+  ask: ['Argumentera', 'Charm', 'Berättarkonst', 'Genomskåda', 'Injaga fruktan', 'Skumraskaffärer', 'attr:Intryck'],
   bribe: ['Handel', 'E:Muta', 'Skumraskaffärer', 'Argumentera', 'Dupera', 'E:Lova'],
   threaten: [
     'attr:Kroppsbyggnad', 'Injaga fruktan', 'Slagsmål', 'Ledarskap', 'Dupera',
@@ -52,6 +55,9 @@ export const TAGGED: Record<string, string[]> = {
   'read-people': ['Genomskåda', 'attr:Vaksamhet'],
   search: ['Genomsöka', 'attr:Vaksamhet'],
   climb: ['Klättra', 'E:Akrobatik', 'K:Apfotad', 'K:Starka nypor'],
+  deceive: ['Dupera', 'Charm', 'Berättarkonst', 'Argumentera', 'E:Skådespel', 'E:Förklädnad', 'K:Smort munläder', 'K:Ärligt ansikte', 'attr:Intryck'],
+  rally: ['Ledarskap', 'Sång & musik', 'Berättarkonst', 'K:Stark stämma', 'attr:Intryck'],
+  gamble: ['Spel & dobbel', 'Dupera', 'Genomskåda', 'E:Fuska', 'Handel'],
   survey: ['Genomsöka', 'Speja', 'Orientering', 'Naturlära', 'Spåra', 'F:Mörkersyn', 'F:Nattsyn', 'attr:Vaksamhet'],
 };
 

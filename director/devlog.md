@@ -1,5 +1,11 @@
 # Devlog
 
+## 2026-10-27 — Session 16: skill map, social skills
+
+- First pass of the handover (social group). New kinds of effort: **deceive**, **rally**, **gamble**, each with examples. Genomskåda, Injaga fruktan and Skumraskaffärer can now also be used to **ask**; Spel & dobbel can **distract** and **gamble**.
+- Court Life (Hovliv) stays etiquette-only on purpose: tagging it for persuade/ask/read-people changed which hook a plain human gets, and a test pins the "depends on who" design. Revisit when hooks are written.
+- Next in the order: movement and wilderness skills.
+
 ## 2026-10-27 — Session 15b: weapons, ways of use, links
 
 - Weapon skills (sword, axe, spear, bow, dagger…) are tagged for **threaten** and **impress**, with examples.
