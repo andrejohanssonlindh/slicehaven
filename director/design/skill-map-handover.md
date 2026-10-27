@@ -1,6 +1,6 @@
 # Skill map and people library: handover
 
-*Updated 2026-10-27, session 18 (structure fixed, see the [structure review](skill-structure-review.md)). For the next session. Read this first; for building hooks, **§4 is the recipe**. Read [Skill web](skill-web.md), [People library](people-library.md) and [Ways a skill can be used](ways-of-use.md) only when changing the shape.*
+*Updated 2026-10-28, session 20 (person hooks finished except bribe; structure fixed in session 18, see the [structure review](skill-structure-review.md)). For the next session. Read this first; for building hooks, **§4 is the recipe**. Read [Skill web](skill-web.md), [People library](people-library.md) and [Ways a skill can be used](ways-of-use.md) only when changing the shape.*
 
 The director's estimate: skills and their connections are about **40% done**. What is built is the data and the first set of rules on top of it; what is missing is mostly more of the same, plus using it in real scenes.
 
@@ -25,19 +25,21 @@ Tags were checked once against the book's descriptions, and several were correct
 - **Skill map page** (`/slicehaven/skills/`): per skill, the tags, examples, ways of use, and a **"Who and where it works"** section (★ = a row that names this skill). Hook lists show the facet a hook is for.
 
 ### Library hooks (what a skill does)
-One file per effort in `content/skillweb/hooks/` (21 efforts have hooks).
-- **By type of person**, a hook may name a `facet`; people with it (or anything under it) get that reply instead of the general one. Done: **impress** (14 types), **threaten** (12), **ask** (18), **persuade** (14), **distract** (8), **etiquette** (2).
+One file per effort in `content/skillweb/hooks/` (28 efforts have hooks).
+- **By type of person**, a hook may name a `facet`; people with it (or anything under it) get that reply instead of the general one. Done: **impress** (14 types), **threaten** (12), **ask** (18), **persuade** (14), **distract** (8), **etiquette** (2), and from session 20 **sweet-talk** (19), **comfort** (12), **provoke** (17), **steal** (12), **gamble** (12), **teach** (11), **law** (11), **deceive** (20).
+  - **Provoke** success is a deliberate rise (mood down, `provoked:{id}`, a kept social advantage). **Steal** is not a talk (no patience cost), spends the `steal` advantage, sets `stolen:{id}` or `suspicious:{id}`. **Gamble** losses cost silver; a win has no purse yet.
+  - **Deceive** is a hidden roll: success and failure read identically (a test enforces it) and differ only in the flag `deceived:{id}` / `doubted:{id}`. `believed()` in `core/skillweb.ts` turns it into ∓2 difficulty on later talks, ±1 Control in conflicts, and a line in a successful size-up. One lie per person.
   Which hook wins: a kind → a state → a setting → who they are, the deeper the facet the better. A person's list of checks keeps the library's order of intentions (`hooks/index.ts`).
 - **On things**, hooks on the narrow kinds (wall, door, lock, tree, food, tool, container, water, gap, trail), on rock, plant and animal, and on the ill: climb, search, mend, force, pick, forage, tame, study, check for poison, swim, jump, follow and read a trail, tend. Hooks never touch the broad `structure` or `item`, so a scene's own palisade or cart keeps its rules.
 
-### Tests: 240 passing
+### Tests: 243 passing (plus 20 browser tests, `npm run test:e2e`)
 `tests/hooks.test.ts` (**the rules every hook follows**, and the planned list), `tests/skillmap.test.ts` (tags, examples, every skill tagged), `tests/people.test.ts` (facets, leanings, kin, conflicts, hooks by type of person, hero tags), `tests/things.test.ts` (hooks on things), `tests/social-web.test.ts` (talking, patience, relations).
 
 ## 2. What is not done
 
 ### Hooks still to write
-The list lives in code: **`PLANNED` in `content/skillweb/hooks/index.ts`**, 18 efforts, each with what it acts on (person, thing, place, group, self) and a note. A test keeps it honest both ways. In short:
-- **On a person** (ready to write, same pattern as `ask.ts`): Done in session 20: sweet-talk, comfort, provoke, steal, gamble, teach, law, deceive (hidden: `deceived:`/`doubted:` flags, read through `believed()` in `core/skillweb.ts`). **Bribe** waits for a decision on how bribing works outside the gate guard's conflict approach.
+The list lives in code: **`PLANNED` in `content/skillweb/hooks/index.ts`**, 10 efforts, each with what it acts on (person, thing, place, group, self) and a note. A test keeps it honest both ways. In short:
+- **On a person**: all done except **bribe**, which waits for a decision on how bribing works outside the gate guard's conflict approach.
 - **On a group** (perform, rally) and **on a place** (sneak, hide, travel) need a new rule in core first (see §2 rules). Survey is a challenge, not a hook. Ride needs a mount kind, analyse needs document/machine kinds, escape is a check on the hero.
 - **Mystic skills** have tags and examples for their plain uses only. Casting, the filaments and dissipation are in [magic on the map](magic-on-map.md) and are not started.
 
@@ -49,7 +51,7 @@ The list lives in code: **`PLANNED` in `content/skillweb/hooks/index.ts`**, 18 e
 
 ### Using it
 - **No scene beyond the gate** uses any of this. The next test is a second scene (a tavern or a market) that leans on tags, thing kinds and the facet hooks, to see the library carry a whole place. No object in any scene uses the new thing kinds yet.
-- **Nothing was checked in a browser** in these sessions (Playwright is not installed on the director's Mac). The Skill map page, the gate's roll log and the new sections have only been tested through unit tests. Look at `/skills/` and play the gate before trusting the display.
+- **Display:** Playwright is installed now and `npm run test:e2e` covers the gate (including random-action fuzzing, so the new hidden lie runs through it), but the **Skill map page** has no browser test and nobody has looked at it with the new hooks. Look at `/skills/` and play the gate (try the new lie, provoke, steal) before trusting the display and balance.
 - **Balance:** every leaning size, kin value and tag choice is a first guess. Tags drive scene behaviour: widening `threaten`, `bribe` etc. widened what the gate offers; it has not been played since.
 - **Translation:** all new text is plain English strings, not `t('key', …)`. The key scheme is decided: hook texts become `hook.<id>.<field>.<n>`, leanings `lean.<leaningId>` (`core/people.ts`). Both ids are stable and unique (tests), so the strings can be moved out later by a script. Don't wrap data strings in `t()` by hand.
 
@@ -125,7 +127,7 @@ Ids are the creator's: plain for base skills (`Argumentera`), `attr:Intryck`, `E
 ## 6. Suggested order
 1. **Look at it:** open `/skills/` and play the gate once; fix whatever the display or balance shows.
 2. **A second scene** (tavern or market) with tagged people, thing-kind objects and scene tags, to exercise the library for real.
-3. **Person hooks for sweet-talk, comfort, deceive, provoke, steal** with the §4 recipe (this is content work a cheaper model can do); decide how bribing works.
+3. ~~Person hooks~~ done in session 20. Left: **decide how bribing works**, then write it with the §4 recipe.
 4. **Place and group hooks**: the small core change, then sneak, hide, perform, rally.
 5. **Conflict refinements:** skill-specific leanings per round; clashing facets.
 6. **Balance pass** over leanings, kin and tags.
