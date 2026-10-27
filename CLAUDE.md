@@ -40,7 +40,7 @@ Read only the handover for the area you're asked about; don't read the whole `di
 The deeper designs (`skill-web.md`, `people-library.md`, `ways-of-use.md`) are for when you change the shape, not for every task. Debug hooks: `window.scene` (`interact(id)`, `tapHex(col,row)`, `isBusy()`, `state`), `window.sandbox` (below).
 
 ## Tech
-- Vite + TypeScript (strict), **own canvas engine** (no Phaser: dropped 2026-10-25, our art and lighting are per-pixel anyway). Vitest for tests. `marked` for the Director's Room.
+- Vite + TypeScript (strict), **own canvas engine** (no Phaser: dropped 2026-10-25, our art and lighting are per-pixel anyway). Vitest for unit tests (`tests/`). **Playwright** (Chromium) for browser tests and screenshots (`e2e/`; on a new machine run `npx playwright install chromium`, no sudo needed). `marked` for the Director's Room.
 - `npm run dev` (also on LAN with `--host`), `npm test`, `npm run build`, `npm run test:e2e` (Playwright browser tests in `e2e/`, ~1 min; run after changing `src/engine/scene.ts` or the scene UI).
 - Deploy: `.github/workflows/deploy.yml` builds and publishes `dist/` on every push to `main`.
 - Vite `base` is `/slicehaven/`. Static assets go in `public/` and are referenced as `import.meta.env.BASE_URL + 'assets/...'`.
