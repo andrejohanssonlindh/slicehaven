@@ -4,6 +4,9 @@ Only decisions that still stand. Ones that were replaced are removed (git histor
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-10-27 | **Social tries linger:** most people put up with a limited number of talks, and the outcome of a try leaves a mood that colours the next | Director (Q18). |
+| 2026-10-27 | **One kept advantage = 5 points off a later difficulty**, tied to a person; spending it uses it up | Matches the margin that earns an advantage on a roll. My choice; say if it feels wrong. |
+| 2026-10-27 | **How peoples see each other changes both the roll and the result:** harder, and a success is grudging (less mood, fewer kept advantages) | Director's "−n control" for charming someone who dislikes your people. |
 | 2026-10-26 | **We are in a design stage, building the engine.** Work comes as small vignettes (like the gate scene). Nothing is finished; anything done in the app is testing. | Director. |
 | 2026-10-26 | **No backwards compatibility.** No save migrations; a save from another version is dropped. Bump the version when a shape changes. | Director: time spent on it is wasted at this stage. |
 | 2026-10-26 | **The final graphical style is not set.** Some of the current art will survive, not all. It's decided when the game design starts. | Director. |
