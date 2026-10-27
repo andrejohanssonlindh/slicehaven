@@ -7,8 +7,10 @@
 - Movement and wilderness pass: new kinds of effort **sneak, hide, steal, escape, jump, swim, ride, travel, track, forage**, with examples. Fingerfärdighet can also distract. A test used Seamanship as its "unlinked skill"; it now uses Shield.
 - Knowledge pass: new kinds of effort **lore, analyse, heal, poison, law, teach** (and Geography under travel), with examples. Lore and analyse examples are written so a wrong-but-plausible answer on failure is possible (hidden reads).
 - Expertise pass (about 65 of 70 tagged, with examples): new kinds of effort **perform, comfort, provoke**; expertise added to most existing efforts (lore, travel, ask, deceive, streetwise…). Also filled the examples that were missing for weapon skills and the Charming-smile / Honest-impression marks. Every tagged pair now has examples, and a test says so.
-- Still untagged: about 20 expertise with no clear effort (e.g. Cleaning, Frossa, Perversiteter, Flagellera, Lappa & laga), 50 abilities, 100 crafts, 92 marks, 25 mystic. Marks and crafts are the open question from the handover.
-- Next: abilities, then crafts (probably one `craft` effort with a couple of examples each), marks; mystic last.
+- Director's answer: marks and crafts are skills, tagged like skills but narrow (a Scary mark when threatening; bread knowledge to impress innkeepers). Skills tied to types of people and situations come after the skill map. Logged in decisions.
+- **Marks, crafts, abilities and the leftover expertise** are written per skill (tags and examples side by side) in `skillweb/marks.ts`, `crafts.ts`, `abilities.ts`, `leftovers.ts`, merged by `byskill.ts`. New effort **craft** (Make & mend). Crafts get one or two side uses (bake bread, impress; bowyer, impress; locksmith, steal…).
+- New test: every skill outside the mystic group has at least one tag. Only the 25 mystic skills are left, for the magic pass.
+- 176 tests.
 
 ## 2026-10-27 — Session 15b: weapons, ways of use, links
 

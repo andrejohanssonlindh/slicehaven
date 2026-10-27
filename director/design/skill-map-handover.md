@@ -24,6 +24,10 @@ Ids are the creator's: plain for base skills (`Argumentera`), `attr:Intryck` for
 
 **Ways of use:** see [Ways a skill can be used](ways-of-use.md) for every way we have considered; the Skill map shows which of them a skill takes part in. Weapon skills are tagged for threaten and impress; add them to other efforts where it makes sense (a bow to hunt or to hit a mark, a shield to block a door).
 
+## Status (2026-10-27, end of session 16)
+Every skill outside the **mystic group** now has at least one tag and examples (a test enforces it). Social, movement, wilderness, knowledge and expertise are written directly in `tags.ts` / `examples.ts`. The narrow groups are written **per skill** (tags and examples side by side) and merged in by `byskill.ts`: `marks.ts`, `crafts.ts`, `abilities.ts`, `leftovers.ts`. To add a tag to a mark, craft or ability, edit its entry there.
+Left: the 25 mystic skills (with the magic), and quality: many tagging choices are first guesses (see the director's notes below), so expect balance passes. Library **hooks** (what a skill does to a type of person) and **skills tied to types of people and situations** are the next steps, in that order.
+
 ## Where each skill is described (sources)
 Every skill has a short description in the character book, chapter "Skills". Read it to decide *what the skill is for* before tagging it; don't tag by name alone. The extracted text is in `reference/` (gitignored, **never commit it or paste it into the repo**; write our own words).
 `reference/p/NNN.txt` is one PDF page each, **PDF page = book page + 3**:
@@ -69,6 +73,6 @@ Every skill has a short description in the character book, chapter "Skills". Rea
 6. Fill gaps in the tests: a rule "every skill has at least one tag" is a goal, **not yet a test** (add it when coverage is close).
 
 ## Open questions for the director (not blockers)
-- Should marks (e.g. a mark like "Charming smile") be tagged the same way as skills, or work as modifiers on top? Today they are tagged like skills.
+- ~~Marks as skills or modifiers?~~ Answered: they are skills, narrow (decisions.md). Crafts the same, rarely social.
 - How many examples is enough for expertise with a narrow use: one line, or still two?
 - Should the Skill map get a "random example" or a "which skill for this effort" view for gauging balance?

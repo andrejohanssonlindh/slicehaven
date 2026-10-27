@@ -8,6 +8,7 @@ import { type Context, linkedSkills, modesOf, relationsOf } from '../src/core/sk
 import { OUTCOME_TYPES, USE_MODES } from '../src/content/skillweb/uses';
 import { GENERIC_GUARD } from '../src/content/npcs';
 import { GATE_SCENE } from '../src/content/scenes/gate';
+import { SKILL_BY_ID } from '../src/content/chargen/skills';
 import { SKILL_SETS, isRollable } from '../src/content/rollables';
 import { LIBRARY } from '../src/content/skillweb';
 import { EXAMPLES, examplesOf, missingExamples } from '../src/content/skillweb/examples';
@@ -149,9 +150,9 @@ describe('the skill map', () => {
   });
 
   it('tells linked from unlinked skills', () => {
-    const linked = linkedSkills(['Charm', 'Sköld'], cx);
+    const linked = linkedSkills(['Charm', 'Ceremoni'], cx);
     expect(linked.has('Charm')).toBe(true);
-    expect(linked.has('Sköld')).toBe(false);
+    expect(linked.has('Ceremoni')).toBe(false); // mystic skills wait for the magic pass
   });
 });
 
@@ -181,6 +182,11 @@ describe('examples per skill and kind of effort', () => {
   it('the model covers every kind of effort, and Physique impresses by lifting something heavy', () => {
     expect(Object.keys(EXAMPLES).sort()).toEqual(Object.keys(TAGGED).sort());
     expect(examplesOf('attr:Kroppsbyggnad').find((e) => e.tag === 'impress')!.ways.join(' ')).toMatch(/lift something heavy/);
+  });
+
+  it('every skill outside the mystic group carries at least one tag', () => {
+    const bare = [...SKILL_BY_ID].filter(([id, s]) => s.group !== 'mystik' && tagsOf(id).length === 0).map(([id]) => id);
+    expect(bare).toEqual([]);
   });
 
   it('every tagged skill has examples for the tag', () => {
