@@ -1,5 +1,9 @@
 # Devlog
 
+## 2026-10-27 — Session 13c: one screen per round
+
+- Each conflict round now ends on its own result screen (what was rolled, who won, his line, the score) with a Next round button. Only then do you see what he does in his round. Before, the next round's screen still showed the last round's result under a new header, so "You lead" read wrong during his turn.
+
 ## 2026-10-27 — Session 13b: people use what they have
 
 - The guard in the conflict rolls only skills on his own sheet (`content/npcs`, the generic guard), picks at random among the ones that fit the situation, and falls back on an attribute when none does. No more answers tied to your skill.

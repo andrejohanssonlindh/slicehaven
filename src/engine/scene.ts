@@ -613,9 +613,22 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
     const r = c.rounds[c.rounds.length - 1];
     if (!r) return '';
     const who = r.mine && r.theirs ? 'A tie: 1 Control each.' : r.mine ? `You win: +${r.mine} Control.` : `He wins: +${r.theirs} Control to him.`;
-    const lead = r.lead === 'me' ? 'You lead' : 'He led';
+    const lead = r.lead === 'me' ? 'You led' : 'He led';
     return `<p class="roll">${lead}. ${esc(rollableName(r.skill))} ${diceText(r.dice)}: <b>${r.roll.total}</b> vs his ${esc(rollableName(r.answer))} `
       + `${diceText(r.answerDice)}: <b>${r.answerRoll.total}</b>. ${who}<br><small>You: ${esc(rollText(r.roll))} · Him: ${esc(rollText(r.answerRoll))}</small></p>`;
+  }
+
+  /** How the round went, on its own screen: then you go on to the next one (and see what he does). */
+  function roundResult(o: ObjectDef, a: SceneApproach, c: Conflict): void {
+    const n = c.rounds.length;
+    const retort = a.retorts[n - 1];
+    const last = conflictOver(c);
+    open(o, {
+      title: `${a.label} · round ${n} of ${ROUNDS}`,
+      body: `${roundText(c)}${retort ? `<p class="speech">${esc(retort)}</p>` : ''}${score(c, a)}`,
+      sections: [{ options: [{ label: last ? 'See how it ends' : 'Next round', style: 'primary', onPick: () => conflictSheet(o, a, c) }] }],
+      closable: false,
+    });
   }
 
   function conflictSheet(o: ObjectDef, a: SceneApproach, c: Conflict, attack?: string): void {
@@ -629,7 +642,6 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
       attack = theirMove(c, a, their, rng);
       say(`He leads with ${rollableName(attack)}.`, 'info');
     }
-    const retort = n > 0 ? a.retorts[n - 1] : '';
     const forced = mustUseLocked(c, a);
     // Your own nature (attributes) is always possible, for when nothing else fits.
     const natural = Object.keys(hero.dice).filter((id) => id.startsWith('attr:') && !a.skills.includes(id));
@@ -656,11 +668,11 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
           say(`Round ${c.rounds.length} (${r.lead === 'me' ? 'you lead' : 'he leads'}): ${rollableName(r.skill)} ${diceText(r.dice)} → ${rollText(r.roll)} vs guard's `
             + `${rollableName(r.answer)} ${diceText(r.answerDice)} → ${rollText(r.answerRoll)}. `
             + (r.mine && r.theirs ? 'Tie, 1 Control each.' : r.mine ? `+${r.mine} Control to you.` : `+${r.theirs} Control to him.`), 'roll');
-          conflictSheet(o, a, c);
+          roundResult(o, a, c);
         }),
       };
     });
-    const intro = n === 0 ? `<p class="you">${esc(a.pitch)}</p>` : `${roundText(c)}<p class="speech">${esc(retort)}</p>`;
+    const intro = n === 0 ? `<p class="you">${esc(a.pitch)}</p>` : '';
     const turn = heLeads
       ? `<p><b>His turn:</b> he leads with <b>${esc(rollableName(attack!))}</b>. Answer with a skill that fits.</p>`
       : '<p><b>Your turn:</b> lead with a skill. He will answer with one that fits, and you cannot tell which.</p>';
@@ -687,7 +699,7 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
     const text = events.filter((e) => e.kind === 'say').map((e) => `<p class="speech">${esc((e as { text: string }).text)}</p>`).join('');
     open(o, {
       title: res.success ? 'He gives in' : 'He won\'t budge',
-      body: `${roundText(c)}<p class="${res.success ? 'good' : 'bad'}">${sum}</p>${text}`,
+      body: `<p class="${res.success ? 'good' : 'bad'}">${sum}</p>${text}`,
       sections: [{ options: [{ label: 'Continue', style: 'primary', onPick: () => sheet.close() }] }],
     });
   }
