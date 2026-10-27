@@ -1,3 +1,4 @@
+import { PER_SKILL } from './byskill';
 import { TAGGED } from './tags';
 
 /**
@@ -373,6 +374,10 @@ export const EXAMPLES: Examples = {
     'attr:Vaksamhet': ['Notice what changes between one glance and the next.', 'Hear what the others have stopped hearing.'],
   },
 };
+
+for (const [skill, byTag] of Object.entries(PER_SKILL)) {
+  for (const [tag, ways] of Object.entries(byTag)) (EXAMPLES[tag] ??= {})[skill] = ways;
+}
 
 /** The examples for one skill, per tag it carries. */
 export function examplesOf(skill: string): { tag: string; ways: string[] }[] {

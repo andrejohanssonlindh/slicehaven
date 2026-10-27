@@ -1,3 +1,5 @@
+import { PER_SKILL } from './byskill';
+
 /**
  * What each skill is good for. A tag names a kind of effort (threaten, barter, search…); the skills
  * listed under it are the ones that are reasonable for it. This is the single source: the skill sets
@@ -123,6 +125,14 @@ export const TAGGED: Record<string, string[]> = {
   ],
   survey: ['Genomsöka', 'Speja', 'Orientering', 'Naturlära', 'Spåra', 'F:Mörkersyn', 'F:Nattsyn', 'attr:Vaksamhet'],
 };
+
+// Narrow skills (marks, crafts, abilities) are written per skill; fold them into the tags.
+for (const [skill, byTag] of Object.entries(PER_SKILL)) {
+  for (const tag of Object.keys(byTag)) {
+    const ids = (TAGGED[tag] ??= []);
+    if (!ids.includes(skill)) ids.push(skill);
+  }
+}
 
 /** The tags a skill has, in the order of TAGGED. */
 export const tagsOf = (id: string): string[] => Object.keys(TAGGED).filter((t) => TAGGED[t].includes(id));

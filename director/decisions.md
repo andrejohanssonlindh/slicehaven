@@ -4,6 +4,7 @@ Only decisions that still stand. Ones that were replaced are removed (git histor
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-10-27 | **Marks and crafts are skills, tagged like skills, but narrow:** a mark enhances an effort the way a skill does (Scary when threatening); a craft is rarely useful in social challenges but sometimes is (bread knowledge to impress innkeepers). Skills tied to types of people and situations come after the skill map is built | Director. |
 | 2026-10-27 | **Social tries linger:** most people put up with a limited number of talks, and the outcome of a try leaves a mood that colours the next | Director (Q18). |
 | 2026-10-27 | **One kept advantage = 5 points off a later difficulty**, tied to a person; spending it uses it up | Matches the margin that earns an advantage on a roll. My choice; say if it feels wrong. |
 | 2026-10-27 | **Attributes are a fallback in conflicts and challenges:** locked roll free; Presence natural, Physique when aggressive; extras by difficulty (easy 2, normal 1, hard 0); with no fitting skill any attribute at −2D6 | Director, checked against the manual (attributes are locked rolls and defences; skills do the rest). Hard reading to confirm. |
