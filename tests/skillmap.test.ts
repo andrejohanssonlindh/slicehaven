@@ -4,7 +4,8 @@ import { challengeAllowed, newChallenge, rollChallenge } from '../src/core/chall
 import { DIFFICULTY_RULES } from '../src/core/difficulty';
 import { Rng } from '../src/core/rng';
 import { type Approach, allowed, attrUseIn, hasOtherChoice, naturalAttrs, newConflict, playRound } from '../src/core/social';
-import { type Context, linkedSkills, relationsOf } from '../src/core/skillgraph';
+import { type Context, linkedSkills, modesOf, relationsOf } from '../src/core/skillgraph';
+import { OUTCOME_TYPES, USE_MODES } from '../src/content/skillweb/uses';
 import { GENERIC_GUARD } from '../src/content/npcs';
 import { GATE_SCENE } from '../src/content/scenes/gate';
 import { SKILL_SETS, isRollable } from '../src/content/rollables';
@@ -186,5 +187,41 @@ describe('examples per skill and kind of effort', () => {
     const left = missingExamples();
     expect(left.length).toBeGreaterThan(0); // the model is a start, not the full map
     for (const m of left) expect(TAGGED[m.tag]).toContain(m.skill);
+  });
+});
+
+describe('weapon skills and the ways of use', () => {
+  it('weapon skills can threaten and impress', () => {
+    for (const w of ['Svärd', 'Yxa', 'Spjut', 'Dolk', 'Båge']) {
+      expect(tagsOf(w), w).toEqual(expect.arrayContaining(['threaten', 'impress']));
+      expect(examplesOf(w).map((e) => e.tag).sort(), w).toEqual(['impress', 'threaten']);
+    }
+    expect(SKILL_SETS.threaten).toContain('Svärd');
+    expect(SKILL_SETS.impress).toContain('Båge');
+    expect(tagsOf('Sköld')).not.toContain('impress'); // a shield is for defending
+  });
+
+  it('every way of use that the map derives for a skill is a known mode', () => {
+    const cx: Context = { tags: TAGGED, library: LIBRARY, scenes: [GATE_SCENE], people: [GENERIC_GUARD] };
+    for (const id of ['Charm', 'Genomskåda', 'attr:Kroppsbyggnad', 'F:Mörkersyn', 'Klättra', 'Genomsöka']) {
+      for (const m of modesOf(relationsOf(id, cx))) expect(m in USE_MODES, `${id}: ${m}`).toBe(true);
+    }
+  });
+
+  it('the modes a skill takes part in are derived from what is recorded', () => {
+    const cx: Context = { tags: TAGGED, library: LIBRARY, scenes: [GATE_SCENE], people: [GENERIC_GUARD] };
+    const m = (id: string) => modesOf(relationsOf(id, cx));
+    expect(m('Genomskåda')).toEqual(expect.arrayContaining(['hidden-read', 'check']));
+    expect(m('Genomskåda')).not.toContain('conflict-lead'); // he uses it against you; it is not on your list
+    expect(m('Charm')).toEqual(expect.arrayContaining(['conflict-lead', 'conflict-answer']));
+    expect(m('F:Mörkersyn')).toEqual(expect.arrayContaining(['challenge-roll', 'edge']));
+    expect(m('attr:Kroppsbyggnad')).toEqual(expect.arrayContaining(['locked-roll', 'attribute-fallback']));
+    expect(m('Genomsöka')).toContain('look-around');
+  });
+
+  it('built and planned modes are both listed', () => {
+    const states = new Set(Object.values(USE_MODES).map((u) => u.status));
+    expect(states).toEqual(new Set(['built', 'planned']));
+    expect(OUTCOME_TYPES.some((o) => o.status === 'planned')).toBe(true);
   });
 });

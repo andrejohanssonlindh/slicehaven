@@ -3,6 +3,9 @@
  * listed under it are the ones that are reasonable for it. This is the single source: the skill sets
  * scenes use (content/rollables SKILL_SETS) are built from it, and the Skills page shows it per skill.
  *
+ * Weapon skills (Sword, Axe, Spear, Bow…) are here for threatening and impressing: a drawn blade
+ * or a clean shot says something to onlookers before any fight does.
+ *
  * Attributes appear here too, but sparingly: Physique helps to threaten or to distract (a show of
  * strength) and hardly ever to barter; Presence helps in most talking. Ids are the creator's
  * ("attr:…" for attributes, "E:" expertise, "K:" marks).
@@ -28,6 +31,8 @@ export const TAGGED: Record<string, string[]> = {
   impress: [
     'Charm', 'Sång & musik', 'Dansa', 'E:Flörta', 'E:Akrobatik', 'K:Charmerande leende', 'K:Hederligt intryck',
     'attr:Intryck', 'attr:Kroppsbyggnad',
+    // Weapon skills: a display of skill with the weapon.
+    'Svärd', 'Yxa', 'Spjut', 'Stav', 'Dolk', 'Kedjevapen', 'Båge', 'Armborst', 'Kastvapen', 'Slagsmål',
   ],
   'sweet-talk': [
     'attr:Intryck', 'Charm', 'Berättarkonst', 'Argumentera', 'Sång & musik',
@@ -39,6 +44,8 @@ export const TAGGED: Record<string, string[]> = {
   threaten: [
     'attr:Kroppsbyggnad', 'Injaga fruktan', 'Slagsmål', 'Ledarskap', 'Dupera',
     'K:Hotfull stämma', 'K:Stark stämma',
+    // Weapon skills: the weapon in the hand is the threat.
+    'Svärd', 'Yxa', 'Spjut', 'Stav', 'Dolk', 'Klubba', 'Kedjevapen', 'Båge', 'Armborst', 'Kastvapen', 'Blåsrör',
   ],
   etiquette: ['Hovliv'],
   streetwise: ['Skumraskaffärer', 'Charm', 'Handel', 'attr:Intryck'],

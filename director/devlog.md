@@ -1,5 +1,12 @@
 # Devlog
 
+## 2026-10-27 — Session 15b: weapons, ways of use, links
+
+- Weapon skills (sword, axe, spear, bow, dagger…) are tagged for **threaten** and **impress**, with examples.
+- New list of **every way a skill can be used** (built and planned) in `content/skillweb/uses.ts`, shown on the Skill map (per skill: which ways it takes part in; plus a glossary) and written up in [Ways a skill can be used](design/ways-of-use.md).
+- Links to the Skill map from the sandbox, the creator and the Director's Room (it was only in the scene).
+- 175 tests.
+
 ## 2026-10-27 — Session 15: examples per skill and kind of effort
 
 - New `content/skillweb/examples.ts`: for each of the 13 kinds of effort a few skills with 2–3 concrete examples each (e.g. impress with Physique: "flex a muscle, or lift something heavy that others struggled with"). The model for the full map. The Skill map page shows them per skill, and how many pairs are still without examples.

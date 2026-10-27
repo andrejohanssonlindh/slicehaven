@@ -1,12 +1,13 @@
 import { ATTR_EN } from '../core/chargen/derive';
 import { difficultyName } from '../core/checks';
-import { type Context, linkedSkills, relationsOf } from '../core/skillgraph';
+import { type Context, linkedSkills, modesOf, relationsOf } from '../core/skillgraph';
 import { SKILLS } from '../content/chargen/skills';
 import { GATE_SCENE } from '../content/scenes/gate';
 import { GENERIC_GUARD } from '../content/npcs';
 import { byGroup, rollableName } from '../content/rollables';
 import { LIBRARY } from '../content/skillweb';
 import { examplesOf, missingExamples } from '../content/skillweb/examples';
+import { OUTCOME_TYPES, USE_MODES } from '../content/skillweb/uses';
 import { TAGGED, TAG_INFO } from '../content/skillweb/tags';
 import { esc } from '../ui/sheet';
 
@@ -67,6 +68,10 @@ function detail(): string {
   if (bare.length) parts.push(`<p class="muted">No examples yet for: ${bare.map((t) => esc(TAG_INFO[t]?.label ?? t)).join(', ')}.</p>`);
   if (id.startsWith('attr:')) parts.push('<p class="muted">An attribute: a fallback roll (the locked roll, Presence, Physique when aggressive, and a few by difficulty).</p>');
 
+  const modes = modesOf(r);
+  parts.push('<h3>Ways it can be used</h3>', modes.length
+    ? `<div class="chips">${modes.map((k) => `<span class="chip tag" title="${esc(USE_MODES[k].what)}">${esc(USE_MODES[k].label)}</span>`).join('')}</div>`
+    : '<p class="muted">Not used in any way yet.</p>');
   parts.push('<h3>Start a conflict with it</h3>');
   if (r.asYours.length) {
     parts.push(...r.asYours.map((l) => `<div class="card"><b>${esc(l.approach)}</b> with ${esc(l.who)} <span class="muted">(${esc(l.scene)})</span>`
@@ -93,9 +98,24 @@ function detail(): string {
     ? `<ul>${r.challenges.map((c) => `<li><b>${esc(c.challenge.label)}</b> (${esc(c.scene)})${c.locked ? ', locked roll' : ''}${c.time ? `, only at ${c.time.join(' / ')}` : ''}</li>`).join('')}</ul>`
     : '<p class="muted">None.</p>');
 
+  parts.push('<h3>Edges it gives</h3>');
+  parts.push(r.edges.length ? `<ul>${r.edges.map((e) => `<li>${esc(e.challenge)} (${esc(e.scene)}): ${e.control > 0 ? '+' : '−'}${Math.abs(e.control)} Control. ${esc(e.note)}</li>`).join('')}</ul>` : '<p class="muted">None.</p>');
   parts.push('<h3>Who has it</h3>');
   parts.push(r.owners.length ? `<ul>${r.owners.map((o) => `<li>${esc(o.name)}: ${dice(o)}</li>`).join('')}</ul>` : '<p class="muted">No sheet we have lists it.</p>');
   return parts.join('');
+}
+
+function glossary(): string {
+  const row = (k: string) => {
+    const u = USE_MODES[k];
+    return `<div class="card"><b>${esc(u.label)}</b> <span class="muted">(${u.status === 'built' ? 'built' : 'planned'})</span><div>${esc(u.what)}</div><div class="muted">${esc(u.shape)}</div><div class="muted">${esc(u.where)}</div></div>`;
+  };
+  const keys = Object.keys(USE_MODES);
+  return `<h2>All the ways a skill can be used</h2>
+    ${keys.filter((k) => USE_MODES[k].status === 'built').map(row).join('')}
+    <h3>Planned</h3>${keys.filter((k) => USE_MODES[k].status === 'planned').map(row).join('')}
+    <h2>What a use can result in</h2>
+    <ul>${OUTCOME_TYPES.map((o) => `<li>${esc(o.label)} <span class="muted">(${o.status})</span></li>`).join('')}</ul>`;
 }
 
 function render(): void {
@@ -105,7 +125,7 @@ function render(): void {
     <label class="check"><input type="checkbox" id="only" ${view.only ? 'checked' : ''} /> only skills with a link</label>
     <h3>Kinds of effort</h3>${tagChips(Object.keys(TAGGED))}
     ${view.tag ? `<p class="muted"><b>${esc(TAG_INFO[view.tag]?.label ?? view.tag)}</b>: ${esc(TAG_INFO[view.tag]?.what ?? '')} <button type="button" class="chip" data-tag="">show all</button></p>` : ''}
-    ${list()}<div id="detail">${detail()}</div>`;
+    ${list()}<div id="detail">${detail()}</div>${glossary()}`;
   const q = root.querySelector<HTMLInputElement>('#q')!;
   q.addEventListener('input', () => {
     view.q = q.value;

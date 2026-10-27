@@ -22,6 +22,8 @@ The model is `src/content/skillweb/examples.ts`. Look at it before writing anyth
 
 Ids are the creator's: plain for base skills (`Argumentera`), `attr:Intryck` for attributes, `E:` expertise, `K:` mark, `H:` craft, `F:` ability. Names are Swedish keys; `rollableName(id)` gives the English.
 
+**Ways of use:** see [Ways a skill can be used](ways-of-use.md) for every way we have considered; the Skill map shows which of them a skill takes part in. Weapon skills are tagged for threaten and impress; add them to other efforts where it makes sense (a bow to hunt or to hit a mark, a shield to block a door).
+
 ## Where each skill is described (sources)
 Every skill has a short description in the character book, chapter "Skills". Read it to decide *what the skill is for* before tagging it; don't tag by name alone. The extracted text is in `reference/` (gitignored, **never commit it or paste it into the repo**; write our own words).
 `reference/p/NNN.txt` is one PDF page each, **PDF page = book page + 3**:

@@ -52,7 +52,9 @@ export interface SkillRelations {
   id: string;
   tags: string[];
   hooks: HookDef[];
-  checks: { scene: string; thing: string; label: string; difficulty: number }[];
+  checks: { scene: string; thing: string; label: string; difficulty: number; hidden: boolean }[];
+  /** Challenges where an ability of this id gives an upper hand. */
+  edges: { scene: string; challenge: string; control: number; note: string }[];
   asYours: ApproachLink[];
   asHis: HisLink[];
   challenges: { scene: string; challenge: ChallengeDef; locked: boolean; time?: string[] }[];
@@ -62,12 +64,12 @@ export interface SkillRelations {
 const social = (o: ObjectDef) => o.social;
 
 export function relationsOf(id: string, cx: Context): SkillRelations {
-  const out: SkillRelations = { id, tags: [], hooks: [], checks: [], asYours: [], asHis: [], challenges: [], owners: [] };
+  const out: SkillRelations = { id, tags: [], hooks: [], checks: [], edges: [], asYours: [], asHis: [], challenges: [], owners: [] };
   out.tags = Object.keys(cx.tags).filter((t) => cx.tags[t].includes(id));
   out.hooks = cx.library.hooks.filter((h) => h.skills.includes(id));
   for (const sc of cx.scenes) {
     for (const o of sc.objects) {
-      for (const c of o.checks ?? []) if (c.skills.includes(id)) out.checks.push({ scene: sc.title, thing: o.name, label: c.label, difficulty: c.difficulty });
+      for (const c of o.checks ?? []) if (c.skills.includes(id)) out.checks.push({ scene: sc.title, thing: o.name, label: c.label, difficulty: c.difficulty, hidden: !!c.hidden });
       const soc = social(o);
       if (soc) {
         const has = (k: string) => (soc.dice[k]?.n ?? 0) > 0;
@@ -87,12 +89,27 @@ export function relationsOf(id: string, cx: Context): SkillRelations {
       }
     }
     for (const ch of sc.challenges ?? []) {
+      for (const e of ch.edges ?? []) if (e.skill === id) out.edges.push({ scene: sc.title, challenge: ch.label, control: e.control, note: e.note });
       const entry = ch.skills.find((s) => s.id === id);
       if (entry || ch.locked.includes(id)) out.challenges.push({ scene: sc.title, challenge: ch, locked: ch.locked.includes(id), time: entry?.time });
     }
   }
   for (const p of cx.people) if ((p.dice[id]?.n ?? 0) > 0) out.owners.push({ name: p.name, n: p.dice[id].n, mod: p.dice[id].mod });
   return out;
+}
+
+/** Which of the built ways of use a skill takes part in (ids of USE_MODES). */
+export function modesOf(r: SkillRelations): string[] {
+  const modes: string[] = [];
+  if (r.hooks.length || r.checks.length) modes.push('check');
+  if (r.hooks.some((h) => h.hidden) || r.checks.some((c) => c.hidden)) modes.push('hidden-read');
+  if (r.tags.includes('search')) modes.push('look-around');
+  if (r.asYours.length) modes.push('conflict-lead', 'conflict-answer');
+  if (r.asYours.some((l) => l.locked) || r.challenges.some((c) => c.locked)) modes.push('locked-roll');
+  if (r.challenges.length) modes.push('challenge-roll');
+  if (r.edges.length) modes.push('edge');
+  if (r.id.startsWith('attr:')) modes.push('attribute-fallback');
+  return modes;
 }
 
 /** Every skill id that has any relation at all. */

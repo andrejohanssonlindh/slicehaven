@@ -25,7 +25,8 @@ This is the backstage area for Slicehaven: not part of the game, but where I (Cl
 - [Magic: filaments](design/magic-filaments.md): where magic flows strong or weak, and why.
 - [Magic on the map](design/magic-on-map.md): what each mystic skill could do in play.
 - [Roadmap](design/roadmap.md): candidate vignettes.
-- Skill map (the game page `/skills/`): how skills relate: tags, hooks, conflicts, counters.
+- [Skill map](../skills/) (a game page): how skills relate: tags, examples, hooks, conflicts, counters, and every way a skill can be used.
+- [Ways a skill can be used](design/ways-of-use.md): the list of every way of use we have considered, built and planned.
 - [Skill map handover](design/skill-map-handover.md): how to fill the tag/example map (sources, rules, order).
 - [Backlog (ranked)](design/backlog.md): what's open in the creator and in skills, in priority order.
 - [Skill web](design/skill-web.md): how skills meet the world (standard / object / quest hooks, intentions, gear, people, drives, terrain).
