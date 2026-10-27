@@ -193,6 +193,8 @@ export interface SceneDef {
   locals?: string[];
   /** The kind of people most folk here are (e.g. 'human' in a human city). Meeting your own kind only counts as kin when you are not the majority. */
   majority?: string;
+  /** Facets of the place and the hour (people library): 'tavern', 'night', 'crowd'… They lean every roll made here. */
+  tags?: string[];
   objects: ObjectDef[];
   exits: ExitDef[];
   /** Efforts against the place itself (survey it, find your way…): three rolls against a difficulty. */

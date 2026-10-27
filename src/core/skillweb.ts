@@ -1,4 +1,5 @@
 import { type CheckDef, type Effect, type ObjectDef, type SceneDef, type SceneState, type Situation, type Token, moodLine, moodWord } from './scene';
+import { type PeopleLibrary, effortOf, leaningFor } from './people';
 import { MAX_RECEPTION } from './social';
 
 /**
@@ -64,6 +65,8 @@ export interface Library {
   peoples: string[];
   /** observer kind → hero's kind → how the observer sees the hero. Missing = neutral; a more specific observer kind wins. */
   relations: Record<string, Record<string, Rel>>;
+  /** The people library: facets of people and places, and what they lean (see core/people). */
+  people?: PeopleLibrary;
 }
 
 /** What the hero brings to a social try. */
@@ -139,6 +142,13 @@ export function talksLeftWith(o: ObjectDef, s: SceneState, lib: Library): number
 export interface Setting {
   locals?: string[];
   majority?: string;
+  /** Facets of the place and the hour (people library). */
+  tags?: string[];
+}
+
+/** Everything that is true of this person and place, as facet ids: their tags and kinds, and the scene's tags. */
+export function facetsOf(o: Pick<ObjectDef, 'kind' | 'tags'>, lib: Library, place?: Setting): string[] {
+  return [...(o.tags ?? []), ...kindChain(o.kind, lib.parents), ...(place?.tags ?? [])];
 }
 
 /**
@@ -168,13 +178,15 @@ export function disposition(o: Pick<ObjectDef, 'kind'>, who: Visitor, lib: Libra
 }
 
 /** What the situation does to one single roll: mood, how their people see yours, and advantages you kept. They change the difficulty. */
-export function situation(s: SceneState, c: CheckDef, o: ObjectDef, who: Visitor, lib: Library, place?: Setting): Situation {
-  if (!c.talk) return { shift: 0, spend: [], notes: [] };
+export function situation(s: SceneState, c: CheckDef, o: ObjectDef, who: Visitor, lib: Library, place?: Setting, skill?: string): Situation {
+  // What kind of person this is and where, for this kind of effort and this skill (people library).
+  const lean = leaningFor(facetsOf(o, lib, place), effortOf(c.intention), skill, lib.people ?? {});
+  if (!c.talk) return { shift: 0 - 2 * lean.v, spend: [], notes: lean.notes };
   const mood = s.social[c.talk.who]?.mood ?? 0;
   const rel = disposition(o, who, lib, place);
   const spend: Token[] = [];
-  const notes: string[] = [];
-  let shift = -2 * (mood + rel.v);
+  const notes: string[] = [...lean.notes];
+  let shift = 0 - 2 * (mood + rel.v + lean.v);
   if (mood) notes.push(mood > 0 ? 'they like you' : 'they are wary of you');
   if (rel.v && rel.why) notes.push(rel.why);
   for (const t of s.tokens) {

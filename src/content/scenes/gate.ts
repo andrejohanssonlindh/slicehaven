@@ -59,6 +59,8 @@ export const GATE_SCENE: SceneDef = {
   start: { time: 'night', silver: 100, hero: [4, 11] },
   locals: ['asharier'],
   majority: 'human',
+  // People library: what the place and the hour do to every roll here.
+  tags: ['asharien', 'checkpoint', 'night'],
   objects: [
     {
       id: 'palisade',
@@ -87,6 +89,8 @@ export const GATE_SCENE: SceneDef = {
       id: 'guard',
       name: 'Gate guard',
       kind: 'guard',
+      // People library: an Asharian soldier-type on duty, at a checkpoint (the scene's tags) at night.
+      tags: ['asharier', 'job-guard', 'on-duty'],
       units: ['guard'],
       hexes: [[4, 4]],
       look: [

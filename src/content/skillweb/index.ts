@@ -1,5 +1,6 @@
 import { DIFFICULTY } from '../../core/checks';
 import type { HookDef, Library } from '../../core/skillweb';
+import { PEOPLE_KINDS, PEOPLE_LIBRARY } from '../people';
 import { SKILL_SETS } from '../rollables';
 import { RELATIONS } from './relations';
 import { SOCIAL_HOOKS } from './social';
@@ -31,6 +32,8 @@ export const KIND_PARENTS: Library['parents'] = {
   structure: 'feature',
   fire: 'feature',
   item: 'thing',
+  // Each people is a kind of its family: an Asharian is a kind of human (content/people).
+  ...PEOPLE_KINDS,
 };
 
 /** The kinds that are peoples: what "your own kind" means. */
@@ -93,4 +96,5 @@ export const LIBRARY: Library = {
   kindDefaults: KIND_DEFAULTS,
   peoples: PEOPLES,
   relations: RELATIONS,
+  people: PEOPLE_LIBRARY,
 };

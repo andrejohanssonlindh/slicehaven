@@ -1,5 +1,14 @@
 # Devlog
 
+## 2026-10-27 — Session 17: the people library
+
+- Started the layer for "skills tied to types of people and situations": [People library](design/people-library.md). A tree of 252 **facets** (peoples, realms, faiths, standing and calling with all 100 backgrounds, settings, passing states), built mostly from the creator's own data, and a table of 308 **leanings** binding a facet to a kind of effort (and optionally particular skills): easier or harder, and why.
+- A people is now a kind of its family (an Asharian is a kind of human), so existing hooks and relations are untouched.
+- Wired into single rolls (`situation()` takes the skill used): the person's tags, kinds and the scene's tags move the difficulty 2 per point, up to 3 points, and the reasons show in the roll log. The gate scene is tagged to try it.
+- Not yet wired: conflicts (Control), the hero's own facets, different outcomes by type, a view on the Skill map. Listed in the doc with open questions.
+- Also corrected the marks, expertise and abilities tags against the book's descriptions, and tagged the mystic skills (earlier this session; see the Session 16 entry).
+- 195 tests.
+
 ## 2026-10-27 — Session 16: skill map, social skills
 
 - First pass of the handover (social group). New kinds of effort: **deceive**, **rally**, **gamble**, each with examples. Genomskåda, Injaga fruktan and Skumraskaffärer can now also be used to **ask**; Spel & dobbel can **distract** and **gamble**.

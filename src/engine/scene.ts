@@ -535,7 +535,7 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
   /** Knowledge and insight: you get an answer and are not told whether it is right. */
   async function hiddenCheck(o: ObjectDef, c: CheckDef, skill: string): Promise<void> {
     const dice = diceOf(hero, skill);
-    const { result, effects: eff } = attempt(state, c, dice, rng, situation(state, c, o, hero, LIBRARY, def));
+    const { result, effects: eff } = attempt(state, c, dice, rng, situation(state, c, o, hero, LIBRARY, def, skill));
     say(`You: ${rollableName(skill)}, ${c.label.toLowerCase()}.`, 'you');
     // The rolled dice stay behind the curtain; the log only keeps what you were told.
     const events = await run(eff.filter((e) => !('set' in e && e.set.startsWith('read:'))), o, true);
@@ -554,7 +554,7 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
     sheet.close();
     const dice = diceOf(hero, skill);
     if (c.hidden) return hiddenCheck(o, c, skill);
-    const sit = situation(state, c, o, hero, LIBRARY, def);
+    const sit = situation(state, c, o, hero, LIBRARY, def, skill);
     const { result, effects: eff, difficulty } = attempt(state, c, dice, rng, sit);
     const name = rollableName(skill);
     const verdict = result.success ? 'success' : 'failure';
