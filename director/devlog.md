@@ -1,5 +1,12 @@
 # Devlog
 
+## 2026-10-27 — Session 19: browser tests for the gate scene
+
+- Playwright is installed (dev dependency, Chromium in your home cache, no sudo). `npm run test:e2e` starts a Vite server, opens `/scene/` at phone size (400×720) and runs 20 tests in `e2e/scene.e2e.ts`: loads cleanly and paints; Use a skill sheet, hints switch, difficulty, log, hero sheet; walking and blocked tiles; every thing's menu; talking to the guard and the three-roll conflict across seeds; Climb and Search rolls across seeds; sleeping by the fire and walking in; and three seeded random-action fuzz runs (random taps, menus, skills; fails on any console error or if `isBusy()` sticks). Screenshots land in `e2e/out/` (gitignored).
+- `/scene/?seed=N` makes the dice repeatable.
+- The tests found a real glitch: during the half-second dawn pause after sleeping, input wasn't locked and the gate still counted as shut, so a quick tap said "You can't walk there". Input is now locked during the pause.
+- `npm test` (240) and the build are unchanged and green. The e2e suite is separate because it takes about a minute.
+
 ## 2026-10-27 — Session 18: handover check, skill hook review
 
 - Checked what a fresh session loads: about 2k tokens (CLAUDE.md plus memory), which is fine. But CLAUDE.md still named the character creator as the current focus and never pointed to the skill work. It now has a "cold start" table: area → page → handover → code, plus a note not to read the whole `director/` folder or the long devlog. Memory trimmed to what the repo doesn't already say.

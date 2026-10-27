@@ -66,7 +66,8 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
   const def = expandScene(rawDef, LIBRARY);
   let hero = startHero;
   const state: SceneState = newSceneState(def);
-  const rng = Rng.fromSeed(Date.now());
+  // `?seed=N` makes the dice repeatable (for automated tests).
+  const rng = Rng.fromSeed(new URLSearchParams(location.search).get('seed') ?? Date.now());
 
   // --- map --------------------------------------------------------------------
 
@@ -764,7 +765,13 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
       } else if (e.kind === 'time') {
         weather.setTime(e.time === 'night' ? 'night' : e.time === 'dawn' ? 'dusk' : 'day');
         say(`${TIME_LABEL[e.time]}.`, 'info');
-        if (!quiet) await wait(500);
+        if (!quiet) {
+          // Lock input for the pause: the map (gate, blockers) only catches up in syncWorld below.
+          const was = busy;
+          busy = true;
+          await wait(500);
+          busy = was;
+        }
       } else if (e.kind === 'remove') {
         for (const u of battle.units.filter((x) => unitObject.get(x.id)?.id === e.id)) {
           const p = renderer.unitPos(u.id);

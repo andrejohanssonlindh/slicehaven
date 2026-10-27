@@ -6,3 +6,4 @@ dist/
 # Eon reference books are copyrighted (Helmgast) - local reference only, never commit
 *.pdf
 reference/
+e2e/out/

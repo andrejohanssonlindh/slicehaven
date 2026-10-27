@@ -41,7 +41,7 @@ The deeper designs (`skill-web.md`, `people-library.md`, `ways-of-use.md`) are f
 
 ## Tech
 - Vite + TypeScript (strict), **own canvas engine** (no Phaser: dropped 2026-10-25, our art and lighting are per-pixel anyway). Vitest for tests. `marked` for the Director's Room.
-- `npm run dev` (also on LAN with `--host`), `npm test`, `npm run build`.
+- `npm run dev` (also on LAN with `--host`), `npm test`, `npm run build`, `npm run test:e2e` (Playwright browser tests in `e2e/`, ~1 min; run after changing `src/engine/scene.ts` or the scene UI).
 - Deploy: `.github/workflows/deploy.yml` builds and publishes `dist/` on every push to `main`.
 - Vite `base` is `/slicehaven/`. Static assets go in `public/` and are referenced as `import.meta.env.BASE_URL + 'assets/...'`.
 
