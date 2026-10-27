@@ -58,6 +58,7 @@ export const GATE_SCENE: SceneDef = {
     {
       id: 'palisade',
       name: 'Palisade',
+      kind: 'structure',
       art: 'palisade',
       perHex: true,
       hexes: [[0, 3], [1, 3], [2, 3], [3, 3], [6, 3], [7, 3], [8, 3], [9, 3]],
@@ -80,6 +81,7 @@ export const GATE_SCENE: SceneDef = {
     {
       id: 'guard',
       name: 'Gate guard',
+      kind: 'human',
       units: ['guard'],
       hexes: [[4, 4]],
       look: [
@@ -201,6 +203,7 @@ export const GATE_SCENE: SceneDef = {
     {
       id: 'rock',
       name: 'Ivy-covered boulder',
+      kind: 'rock',
       art: 'ivy-rock',
       hexes: [[7, 4], [8, 4], [7, 5]],
       look: [
@@ -210,10 +213,13 @@ export const GATE_SCENE: SceneDef = {
       checks: [
         {
           id: 'climb',
+          intention: 'climb',
           label: 'Climb the ivy and go over the palisade',
           skills: [...SKILL_SETS.climb],
           difficulty: 15,
-          hint: 'The ivy on the boulder is thick as rope, and the top of the rock is close to the palisade points. Someone could climb that.',
+          // Describes the thing; what to do with it is the player's idea (and the layer-2 climb hook exists anyway).
+          hint: 'The ivy on the boulder is thick as rope, and the top of the rock stands close to the palisade points.',
+          spot: 8,
           tries: 2,
           success: [
             { say: 'Hand over hand through the ivy, along the top of the rock, and you drop over the points into the dark on the other side.', tone: 'good' },
@@ -231,6 +237,7 @@ export const GATE_SCENE: SceneDef = {
     {
       id: 'cart',
       name: 'Handcart',
+      kind: 'item',
       art: 'handcart',
       hexes: [[1, 4], [2, 4]],
       look: [
@@ -240,10 +247,12 @@ export const GATE_SCENE: SceneDef = {
       checks: [
         {
           id: 'search',
+          intention: 'search',
           label: 'Search the cart',
           skills: [...SKILL_SETS.search],
           difficulty: DIFFICULTY.tricky,
-          hint: 'The handcart\'s tarp is tied down over more than turnips, by the look of it. Worth a closer search.',
+          hint: 'The handcart\'s tarp is tied down tight, over more than turnips by the look of it.',
+          spot: 12,
           when: { none: ['hasPass'] },
           success: [
             { say: 'Under the tarp, between sacks of turnips, a folded letter with a wax seal: a trader\'s pass, good for "the bearer and his goods". That could open a gate.', tone: 'good' },
@@ -257,6 +266,7 @@ export const GATE_SCENE: SceneDef = {
     {
       id: 'campfire',
       name: 'Campfire',
+      kind: 'fire',
       art: 'campfire',
       artWhen: [{ flag: 'rested', art: 'campfire-out' }],
       hexes: [[2, 8]],
@@ -273,6 +283,7 @@ export const GATE_SCENE: SceneDef = {
     {
       id: 'travellers',
       name: 'Travellers',
+      kind: 'human',
       units: ['tinker', 'crone', 'youth'],
       hexes: [[1, 8], [1, 9], [3, 8]],
       look: 'Three travellers: a tinker with his pack, an old woman, and a young man who smiles a lot.',
@@ -288,10 +299,11 @@ export const GATE_SCENE: SceneDef = {
       checks: [
         {
           id: 'read-travellers',
+          intention: 'size-up',
           label: 'Size them up',
           skills: [...SKILL_SETS.readPeople],
           difficulty: DIFFICULTY.hard,
-          hint: 'One of the travellers keeps glancing your way. You could try to size them up.',
+          hint: 'One of the travellers keeps glancing your way.',
           tries: 1,
           when: { none: ['readThem'] },
           success: [

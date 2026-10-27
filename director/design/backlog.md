@@ -4,7 +4,11 @@
 
 Effort: **S** under an hour · **M** a session · **L** several sessions, split into vignettes.
 
-## Done this session
+## Done 2026-10-27
+| ✅ | Search is a check, not a win: look-around rolls, hints describe things only | Skill web steps 1 and 2. |
+| ✅ | Shape of the skill web (kinds, intentions, library hooks, strong success, shadowing) | `core/skillweb.ts`; three example hooks. |
+
+## Done 2026-10-26
 | # | Item | Notes |
 |---|---|---|
 | ✅ | Removed "game master" / "GM allows" from the creator UI, warnings and event texts | Rule notes that said "the GM decides" now just state the rule. |

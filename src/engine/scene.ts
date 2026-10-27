@@ -6,7 +6,7 @@ import { type Hero, canRoll, diceOf } from '../core/hero';
 import { Rng } from '../core/rng';
 import {
   type CheckDef, type Effect, type ObjectDef, type SceneApproach, type SceneDef, type SceneEvent, type SceneState,
-  apply, approachOpen, artOf, attempt, blocks, checkFor, checksHere, hintsNear, lookText, met, newSceneState, openChecks,
+  apply, approachOpen, artOf, attempt, blocks, checkFor, checksHere, lookAround as rollLookAround, lookText, met, newSceneState, openChecks,
   talkFor, usefulSkills,
 } from '../core/scene';
 import {
@@ -17,6 +17,8 @@ import { SCENE_ART } from '../art/sceneArt';
 import type { Ground } from '../art/terrain';
 import type { PropKind } from '../art/mapScene';
 import { SKILL_SETS, byGroup, rollableName } from '../content/rollables';
+import { LIBRARY } from '../content/skillweb';
+import { expandScene } from '../core/skillweb';
 import type { SandboxCell } from '../content/sandbox';
 import { GameConsole, type LogTone } from '../ui/console';
 import { Sheet, type SheetOption, type SheetSection, esc } from '../ui/sheet';
@@ -54,7 +56,8 @@ export interface SceneHooks {
   heroChoices: () => { label: string; sub: string; pick: () => Hero }[];
 }
 
-export function startScene(def: SceneDef, kinds: Record<string, MobDef>, startHero: Hero, hooks: SceneHooks): void {
+export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, startHero: Hero, hooks: SceneHooks): void {
+  const def = expandScene(rawDef, LIBRARY);
   let hero = startHero;
   const state: SceneState = newSceneState(def);
   const rng = Rng.fromSeed(Date.now());
@@ -381,16 +384,25 @@ export function startScene(def: SceneDef, kinds: Record<string, MobDef>, startHe
     });
   }
 
-  /** Searching with nothing to search right here: what's worth a closer look nearby. */
+  /** Searching with nothing to search right here: a roll decides what you notice nearby. */
   function lookAround(id: string): void {
-    const found = hintsNear(def.objects, state, (o) => gap(unitHexes(heroUnit), hexesOf(o)), 5);
-    say(`You: ${rollableName(id)}, looking around.`, 'you');
-    const lines = found.map((f) => `${directionTo(hexesOf(f.o))}: ${f.hint}`);
-    if (!lines.length) lines.push('You look around carefully. Nothing nearby catches your eye.');
+    const dice = diceOf(hero, id);
+    const r = rollLookAround(def.objects, state, hexKey(heroUnit.at), (o) => gap(unitHexes(heroUnit), hexesOf(o)), 5, dice, rng);
+    const name = rollableName(id);
+    if (r.again) {
+      const line = 'You have already looked this place over. Move to see more.';
+      say(line, 'info');
+      open(undefined, { title: 'You look around', body: `<p>${esc(line)}</p>`, sections: [{ options: [{ label: 'Continue', style: 'primary', onPick: () => sheet.close() }] }] });
+      return;
+    }
+    say(`You: ${name} ${diceText(dice)}, looking around → ${rollText(r.result.roll)}.`, 'roll');
+    floatOverHero(`${r.result.roll.total}`, '#cfd8ff');
+    const lines = r.found.map((f) => `${directionTo(hexesOf(f.o))}: ${f.hint}`);
+    if (!lines.length) lines.push('You look around carefully. Nothing catches your eye.');
     for (const l of lines) say(l, 'info');
     open(undefined, {
       title: 'You look around',
-      body: lines.map((l) => `<p>${esc(l)}</p>`).join(''),
+      body: `<p class="roll"><small>${esc(name)} ${esc(diceText(dice))}: ${esc(rollText(r.result.roll))}</small></p>${lines.map((l) => `<p>${esc(l)}</p>`).join('')}`,
       sections: [{ options: [{ label: 'Continue', style: 'primary', onPick: () => sheet.close() }] }],
     });
   }

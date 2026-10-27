@@ -1,5 +1,14 @@
 # Devlog
 
+## 2026-10-27 — Session 11: the shape of the skill web
+
+First build step from the [skill web](design/skill-web.md) plan.
+- Things have a `kind` (human, rock, fire…) in a tree; a library of hooks per kind is copied onto scene objects at start. A thing's own check shadows a library hook with the same intention. Three example hooks only.
+- **Search fixed:** looking around is now a roll. Poor rolls notice nothing, far things are harder, hints describe things and no longer say what to do ("Someone could climb that" is gone). Each spot can be looked over once.
+- **Strong success** (2+ advantages) adds extra effects when a hook defines them.
+- The guard can now be sized up and the boulder studied with Nature Lore, through library hooks, with no gate-specific code.
+- 100 tests. Not checked in a browser (no Playwright on this machine), so please try the gate: look around from the start, then walk toward the boulder.
+
 ## 2026-10-26 — Session 10: director's review turned into a plan
 
 Plans written, not built: [ranked backlog](design/backlog.md), [skill web](design/skill-web.md) (standard / object / quest hooks, intentions, gear, people, drives, terrain), [creator next pass](design/creator-next.md) (pre-set characters with locks, clearer event cards, life events as searchable hooks, handover for a content pass).

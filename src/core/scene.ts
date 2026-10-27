@@ -1,5 +1,6 @@
-import { type Dice, type TestResult, test } from './checks';
+import { type Dice, type TestResult, DIFFICULTY, test } from './checks';
 import type { Rng } from './rng';
+import { STRONG_AT } from './skillweb';
 import type { Approach } from './social';
 
 /**
@@ -41,8 +42,16 @@ export interface CheckDef {
   /** Reasonable skills (and attr:… ids). */
   skills: string[];
   difficulty: number;
-  /** What searching nearby tells you about this (in-world, instead of flagging skills). */
+  /** What looking around turns up about this: describe the thing, never the solution. */
   hint?: string;
+  /** How well you must roll when looking around to notice the hint (default tricky). */
+  spot?: number;
+  /** What you're trying to get done. A check shadows library hooks with the same intention (see skillweb). */
+  intention?: string;
+  /** Added to `success` on a strong success (2+ advantages). */
+  strong?: Effect[];
+  /** Came from the skill-web library rather than the scene itself. */
+  fromLibrary?: boolean;
   when?: Cond;
   /** Failures allowed before the check closes (default: unlimited). */
   tries?: number;
@@ -107,6 +116,10 @@ export interface ObjectDef {
   artWhen?: { flag: string; art: string }[];
   /** Offset (col,row) hexes it covers. */
   hexes: [number, number][];
+  /** What kind of thing it is (content/skillweb kinds); library hooks for that kind apply. */
+  kind?: string;
+  /** Status tags (e.g. 'rich') that tagged library hooks look for. */
+  tags?: string[];
   /** People: one unit per hex, of these kinds (a guard; a group of travellers). */
   units?: string[];
   /** Blocks movement (or only until a flag is set). Default: blocks. */
@@ -146,12 +159,14 @@ export interface SceneState {
   /** Failed attempts per check id. */
   fails: Record<string, number>;
   removed: string[];
+  /** Spots (col,row) where you've already looked around. */
+  looked: string[];
   /** Set once the scene is over: the closing text. */
   ended?: string;
 }
 
 export const newSceneState = (def: SceneDef): SceneState => ({
-  time: def.start.time, silver: def.start.silver, flags: {}, fails: {}, removed: [],
+  time: def.start.time, silver: def.start.silver, flags: {}, fails: {}, removed: [], looked: [],
 });
 
 export function met(s: SceneState, c?: Cond): boolean {
@@ -217,12 +232,34 @@ export function hintsNear(objects: ObjectDef[], s: SceneState, distance: (o: Obj
   return out.sort((a, b) => a.d - b.d);
 }
 
+/** Looking around: can a hint be noticed with this total, from this far away? Far things are harder. */
+export const spotted = (total: number, spot: number | undefined, distance: number): boolean =>
+  total >= (spot ?? DIFFICULTY.tricky) + Math.max(0, distance - 2);
+
+/**
+ * Look around from a spot: a Search (or Alertness) roll, not a free list.
+ * You only learn about what the roll is good enough to notice, and only the thing,
+ * not what to do with it. Each spot can be looked over once; move to look again.
+ */
+export function lookAround(
+  objects: ObjectDef[], s: SceneState, spotKey: string, distance: (o: ObjectDef) => number, range: number, dice: Dice, rng: Rng,
+): { again: true } | { again: false; result: TestResult; found: { o: ObjectDef; hint: string; d: number }[] } {
+  if (s.looked.includes(spotKey)) return { again: true };
+  s.looked.push(spotKey);
+  const roll = test(dice, 0, rng);
+  const found = hintsNear(objects, s, distance, range).filter((h) => {
+    const c = openChecks(h.o, s).find((x) => x.hint === h.hint);
+    return spotted(roll.roll.total, c?.spot, h.d);
+  });
+  return { again: false, result: roll, found };
+}
+
 export const approachOpen =(a: SceneApproach, s: SceneState): boolean => met(s, a.when) && !s.flags[`tried:${a.id}`];
 
 /** Roll a check and work out what happens (effects are applied by the caller). */
 export function attempt(s: SceneState, c: CheckDef, dice: Dice, rng: Rng): { result: TestResult; effects: Effect[] } {
   const result = test(dice, c.difficulty, rng);
-  if (result.success) return { result, effects: c.success };
+  if (result.success) return { result, effects: result.advantages >= STRONG_AT && c.strong ? [...c.success, ...c.strong] : c.success };
   s.fails[c.id] = (s.fails[c.id] ?? 0) + 1;
   const last = c.tries !== undefined && s.fails[c.id] >= c.tries;
   return { result, effects: [...c.failure, ...(last ? c.outOfTries ?? [] : [])] };

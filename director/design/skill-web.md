@@ -63,9 +63,16 @@ Rules:
 - It is a skill check. Success reveals *things* (layer 2/1 targets), not *solutions*.
 - Scenes without a quest or mission must not announce "you can climb over". The player discovers options by using skills on things; the climb exists as a layer 2 hook on the boulder ("Climb" on any climbable feature).
 
+## Status (2026-10-27)
+Steps 1 and 2 below are built. Code: `core/skillweb.ts` (types, kind tree, lookup, `expandScene`), `content/skillweb/index.ts` (kinds + three example hooks: size up a humanoid, climb a rock, study a rock), `core/scene.ts` (`lookAround`, strong success), tests in `tests/skillweb.test.ts`.
+- **How it works:** a scene object gets a `kind` (and optional `tags`). At scene start `expandScene` copies the matching library hooks onto each object as ordinary checks, so the Use-a-skill menus, "useful here" and hints work unchanged. An object's own check shadows a library hook with the same `intention`.
+- **Search is a roll now.** "Look around" (Search/Alertness with nothing right there) rolls your dice. Each hint has a `spot` number; far things are +1 harder per hex beyond 2. A poor roll notices nothing. Hints **describe the thing**, never the solution. A spot can be looked over once; move to look again.
+- **Strong success:** 2+ advantages over the difficulty adds the hook's `strong` effects.
+- **Not built yet:** tags with real content (only the lookup rule exists), advantage tokens, mood and talk limits, gear choice, people tables, terrain.
+
 ## Build order (each a vignette, one push)
-1. **Shape only.** Types in `core/` for: thing kinds, intentions, outcomes, effects, advantage tokens. A resolver that walks layers 3→2→1. Unit tests. No content beyond a few examples.
-2. **Search fix** in the gate scene: make it a check, stop listing solutions; give the boulder and the guard layer 2 / layer 1 hooks instead of hand-written ones where they exist.
+1. ✅ **Shape only.** Types in `core/` for: thing kinds, intentions, outcomes, effects, advantage tokens. A resolver that walks layers 3→2→1. Unit tests. No content beyond a few examples.
+2. ✅ **Search fix** in the gate scene: make it a check, stop listing solutions; give the boulder and the guard layer 2 / layer 1 hooks instead of hand-written ones where they exist.
 3. **Humanoid social set.** Argue (persuade, haggle, stall) and Charm on any humanoid. Then Court life / Streetwise-style skills with status tags.
 4. **Wilderness set.** Gather food, light a fire, find a trail on terrain tiles.
 5. **Object set.** Rocks (Geology), plants (Botany-style), locks (Lockpick), doors, water.
