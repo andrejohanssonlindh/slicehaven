@@ -52,6 +52,8 @@ export interface HookDef {
   wants?: string[];
   /** Knowledge/insight: the result is hidden, and failure gives a plausible wrong answer (see CheckDef.hidden). */
   hidden?: boolean;
+  /** Only things that carry this much to read: 'lore' = the thing has `lore` texts (a hidden read has to say something). */
+  needs?: 'lore';
 }
 
 /** How one people sees another: −3 (hostile) … +3 (kin). */
@@ -103,7 +105,7 @@ function facetScore(id: string, facets: PeopleLibrary['facets']): number {
 }
 
 /** Library hooks that apply to a thing, best match first, one per intention. */
-export function hooksFor(o: Pick<ObjectDef, 'kind' | 'tags'>, lib: Library, place?: Setting): HookDef[] {
+export function hooksFor(o: Pick<ObjectDef, 'kind' | 'tags' | 'lore'>, lib: Library, place?: Setting): HookDef[] {
   const chain = kindChain(o.kind, lib.parents);
   if (!chain.includes('thing')) chain.push('thing');
   const tags = o.tags ?? [];
@@ -111,7 +113,7 @@ export function hooksFor(o: Pick<ObjectDef, 'kind' | 'tags'>, lib: Library, plac
   // Every facet that is true here, with the ones above it (a soldier is also martial).
   const have = new Set([...personFacets(o, lib), ...(place?.tags ?? [])].flatMap((f) => facetChain(f, facets)));
   const scored = lib.hooks
-    .filter((h) => chain.includes(h.kind) && (!h.tag || tags.includes(h.tag)) && (!h.facet || have.has(h.facet)))
+    .filter((h) => chain.includes(h.kind) && (!h.tag || tags.includes(h.tag)) && (!h.facet || have.has(h.facet)) && (h.needs !== 'lore' || o.lore))
     .map((h) => ({
       h,
       // The kind decides first, then a tag, then a facet (the deeper the facet, the more particular).

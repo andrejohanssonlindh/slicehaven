@@ -4,6 +4,7 @@ import { PEOPLE_KINDS, PEOPLE_LIBRARY } from '../people';
 import { SKILL_SETS } from '../rollables';
 import { OUTCOME_HOOKS } from './outcomes';
 import { TALK_HOOKS } from './outcomes-talk';
+import { THING_HOOKS, THING_KINDS } from './things';
 import { RELATIONS } from './relations';
 import { SOCIAL_HOOKS } from './social';
 
@@ -36,6 +37,8 @@ export const KIND_PARENTS: Library['parents'] = {
   item: 'thing',
   // Each people is a kind of its family: an Asharian is a kind of human (content/people).
   ...PEOPLE_KINDS,
+  // Narrow kinds of thing, for the hooks on things (a wall, a lock, a tree, a stretch of water…).
+  ...THING_KINDS,
 };
 
 /** The kinds that are peoples: what "your own kind" means. */
@@ -94,7 +97,7 @@ const OBJECT_HOOKS: HookDef[] = [
 
 export const LIBRARY: Library = {
   parents: KIND_PARENTS,
-  hooks: [...OBJECT_HOOKS, ...SOCIAL_HOOKS, ...OUTCOME_HOOKS, ...TALK_HOOKS],
+  hooks: [...OBJECT_HOOKS, ...THING_HOOKS, ...SOCIAL_HOOKS, ...OUTCOME_HOOKS, ...TALK_HOOKS],
   kindDefaults: KIND_DEFAULTS,
   peoples: PEOPLES,
   relations: RELATIONS,

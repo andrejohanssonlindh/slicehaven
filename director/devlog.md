@@ -7,9 +7,10 @@
 - Wired into single rolls (`situation()` takes the skill used): the person's tags, kinds and the scene's tags move the difficulty 2 per point, up to 3 points, and the reasons show in the roll log. The gate scene is tagged to try it.
 - Then wired **conflicts** (each approach names its effort; leanings add Control), **what you share** (the hero carries people, homeland, faith and calling from the creator; a shared faith, walk of life or homeland helps), and a **"Who and where it works"** section on the Skill map page per skill and effort.
 - Then the first **library hooks by type** (`content/skillweb/outcomes.ts`): hooks can name a `facet`, so the same try gets a different reply from a noble, a soldier, a priest, a merchant, a servant, a child. Done for **impress** (14 types), **threaten** (11), **ask** (17), **persuade** (14) and **distract** (8) in `outcomes.ts` and `outcomes-talk.ts`. A state beats a setting beats who they are when several fit, and a person's list of checks keeps the library's order of intentions.
-- Not yet: the same for the other efforts, skill-specific leanings in conflicts, hostility between facets. Listed in the doc with open questions.
+- Then the first **hooks on things** (`content/skillweb/things.ts`): 28 hooks on 10 new narrow kinds (wall, door, lock, tree, food, tool, container, water, gap, trail) and on plant, animal and the ill. They never touch the broad `structure` or `item` kinds, so a scene's own palisade or cart keeps its rules (the gate gains nothing). A hook records what happened as a flag (`climbed:x`, `opened:x`, `crossed:x`, `noisy:x`…). A general search says "nothing out of place" (a thing that hides something has its own check, which wins). Hidden reads (`needs: 'lore'`) only exist on things that carry lore.
+- Not yet: social hooks for sweet-talk, comfort, deceive, provoke, rally and bribe; hooks for sneak/hide (they belong to places), steal, escape, ride; skill-specific leanings in conflicts; hostility between facets. Listed in the doc with open questions.
 - Also corrected the marks, expertise and abilities tags against the book's descriptions, and tagged the mystic skills (earlier this session; see the Session 16 entry).
-- 217 tests.
+- 232 tests.
 
 ## 2026-10-27 — Session 16: skill map, social skills
 
