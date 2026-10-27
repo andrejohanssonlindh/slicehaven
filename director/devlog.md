@@ -4,7 +4,8 @@
 
 - First pass of the handover (social group). New kinds of effort: **deceive**, **rally**, **gamble**, each with examples. Genomskåda, Injaga fruktan and Skumraskaffärer can now also be used to **ask**; Spel & dobbel can **distract** and **gamble**.
 - Court Life (Hovliv) stays etiquette-only on purpose: tagging it for persuade/ask/read-people changed which hook a plain human gets, and a test pins the "depends on who" design. Revisit when hooks are written.
-- Next in the order: movement and wilderness skills.
+- Movement and wilderness pass: new kinds of effort **sneak, hide, steal, escape, jump, swim, ride, travel, track, forage**, with examples. Fingerfärdighet can also distract. A test used Seamanship as its "unlinked skill"; it now uses Shield.
+- Next in the order: knowledge skills (lore, analyse, heal, law…).
 
 ## 2026-10-27 — Session 15b: weapons, ways of use, links
 

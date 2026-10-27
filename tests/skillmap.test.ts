@@ -149,9 +149,9 @@ describe('the skill map', () => {
   });
 
   it('tells linked from unlinked skills', () => {
-    const linked = linkedSkills(['Charm', 'Sjömannaskap'], cx);
+    const linked = linkedSkills(['Charm', 'Sköld'], cx);
     expect(linked.has('Charm')).toBe(true);
-    expect(linked.has('Sjömannaskap')).toBe(false);
+    expect(linked.has('Sköld')).toBe(false);
   });
 });
 
