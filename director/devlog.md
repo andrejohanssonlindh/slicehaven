@@ -1,5 +1,12 @@
 # Devlog
 
+## 2026-10-27 — Session 15: examples per skill and kind of effort
+
+- New `content/skillweb/examples.ts`: for each of the 13 kinds of effort a few skills with 2–3 concrete examples each (e.g. impress with Physique: "flex a muscle, or lift something heavy that others struggled with"). The model for the full map. The Skill map page shows them per skill, and how many pairs are still without examples.
+- The "charm" tag became **impress** (Physique, acrobatics and dance added).
+- Handover for filling in the rest: [Skill map handover](design/skill-map-handover.md) (where each skill is described, rules, order, pitfalls).
+- 171 tests.
+
 ## 2026-10-27 — Session 14: attributes by difficulty, tags, skill map
 
 See the fifth-pass status in [Skill web](design/skill-web.md): Control hidden except on Easy (with the true figure, reception included), attribute rolls limited by difficulty with a −2D6 escape hatch, skill tags as the single source for skill sets, and a new Skill map page at `/skills/`. 167 tests; not checked in a browser.

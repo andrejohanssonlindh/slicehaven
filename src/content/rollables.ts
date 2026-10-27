@@ -23,7 +23,7 @@ export const SKILL_SETS = {
   /** Making a case: reasoning, standing, a plain good argument. */
   argue: skillsWith('persuade'),
   /** Winning someone over. */
-  charm: skillsWith('charm'),
+  impress: skillsWith('impress'),
   /** Holding attention while something else happens. */
   distract: skillsWith('distract'),
   /** Getting someone to tell you things. */

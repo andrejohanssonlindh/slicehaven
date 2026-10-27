@@ -4,6 +4,9 @@
 
 Effort: **S** under an hour · **M** a session · **L** several sessions, split into vignettes.
 
+## Next: fill the skill map
+Next session: populate every skill's tags and examples, following the [handover](skill-map-handover.md). Then library hooks per kind of effort.
+
 ## Done 2026-10-27 (third pass)
 | ✅ | Knowledge/insight reads are hidden 50/50 (plausible wrong answer on failure, one try) | Size up, Study. |
 | ✅ | Social conflict follows the rules: alternating lead, random fitting answers | Gate guard. |

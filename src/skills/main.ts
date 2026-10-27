@@ -6,6 +6,7 @@ import { GATE_SCENE } from '../content/scenes/gate';
 import { GENERIC_GUARD } from '../content/npcs';
 import { byGroup, rollableName } from '../content/rollables';
 import { LIBRARY } from '../content/skillweb';
+import { examplesOf, missingExamples } from '../content/skillweb/examples';
 import { TAGGED, TAG_INFO } from '../content/skillweb/tags';
 import { esc } from '../ui/sheet';
 
@@ -31,6 +32,12 @@ const name = (id: string) => esc(rollableName(id));
 const names = (ids: string[]) => (ids.length ? ids.map(name).join(', ') : '—');
 const dice = (d: { n: number; mod: number }) => `${d.n}D6${d.mod ? `+${d.mod}` : ''}`;
 
+function coverage(): string {
+  const total = Object.values(TAGGED).reduce((n, ids) => n + ids.length, 0);
+  const missing = missingExamples().length;
+  return `Examples written for ${total - missing} of ${total} skill/effort pairs.`;
+}
+
 function list(): string {
   const q = view.q.trim().toLowerCase();
   const pool = ALL.filter((id) => (!view.only || LINKED.has(id)) && (!view.tag || TAGGED[view.tag].includes(id)) && (!q || rollableName(id).toLowerCase().includes(q)));
@@ -53,6 +60,11 @@ function detail(): string {
   const r = relationsOf(id, cx);
   const parts: string[] = [`<h2>${name(id)}</h2>`];
   parts.push(r.tags.length ? `<p class="muted">Tagged for:</p>${tagChips(r.tags)}${r.tags.map((t) => `<p class="muted"><b>${esc(TAG_INFO[t]?.label ?? t)}</b>: ${esc(TAG_INFO[t]?.what ?? '')}</p>`).join('')}` : '<p class="muted">Not tagged for any kind of effort yet.</p>');
+  const ex = examplesOf(id);
+  const exTags = new Set(ex.map((e) => e.tag));
+  if (ex.length) parts.push('<h3>What it looks like</h3>', ...ex.map((e) => `<div class="card"><b>${esc(TAG_INFO[e.tag]?.label ?? e.tag)}</b><ul>${e.ways.map((w) => `<li>${esc(w)}</li>`).join('')}</ul></div>`));
+  const bare = r.tags.filter((t) => !exTags.has(t));
+  if (bare.length) parts.push(`<p class="muted">No examples yet for: ${bare.map((t) => esc(TAG_INFO[t]?.label ?? t)).join(', ')}.</p>`);
   if (id.startsWith('attr:')) parts.push('<p class="muted">An attribute: a fallback roll (the locked roll, Presence, Physique when aggressive, and a few by difficulty).</p>');
 
   parts.push('<h3>Start a conflict with it</h3>');
@@ -88,7 +100,7 @@ function detail(): string {
 
 function render(): void {
   root.innerHTML = `<h1>Skill map</h1>
-    <p class="muted">How skills relate: what each is tagged for, where it is used and what he answers with. Dimmed skills have no link yet.</p>
+    <p class="muted">How skills relate: what each is tagged for, where it is used and what he answers with. Dimmed skills have no link yet. ${coverage()}</p>
     <input type="search" id="q" placeholder="Search a skill…" value="${esc(view.q)}" />
     <label class="check"><input type="checkbox" id="only" ${view.only ? 'checked' : ''} /> only skills with a link</label>
     <h3>Kinds of effort</h3>${tagChips(Object.keys(TAGGED))}

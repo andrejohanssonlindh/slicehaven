@@ -9,7 +9,7 @@
  */
 export const TAG_INFO: Record<string, { label: string; what: string }> = {
   persuade: { label: 'Persuade', what: 'Making a case with reasons and standing.' },
-  charm: { label: 'Charm', what: 'Winning someone over.' },
+  impress: { label: 'Impress', what: 'Winning someone over, by charm or by showing what you can do.' },
   'sweet-talk': { label: 'Sweet-talk', what: 'Smooth words in a conflict (charm, stories, a good face).' },
   distract: { label: 'Distract', what: 'Holding attention while something else happens.' },
   ask: { label: 'Ask', what: 'Getting someone to tell you things.' },
@@ -25,7 +25,10 @@ export const TAG_INFO: Record<string, { label: string; what: string }> = {
 
 export const TAGGED: Record<string, string[]> = {
   persuade: ['Argumentera', 'Berättarkonst', 'Ledarskap', 'attr:Intryck'],
-  charm: ['Charm', 'Sång & musik', 'E:Flörta', 'K:Charmerande leende', 'K:Hederligt intryck', 'attr:Intryck'],
+  impress: [
+    'Charm', 'Sång & musik', 'Dansa', 'E:Flörta', 'E:Akrobatik', 'K:Charmerande leende', 'K:Hederligt intryck',
+    'attr:Intryck', 'attr:Kroppsbyggnad',
+  ],
   'sweet-talk': [
     'attr:Intryck', 'Charm', 'Berättarkonst', 'Argumentera', 'Sång & musik',
     'E:Flörta', 'E:Lova', 'K:Charmerande leende', 'K:Smort munläder', 'K:Hederligt intryck',

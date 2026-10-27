@@ -9,6 +9,7 @@ import { GENERIC_GUARD } from '../src/content/npcs';
 import { GATE_SCENE } from '../src/content/scenes/gate';
 import { SKILL_SETS, isRollable } from '../src/content/rollables';
 import { LIBRARY } from '../src/content/skillweb';
+import { EXAMPLES, examplesOf, missingExamples } from '../src/content/skillweb/examples';
 import { TAGGED, TAG_INFO, skillsWith, tagsOf } from '../src/content/skillweb/tags';
 
 function dice(...faces: number[]): Rng {
@@ -35,7 +36,7 @@ describe('skill tags', () => {
   it('Physique is for threatening and distracting, not bartering', () => {
     expect(tagsOf('attr:Kroppsbyggnad')).toEqual(expect.arrayContaining(['threaten', 'distract']));
     expect(tagsOf('attr:Kroppsbyggnad')).not.toContain('bribe');
-    expect(tagsOf('attr:Kroppsbyggnad')).not.toContain('charm');
+    expect(tagsOf('attr:Kroppsbyggnad')).toContain('impress'); // a show of strength impresses
   });
 
   it('every skill a library hook or a survey lists carries a matching tag where one exists', () => {
@@ -150,5 +151,40 @@ describe('the skill map', () => {
     const linked = linkedSkills(['Charm', 'Sjömannaskap'], cx);
     expect(linked.has('Charm')).toBe(true);
     expect(linked.has('Sjömannaskap')).toBe(false);
+  });
+});
+
+describe('examples per skill and kind of effort', () => {
+  it('only skills that carry the tag have examples under it', () => {
+    for (const [tag, bySkill] of Object.entries(EXAMPLES)) {
+      expect(tag in TAGGED, tag).toBe(true);
+      for (const skill of Object.keys(bySkill)) expect(TAGGED[tag], `${tag}: ${skill}`).toContain(skill);
+    }
+  });
+
+  it('each is a short line, and every skill has two or three of them', () => {
+    for (const [tag, bySkill] of Object.entries(EXAMPLES)) {
+      for (const [skill, ways] of Object.entries(bySkill)) {
+        expect(ways.length, `${tag}/${skill}`).toBeGreaterThanOrEqual(2);
+        expect(ways.length, `${tag}/${skill}`).toBeLessThanOrEqual(3);
+        for (const w of ways) {
+          expect(w.length, w).toBeGreaterThan(10);
+          expect(w.length, w).toBeLessThan(120);
+          expect(/[.!?]$/.test(w), w).toBe(true);
+        }
+        expect(new Set(ways).size).toBe(ways.length);
+      }
+    }
+  });
+
+  it('the model covers every kind of effort, and Physique impresses by lifting something heavy', () => {
+    expect(Object.keys(EXAMPLES).sort()).toEqual(Object.keys(TAGGED).sort());
+    expect(examplesOf('attr:Kroppsbyggnad').find((e) => e.tag === 'impress')!.ways.join(' ')).toMatch(/lift something heavy/);
+  });
+
+  it('what is left to write can be listed', () => {
+    const left = missingExamples();
+    expect(left.length).toBeGreaterThan(0); // the model is a start, not the full map
+    for (const m of left) expect(TAGGED[m.tag]).toContain(m.skill);
   });
 });

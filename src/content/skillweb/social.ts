@@ -38,7 +38,7 @@ export const SOCIAL_HOOKS: HookDef[] = [
     kind: 'humanoid',
     intention: 'impress',
     label: 'Win {name} over',
-    skills: [...SKILL_SETS.charm],
+    skills: [...SKILL_SETS.impress],
     difficulty: DIFFICULTY.tricky,
     wants: ['social'],
     success: [
