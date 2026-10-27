@@ -6,9 +6,10 @@
 - A people is now a kind of its family (an Asharian is a kind of human), so existing hooks and relations are untouched.
 - Wired into single rolls (`situation()` takes the skill used): the person's tags, kinds and the scene's tags move the difficulty 2 per point, up to 3 points, and the reasons show in the roll log. The gate scene is tagged to try it.
 - Then wired **conflicts** (each approach names its effort; leanings add Control), **what you share** (the hero carries people, homeland, faith and calling from the creator; a shared faith, walk of life or homeland helps), and a **"Who and where it works"** section on the Skill map page per skill and effort.
-- Not yet: different outcomes by type (with the hooks), skill-specific leanings in conflicts, hostility between facets. Listed in the doc with open questions.
+- Then the first **library hooks by type** (`content/skillweb/outcomes.ts`): hooks can name a `facet`, so the same try gets a different reply from a noble, a soldier, a priest, a merchant, a servant, a child. Done for **impress** (14 types) and **threaten** (11). A state beats a setting beats who they are when several fit.
+- Not yet: the same for the other efforts, skill-specific leanings in conflicts, hostility between facets. Listed in the doc with open questions.
 - Also corrected the marks, expertise and abilities tags against the book's descriptions, and tagged the mystic skills (earlier this session; see the Session 16 entry).
-- 207 tests.
+- 214 tests.
 
 ## 2026-10-27 — Session 16: skill map, social skills
 

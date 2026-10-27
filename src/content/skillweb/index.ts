@@ -2,6 +2,7 @@ import { DIFFICULTY } from '../../core/checks';
 import type { HookDef, Library } from '../../core/skillweb';
 import { PEOPLE_KINDS, PEOPLE_LIBRARY } from '../people';
 import { SKILL_SETS } from '../rollables';
+import { OUTCOME_HOOKS } from './outcomes';
 import { RELATIONS } from './relations';
 import { SOCIAL_HOOKS } from './social';
 
@@ -92,7 +93,7 @@ const OBJECT_HOOKS: HookDef[] = [
 
 export const LIBRARY: Library = {
   parents: KIND_PARENTS,
-  hooks: [...OBJECT_HOOKS, ...SOCIAL_HOOKS],
+  hooks: [...OBJECT_HOOKS, ...SOCIAL_HOOKS, ...OUTCOME_HOOKS],
   kindDefaults: KIND_DEFAULTS,
   peoples: PEOPLES,
   relations: RELATIONS,

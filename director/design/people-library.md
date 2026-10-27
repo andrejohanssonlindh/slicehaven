@@ -43,8 +43,11 @@ Several facets add up, to at most 3 points either way. Each facet counts once.
 - **The Skill map** page lists, per skill and per effort it carries, the kinds of person and place that make it easier or harder (★ when a row names that skill).
 - **The gate scene** is tagged (`asharien`, `checkpoint`, `night`; the guard is `asharier`, `job-guard`, `on-duty`) and its three approaches name their effort, so it can be tried.
 
+- **Outcomes by type** (`content/skillweb/outcomes.ts`): a library hook can name a `facet`, and then it is the one used for people with that facet (or anything under it) or in a place with it. So the same try gets a different reply: impressing a noble ("you have been noticed"), a soldier (a short nod), a servant ("not used to being seen"), a merchant (they warm to someone who understands trade, and the price softens); frightening a priest (they pray, unafraid), a merchant (the price drops, then the watch is mentioned), a servant (they tell you anything, or cry out). 14 impress and 11 threaten hooks so far; every other effort still answers with its general hook.
+  Which hook wins: a **kind** first (the gate guard's own hook), then a **state** (a terrified soldier is first of all terrified), then a **setting**, then who they are, the more particular the better (a calling beats its group).
+
 ## What is not wired yet
-- **Hooks**: a leaning only moves difficulty or Control. Different *outcomes* by type (a noble snubs you, a servant confides) belong with the library hooks.
+- **Outcomes for the other efforts** (ask, persuade, bribe, distract, sweet-talk, comfort, deceive, and all the non-social ones). Write them one effort at a time in `content/skillweb/outcomes.ts` (or a file per effort when it grows).
 - **Skill-specific leanings in conflicts** (see above).
 - **Hostility between facets** (a heretic and a priest): kin only gives bonuses today.
 

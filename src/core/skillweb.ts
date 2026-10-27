@@ -1,5 +1,5 @@
 import { type CheckDef, type Effect, type ObjectDef, type SceneDef, type SceneState, type Situation, type Token, moodLine, moodWord } from './scene';
-import { type PeopleLibrary, effortOf, totalLean } from './people';
+import { type PeopleLibrary, effortOf, facetChain, totalLean } from './people';
 import { MAX_RECEPTION } from './social';
 
 /**
@@ -31,6 +31,11 @@ export interface HookDef {
   intention: string;
   /** Only things with this tag (e.g. 'rich', 'poor'). */
   tag?: string;
+  /**
+   * Only people (or places) with this facet or one below it (people library): 'martial' also fits a
+   * soldier, 'tavern' any scene tagged so. The deeper the facet, the better the match.
+   */
+  facet?: string;
   label: string;
   /** Reasonable skills (and attr:… ids). */
   skills: string[];
@@ -86,14 +91,32 @@ export function kindChain(kind: string | undefined, parents: Library['parents'])
   return chain;
 }
 
+/**
+ * How particular a facet is as a reason to pick a hook (always under 2, so a kind outranks it).
+ * What is happening right now (a state) beats where it happens (a setting), which beats who they are;
+ * among who they are, a calling beats its group.
+ */
+function facetScore(id: string, facets: PeopleLibrary['facets']): number {
+  const dim = facets[id]?.dim;
+  const bonus = dim === 'state' ? 0.6 : dim === 'setting' ? 0.4 : 0;
+  return 0.5 + bonus + facetChain(id, facets).length / 10;
+}
+
 /** Library hooks that apply to a thing, best match first, one per intention. */
-export function hooksFor(o: Pick<ObjectDef, 'kind' | 'tags'>, lib: Library): HookDef[] {
+export function hooksFor(o: Pick<ObjectDef, 'kind' | 'tags'>, lib: Library, place?: Setting): HookDef[] {
   const chain = kindChain(o.kind, lib.parents);
   if (!chain.includes('thing')) chain.push('thing');
   const tags = o.tags ?? [];
+  const facets = lib.people?.facets ?? {};
+  // Every facet that is true here, with the ones above it (a soldier is also martial).
+  const have = new Set([...personFacets(o, lib), ...(place?.tags ?? [])].flatMap((f) => facetChain(f, facets)));
   const scored = lib.hooks
-    .filter((h) => chain.includes(h.kind) && (!h.tag || tags.includes(h.tag)))
-    .map((h) => ({ h, score: (chain.length - chain.indexOf(h.kind)) * 2 + (h.tag ? 1 : 0) }));
+    .filter((h) => chain.includes(h.kind) && (!h.tag || tags.includes(h.tag)) && (!h.facet || have.has(h.facet)))
+    .map((h) => ({
+      h,
+      // The kind decides first, then a tag, then a facet (the deeper the facet, the more particular).
+      score: (chain.length - chain.indexOf(h.kind)) * 2 + (h.tag ? 1 : 0) + (h.facet ? facetScore(h.facet, facets) : 0),
+    }));
   // Stable sort: most specific first, library order breaks ties.
   scored.sort((a, b) => b.score - a.score);
   const seen = new Set<string>();
@@ -280,11 +303,11 @@ export function instantiate(h: HookDef, o: ObjectDef, lib?: Library): CheckDef {
 }
 
 /** Own checks first (they win for their intention), then what the library adds. */
-export function expandObject(o: ObjectDef, lib: Library): ObjectDef {
+export function expandObject(o: ObjectDef, lib: Library, place?: Setting): ObjectDef {
   const own = o.checks ?? [];
   const taken = new Set(own.map((c) => c.intention ?? c.id));
-  const added = hooksFor(o, lib).filter((h) => !taken.has(h.intention)).map((h) => instantiate(h, o, lib));
+  const added = hooksFor(o, lib, place).filter((h) => !taken.has(h.intention)).map((h) => instantiate(h, o, lib));
   return added.length ? { ...o, checks: [...own, ...added] } : o;
 }
 
-export const expandScene = (def: SceneDef, lib: Library): SceneDef => ({ ...def, objects: def.objects.map((o) => expandObject(o, lib)) });
+export const expandScene = (def: SceneDef, lib: Library): SceneDef => ({ ...def, objects: def.objects.map((o) => expandObject(o, lib, def)) });
