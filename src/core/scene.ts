@@ -136,10 +136,8 @@ export interface SocialDef {
   goal: string;
   /** Control needed to buy the goal (2 = make them do something). */
   cost: number;
-  /** The other side's pools by skill id. */
+  /** The other side's pools by skill id: what he really has. */
   dice: Record<string, Dice>;
-  /** His fitting answers to a skill of yours (he picks one at random); anything else uses the approach's `answers`. */
-  responses?: Record<string, string[]>;
   approaches: SceneApproach[];
 }
 

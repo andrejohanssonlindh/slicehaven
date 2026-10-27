@@ -102,6 +102,7 @@ describe('social conflict', () => {
     situation: 0, answers: ['Genomskåda', 'attr:Självkontroll'],
   };
   const mine = () => ({ n: 3, mod: 0 });
+  const him = { dice: mine, ids: ['Genomskåda', 'attr:Självkontroll'] };
 
   it('Control: 1 for the winner, +1 per 5 more; a tie gives both 1', () => {
     expect(exchange(12, 7)).toEqual({ mine: 2, theirs: 0 });
@@ -111,17 +112,17 @@ describe('social conflict', () => {
 
   it('the locked roll is forced in the last round if it has not been used', () => {
     const c = newConflict('sweet');
-    playRound(c, a, 'Charm', mine, mine, dice());
-    playRound(c, a, 'Argumentera', mine, mine, dice());
+    playRound(c, a, 'Charm', mine, him, dice());
+    playRound(c, a, 'Argumentera', mine, him, dice());
     expect(mustUseLocked(c, a)).toBe(true);
     expect(allowed(c, a, 'Charm')).toBe(false);
     expect(allowed(c, a, 'attr:Intryck')).toBe(true);
-    expect(() => playRound(c, a, 'Charm', mine, mine, dice())).toThrow();
+    expect(() => playRound(c, a, 'Charm', mine, him, dice())).toThrow();
   });
 
   it('repeating a skill costs 2D6 per earlier use', () => {
     const c = newConflict('sweet');
-    playRound(c, a, 'Charm', mine, mine, dice());
+    playRound(c, a, 'Charm', mine, him, dice());
     expect(pooled(c, 'Charm', { n: 3, mod: 0 })).toEqual({ n: 1, mod: 0 });
     expect(pooled(c, 'Argumentera', { n: 3, mod: 0 })).toEqual({ n: 3, mod: 0 });
   });

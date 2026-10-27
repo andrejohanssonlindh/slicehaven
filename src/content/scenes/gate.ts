@@ -2,6 +2,7 @@ import type { MobKind } from '../../art/mapScene';
 import { DIFFICULTY } from '../../core/checks';
 import type { Effect, SceneDef } from '../../core/scene';
 import { SKILL_SETS } from '../rollables';
+import { GENERIC_GUARD } from '../npcs';
 import { surveyChallenge } from '../skillweb/challenges';
 
 /**
@@ -121,27 +122,8 @@ export const GATE_SCENE: SceneDef = {
       social: {
         goal: 'open the gate',
         cost: 2,
-        dice: {
-          Handel: { n: 2, mod: 2 },
-          Genomskåda: { n: 3, mod: 0 },
-          'Injaga fruktan': { n: 2, mod: 2 },
-          'attr:Självkontroll': { n: 3, mod: 0 },
-          'attr:Vaksamhet': { n: 2, mod: 3 },
-          'attr:Kroppsbyggnad': { n: 3, mod: 1 },
-        },
-        // What he might answer with, by what you lead with. He picks one of these at random.
-        responses: {
-          Handel: ['Handel', 'Genomskåda'],
-          'E:Muta': ['Genomskåda', 'attr:Självkontroll'],
-          Skumraskaffärer: ['Genomskåda', 'attr:Vaksamhet', 'attr:Självkontroll'],
-          Dupera: ['Genomskåda', 'attr:Vaksamhet'],
-          Argumentera: ['Genomskåda', 'attr:Självkontroll', 'Handel'],
-          Charm: ['Genomskåda', 'attr:Självkontroll'],
-          Berättarkonst: ['Genomskåda', 'attr:Vaksamhet'],
-          'Injaga fruktan': ['attr:Självkontroll', 'Injaga fruktan'],
-          Ledarskap: ['attr:Självkontroll', 'Injaga fruktan', 'attr:Kroppsbyggnad'],
-          Slagsmål: ['attr:Kroppsbyggnad', 'Injaga fruktan'],
-        },
+        // He rolls what he has (the generic guard's sheet), and falls back on his attributes.
+        dice: GENERIC_GUARD.dice,
         approaches: [
           {
             id: 'bribe',

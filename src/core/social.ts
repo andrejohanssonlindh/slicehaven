@@ -5,8 +5,12 @@ import type { Rng } from './rng';
  * Social conflicts, after the tabletop rules for challenges & conflicts:
  * - Three rounds, and the lead alternates: in rounds 1 and 3 you pick a skill and he
  *   answers with a fitting one; in round 2 he picks a skill and you answer.
- *   What he picks and answers with is drawn at random from the few skills that fit
- *   (so you never know exactly what he will do); `responses` ties his answers to your skill.
+ *   He only uses what he actually has: of the skills that fit the situation (the approach's
+ *   lists) he picks one he has at random, preferring one he hasn't used. If none fit he
+ *   falls back on an attribute, which is always possible. Every character has their own
+ *   skills (NPC sheets), so nobody answers "with the same skill as yours".
+ * - Attributes (Presence and so on) are always allowed for anyone, but using one again
+ *   costs −2D6 like any other skill.
  * - The winner of a round gains 1 Control, +1 per full 5 they won by. A tie gives both 1.
  * - The approach has a locked roll that must be used once; if it hasn't been used
  *   by the last round, the last round must use it. Lacking it entirely rolls 0.
@@ -28,9 +32,9 @@ export interface Approach {
   locked: string;
   /** Upper hand (+2), even (0) or weak position (−2). */
   situation: number;
-  /** How the other side answers when you lead, unless `responses` has something for your skill. */
+  /** Skills that fit as an answer here (he uses those he has). */
   answers: string[];
-  /** What the other side leads with in his round (defaults to `answers`). */
+  /** Skills that fit when he leads (defaults to `answers`). */
   moves?: string[];
 }
 
@@ -73,7 +77,8 @@ export const pooled = (c: Conflict, skill: string, base: Dice): Dice => modify(b
 
 /** Is this skill allowed this round? Reasonable for the approach, and the locked roll is forced last. */
 export function allowed(c: Conflict, a: Approach, skill: string): boolean {
-  if (!a.skills.includes(skill)) return false;
+  // Your own nature is always possible when nothing else fits.
+  if (!a.skills.includes(skill) && !skill.startsWith('attr:')) return false;
   const last = c.rounds.length === ROUNDS - 1;
   const lockedUsed = c.rounds.some((r) => r.skill === a.locked);
   return !last || lockedUsed || skill === a.locked;
@@ -94,39 +99,52 @@ export function exchange(mine: number, theirs: number): { mine: number; theirs: 
 /** Who leads round n (0-based): you, then him, then you again. */
 export const leadOf = (round: number): 'me' | 'them' => (round % 2 === 0 ? 'me' : 'them');
 
-/** A random pick, preferring options not used yet (repeats cost dice). */
+/** One side of a conflict: what they can roll. */
+export interface Side {
+  dice: (id: string) => Dice;
+  /** Everything they have a pool for (to find their attributes). */
+  ids: string[];
+}
+
+/** A random pick among the least used options. */
 function pick(options: string[], used: string[], rng: Rng): string {
-  const fresh = options.filter((o) => !used.includes(o));
-  const from = fresh.length ? fresh : options;
+  const count = (o: string) => used.filter((u) => u === o).length;
+  const least = Math.min(...options.map(count));
+  const from = options.filter((o) => count(o) === least);
   return from[rng.int(from.length)];
 }
 
-/** His skill for his round: random among what fits, avoiding what he has used. */
-export function theirMove(c: Conflict, a: Approach, rng: Rng): string {
-  return pick(a.moves?.length ? a.moves : a.answers, c.rounds.map((r) => r.answer), rng);
+/** What a side uses: a skill that fits and that they have, else one of their attributes (worse each time it's reused). */
+export function choose(fits: string[], side: Side, used: string[], rng: Rng): string {
+  const has = fits.filter((id) => side.dice(id).n > 0);
+  if (has.length) return pick(has, used, rng);
+  const stats = side.ids.filter((id) => id.startsWith('attr:') && side.dice(id).n > 0);
+  if (stats.length) return pick(stats, used, rng);
+  return fits[0]; // nothing at all: rolls 0
 }
 
-/** His answer when you lead with `mySkill`: random among the skills that fit it. */
-export function replyTo(c: Conflict, a: Approach, mySkill: string, rng: Rng, responses?: Record<string, string[]>): string {
-  return pick(responses?.[mySkill]?.length ? responses[mySkill] : a.answers, c.rounds.map((r) => r.answer), rng);
-}
+const usedBy = (c: Conflict): string[] => c.rounds.map((r) => r.answer);
+
+/** His skill for his round. */
+export const theirMove = (c: Conflict, a: Approach, side: Side, rng: Rng): string => choose(a.moves?.length ? a.moves : a.answers, side, usedBy(c), rng);
+
+/** His answer when you lead. */
+export const replyTo = (c: Conflict, a: Approach, side: Side, rng: Rng): string => choose(a.answers, side, usedBy(c), rng);
 
 /**
  * Play one round. When you lead, `skill` is yours and he answers (chosen here);
  * when he leads, `theirSkill` is his pick (from `theirMove`) and `skill` is your answer.
- * `mineDice`/`theirDice` give the base pool for a skill id.
  */
 export function playRound(
   c: Conflict, a: Approach, skill: string,
-  mineDice: (id: string) => Dice, theirDice: (id: string) => Dice, rng: Rng,
-  responses?: Record<string, string[]>, theirSkill?: string,
+  mineDice: (id: string) => Dice, their: Side, rng: Rng, theirSkill?: string,
 ): Round {
   if (conflictOver(c)) throw new Error('conflict is over');
   if (!allowed(c, a, skill)) throw new Error(`${skill} is not allowed now`);
   const lead = leadOf(c.rounds.length);
   const dice = pooled(c, skill, mineDice(skill));
-  const answer = lead === 'me' ? replyTo(c, a, skill, rng, responses) : theirSkill ?? theirMove(c, a, rng);
-  const answerDice = modify(theirDice(answer), -2 * c.rounds.filter((r) => r.answer === answer).length);
+  const answer = lead === 'me' ? replyTo(c, a, their, rng) : theirSkill ?? theirMove(c, a, their, rng);
+  const answerDice = modify(their.dice(answer), -2 * c.rounds.filter((r) => r.answer === answer).length);
   const roll = rollOpen(dice, rng);
   const answerRoll = rollOpen(answerDice, rng);
   const ctl = exchange(roll.total, answerRoll.total);

@@ -6,7 +6,7 @@ import {
 import { type Dice, difficultyName, rollText } from '../core/checks';
 import { around, gap } from '../core/footprint';
 import { type Hex, hexEquals, hexKey, offsetToHex, parseHexKey } from '../core/hex';
-import { type Hero, canRoll, diceOf } from '../core/hero';
+import { type Hero, NO_DICE, canRoll, diceOf } from '../core/hero';
 import { Rng } from '../core/rng';
 import {
   type CheckDef, type Effect, type ObjectDef, type SceneApproach, type SceneDef, type SceneEvent, type SceneState,
@@ -14,7 +14,7 @@ import {
   talkFor, usefulSkills,
 } from '../core/scene';
 import {
-  type Conflict, ROUNDS, allowed, conflictOver, leadOf, mustUseLocked, newConflict, outcome, playRound, pooled, theirMove,
+  type Conflict, type Side, ROUNDS, allowed, conflictOver, leadOf, mustUseLocked, newConflict, outcome, playRound, pooled, theirMove,
 } from '../core/social';
 import { diceText } from '../core/chargen/tables';
 import { SCENE_ART } from '../art/sceneArt';
@@ -406,7 +406,8 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
     const must = mustLock(d, c);
     const edge = edgeControl(d, time, (id) => canRoll(hero, id));
     const difficulty = difficultyAt(d, time);
-    const opts: SheetOption[] = challengeSkills(d, time).map((id) => {
+    const natural = Object.keys(hero.dice).filter((id) => id.startsWith('attr:') && !challengeSkills(d, time).includes(id));
+    const opts: SheetOption[] = [...challengeSkills(d, time), ...natural].map((id) => {
       const base = diceOf(hero, id);
       const dice = challengePool(c, id, base);
       const ok = challengeAllowed(d, c, id, time);
@@ -622,13 +623,17 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
     const n = c.rounds.length;
     // In his round he picks a skill (at random among what fits) and you answer it.
     const heLeads = leadOf(n) === 'them';
+    // He rolls only what he has, and falls back on his attributes.
+    const their: Side = { dice: (k) => o.social!.dice[k] ?? NO_DICE, ids: Object.keys(o.social!.dice) };
     if (heLeads && !attack) {
-      attack = theirMove(c, a, rng);
+      attack = theirMove(c, a, their, rng);
       say(`He leads with ${rollableName(attack)}.`, 'info');
     }
     const retort = n > 0 ? a.retorts[n - 1] : '';
     const forced = mustUseLocked(c, a);
-    const opts: SheetOption[] = a.skills.map((id) => {
+    // Your own nature (attributes) is always possible, for when nothing else fits.
+    const natural = Object.keys(hero.dice).filter((id) => id.startsWith('attr:') && !a.skills.includes(id));
+    const opts: SheetOption[] = [...a.skills, ...natural].map((id) => {
       const base = diceOf(hero, id);
       const d = pooled(c, id, base);
       const ok = allowed(c, a, id);
@@ -647,7 +652,7 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
         disabled: !ok || (!has && !locked),
         style: ok && (has || locked) ? (locked ? 'primary' : 'good') : 'muted',
         onPick: () => void safe(() => {
-          const r = playRound(c, a, id, (k) => diceOf(hero, k), (k) => o.social!.dice[k] ?? { n: 2, mod: 0 }, rng, o.social!.responses, attack);
+          const r = playRound(c, a, id, (k) => diceOf(hero, k), their, rng, attack);
           say(`Round ${c.rounds.length} (${r.lead === 'me' ? 'you lead' : 'he leads'}): ${rollableName(r.skill)} ${diceText(r.dice)} → ${rollText(r.roll)} vs guard's `
             + `${rollableName(r.answer)} ${diceText(r.answerDice)} → ${rollText(r.answerRoll)}. `
             + (r.mine && r.theirs ? 'Tie, 1 Control each.' : r.mine ? `+${r.mine} Control to you.` : `+${r.theirs} Control to him.`), 'roll');

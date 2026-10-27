@@ -6,7 +6,8 @@ import {
 import type { ChallengeDef } from '../src/core/challenge';
 import { Rng } from '../src/core/rng';
 import { apply, attempt, checkFor, checkOpen, newSceneState } from '../src/core/scene';
-import { type Approach, conflictOver, leadOf, newConflict, playRound, replyTo, theirMove } from '../src/core/social';
+import { type Approach, type Side, allowed, conflictOver, leadOf, newConflict, playRound, replyTo, theirMove } from '../src/core/social';
+import { GENERIC_GUARD } from '../src/content/npcs';
 import { expandScene, readPerson } from '../src/core/skillweb';
 import { surveyChallenge } from '../src/content/skillweb/challenges';
 import { GATE_SCENE } from '../src/content/scenes/gate';
@@ -33,38 +34,67 @@ describe('conflicts alternate who leads', () => {
   it('you lead rounds 1 and 3, he leads round 2', () => {
     expect([0, 1, 2].map(leadOf)).toEqual(['me', 'them', 'me']);
     const c = newConflict('sweet');
-    const r1 = playRound(c, a, 'Charm', mine, mine, dice());
-    const r2 = playRound(c, a, 'Argumentera', mine, mine, dice(), undefined, 'Y');
-    const r3 = playRound(c, a, 'attr:Intryck', mine, mine, dice());
+    const r1 = playRound(c, a, 'Charm', mine, side({ A: 2, X: 2, Y: 2 }), dice());
+    const r2 = playRound(c, a, 'Argumentera', mine, side({ A: 2, X: 2, Y: 2 }), dice(), 'Y');
+    const r3 = playRound(c, a, 'attr:Intryck', mine, side({ A: 2, X: 2, Y: 2 }), dice());
     expect([r1.lead, r2.lead, r3.lead]).toEqual(['me', 'them', 'me']);
     expect(r2.answer).toBe('Y'); // his pick, not an answer to your skill
     expect(conflictOver(c)).toBe(true);
   });
 
-  it('his answer to your lead is one of the skills that fit it, drawn at random', () => {
+  const side = (have: Record<string, number>): Side => ({ dice: (id) => ({ n: have[id] ?? 0, mod: 0 }), ids: Object.keys(have) });
+
+  it('he answers with a skill he has that fits, drawn at random, not with a copy of yours', () => {
     const c = newConflict('sweet');
-    const responses = { Charm: ['P', 'Q'] };
+    const him = side({ A: 2, B: 2, 'attr:Vaksamhet': 3 }); // he has no C
     const seen = new Set<string>();
-    for (let seed = 1; seed < 40; seed++) seen.add(replyTo(c, a, 'Charm', Rng.fromSeed(seed), responses));
-    expect([...seen].sort()).toEqual(['P', 'Q']);
-    // A skill with no entry falls back to the approach's own answers.
-    const fallback = new Set<string>();
-    for (let seed = 1; seed < 60; seed++) fallback.add(replyTo(c, a, 'Argumentera', Rng.fromSeed(seed), responses));
-    expect([...fallback].sort()).toEqual(['A', 'B', 'C']);
+    for (let seed = 1; seed < 60; seed++) seen.add(replyTo(c, a, him, Rng.fromSeed(seed)));
+    expect([...seen].sort()).toEqual(['A', 'B']);
   });
 
-  it('he leads with something from his own moves, and avoids repeating himself', () => {
+  it('with nothing that fits he falls back on an attribute, and reuse makes it worse', () => {
     const c = newConflict('sweet');
-    const first = theirMove(c, a, Rng.fromSeed(3));
+    const him = side({ 'attr:Intryck': 3, 'attr:Vaksamhet': 2, Q: 2 });
+    const seen = new Set<string>();
+    for (let seed = 1; seed < 60; seed++) seen.add(replyTo(c, a, him, Rng.fromSeed(seed)));
+    expect([...seen].sort()).toEqual(['attr:Intryck', 'attr:Vaksamhet']);
+    // Used before: tough luck, it costs him 2D6.
+    const r1 = playRound(c, a, 'Charm', mine, him, dice());
+    const r2 = playRound(c, a, 'Argumentera', mine, him, dice(), r1.answer);
+    expect(r2.answerDice.n).toBeLessThan(him.dice(r1.answer).n);
+  });
+
+  it('he leads with something he has from his own moves, and avoids repeating himself', () => {
+    const c = newConflict('sweet');
+    const him = side({ X: 2, Y: 2, Z: 2 });
+    const first = theirMove(c, a, him, Rng.fromSeed(3));
     expect(['X', 'Y', 'Z']).toContain(first);
     c.rounds.push({ answer: first } as never);
-    for (let seed = 1; seed < 30; seed++) expect(theirMove(c, a, Rng.fromSeed(seed))).not.toBe(first);
+    for (let seed = 1; seed < 30; seed++) expect(theirMove(c, a, him, Rng.fromSeed(seed))).not.toBe(first);
+  });
+
+  it('you may always use an attribute, even if the approach does not list it', () => {
+    const c = newConflict('sweet');
+    expect(allowed(c, a, 'attr:Kroppsbyggnad')).toBe(true);
+    expect(allowed(c, a, 'Klättra')).toBe(false);
+  });
+
+  it('the generic guard rolls what the generic guard has', () => {
+    const him = side(Object.fromEntries(Object.keys(GENERIC_GUARD.dice).map((k) => [k, GENERIC_GUARD.dice[k].n])));
+    for (const approach of GATE_SCENE.objects.find((o) => o.id === 'guard')!.social!.approaches) {
+      const c = newConflict(approach.id);
+      for (let seed = 1; seed < 20; seed++) {
+        expect(GENERIC_GUARD.dice[replyTo(c, approach, him, Rng.fromSeed(seed))].n).toBeGreaterThan(0);
+        expect(GENERIC_GUARD.dice[theirMove(c, approach, him, Rng.fromSeed(seed))].n).toBeGreaterThan(0);
+      }
+    }
   });
 
   it('his side also pays −2D6 for repeating a skill', () => {
     const c = newConflict('sweet');
-    playRound(c, a, 'Charm', mine, mine, dice(), undefined);
-    const r = playRound(c, a, 'Argumentera', mine, mine, dice(), undefined, c.rounds[0].answer);
+    const him = side({ A: 3, B: 3, C: 3 });
+    playRound(c, a, 'Charm', mine, him, dice());
+    const r = playRound(c, a, 'Argumentera', mine, him, dice(), c.rounds[0].answer);
     expect(r.answerDice).toEqual({ n: 1, mod: 0 });
   });
 });

@@ -6,6 +6,8 @@ Only decisions that still stand. Ones that were replaced are removed (git histor
 |---|---|---|
 | 2026-10-27 | **Social tries linger:** most people put up with a limited number of talks, and the outcome of a try leaves a mood that colours the next | Director (Q18). |
 | 2026-10-27 | **One kept advantage = 5 points off a later difficulty**, tied to a person; spending it uses it up | Matches the margin that earns an advantage on a roll. My choice; say if it feels wrong. |
+| 2026-10-27 | **People use what they have:** every character has their own skills; in a conflict they pick among the fitting skills they own, and fall back on an attribute (always allowed, for everyone) | Director. The generic guard is the first NPC sheet; many generics follow. |
+| 2026-10-27 | **Knowledge and insight rolls are hidden 50/50 reads** (a plausible wrong answer on failure, one try) | Director. |
 | 2026-10-27 | **Single rolls change difficulty; challenges and conflicts change Control.** Mood and how peoples see each other: 2 difficulty per point, or 1 Control per point (max ±4); a kept advantage is 5 difficulty or 1 Control | Director, checked against the rules: difficulty is picked by circumstances, Control by situation. |
 | 2026-10-27 | **Kin depends on context:** your own people only count as kin where you are not the majority. Rural humans sit between human and guard/outcast in the kind tree | Director. |
 | 2026-10-27 | **Mood is shown as discrete notes in the log and when tapping a person**, no meter | Director. |

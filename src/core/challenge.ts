@@ -84,7 +84,7 @@ export const challengeOpen = (d: ChallengeDef, s: SceneState): boolean => met(s,
 
 /** Is this skill reasonable now? Locked rolls always are. */
 export function reasonable(d: ChallengeDef, skill: string, time: SceneTime): boolean {
-  if (d.locked.includes(skill)) return true;
+  if (d.locked.includes(skill) || skill.startsWith('attr:')) return true; // your own nature is always possible
   const s = d.skills.find((x) => x.id === skill);
   return !!s && (!s.time || s.time.includes(time));
 }

@@ -1,5 +1,11 @@
 # Devlog
 
+## 2026-10-27 — Session 13b: people use what they have
+
+- The guard in the conflict rolls only skills on his own sheet (`content/npcs`, the generic guard), picks at random among the ones that fit the situation, and falls back on an attribute when none does. No more answers tied to your skill.
+- Attributes are always allowed as a fallback for you too (conflicts and challenges); reusing one costs −2D6.
+- 146 tests.
+
 ## 2026-10-27 — Session 13: hidden reads, real conflicts, challenges
 
 See the third-pass status in [Skill web](design/skill-web.md).
