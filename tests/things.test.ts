@@ -5,8 +5,10 @@ import { expandObject, expandScene, hooksFor, kindChain } from '../src/core/skil
 import { GATE_SCENE } from '../src/content/scenes/gate';
 import { isRollable } from '../src/content/rollables';
 import { KIND_PARENTS, LIBRARY } from '../src/content/skillweb';
-import { THING_HOOKS, THING_KINDS } from '../src/content/skillweb/things';
 import type { ObjectDef } from '../src/core/scene';
+
+/** Hooks on things (layer 2), not on people. */
+const THING_HOOKS = LIBRARY.hooks.filter((h) => h.layer === 2);
 
 function dice(...faces: number[]): Rng {
   const r = Rng.fromSeed(1);
@@ -36,7 +38,6 @@ describe('hooks on things', () => {
     expect(kindChain('lock', KIND_PARENTS)).toEqual(['lock', 'structure', 'feature', 'thing']);
     expect(kindChain('tree', KIND_PARENTS)).toEqual(['tree', 'plant', 'feature', 'thing']);
     expect(kindChain('food', KIND_PARENTS)).toEqual(['food', 'item', 'thing']);
-    expect(Object.keys(THING_KINDS)).toHaveLength(10);
     // No hook is written for structure or item themselves, so a scene's own palisade or cart keeps its own rules.
     for (const h of THING_HOOKS) expect(['structure', 'item'], h.id).not.toContain(h.kind);
   });
@@ -75,9 +76,13 @@ describe('hooks on things', () => {
     expect(intents('water')).toEqual(expect.arrayContaining(['swim', 'forage']));
     expect(intents('gap')).toEqual(['jump']);
     expect(intents('trail')).toEqual(['track']);
-    expect(intents('animal')).toEqual(expect.arrayContaining(['calm', 'forage']));
-    // The rock keeps the hooks it always had.
-    expect(intents('rock')).toEqual(['climb', 'study']);
+    expect(intents('animal')).toEqual(expect.arrayContaining(['tame', 'forage']));
+    // A rock can be climbed, and studied if it has anything to tell.
+    expect(intents('rock')).toEqual(['climb']);
+    expect(hooksFor({ kind: 'rock', lore: { true: 'a', false: 'b' } }, LIBRARY).map((h) => h.intention)).toEqual(['climb', 'study']);
+    // A trail can be followed, and read when it has lore: two slots of one effort.
+    expect(hooksFor({ kind: 'trail', lore: { true: 'a', false: 'b' } }, LIBRARY).map((h) => [h.intention, h.effort]))
+      .toEqual(expect.arrayContaining([['track', 'track'], ['study', 'track']]));
   });
 
   it('which skills do it: the climbing, jumping, swimming and healing sets', () => {

@@ -34,7 +34,7 @@ A use has three parts: **what you are trying** (the intention and the kind of ef
 **Planned:** an item, pass or clue; a changed relationship or a hold over someone; wellbeing or health changes; a new option opening (a route, a talk line).
 
 ## Intentions we have so far
-From the library: **persuade, impress, distract, ask, intimidate, etiquette, size up, climb, study** (and, as conflict approaches, **bribe, threaten, sweet-talk**; as a challenge, **survey**). Search is "look around" and the cart's check. More come with the content pass.
+From the library: **persuade, impress, distract, ask, threaten, etiquette, size up, climb, study, search, mend, force, pick, forage, tame, swim, jump, track, heal, check for poison** (and, as conflict approaches, **bribe, threaten, sweet-talk**; as a challenge, **survey**). Search is "look around" and the cart's check. More come with the content pass.
 
 ## Kinds of effort (tags)
 persuade, impress, sweet-talk, distract, ask, barter, threaten, etiquette, streetwise, read people, search, climb, survey. Weapon skills are tagged for **threaten** and **impress** (a drawn blade, a clean shot, a trick throw). More kinds are listed as wanted in the [handover](skill-map-handover.md).

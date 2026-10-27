@@ -16,11 +16,11 @@ function dice(...faces: number[]): Rng {
 }
 
 const hook = (over: Partial<HookDef>): HookDef => ({
-  id: 'h', kind: 'thing', layer: 1, intention: 'i', label: 'Do it to {name}', skills: ['Charm'], difficulty: 6,
+  id: 'h', kind: 'thing', layer: 1, effort: 'i', intention: 'i', label: 'Do it to {name}', skills: ['Charm'], difficulty: 6,
   success: [{ say: 'ok {name}' }], failure: [{ say: 'no' }], ...over,
 });
 const obj = (over: Partial<ObjectDef> = {}): ObjectDef => ({ id: 'o', name: 'Thing', hexes: [[0, 0]], look: '', ...over });
-const lib = (...hooks: HookDef[]): Library => ({ parents: { thing: undefined, creature: 'thing', humanoid: 'creature', dwarf: 'humanoid' }, hooks, kindDefaults: {}, peoples: [], relations: {} });
+const lib = (...hooks: HookDef[]): Library => ({ parents: { thing: undefined, creature: 'thing', humanoid: 'creature', dwarf: 'humanoid' }, hooks, defaults: {}, peoples: [], relations: {} });
 
 describe('skill web: kinds and lookup', () => {
   it('walks a kind up to the root', () => {

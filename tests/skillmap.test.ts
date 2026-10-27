@@ -198,7 +198,7 @@ describe('weapon skills and the ways of use', () => {
   it('weapon skills can threaten and impress', () => {
     for (const w of ['Svärd', 'Yxa', 'Spjut', 'Dolk', 'Båge']) {
       expect(tagsOf(w), w).toEqual(expect.arrayContaining(['threaten', 'impress']));
-      expect(examplesOf(w).map((e) => e.tag).sort(), w).toEqual(['impress', 'threaten']);
+      expect(examplesOf(w).map((e) => e.tag), w).toEqual(expect.arrayContaining(['impress', 'threaten']));
     }
     expect(SKILL_SETS.threaten).toContain('Svärd');
     expect(SKILL_SETS.impress).toContain('Båge');

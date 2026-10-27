@@ -2,6 +2,13 @@
 
 *2026-10-27. A check on the **shape** of the skill tags, people library and hooks built in sessions 15–17, not on how much is done. The question: will it hold when we add many more efforts, people and scenes? Handover: [skill-map-handover.md](skill-map-handover.md).*
 
+> **Done, session 18 (Q19: fix first).** All five seams are fixed. The game plays the same; only ids and the code layout changed. How to build on it: [handover §4](skill-map-handover.md). What each fix became:
+> 1. Guard, outcast and rural are facets now (`job-guard`, `poor`/`job-vagrant`, `rural`). Patience and relations read facets first, then kinds. A frightened guard is answered as frightened.
+> 2. Every hook has an `effort` (a tag) and an `intention` (its slot on a thing). `intimidate` → `threaten`; new efforts `force`, `pick`, `tame`; token kinds `barter` → `bribe`, `pickpocket` → `steal`.
+> 3. Hook skills come from the tag, narrowed with `only`, plus visible exceptions in `also`. A test enforces it.
+> 4. `content/skillweb/hooks/<effort>.ts`, shared `helpers.ts`, and `hooks/index.ts` with the order and the `PLANNED` list of efforts still to build.
+> 5. Leanings have `leaningId`; the key scheme for later translation is written in the handover.
+
 ## Verdict
 **The core is sound and worth keeping.** Five seams will cost more the more content we write, so fix them before the next big content pass (sweet-talk, comfort, deceive, sneak…). All five are a session or less, and the content survives them.
 

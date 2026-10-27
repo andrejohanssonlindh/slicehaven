@@ -72,11 +72,11 @@ export function coversSkill(entry: string, skill: string): boolean {
   return entry.endsWith(':*') ? skill.startsWith(entry.slice(0, -1)) : entry === skill;
 }
 
-/** The effort a check is about: its intention, with the old names mapped to the tags. */
-export function effortOf(intention: string | undefined): string | undefined {
-  if (intention === 'intimidate') return 'threaten';
-  return intention;
-}
+/**
+ * A leaning's stable id: facet, effort and (if any) its skills. Unique (a test checks), so it can be a
+ * translation key later (`lean.<id>`) without depending on where the row sits in the table.
+ */
+export const leaningId = (l: Leaning): string => [l.who, l.effort, ...(l.skills ?? [])].join('.');
 
 /**
  * Where an effort works better or worse, for one skill: every leaning for the effort that either

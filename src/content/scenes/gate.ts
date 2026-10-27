@@ -88,9 +88,9 @@ export const GATE_SCENE: SceneDef = {
     {
       id: 'guard',
       name: 'Gate guard',
-      kind: 'guard',
-      // People library: an Asharian soldier-type on duty, at a checkpoint (the scene's tags) at night.
-      tags: ['asharier', 'job-guard', 'on-duty'],
+      kind: 'human',
+      // People library: an Asharian country guard on duty, at a checkpoint (the scene's tags) at night.
+      tags: ['asharier', 'rural', 'job-guard', 'on-duty'],
       units: ['guard'],
       hexes: [[4, 4]],
       look: [
@@ -333,7 +333,8 @@ export const GATE_SCENE: SceneDef = {
     {
       id: 'drifter',
       name: 'Drifter',
-      kind: 'outcast',
+      kind: 'human',
+      tags: ['rural', 'job-vagrant', 'poor'],
       units: ['drifter'],
       hexes: [[6, 10]],
       look: 'A ragged man sitting against a tree a little way from everyone, with a bundle and a wary eye. He does not come near the fire.',

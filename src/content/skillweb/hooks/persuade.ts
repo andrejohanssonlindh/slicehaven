@@ -1,0 +1,58 @@
+import { DIFFICULTY } from '../../../core/checks';
+import type { HookDef } from '../../../core/skillweb';
+import { TALK, effortHooks, keep, say } from './helpers';
+
+/** Persuade: making a case with reasons and standing. Who hears it decides what comes of it. */
+const persuade = effortHooks('persuade', { ...TALK, difficulty: DIFFICULTY.tricky });
+
+export const PERSUADE: HookDef[] = [
+  persuade.general('Make your case to {name}',
+    [say('{Name} hears you out, and seems to take it in.', 'good'), { mood: 1 }, keep('social', 1, 'you made your case to {name}')],
+    [say('{Name} is not swayed.'), { mood: -1 }],
+    { strong: [say('You find exactly the right words.', 'good'), { mood: 1 }] }),
+
+  persuade.forFacet('nobility', 'Make your case to {name}',
+    [say('{Name} concludes, after a pause, that it was their own idea. Do not correct them.', 'good'), { mood: 1 }, keep('social', 1, '{name} thinks it was their idea')],
+    [say('{Name} is not in the habit of being told.'), { mood: -1 }]),
+  persuade.forFacet('clergy', 'Make your case to {name}',
+    [say('{Name} weighs it against the teaching and finds there is room.', 'good'), { mood: 1 }, keep('social', 1, '{name} found room for it')],
+    [say('{Name} recalls the passage that answers you, and does not look pleased.'), { mood: -1 }]),
+  persuade.forFacet('martial', 'Make your case to {name}',
+    [say('{Name} takes it as a plan sensibly given, and nods.', 'good'), { mood: 1 }],
+    [say('"Orders are orders," says {name}.'), { mood: -1 }]),
+  persuade.forFacet('officialdom', 'Make your case to {name}',
+    [say('{Name} finds a clause which allows exactly what you ask.', 'good'), { mood: 1 }, keep('social', 2, '{name} found the clause')],
+    [say('{Name} cites the regulation, in full.'), { mood: -1 }]),
+  persuade.forFacet('merchant', 'Make your case to {name}',
+    [say('{Name} runs the sums and finds that you are right.', 'good'), { mood: 1 }, keep('bribe', 1, '{name} saw the profit in it')],
+    [say('{Name} asks what is in it for them, and does not like the answer.'), { mood: -1 }]),
+  persuade.forFacet('learned', 'Make your case to {name}',
+    [say('{Name} engages with the argument itself, which is the highest praise they have.', 'good'), { mood: 1 }, keep('social', 1, '{name} took your argument seriously')],
+    [say('{Name} finds the flaw, and puts a finger on it.'), { mood: -1 }]),
+  persuade.forFacet('underworld', 'Make your case to {name}',
+    [say('{Name} sees what is in it for them, which is the only argument they take.', 'good'), { mood: 1 }],
+    [say('{Name} asks what is in it for them, and you cannot say.'), { mood: -1 }]),
+  persuade.forFacet('servile', 'Make your case to {name}',
+    [say('{Name} is surprised to be asked. They give it a moment of real thought.', 'good'), { mood: 1 }],
+    [say('"It is not for me to say," says {name}, and that is the end of it.')]),
+  persuade.forFacet('elder', 'Make your case to {name}',
+    [say('{Name} has heard it before, but admits you put it well.', 'good'), { mood: 1 }],
+    [say('{Name} says it was done otherwise in their day, and so it shall be.'), { mood: -1 }]),
+  persuade.forFacet('child', 'Make your case to {name}',
+    [say('{Name} gets part of it, and decides they agree with that part.', 'good')],
+    [say('{Name} does not follow, and says so loudly.')]),
+  persuade.forFacet('drunk', 'Make your case to {name}',
+    [say('{Name} agrees warmly with every word, and will have forgotten by morning.', 'good')],
+    [say('{Name} loses the thread and begins to argue the other side with great feeling.')]),
+  persuade.forFacet('grieving', 'Make your case to {name}',
+    [say('{Name} looks at you as if from far away, and nods.', 'good')],
+    [say('{Name} cannot think of anything but their loss.')],
+    { difficulty: DIFFICULTY.hard }),
+  persuade.forFacet('angry', 'Make your case to {name}',
+    [say('{Name} breaks off in mid-shout to listen, which costs them something.', 'good')],
+    [say('{Name} does not let you finish.'), { mood: -1 }],
+    { difficulty: DIFFICULTY.hard }),
+  persuade.forFacet('courtroom', 'Make your case to {name}',
+    [say('{Name} sets the pen down and listens to the whole of it.', 'good'), { mood: 1 }, keep('social', 1, 'you were heard in court')],
+    [say('{Name} says the court has heard enough.'), { mood: -1 }]),
+];

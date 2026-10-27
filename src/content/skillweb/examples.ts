@@ -300,6 +300,22 @@ export const EXAMPLES: Examples = {
     'E:Språklära': ['Place a speaker\'s accent to a region.', 'Work out a few words of a language you have never heard.'],
     'E:Tolka religiösa skrifter': ['Find the verse they are alluding to.', 'Tell a real scripture from a forged one.'],
     'E:Väderkännedom': ['Remember how last winter\'s storm came in.', 'Know the usual season for spring floods here.'],
+    Naturlära: ['Name the plant and say what it is good for.', 'Tell how deep and how cold the water runs from its colour.'],
+  },
+  force: {
+    'attr:Kroppsbyggnad': ['Put a shoulder to the door until it gives.', 'Wrench the lid off the chest.'],
+    Slagsmål: ['Kick the door just beside the latch.', 'Break the chair over your knee for a club.'],
+    Yxa: ['Split the planks of the door.', 'Knock the hasp off with the back of the axe.'],
+    Klubba: ['Smash the lock with three good blows.', 'Stave in the barrel.'],
+    'E:Slita & släpa': ['Lever the stone aside with a pole.', 'Drag the cart out of the mud by hand.'],
+  },
+  pick: {
+    'E:Låsdyrkning': ['Open a padlock with two bent pins.', 'Feel through the wards for the one that sticks.'],
+    Fingerfärdighet: ['Lift the latch through the gap with a knife tip.', 'Slip the catch of a jewel box.'],
+  },
+  tame: {
+    'E:Djurträning': ['Settle a horse that has thrown its rider.', 'Teach a dog to stay and wait.'],
+    Naturlära: ['Know what upsets the animal, and stop doing it.', 'Approach from downwind and slowly.'],
   },
   analyse: {
     Kalkylera: ['Work out how long a rope must be to span the gap.', 'Count the beams to find out how much a bridge can bear.'],

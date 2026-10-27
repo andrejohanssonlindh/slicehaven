@@ -4,6 +4,12 @@
 
 - Checked what a fresh session loads: about 2k tokens (CLAUDE.md plus memory), which is fine. But CLAUDE.md still named the character creator as the current focus and never pointed to the skill work. It now has a "cold start" table: area → page → handover → code, plus a note not to read the whole `director/` folder or the long devlog. Memory trimmed to what the repo doesn't already say.
 - Reviewed the structure of the skill tags, people library and hooks: [structure review](design/skill-structure-review.md). The core is sound; five seams to fix before the next content pass (Q19).
+- You said fix first (Q19), so all five seams are fixed, and the game plays the same:
+  - The guard, the drifter and country folk are facets now, not kinds.
+  - Every hook names its effort, and its skills come from that effort's tag. Three new efforts (force, pick locks, handle animals) were added, with examples.
+  - All hooks now live in one file per effort under `content/skillweb/hooks/`.
+  - The 18 efforts still without hooks are listed in code, each with what it acts on (a person, a thing, a place, a group, or the hero).
+  - A new test file (`tests/hooks.test.ts`) enforces the rules. The [handover](design/skill-map-handover.md) §4 has the recipe for writing the rest. 240 tests.
 
 ## 2026-10-27 — Session 17: the people library
 

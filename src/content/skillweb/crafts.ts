@@ -45,7 +45,7 @@ export const CRAFTS: BySkill = {
   },
   'H:Boskapsskötare': {
     craft: ['Calve a cow in the dead of night.', 'Drive the herd to market without a loss.'],
-    comfort: ['Calm a nervous beast with a hand and a hum.', 'Be gentle with a frightened animal.'],
+    tame: ['Calm a nervous beast with a hand and a hum.', 'Be gentle with a frightened animal.'],
   },
   'H:Brodör': {
     craft: ['Stitch a crest so fine it looks painted.', 'Mend a tear so well the seam vanishes.'],
@@ -142,6 +142,7 @@ export const CRAFTS: BySkill = {
   'H:Herde': {
     craft: ['Gather a flock with a whistle and a dog.', 'Shear a sheep without a nick.'],
     survey: ['Count the herd at a glance.', 'Spot the wolf\'s tracks before the sheep do.'],
+    tame: ['Bring a strayed ewe back with a low call.', 'Hold a frightened lamb still for the knife.'],
   },
   'H:Hovslagare': {
     craft: ['Shoe a horse that does not want to be shod.', 'Trim a hoof and set a shoe in an hour.'],
@@ -174,6 +175,7 @@ export const CRAFTS: BySkill = {
   'H:Klensmed': {
     craft: ['Mend a kettle, a lock and a hinge.', 'Beat out a dent in a pot.'],
     streetwise: ['Walk the lanes selling mending and hear the news.', 'Be let into any back yard.'],
+    pick: ['Open a stuck lock you were asked to mend.', 'Lift a latch with a bent wire.'],
   },
   'H:Kock': {
     craft: ['Turn scraps into a good meal.', 'Cook for forty on a single fire.'],
@@ -222,6 +224,7 @@ export const CRAFTS: BySkill = {
   'H:Låssmed': {
     craft: ['File a key from the wax print.', 'Fit a lock that is hard to pick.'],
     steal: ['Know exactly how a lock is made, and so how to open it.', 'Spot the weak point in a door lock.'],
+    pick: ['Open a lock you could have made yourself.', 'Tell from the keyhole which maker built it.'],
   },
   'H:Lädermakare': {
     craft: ['Cut and stitch a belt and a pouch.', 'Make a strap that outlasts the buckle.'],

@@ -1,5 +1,5 @@
 import { type CheckDef, type Effect, type ObjectDef, type SceneDef, type SceneState, type Situation, type Token, moodLine, moodWord } from './scene';
-import { type PeopleLibrary, effortOf, facetChain, totalLean } from './people';
+import { type PeopleLibrary, facetChain, totalLean } from './people';
 import { MAX_RECEPTION } from './social';
 
 /**
@@ -14,9 +14,14 @@ import { MAX_RECEPTION } from './social';
  * For each *intention* (what you're trying to get done) the first match wins,
  * so a thing's own check shadows a library hook with the same intention.
  *
- * The library is data (content/skillweb). `expandScene` copies the matching hooks
- * onto each object as ordinary checks, so everything that already reads `checks`
+ * The library is data (content/skillweb/hooks, one file per effort). `expandScene` copies the
+ * matching hooks onto each object as ordinary checks, so everything that already reads `checks`
  * (useful skills, use-a-skill-where-you-stand, hints) works unchanged.
+ *
+ * Two trees say what something is. *Kinds* (content/skillweb/kinds) are what a thing is made as:
+ * humanoid, human, elf, animal, door, water. *Facets* (content/people) are everything social:
+ * calling, homeland, faith, state, setting. Peoples are in both (an Asharian is a kind of human and a
+ * facet). A hook names a `kind` for what it can be done to, and a `facet` for whom it answers differently.
  */
 
 /** One reusable skill use for a kind of thing. */
@@ -27,8 +32,19 @@ export interface HookDef {
   kind: string;
   /** 1 = standard (broad kinds), 2 = object related. Informational: precedence comes from the kind tree. */
   layer: 1 | 2;
-  /** What you're trying to get done. One result per intention on a thing. */
+  /**
+   * The kind of effort: a skill tag (content/skillweb/tags). It decides which skills fit (the skills
+   * carrying the tag) and which leanings of the people library apply.
+   */
+  effort: string;
+  /**
+   * The slot on a thing: one result per intention. Usually the effort itself; different when one thing
+   * offers two tries of the same effort (follow a trail, read a trail), or when the engine knows the
+   * slot by name ('size-up', 'study').
+   */
   intention: string;
+  /** Skills that fit this thing but do not carry the effort's tag. Visible exceptions; a test checks the rest carry it. */
+  also?: string[];
   /** Only things with this tag (e.g. 'rich', 'poor'). */
   tag?: string;
   /**
@@ -37,7 +53,7 @@ export interface HookDef {
    */
   facet?: string;
   label: string;
-  /** Reasonable skills (and attr:… ids). */
+  /** Reasonable skills (and attr:… ids): the effort's tagged skills (or some of them), plus `also`. */
   skills: string[];
   difficulty: number;
   when?: CheckDef['when'];
@@ -66,11 +82,11 @@ export interface Library {
   /** kind → its parent kind (the root has none). */
   parents: Record<string, string | undefined>;
   hooks: HookDef[];
-  /** Defaults for a kind and everything below it (the most specific kind wins). */
-  kindDefaults: Record<string, { patience?: number }>;
+  /** Defaults for a facet or kind and everything below it (see whoChain: facets first, then kinds). */
+  defaults: Record<string, { patience?: number }>;
   /** The kinds that are peoples (human, dwarf…): what 'your own kind' means. */
   peoples: string[];
-  /** observer kind → hero's kind → how the observer sees the hero. Missing = neutral; a more specific observer kind wins. */
+  /** observer (facet or kind) → hero's kind → how the observer sees the hero. Missing = neutral; first in whoChain wins. */
   relations: Record<string, Record<string, Rel>>;
   /** The people library: facets of people and places, and what they lean (see core/people). */
   people?: PeopleLibrary;
@@ -94,14 +110,25 @@ export function kindChain(kind: string | undefined, parents: Library['parents'])
 }
 
 /**
- * How particular a facet is as a reason to pick a hook (always under 2, so a kind outranks it).
+ * Everything someone is, most particular first: each of their facets with the ones above it, then
+ * their kinds. Defaults and relations take the first entry that has something to say.
+ */
+export function whoChain(o: Pick<ObjectDef, 'kind' | 'tags'>, lib: Library): string[] {
+  const facets = lib.people?.facets ?? {};
+  const out = [...(o.tags ?? []).flatMap((t) => facetChain(t, facets)), ...kindChain(o.kind, lib.parents)];
+  return [...new Set(out)];
+}
+
+/**
+ * How particular a facet is as a reason to pick a hook: between 0.5 and 1.5, so always under 2,
+ * so a kind (2 a step) outranks it however deep the facet tree grows.
  * What is happening right now (a state) beats where it happens (a setting), which beats who they are;
  * among who they are, a calling beats its group.
  */
-function facetScore(id: string, facets: PeopleLibrary['facets']): number {
+export function facetScore(id: string, facets: PeopleLibrary['facets']): number {
   const dim = facets[id]?.dim;
   const bonus = dim === 'state' ? 0.6 : dim === 'setting' ? 0.4 : 0;
-  return 0.5 + bonus + facetChain(id, facets).length / 10;
+  return 0.5 + bonus + Math.min(facetChain(id, facets).length, 4) / 10;
 }
 
 /** Library hooks that apply to a thing, best match first, one per intention. */
@@ -147,11 +174,11 @@ function fillEffect(e: Effect, o: ObjectDef, truth = true): Effect {
   return e;
 }
 
-/** How many social tries they put up with: their own, else from the most specific kind. */
-export function patienceOf(o: Pick<ObjectDef, 'kind' | 'patience'>, lib: Library): number | undefined {
+/** How many social tries they put up with: their own, else from their facets, else from their kind. */
+export function patienceOf(o: Pick<ObjectDef, 'kind' | 'tags' | 'patience'>, lib: Library): number | undefined {
   if (o.patience !== undefined) return o.patience;
-  for (const k of kindChain(o.kind, lib.parents)) {
-    const p = lib.kindDefaults[k]?.patience;
+  for (const k of whoChain(o, lib)) {
+    const p = lib.defaults[k]?.patience;
     if (p !== undefined) return p;
   }
   return undefined;
@@ -187,24 +214,23 @@ export function personFacets(o: Pick<ObjectDef, 'kind' | 'tags'>, lib: Library):
  * what you share with the person (people library). Positive = easier for you.
  */
 export function leanOf(
-  o: Pick<ObjectDef, 'kind' | 'tags'>, who: Visitor, lib: Library, place: Setting | undefined, intention: string | undefined, skill?: string,
+  o: Pick<ObjectDef, 'kind' | 'tags'>, who: Visitor, lib: Library, place: Setting | undefined, effort: string | undefined, skill?: string,
 ): { v: number; notes: string[] } {
-  return totalLean(who.tags ?? [], personFacets(o, lib), place?.tags ?? [], effortOf(intention), skill, lib.people ?? {});
+  return totalLean(who.tags ?? [], personFacets(o, lib), place?.tags ?? [], effort, skill, lib.people ?? {});
 }
 
 /**
  * How the thing sees the hero's people.
- * - The row comes from the most specific kind that has an opinion (a rural human before a human).
+ * - The row comes from the first of their facets or kinds that has an opinion (country folk before humans).
  * - Meeting your own kind is kin (a bonus) only when you are not the majority here:
  *   two elves in a human city are kin, two humans in a human city are just neutral.
  * - A visitor from a people that doesn't belong here is a step cooler.
  */
-export function disposition(o: Pick<ObjectDef, 'kind'>, who: Visitor, lib: Library, place: Setting = {}): Rel {
+export function disposition(o: Pick<ObjectDef, 'kind' | 'tags'>, who: Visitor, lib: Library, place: Setting = {}): Rel {
   if (!who.kind) return { v: 0, why: '' };
-  const chain = kindChain(o.kind, lib.parents);
-  const own = chain.find((k) => lib.peoples.includes(k));
+  const own = kindChain(o.kind, lib.parents).find((k) => lib.peoples.includes(k));
   let rel: Rel = { v: 0, why: '' };
-  for (const k of chain) {
+  for (const k of whoChain(o, lib)) {
     const r = lib.relations[k]?.[who.kind];
     if (r) {
       rel = r;
@@ -221,7 +247,7 @@ export function disposition(o: Pick<ObjectDef, 'kind'>, who: Visitor, lib: Libra
 /** What the situation does to one single roll: mood, how their people see yours, and advantages you kept. They change the difficulty. */
 export function situation(s: SceneState, c: CheckDef, o: ObjectDef, who: Visitor, lib: Library, place?: Setting, skill?: string): Situation {
   // What kind of person this is and where, for this kind of effort and this skill (people library).
-  const lean = leanOf(o, who, lib, place, c.intention, skill);
+  const lean = leanOf(o, who, lib, place, c.effort ?? c.intention, skill);
   if (!c.talk) return { shift: 0 - 2 * lean.v, spend: [], notes: lean.notes };
   const mood = s.social[c.talk.who]?.mood ?? 0;
   const rel = disposition(o, who, lib, place);
@@ -295,6 +321,7 @@ export function instantiate(h: HookDef, o: ObjectDef, lib?: Library): CheckDef {
     ...(h.wants ? { wants: h.wants } : {}),
     id: `${o.id}/${h.id}`,
     intention: h.intention,
+    effort: h.effort,
     label: fill(h.label, o),
     skills: [...h.skills],
     difficulty: h.difficulty,

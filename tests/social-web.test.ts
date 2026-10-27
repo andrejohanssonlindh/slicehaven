@@ -9,6 +9,7 @@ import { defaultHero, isRollable } from '../src/content/rollables';
 import { GATE_SCENE } from '../src/content/scenes/gate';
 import { KIND_PARENTS, LIBRARY } from '../src/content/skillweb';
 import { RELATIONS } from '../src/content/skillweb/relations';
+import { FACETS } from '../src/content/people';
 
 /** An Rng that returns these d6 faces in order (then 1s). */
 function dice(...faces: number[]): Rng {
@@ -29,32 +30,39 @@ const use = (o: ObjectDef, s: SceneState, skill: string, who = { kind: 'human', 
   return { c, sit, ...r, events: apply(s, r.effects) };
 };
 
-describe('humans and their subkinds', () => {
-  it('guard and outcast are kinds of rural human, which are humanoids', () => {
-    expect(kindChain('guard', KIND_PARENTS)).toEqual(['guard', 'rural', 'human', 'humanoid', 'creature', 'thing']);
-    expect(kindChain('outcast', KIND_PARENTS)).toEqual(['outcast', 'rural', 'human', 'humanoid', 'creature', 'thing']);
+/** A country guard and a country vagrant: humans, told apart by their facets. */
+const GUARD = ['rural', 'job-guard'];
+const VAGRANT = ['rural', 'job-vagrant', 'poor'];
+
+describe('humans and who they are', () => {
+  it('kinds are what a thing is; a guard or a vagrant is a human with facets', () => {
+    for (const k of ['guard', 'outcast', 'rural']) expect(k in KIND_PARENTS, k).toBe(false);
+    expect(kindChain('asharier', KIND_PARENTS)).toEqual(['asharier', 'human', 'humanoid', 'creature', 'thing']);
   });
 
   it('every humanoid can be argued with, charmed, asked and frightened', () => {
-    for (const kind of ['humanoid', 'human', 'rural', 'dwarf', 'elf', 'tirak', 'guard', 'outcast']) {
-      expect(hooksFor({ kind }, LIBRARY).map((h) => h.intention), kind).toEqual(
-        expect.arrayContaining(['persuade', 'impress', 'distract', 'ask', 'etiquette', 'intimidate', 'size-up']),
+    const who: [string, string[]][] = [['humanoid', []], ['human', []], ['dwarf', []], ['elf', []], ['tirak', []], ['human', GUARD], ['human', VAGRANT]];
+    for (const [kind, tags] of who) {
+      expect(hooksFor({ kind, tags }, LIBRARY).map((h) => h.intention), `${kind} ${tags}`).toEqual(
+        expect.arrayContaining(['persuade', 'impress', 'distract', 'ask', 'etiquette', 'threaten', 'size-up']),
       );
     }
   });
 
-  it('subkinds change single hooks: the guard is harder to frighten, the outcast is easier to ask', () => {
-    const by = (kind: string, intention: string) => hooksFor({ kind }, LIBRARY).find((h) => h.intention === intention)!;
-    expect(by('guard', 'intimidate').difficulty).toBeGreaterThan(by('human', 'intimidate').difficulty);
-    expect(by('outcast', 'ask').difficulty).toBeLessThan(by('human', 'ask').difficulty);
-    expect(by('guard', 'persuade').id).toBe(by('human', 'persuade').id);
+  it('facets change single hooks: the guard is harder to frighten, the poor are easier to ask with streetwise', () => {
+    const by = (tags: string[], intention: string) => hooksFor({ kind: 'human', tags }, LIBRARY).find((h) => h.intention === intention)!;
+    expect(by(GUARD, 'threaten').difficulty).toBeGreaterThan(by([], 'threaten').difficulty);
+    expect(by(VAGRANT, 'ask').difficulty).toBeLessThan(by([], 'ask').difficulty);
+    expect(by(VAGRANT, 'ask').effort).toBe('streetwise');
+    // A guard is martial: orders are orders.
+    expect(by(GUARD, 'persuade').id).toBe('persuade-martial');
   });
 
-  it('patience comes from the most specific kind', () => {
+  it('patience comes from their facets, else their kind', () => {
     expect(patienceOf({ kind: 'human' }, LIBRARY)).toBe(3);
-    expect(patienceOf({ kind: 'guard' }, LIBRARY)).toBe(4);
-    expect(patienceOf({ kind: 'outcast' }, LIBRARY)).toBe(2);
-    expect(patienceOf({ kind: 'outcast', patience: 5 }, LIBRARY)).toBe(5);
+    expect(patienceOf({ kind: 'human', tags: GUARD }, LIBRARY)).toBe(4);
+    expect(patienceOf({ kind: 'human', tags: VAGRANT }, LIBRARY)).toBe(2);
+    expect(patienceOf({ kind: 'human', tags: VAGRANT, patience: 5 }, LIBRARY)).toBe(5);
     expect(patienceOf({ kind: 'rock' }, LIBRARY)).toBeUndefined();
   });
 });
@@ -68,14 +76,14 @@ describe('Court Life depends on who it is done to', () => {
     expect(s.social.npc.mood).toBe(1);
     // Six dice is a strong success: one token from the success, one more from the strong effects.
     expect(s.tokens.length).toBeGreaterThanOrEqual(1);
-    expect(s.tokens.every((t) => t.kind === 'barter' && t.against === 'npc')).toBe(true);
+    expect(s.tokens.every((t) => t.kind === 'bribe' && t.against === 'npc')).toBe(true);
     expect(events.map((e) => e.kind === 'say' && e.text).join(' ')).toMatch(/warmer toward you/);
   });
 
-  it('an outcast hears mockery, however it goes', () => {
+  it('the poor hear mockery, however it goes', () => {
     for (const faces of [[5, 5, 5, 5, 5, 5], [1, 1, 1, 1, 1, 1]]) {
       const s = fresh();
-      use(npc('outcast'), s, cl, undefined, dice(...faces));
+      use(npc('human', { tags: VAGRANT }), s, cl, undefined, dice(...faces));
       expect(s.social.npc.mood).toBe(-2);
       expect(s.tokens).toEqual([]);
     }
@@ -90,7 +98,9 @@ describe('Court Life depends on who it is done to', () => {
 });
 
 describe('how peoples see each other', () => {
-  const look = (observer: string, hero: string, place = {}) => disposition({ kind: observer }, { kind: hero }, LIBRARY, place);
+  /** The observer is a kind (elf) or, for country folk, a human with that facet. */
+  const look = (observer: string, hero: string, place = {}) =>
+    disposition(observer in KIND_PARENTS ? { kind: observer } : { kind: 'human', tags: [observer] }, { kind: hero }, LIBRARY, place);
 
   it('dwarves and elves distrust each other, both ways; almost nobody likes the tirak', () => {
     expect(look('dwarf', 'elf').v).toBeLessThan(0);
@@ -103,7 +113,7 @@ describe('how peoples see each other', () => {
     expect(look('rural', 'tirak').v).toBeLessThan(look('human', 'tirak').v);
     expect(look('rural', 'human').v).toBe(look('human', 'human').v);
     // A guard is rural, so he looks at you as country folk do.
-    expect(look('guard', 'elf').v).toBe(RELATIONS.rural.elf.v);
+    expect(disposition({ kind: 'human', tags: GUARD }, { kind: 'elf' }, LIBRARY).v).toBe(RELATIONS.rural.elf.v);
   });
 
   it('your own kind is kin only where you are not the majority', () => {
@@ -145,7 +155,7 @@ describe('how peoples see each other', () => {
     expect(elf.control).toBe(RELATIONS.dwarf.elf.v);
     expect(elf.control).toBe(-2);
     const s = fresh();
-    s.tokens.push({ kind: 'social', n: 1, against: 'npc', label: 'x' }, { kind: 'barter', n: 1, against: 'npc', label: 'y' });
+    s.tokens.push({ kind: 'social', n: 1, against: 'npc', label: 'x' }, { kind: 'bribe', n: 1, against: 'npc', label: 'y' });
     expect(conflictBonus(s, o, { kind: 'elf' }, LIBRARY).control).toBe(-1);
     // The bonus becomes part of the conflict's situation.
     const c = newConflict('bribe');
@@ -153,9 +163,9 @@ describe('how peoples see each other', () => {
     expect(outcome(c, { id: 'bribe', label: '', skills: [], locked: '', situation: 2, answers: [] }, 2).situation).toBe(0);
   });
 
-  it('every people in the table is a real kind', () => {
+  it('every row is a real kind or facet, every column a real kind', () => {
     for (const [obs, row] of Object.entries(RELATIONS)) {
-      expect(obs in KIND_PARENTS).toBe(true);
+      expect(obs in KIND_PARENTS || obs in FACETS, obs).toBe(true);
       for (const k of Object.keys(row)) expect(k in KIND_PARENTS).toBe(true);
     }
   });
@@ -176,7 +186,7 @@ describe('what you can tell about someone', () => {
   });
 
   it('sizing someone up tells you their mood, how they see your people and whether to push', () => {
-    const o = npc('outcast');
+    const o = npc('human', { tags: VAGRANT });
     const s = fresh();
     s.social.npc = { talks: 1, mood: -1 };
     const lines = readPerson(o, s, { kind: 'elf' }, LIBRARY, PLACE);
@@ -188,7 +198,7 @@ describe('what you can tell about someone', () => {
 
 describe('limited talks and mood', () => {
   it('each social try costs a talk, then they have had enough', () => {
-    const o = npc('outcast'); // patience 2
+    const o = npc('human', { tags: VAGRANT }); // patience 2
     const s = fresh();
     expect(talksLeftWith(o, s, LIBRARY)).toBe(2);
     use(o, s, 'Charm');
@@ -250,7 +260,7 @@ describe('kept advantages', () => {
     const s2 = fresh();
     const { c } = use(npc('human'), s2, 'Dupera');
     expect(c.intention).toBe('distract');
-    expect(s2.tokens.map((t) => t.kind).sort()).toEqual(['pickpocket', 'sneak']);
+    expect(s2.tokens.map((t) => t.kind).sort()).toEqual(['sneak', 'steal']);
     expect(s2.tokens.every((t) => t.against === 'npc')).toBe(true);
   });
 });
@@ -262,11 +272,11 @@ describe('library data and the gate', () => {
     }
   });
 
-  it('in the gate: the guard has more patience than the drifter, who is a human outcast', () => {
+  it('in the gate: the guard has more patience than the drifter, a poor human vagrant', () => {
     const def = expandScene(GATE_SCENE, LIBRARY);
     const by = (id: string) => def.objects.find((o) => o.id === id)!;
-    expect(by('guard').kind).toBe('guard');
-    expect(by('drifter').kind).toBe('outcast');
+    expect(by('guard').tags).toContain('job-guard');
+    expect(by('drifter').tags).toEqual(expect.arrayContaining(['job-vagrant', 'poor']));
     expect(patienceOf(by('guard'), LIBRARY)).toBeGreaterThan(patienceOf(by('drifter'), LIBRARY)!);
     expect(checkOpen(checkFor(by('drifter'), newSceneState(def), 'Skumraskaffärer')!, newSceneState(def))).toBe(true);
   });

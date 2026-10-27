@@ -65,6 +65,7 @@ export const MARKS: BySkill = {
   'K:Djurvän': {
     ride: ['Win a strange horse\'s trust at a touch.', 'Make a nervous mule follow you.'],
     sneak: ['Hush a guard dog with a low word.', 'Pass the geese without a honk.'],
+    tame: ['Let the stray dog come to you.', 'Have the cat on your lap by the end of the evening.'],
   },
   'K:Djärva visioner': {
     rally: ['Paint a picture of what could be, and make them want it.', 'Say "why not us?" and mean it.'],
@@ -257,6 +258,7 @@ export const MARKS: BySkill = {
   'K:Smednävar': {
     travel: ['Walk the stony path barefoot.', 'Ignore the nettles and the midges.'],
     impress: ['Lift the hot iron lid with a bare hand.', 'Pick up a coal and set it back.'],
+    force: ['Bend the hasp back with your fingers.', 'Twist the rusted bolt until it turns.'],
   },
   'K:Snusförnuftig': {
     teach: ['Explain, patiently, how it is done.', 'Tell them the right way to do it.'],
@@ -281,6 +283,7 @@ export const MARKS: BySkill = {
   'K:Storväxt': {
     threaten: ['Fill the doorway.', 'Look down at them from a great height.'],
     impress: ['Lift the child onto your shoulders.', 'Duck under the lintel and be a spectacle.'],
+    force: ['Lean on the door until the frame gives.', 'Lift the gate off its hinges.'],
   },
   'K:Strukturerat sinne': {
     analyse: ['Sort the problem into neat parts.', 'Spot the pattern in the mess.'],

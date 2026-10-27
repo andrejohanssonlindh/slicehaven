@@ -75,6 +75,8 @@ const REALM_KINDS: [string, string, string][] = [
 ];
 add('realm', 'realm', 'Realms', 'Where a person comes from, and what that land is like.');
 for (const [id, label, blurb] of REALM_KINDS) add('realm', id, label, blurb, 'realm');
+// Where someone grew up, beside which land: villages and farms, where strangers are rare (relations has a row for them).
+add('realm', 'rural', 'Country folk', 'Villages, farms and roads, where strangers are rare and talked about.', 'realm');
 
 /** Which kind of realm each homeland is closest to. */
 const REALM_OF: Record<string, string> = {

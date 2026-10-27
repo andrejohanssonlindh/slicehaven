@@ -76,6 +76,8 @@ export interface CheckDef {
   spot?: number;
   /** What you're trying to get done. A check shadows library hooks with the same intention (see skillweb). */
   intention?: string;
+  /** The kind of effort (a skill tag) the people library leans on. Default: the intention. */
+  effort?: string;
   /** Added to `success` on a strong success (2+ advantages). */
   strong?: Effect[];
   /** Came from the skill-web library rather than the scene itself. */

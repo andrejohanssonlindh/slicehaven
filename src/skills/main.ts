@@ -99,7 +99,7 @@ function detail(): string {
 
   parts.push('<h3>Library hooks (what it can do to things)</h3>');
   parts.push(r.hooks.length
-    ? `<ul>${r.hooks.map((h) => `<li><b>${esc(h.label.replace('{name}', '…'))}</b>: on ${esc(h.kind)}${h.facet ? ` (${esc(FACETS[h.facet]?.label ?? h.facet)})` : ''}, ${esc(difficultyName(h.difficulty))} (${h.difficulty})${h.social ? ', social' : ''}${h.hidden ? ', hidden read' : ''}</li>`).join('')}</ul>`
+    ? `<ul>${r.hooks.map((h) => `<li><b>${esc(h.label.replace('{name}', '…'))}</b> (${esc(TAG_INFO[h.effort]?.label ?? h.effort)}${h.also?.includes(id) ? ', fits this thing without the tag' : ''}): on ${esc(h.kind)}${h.facet ? ` (${esc(FACETS[h.facet]?.label ?? h.facet)})` : ''}, ${esc(difficultyName(h.difficulty))} (${h.difficulty})${h.social ? ', social' : ''}${h.hidden ? ', hidden read' : ''}</li>`).join('')}</ul>`
     : '<p class="muted">No library hook lists it.</p>');
 
   parts.push('<h3>Written into scenes</h3>');

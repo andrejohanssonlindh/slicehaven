@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_LEAN, coversSkill, effortOf, facetChain, kinFor, leaningFor, leaningsForSkill } from '../src/core/people';
-import { conflictBonus, expandScene, hooksFor, kindChain, leanOf } from '../src/core/skillweb';
-import { OUTCOME_HOOKS } from '../src/content/skillweb/outcomes';
-import { ASK_HOOKS, TALK_HOOKS } from '../src/content/skillweb/outcomes-talk';
+import { MAX_LEAN, coversSkill, facetChain, kinFor, leaningFor, leaningId, leaningsForSkill } from '../src/core/people';
+import { conflictBonus, expandScene, facetScore, hooksFor, kindChain, leanOf } from '../src/core/skillweb';
 import { BACKGROUNDS } from '../src/content/chargen/backgrounds';
 import { HOMELANDS } from '../src/content/chargen/homelands';
 import { PEOPLES } from '../src/content/chargen/peoples';
@@ -40,8 +38,6 @@ describe('the facets', () => {
     expect(kindChain('asharier', KIND_PARENTS)).toEqual(['asharier', 'human', 'humanoid', 'creature', 'thing']);
     expect(kindChain('learam', KIND_PARENTS).slice(0, 2)).toEqual(['learam', 'elf']);
     expect(kindChain('bazirk', KIND_PARENTS).slice(0, 2)).toEqual(['bazirk', 'tirak']);
-    // The old kinds are unchanged.
-    expect(kindChain('guard', KIND_PARENTS)[1]).toBe('rural');
   });
 });
 
@@ -83,10 +79,10 @@ describe('applying the leanings', () => {
     expect(coversSkill('Charm', 'Charm')).toBe(true);
   });
 
-  it('intimidate is the threaten effort', () => {
-    expect(effortOf('intimidate')).toBe('threaten');
-    expect(effortOf('ask')).toBe('ask');
-    expect(effortOf(undefined)).toBeUndefined();
+  it('every leaning has a stable id of its own (for translation keys later)', () => {
+    const ids = LEANINGS.map(leaningId);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(leaningId({ who: 'roghan', effort: 'impress', shift: 1, why: '', skills: ['H:*'] })).toBe('roghan.impress.H:*');
   });
 
   it('a leaning applies to the facet and everything below it', () => {
@@ -149,9 +145,9 @@ describe('in a roll', () => {
   });
 
   it('a people leans through its kind: an Asharian is not easily threatened, any human is', () => {
-    const a = situation(state(), check('intimidate'), npc([], 'asharier'), { kind: 'human' }, LIBRARY, undefined, 'Injaga fruktan');
+    const a = situation(state(), check('threaten'), npc([], 'asharier'), { kind: 'human' }, LIBRARY, undefined, 'Injaga fruktan');
     expect(a.shift).toBe(2);
-    const h = situation(state(), check('intimidate'), npc([], 'human'), { kind: 'human' }, LIBRARY, undefined, 'Injaga fruktan');
+    const h = situation(state(), check('threaten'), npc([], 'human'), { kind: 'human' }, LIBRARY, undefined, 'Injaga fruktan');
     expect(h.shift).toBe(0);
   });
 
@@ -224,7 +220,7 @@ describe('what you share', () => {
 });
 
 describe('in a conflict', () => {
-  const guard = expandObject({ id: 'guard', name: 'Gate guard', kind: 'guard', tags: ['asharier', 'job-guard', 'on-duty'], hexes: [[0, 0]], look: '' }, LIBRARY);
+  const guard = expandObject({ id: 'guard', name: 'Gate guard', kind: 'human', tags: ['asharier', 'rural', 'job-guard', 'on-duty'], hexes: [[0, 0]], look: '' }, LIBRARY);
   const state = () => newSceneState(GATE_SCENE);
 
   it('the approach\'s effort moves the starting Control', () => {
@@ -250,12 +246,14 @@ describe('outcomes by type of person', () => {
   const person = (tags: string[], kind = 'human') => ({ kind, tags });
   const pick = (tags: string[], intention: string, kind?: string) => hooksFor(person(tags, kind), LIBRARY).find((h) => h.intention === intention)!;
 
-  const ALL = [...OUTCOME_HOOKS, ...TALK_HOOKS];
+  /** Hooks by type of person: a facet on someone humanoid. */
+  const ALL = LIBRARY.hooks.filter((h) => h.facet && h.kind === 'humanoid' && h.social);
+  const ASK_HOOKS = ALL.filter((h) => h.intention === 'ask');
 
-  it('every outcome hook targets a real facet and replaces a general hook of the same intention', () => {
+  it('every hook by type of person targets a real facet and replaces a general hook of the same intention', () => {
+    expect(ALL.length).toBeGreaterThan(60);
     for (const h of ALL) {
       expect(FACETS[h.facet!], h.id).toBeDefined();
-      expect(['impress', 'intimidate', 'ask', 'persuade', 'distract'], h.id).toContain(h.intention);
       expect(LIBRARY.hooks.some((g) => !g.facet && g.kind === 'humanoid' && g.intention === h.intention), h.id).toBe(true);
       expect(h.id.startsWith(`${h.intention}-`), h.id).toBe(true);
       expect(h.success.length, h.id).toBeGreaterThan(0);
@@ -293,24 +291,28 @@ describe('outcomes by type of person', () => {
 
   it('a person without any of these facets gets the general hook', () => {
     expect(pick([], 'impress').id).toBe('impress');
-    expect(pick([], 'intimidate').id).toBe('intimidate');
+    expect(pick([], 'threaten').id).toBe('threaten');
   });
 
   it('a facet hook applies to the facet and everything under it', () => {
     expect(pick(['martial'], 'impress').id).toBe('impress-martial');
     expect(pick(['job-soldier'], 'impress').id).toBe('impress-martial'); // a soldier is martial
-    expect(pick(['job-priest'], 'intimidate').id).toBe('intimidate-clergy');
+    expect(pick(['job-priest'], 'threaten').id).toBe('threaten-clergy');
   });
 
-  it('a particular facet beats a general one; a particular kind beats a facet', () => {
+  it('a particular facet beats a general one; a state beats who they are', () => {
     // What is happening to them right now beats who they are: a terrified soldier is first of all terrified.
-    expect(pick(['job-soldier', 'afraid'], 'intimidate').id).toBe('intimidate-afraid');
-    expect(pick(['job-soldier'], 'intimidate').id).toBe('intimidate-martial');
-    // A calling beats its group, when both have a hook.
-    const lib = { ...LIBRARY, hooks: [...LIBRARY.hooks, { ...OUTCOME_HOOKS[0], id: 'impress-soldier', facet: 'job-soldier' }] };
-    expect(hooksFor(person(['job-soldier']), lib).find((h) => h.intention === 'impress')!.id).toBe('impress-soldier');
-    const g = pick(['job-guard'], 'intimidate', 'guard');
-    expect(g.id).toBe('intimidate-guard'); // the guard's own hook is a kind, and wins
+    expect(pick(['job-soldier', 'afraid'], 'threaten').id).toBe('threaten-afraid');
+    expect(pick(['job-soldier'], 'threaten').id).toBe('threaten-martial');
+    // A calling beats its group: a guard is martial, but has a hook of his own.
+    expect(pick(['job-guard'], 'threaten').id).toBe('threaten-job-guard');
+    // And a frightened guard is frightened first (when a guard was a kind, the guard's hook always won).
+    expect(pick(['job-guard', 'afraid'], 'threaten').id).toBe('threaten-afraid');
+  });
+
+  it('a facet never outranks a kind, however deep the facet tree grows', () => {
+    for (const f of Object.keys(FACETS)) expect(facetScore(f, FACETS), f).toBeLessThan(2);
+    expect(facetScore('made-up', { 'made-up': { id: 'made-up', dim: 'state', label: '', blurb: '', parent: 'a' }, a: { id: 'a', dim: 'state', label: '', blurb: '', parent: 'b' }, b: { id: 'b', dim: 'state', label: '', blurb: '', parent: 'c' }, c: { id: 'c', dim: 'state', label: '', blurb: '', parent: 'd' }, d: { id: 'd', dim: 'state', label: '', blurb: '' } })).toBeLessThan(2);
   });
 
   it('different people answer the same try in different ways', () => {
@@ -320,7 +322,7 @@ describe('outcomes by type of person', () => {
   });
 
   it('the place can pick a hook too', () => {
-    const lib = { ...LIBRARY, hooks: [...LIBRARY.hooks, { ...OUTCOME_HOOKS[0], id: 'impress-tavern', facet: 'tavern', kind: 'humanoid' }] };
+    const lib = { ...LIBRARY, hooks: [...LIBRARY.hooks, { ...pick(['nobility'], 'impress'), id: 'impress-tavern', facet: 'tavern' }] };
     const o = { kind: 'human', tags: [] as string[] };
     expect(hooksFor(o, lib).find((h) => h.intention === 'impress')!.id).toBe('impress');
     expect(hooksFor(o, lib, { tags: ['tavern'] }).find((h) => h.intention === 'impress')!.id).toBe('impress-tavern');
@@ -331,7 +333,7 @@ describe('outcomes by type of person', () => {
     const guard = def.objects.find((o) => o.id === 'guard')!;
     const ids = (guard.checks ?? []).map((c) => c.id);
     expect(ids.some((i) => i.endsWith('impress-martial'))).toBe(true);
-    expect(ids.some((i) => i.endsWith('intimidate-guard'))).toBe(true);
+    expect(ids.some((i) => i.endsWith('threaten-job-guard'))).toBe(true);
   });
 });
 
