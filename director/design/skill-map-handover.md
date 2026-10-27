@@ -2,6 +2,8 @@
 
 *Updated 2026-10-27, end of sessions 16–17. For the next session. Read this first, then [Skill web](skill-web.md) (the design), [People library](people-library.md) and [Ways a skill can be used](ways-of-use.md). The devlog has the story session by session.*
 
+**Before adding content, see the [structure review](skill-structure-review.md)** (2026-10-27): five structural fixes are proposed (Q19) and may change the file layout described below.
+
 The director's estimate: skills and their connections are about **40% done**. What is built is the data and the first set of rules on top of it; what is missing is mostly more of the same, plus using it in real scenes.
 
 ## 1. What is done

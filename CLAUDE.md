@@ -22,11 +22,22 @@ Grounded fantasy campaign game on hex maps, built on a tabletop ruleset (D6 pool
   - The director's own vision notes → `director/vision/` (original text kept verbatim, plus an English digest). **Read these before designing anything.** They're ambitions to build on, not a checklist to do right away.
 - The Eon 5 PDFs in the project root are **copyrighted reference for the world only** (ignore the RPG rules). Never commit them, never paste their text into the repo. Write our own prose. See `director/world/eon-notes.md`.
 
-## Current focus: the character creator
-- The director turned the project toward recreating the tabletop ruleset. First piece: the character creator at `/chargen/` (`src/core/chargen`, `src/content/chargen`, `src/chargen`).
-- **Never write the brand name** of the ruleset in the repo, UI or commits. World names are fine (decision Q1). Data is mechanics plus our own short summaries, never copied prose.
-- Status, what's left and handover notes: `director/design/character-creator.md`. Extracted book text lives in `reference/` (gitignored).
-- Exploration scenes (skills, talking, multi-hex things) at `/scene/`: see `director/design/exploration-scenes.md`. Debug hooks on `window.scene` (`interact(id)`, `tapHex(col,row)`, `isBusy()`, `state`).
+## The ruleset
+- The director turned the project toward recreating the tabletop ruleset. **Never write the brand name** of the ruleset in the repo, UI or commits. World names are fine (decision Q1). Data is mechanics plus our own short summaries, never copied prose.
+- Extracted book text lives in `reference/` (gitignored; never commit it or paste it in).
+
+## Cold start: where to read
+Read only the handover for the area you're asked about; don't read the whole `director/` folder. `devlog.md` is long: read its top entry at most. Skill ids are the creator's Swedish ids (`Argumentera`, `E:`/`K:`/`H:`/`F:` prefixes, `attr:`); `rollableName(id)` gives the English.
+
+| Area | Page | Handover (read first) | Code |
+|---|---|---|---|
+| **Skills, people, hooks (current focus)** | `/skills/` | `director/design/skill-map-handover.md` | `src/content/skillweb`, `src/content/people`, `src/core/skillweb.ts`, `src/core/people.ts` |
+| Character creator | `/chargen/` | `director/design/character-creator.md` | `src/core/chargen`, `src/content/chargen`, `src/chargen` |
+| Exploration scenes (gate) | `/scene/` | `director/design/exploration-scenes.md` | `src/core/scene.ts`, `src/content/scenes`, `src/scene`, `src/engine/scene.ts` |
+| Engine sandbox | `/` | `director/design/game-design.md` | `src/engine`, `src/art` |
+| Magic (planned) | | `director/design/magic-on-map.md`, `magic-filaments.md` | `src/core/filaments.ts` |
+
+The deeper designs (`skill-web.md`, `people-library.md`, `ways-of-use.md`) are for when you change the shape, not for every task. Debug hooks: `window.scene` (`interact(id)`, `tapHex(col,row)`, `isBusy()`, `state`), `window.sandbox` (below).
 
 ## Tech
 - Vite + TypeScript (strict), **own canvas engine** (no Phaser: dropped 2026-10-25, our art and lighting are per-pixel anyway). Vitest for tests. `marked` for the Director's Room.
@@ -38,13 +49,13 @@ Grounded fantasy campaign game on hex maps, built on a tabletop ruleset (D6 pool
 ```
 src/
   core/      Pure game rules. NO DOM imports. Deterministic (all randomness via core/rng.ts). Unit tested.
-  content/   Game data: character creator data, scenes, skill sets. Plain TS objects.
+  content/   Game data, plain TS objects: chargen/, scenes/, npcs/, skillweb/ (skill tags, examples, hooks), people/ (facets, leanings).
   i18n/      Language support groundwork: t(key, 'English'). Language files are empty for now.
   art/       Art generators: pixel buffers, terrain, props, mobs, icons. Everything is drawn by code.
   engine/    Renderer, camera (zoom/pan), weather, lighting, effects, and the sandbox controller.
   ui/        DOM overlays (top bar, menus, long text, dialogs) - text reads better in HTML than canvas on phones.
   director/  Director's Room page script.
-  artlab/    Art Lab page script (art tests).
+  chargen/, scene/, skills/, artlab/   Page scripts for /chargen/, /scene/, /skills/, /artlab/ (each has an index.html at the root).
 director/    Markdown notes for the producer (design, world, art, story, questions, devlog).
 tests/       Vitest tests for core/.
 public/      Static assets (sprites, audio, fonts).

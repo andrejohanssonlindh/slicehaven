@@ -1,5 +1,10 @@
 # Devlog
 
+## 2026-10-27 — Session 18: handover check, skill hook review
+
+- Checked what a fresh session loads: about 2k tokens (CLAUDE.md plus memory), which is fine. But CLAUDE.md still named the character creator as the current focus and never pointed to the skill work. It now has a "cold start" table: area → page → handover → code, plus a note not to read the whole `director/` folder or the long devlog. Memory trimmed to what the repo doesn't already say.
+- Reviewed the structure of the skill tags, people library and hooks: [structure review](design/skill-structure-review.md). The core is sound; five seams to fix before the next content pass (Q19).
+
 ## 2026-10-27 — Session 17: the people library
 
 - Started the layer for "skills tied to types of people and situations": [People library](design/people-library.md). A tree of 252 **facets** (peoples, realms, faiths, standing and calling with all 100 backgrounds, settings, passing states), built mostly from the creator's own data, and a table of 308 **leanings** binding a facet to a kind of effort (and optionally particular skills): easier or harder, and why.

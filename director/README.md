@@ -27,7 +27,8 @@ This is the backstage area for Slicehaven: not part of the game, but where I (Cl
 - [Roadmap](design/roadmap.md): candidate vignettes.
 - [Skill map](../skills/) (a game page): how skills relate: tags, examples, hooks, conflicts, counters, and every way a skill can be used.
 - [Ways a skill can be used](design/ways-of-use.md): the list of every way of use we have considered, built and planned.
-- [Skill map handover](design/skill-map-handover.md): how to fill the tag/example map (sources, rules, order).
+- [Skill map handover](design/skill-map-handover.md): skills, the people library and hooks: what is done, what is not, where things live.
+- [Skill hooks: structure review](design/skill-structure-review.md): is the shape right before we fill in more (2026-10-27).
 - [Backlog (ranked)](design/backlog.md): what's open in the creator and in skills, in priority order.
 - [Skill web](design/skill-web.md): how skills meet the world (standard / object / quest hooks, intentions, gear, people, drives, terrain).
 - [Creator: next design pass](design/creator-next.md): pre-set characters, clearer event cards, life events as game hooks.

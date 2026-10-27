@@ -4,6 +4,13 @@ Newest on top. Answer in chat (just reference the number, e.g. "Q11: option B").
 
 ---
 
+### Q19 — Tidy the skill hooks before adding more? *(2026-10-27)*
+The [structure review](design/skill-structure-review.md) finds the skill/hook design sound, with five seams that get more expensive as content grows: two trees for "who someone is", intentions vs tags, hooks hand-picking skills, files by history, and no translation keys for leanings.
+- **A) Fix them first** (about 1.5 sessions, no new features, the content stays). **My recommendation.**
+- **B) Keep adding content** and fix later, which means more to move.
+
+---
+
 ### Q11 — Private repo, but testable from anywhere *(you asked: can it be private?)*
 Short version: **a private repo does not make the site private.** GitHub Pages sites are public even when the repo is private, unless the account is on GitHub Enterprise Cloud. So there are three ways, and I haven't changed anything yet:
 
