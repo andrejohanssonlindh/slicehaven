@@ -37,16 +37,18 @@ What the first pass says differs (all balance data, edit freely):
 Several facets add up, to at most 3 points either way. Each facet counts once.
 
 ## What is wired
-- **Single rolls** (`situation()` in `core/skillweb.ts`): the person's tags, their kind chain and the scene's tags are matched against the table for the check's intention and the skill rolled. Works for social checks and for other checks that have an intention.
-- **The gate scene** is tagged (`asharien`, `checkpoint`, `night`; the guard is `asharier`, `job-guard`, `on-duty`) so it can be tried.
+- **Single rolls** (`situation()` in `core/skillweb.ts`): the person's tags, their kind chain and the scene's tags are matched against the table for the check's intention and the skill rolled. Works for social checks and for other checks that have an intention. The reasons show in the roll log.
+- **Conflicts** (`conflictBonus()`): each approach names its effort (`effort: 'bribe' | 'threaten' | 'sweet-talk'`), and the leanings for that effort add to or take from the starting Control (a point is a Control). Leanings that name particular skills are left out here, because the skill is chosen round by round; they apply in single rolls. (Skill-by-round is a possible next step.)
+- **What you share** (`content/people/kin.ts`): the hero carries their own facets (people, homeland, faith and calling from the creator; the default shepherd is an Asharian herder from Asharien). Sharing a faith helps persuade / ask / sweet-talk / comfort (+1), a walk of life (same group, e.g. both martial) helps impress / ask / sweet-talk / persuade (+1), and coming from the very same homeland helps ask / sweet-talk (+1). Peoples are not in this table: the relations table already treats your own kind. The scene's tags do not count as kin, only the person.
+- **The Skill map** page lists, per skill and per effort it carries, the kinds of person and place that make it easier or harder (★ when a row names that skill).
+- **The gate scene** is tagged (`asharien`, `checkpoint`, `night`; the guard is `asharier`, `job-guard`, `on-duty`) and its three approaches name their effort, so it can be tried.
 
 ## What is not wired yet
-- **Conflicts** (the gate's bribe / threaten / sweet-talk exchanges): they run on Control of situation, not on difficulty. Leanings should become ±1 Control a point there, by the approach's effort. Needs the approach → effort map (bribe, threaten, sweet-talk).
-- **The hero's own facets**: today only the target and the place lean. A soldier talking to soldiers, a priest to a priest, or a Taup acting among Taups would have their own table ("kin"). The relations table covers peoples; callings and faiths do not have one yet.
-- **Hooks**: a leaning only moves difficulty. Different *outcomes* by type (a noble snubs you, a servant confides) belong with the library hooks.
-- **Skill map page**: should list, per skill, who it works best and worst on.
+- **Hooks**: a leaning only moves difficulty or Control. Different *outcomes* by type (a noble snubs you, a servant confides) belong with the library hooks.
+- **Skill-specific leanings in conflicts** (see above).
+- **Hostility between facets** (a heretic and a priest): kin only gives bonuses today.
 
 ## Open questions for the director
 1. Are the sizes right? ±2 is a wall or an open door; ±1 a tendency. Several of the peoples rows are first guesses from a one-line summary.
-2. Should the hero's own calling and faith matter (shared faith = kin)? I would add it as a second table, "same facet as the hero", next.
-3. Should one calling be tied to *one* kind of effort for each skill ("Baker with an innkeeper to impress") as a visible hint in the scene, or stay hidden and be discovered by the roll log?
+2. Should one calling be tied to *one* kind of effort for each skill ("Baker with an innkeeper to impress") as a visible hint in the scene, or stay hidden and be discovered by the roll log?
+3. Should the other side have facets that clash with the hero's (a devout priest versus a known blasphemer), not only ones that match?

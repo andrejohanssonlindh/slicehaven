@@ -2,6 +2,7 @@ import { ATTR_EN, type Derived } from '../core/chargen/derive';
 import { attrDice, skillDice } from '../core/chargen/tables';
 import type { Hero } from '../core/hero';
 import { GROUP_EN, SKILL_BY_ID } from './chargen/skills';
+import { backgroundFacet, peopleFacet } from './people';
 import { skillsWith } from './skillweb/tags';
 
 /**
@@ -80,7 +81,7 @@ export function defaultHero(): Hero {
   const dice: Hero['dice'] = {};
   for (const [a, v] of Object.entries(SHEPHERD_ATTRS)) dice[`attr:${a}`] = attrDice(v);
   for (const [s, v] of Object.entries(SHEPHERD_SKILLS)) dice[s] = skillDice(v);
-  return { name: 'Shepherd', from: 'Default shepherd', dice, kind: 'human', people: 'asharier' };
+  return { name: 'Shepherd', from: 'Default shepherd', dice, kind: 'human', people: 'asharier', tags: ['asharier', 'asharien', 'job-herder'] };
 }
 
 /** The creator's families as skill-web kinds. */
@@ -91,5 +92,8 @@ export function heroFromChar(name: string, d: Derived): Hero {
   const dice: Hero['dice'] = {};
   for (const a of d.attrs) dice[`attr:${a.attr}`] = a.dice;
   for (const s of d.skills) if (s.dice.n > 0) dice[s.id] = s.dice;
-  return { name: name || 'Unnamed hero', from: 'Character creator', dice, kind: d.people ? FAMILY_KIND[d.people.family] : undefined, people: d.people?.id };
+  const tags = [
+    d.people && peopleFacet(d.people.id), d.homeland?.id, d.religion?.id, d.background && backgroundFacet(d.background.en),
+  ].filter((t): t is string => !!t && t !== 'ovriga');
+  return { name: name || 'Unnamed hero', from: 'Character creator', dice, kind: d.people ? FAMILY_KIND[d.people.family] : undefined, people: d.people?.id, tags };
 }

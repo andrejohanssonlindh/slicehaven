@@ -14,6 +14,8 @@ export interface Hero {
   kind?: string;
   /** The specific people (creator id, e.g. 'asharier'). */
   people?: string;
+  /** Own facets (people library): homeland, faith, calling, people. Sharing one with someone can help. */
+  tags?: string[];
 }
 
 export const NO_DICE: Dice = { n: 0, mod: 0 };

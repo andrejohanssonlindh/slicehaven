@@ -1,10 +1,12 @@
 import { ATTR_EN } from '../core/chargen/derive';
 import { difficultyName } from '../core/checks';
+import { leaningsForSkill } from '../core/people';
 import { type Context, linkedSkills, modesOf, relationsOf } from '../core/skillgraph';
 import { SKILLS } from '../content/chargen/skills';
 import { GATE_SCENE } from '../content/scenes/gate';
 import { GENERIC_GUARD } from '../content/npcs';
 import { byGroup, rollableName } from '../content/rollables';
+import { FACETS, PEOPLE_LIBRARY } from '../content/people';
 import { LIBRARY } from '../content/skillweb';
 import { examplesOf, missingExamples } from '../content/skillweb/examples';
 import { OUTCOME_TYPES, USE_MODES } from '../content/skillweb/uses';
@@ -67,6 +69,16 @@ function detail(): string {
   const bare = r.tags.filter((t) => !exTags.has(t));
   if (bare.length) parts.push(`<p class="muted">No examples yet for: ${bare.map((t) => esc(TAG_INFO[t]?.label ?? t)).join(', ')}.</p>`);
   if (id.startsWith('attr:')) parts.push('<p class="muted">An attribute: a fallback roll (the locked roll, Presence, Physique when aggressive, and a few by difficulty).</p>');
+
+  const where = r.tags
+    .map((t) => ({ t, rows: leaningsForSkill(id, t, PEOPLE_LIBRARY) }))
+    .filter((x) => x.rows.length);
+  if (where.length) {
+    parts.push('<h3>Who and where it works</h3>', '<p class="muted">Easier (+) and harder (−) for this effort, by kind of person or place. Marked ★ when it names this skill.</p>');
+    parts.push(...where.map(({ t, rows }) => `<details><summary>${esc(TAG_INFO[t]?.label ?? t)} (${rows.length})</summary><ul>${rows
+      .map(({ l, specific }) => `<li><b>${l.shift > 0 ? '+' : '−'}${Math.abs(l.shift)}</b> ${esc(FACETS[l.who]?.label ?? l.who)}${specific ? ' ★' : ''} <span class="muted">${esc(l.why)}</span></li>`)
+      .join('')}</ul></details>`));
+  }
 
   const modes = modesOf(r);
   parts.push('<h3>Ways it can be used</h3>', modes.length

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_LEAN, coversSkill, effortOf, facetChain, leaningFor } from '../src/core/people';
-import { kindChain } from '../src/core/skillweb';
+import { MAX_LEAN, coversSkill, effortOf, facetChain, kinFor, leaningFor, leaningsForSkill } from '../src/core/people';
+import { conflictBonus, kindChain, leanOf } from '../src/core/skillweb';
 import { BACKGROUNDS } from '../src/content/chargen/backgrounds';
 import { HOMELANDS } from '../src/content/chargen/homelands';
 import { PEOPLES } from '../src/content/chargen/peoples';
 import { RELIGIONS } from '../src/content/chargen/religions';
-import { FACETS, FACET_LIST, LEANINGS, PEOPLE_LIBRARY } from '../src/content/people';
-import { isRollable } from '../src/content/rollables';
+import { FACETS, FACET_LIST, LEANINGS, PEOPLE_LIBRARY, backgroundFacet, peopleFacet } from '../src/content/people';
+import { defaultHero, isRollable } from '../src/content/rollables';
 import { KIND_PARENTS, LIBRARY } from '../src/content/skillweb';
 import { TAG_INFO } from '../src/content/skillweb/tags';
 import { expandObject, situation } from '../src/core/skillweb';
@@ -160,5 +160,100 @@ describe('in a roll', () => {
 
   it('nothing changes for a person with no facets', () => {
     expect(situation(state(), check('ask'), npc([]), { kind: 'human' }, LIBRARY, undefined, 'Charm').shift).toBe(0);
+  });
+});
+
+describe('the Skill map view', () => {
+  it('lists where a skill works for an effort, general rows and ones that name the skill', () => {
+    const rows = leaningsForSkill('H:Bagare', 'impress', PEOPLE_LIBRARY);
+    const mine = rows.filter((r) => r.specific).map((r) => r.l.who);
+    expect(mine).toEqual(expect.arrayContaining(['job-innkeeper', 'job-miller']));
+    // A general row (the rich are hard to impress, whatever you do) is there too, and sorts below the open doors.
+    expect(rows.find((r) => r.l.who === 'rich')?.specific).toBe(false);
+    expect(rows[0].l.shift).toBeGreaterThanOrEqual(rows[rows.length - 1].l.shift);
+    // A skill that is not named only gets the general rows.
+    expect(leaningsForSkill('Svärd', 'impress', PEOPLE_LIBRARY).some((r) => r.l.who === 'job-innkeeper')).toBe(false);
+  });
+});
+
+describe('what you share', () => {
+  const lib = PEOPLE_LIBRARY;
+
+  it('a shared faith helps with persuading, a shared calling with impressing', () => {
+    expect(kinFor(['samorism'], ['samorism'], 'persuade', lib).v).toBe(1);
+    expect(kinFor(['samorism'], ['daak'], 'persuade', lib).v).toBe(0);
+    // A soldier and a guard are both martial: one walk of life.
+    expect(kinFor(['job-soldier'], ['job-guard'], 'impress', lib).v).toBe(1);
+    expect(kinFor(['job-soldier'], ['job-baker'], 'impress', lib).v).toBe(0);
+  });
+
+  it('the root of a dimension is not something you share', () => {
+    // Both have "a faith" in the abstract, but nothing in common.
+    expect(kinFor(['arachna'], ['daak'], 'persuade', lib).v).toBe(0);
+    expect(kinFor(['arachna'], ['dibuk'], 'persuade', lib).v).toBe(1); // two old pagan cults
+  });
+
+  it('a homeland counts only when it is the very same one', () => {
+    expect(kinFor(['asharien'], ['asharien'], 'ask', lib).v).toBe(1);
+    expect(kinFor(['asharien'], ['vastmark'], 'ask', lib).v).toBe(0); // both lawless lands, but not the same land
+  });
+
+  it('it does nothing for efforts it does not help', () => {
+    expect(kinFor(['samorism'], ['samorism'], 'threaten', lib).v).toBe(0);
+    expect(kinFor([], ['samorism'], 'persuade', lib).v).toBe(0);
+  });
+
+  it('the place is not kin, only the person', () => {
+    const o = expandObject({ id: 'npc', name: 'Old Rae', kind: 'human', hexes: [[0, 0]], look: '' }, LIBRARY);
+    const sit = leanOf(o, { kind: 'human', tags: ['asharien'] }, LIBRARY, { tags: ['asharien'] }, 'ask');
+    expect(sit.v).toBe(0); // lawless land: nothing for asking; and the scene tag does not make Rae a fellow countryman
+  });
+
+  it('is part of the roll', () => {
+    const o = expandObject({ id: 'npc', name: 'Old Rae', kind: 'human', tags: ['samorism'], hexes: [[0, 0]], look: '' }, LIBRARY);
+    const c: CheckDef = { id: 'c', label: 'Try', skills: [], difficulty: 10, intention: 'persuade', success: [], failure: [], talk: { who: 'npc', patience: 3 } };
+    const same = situation(newSceneState(GATE_SCENE), c, o, { kind: 'human', tags: ['samorism'] }, LIBRARY, undefined, 'Teologi');
+    // Samorists weigh scripture (+1) and you share their faith (+1).
+    expect(same.shift).toBe(-4);
+    expect(same.notes).toEqual(expect.arrayContaining(['scripture counts', 'you share their faith']));
+    const other = situation(newSceneState(GATE_SCENE), c, o, { kind: 'human', tags: ['daak'] }, LIBRARY, undefined, 'Teologi');
+    expect(other.shift).toBe(-2);
+  });
+});
+
+describe('in a conflict', () => {
+  const guard = expandObject({ id: 'guard', name: 'Gate guard', kind: 'guard', tags: ['asharier', 'job-guard', 'on-duty'], hexes: [[0, 0]], look: '' }, LIBRARY);
+  const state = () => newSceneState(GATE_SCENE);
+
+  it('the approach\'s effort moves the starting Control', () => {
+    const none = conflictBonus(state(), guard, { kind: 'human', people: 'asharier' }, LIBRARY, { tags: ['checkpoint'] });
+    const bribe = conflictBonus(state(), guard, { kind: 'human', people: 'asharier' }, LIBRARY, { tags: ['checkpoint'] }, undefined, 'bribe');
+    // A checkpoint is a familiar place for a bribe (+1); a guard on duty is less open to it (−1 twice: as a guard and on duty).
+    expect(bribe.control - none.control).toBe(-1);
+    expect(bribe.notes).toEqual(expect.arrayContaining(['a familiar transaction', 'on watch, and answerable for it']));
+  });
+
+  it('is only applied when the approach names an effort', () => {
+    const a = conflictBonus(state(), guard, { kind: 'human' }, LIBRARY, { tags: ['checkpoint'] });
+    expect(a.notes.filter((n) => n === 'a familiar transaction')).toHaveLength(0);
+  });
+
+  it('the gate\'s three approaches name their effort', () => {
+    const soc = GATE_SCENE.objects.find((o) => o.id === 'guard')!.social!;
+    expect(soc.approaches.map((a) => a.effort).sort()).toEqual(['bribe', 'sweet-talk', 'threaten']);
+  });
+});
+
+describe('the hero\'s own facets', () => {
+  it('the default shepherd is an Asharian herder from Asharien, and the tags are real facets', () => {
+    const h = defaultHero();
+    expect(h.tags).toEqual(['asharier', 'asharien', 'job-herder']);
+    for (const t of h.tags!) expect(FACETS[t], t).toBeDefined();
+  });
+
+  it('every calling the creator offers is a facet a hero can carry', () => {
+    for (const b of BACKGROUNDS) expect(FACETS[backgroundFacet(b.en)], b.en).toBeDefined();
+    expect(peopleFacet('bazirk-gurder')).toBe('bazirk');
+    expect(peopleFacet('asharier')).toBe('asharier');
   });
 });

@@ -5,9 +5,10 @@
 - Started the layer for "skills tied to types of people and situations": [People library](design/people-library.md). A tree of 252 **facets** (peoples, realms, faiths, standing and calling with all 100 backgrounds, settings, passing states), built mostly from the creator's own data, and a table of 308 **leanings** binding a facet to a kind of effort (and optionally particular skills): easier or harder, and why.
 - A people is now a kind of its family (an Asharian is a kind of human), so existing hooks and relations are untouched.
 - Wired into single rolls (`situation()` takes the skill used): the person's tags, kinds and the scene's tags move the difficulty 2 per point, up to 3 points, and the reasons show in the roll log. The gate scene is tagged to try it.
-- Not yet wired: conflicts (Control), the hero's own facets, different outcomes by type, a view on the Skill map. Listed in the doc with open questions.
+- Then wired **conflicts** (each approach names its effort; leanings add Control), **what you share** (the hero carries people, homeland, faith and calling from the creator; a shared faith, walk of life or homeland helps), and a **"Who and where it works"** section on the Skill map page per skill and effort.
+- Not yet: different outcomes by type (with the hooks), skill-specific leanings in conflicts, hostility between facets. Listed in the doc with open questions.
 - Also corrected the marks, expertise and abilities tags against the book's descriptions, and tagged the mystic skills (earlier this session; see the Session 16 entry).
-- 195 tests.
+- 207 tests.
 
 ## 2026-10-27 — Session 16: skill map, social skills
 

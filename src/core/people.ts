@@ -35,9 +35,26 @@ export interface Leaning {
   skills?: string[];
 }
 
+/**
+ * Kinship: what it is worth that the hero and the other person have something in common. Sharing a
+ * faith, a walk of life or a homeland makes some efforts a little easier. (Peoples are covered by the
+ * relations table, so they are not here.)
+ */
+export interface KinRule {
+  dim: Dimension;
+  /** The efforts it helps. */
+  efforts: string[];
+  shift: number;
+  /** Shown in the roll's log line. */
+  why: string;
+  /** Only the very same facet counts (both carry the homeland), not a shared parent (both are martial). */
+  exact?: boolean;
+}
+
 export interface PeopleLibrary {
   facets: Record<string, Facet>;
   leanings: Leaning[];
+  kin?: KinRule[];
 }
 
 /** The most the leanings together can move a roll, in points. */
@@ -59,6 +76,55 @@ export function coversSkill(entry: string, skill: string): boolean {
 export function effortOf(intention: string | undefined): string | undefined {
   if (intention === 'intimidate') return 'threaten';
   return intention;
+}
+
+/**
+ * Where an effort works better or worse, for one skill: every leaning for the effort that either
+ * names no skill (any skill with the tag) or names this one. `specific` marks the second kind.
+ * Strongest first.
+ */
+export function leaningsForSkill(skill: string, effort: string, lib: Partial<PeopleLibrary>): { l: Leaning; specific: boolean }[] {
+  const out: { l: Leaning; specific: boolean }[] = [];
+  for (const l of lib.leanings ?? []) {
+    if (l.effort !== effort) continue;
+    if (!l.skills) out.push({ l, specific: false });
+    else if (l.skills.some((s) => coversSkill(s, skill))) out.push({ l, specific: true });
+  }
+  return out.sort((a, b) => b.l.shift - a.l.shift || a.l.who.localeCompare(b.l.who));
+}
+
+/** What the hero and the other person have in common, for this effort. */
+export function kinFor(
+  mine: string[], theirs: string[], effort: string | undefined, lib: Partial<PeopleLibrary>,
+): { v: number; notes: string[] } {
+  if (!effort || !lib.kin?.length || !mine.length || !theirs.length) return { v: 0, notes: [] };
+  const facets = lib.facets ?? {};
+  const isRoot = (id: string) => !facets[id]?.parent;
+  let v = 0;
+  const notes: string[] = [];
+  for (const rule of lib.kin) {
+    if (!rule.efforts.includes(effort)) continue;
+    const of = (ids: string[]) => new Set((rule.exact ? ids : ids.flatMap((i) => facetChain(i, facets))).filter((f) => facets[f]?.dim === rule.dim && !isRoot(f)));
+    const a = of(mine);
+    const shared = [...of(theirs)].some((f) => a.has(f));
+    if (shared) {
+      v += rule.shift;
+      notes.push(rule.why);
+    }
+  }
+  return { v, notes };
+}
+
+/**
+ * Both together, kept within MAX_LEAN: what the person and the place lean, and what you share with the
+ * person (the place does not count as kin).
+ */
+export function totalLean(
+  mine: string[], person: string[], place: string[], effort: string | undefined, skill: string | undefined, lib: Partial<PeopleLibrary>,
+): { v: number; notes: string[] } {
+  const a = leaningFor([...person, ...place], effort, skill, lib);
+  const b = kinFor(mine, person, effort, lib);
+  return { v: Math.max(-MAX_LEAN, Math.min(MAX_LEAN, a.v + b.v)), notes: [...a.notes, ...b.notes] };
 }
 
 /**

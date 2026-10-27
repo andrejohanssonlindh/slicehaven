@@ -600,7 +600,7 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
 
   /** What you start with in the conversation (easy only): the approach's own footing plus how he sees you. */
   function situationText(o: ObjectDef, a: SceneApproach): string {
-    const b = conflictBonus(state, o, hero, LIBRARY, def);
+    const b = conflictBonus(state, o, hero, LIBRARY, def, undefined, a.effort);
     const total = a.situation + b.control;
     return `Situation ${total > 0 ? '+' : total < 0 ? '−' : ''}${Math.abs(total)} Control${b.notes.length ? ` (${b.notes.join('; ')})` : ''}.`;
   }
@@ -620,7 +620,7 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
         onPick: () => {
           say(`You: ${a.pitch}`, 'you');
           const c = newConflict(a.id);
-          const b = conflictBonus(state, o, hero, LIBRARY, def);
+          const b = conflictBonus(state, o, hero, LIBRARY, def, undefined, a.effort);
           if (b.control || b.notes.length) c.bonus = { control: b.control, notes: b.notes };
           conflictSheet(o, a, c);
         },

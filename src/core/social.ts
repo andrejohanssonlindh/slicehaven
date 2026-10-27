@@ -31,6 +31,8 @@ export interface Approach {
   skills: string[];
   /** Must be rolled once during the conflict. */
   locked: string;
+  /** The kind of effort it is (a skill tag: bribe, threaten, sweet-talk…): the people library's leanings apply to it. */
+  effort?: string;
   /** Upper hand (+2), even (0) or weak position (−2). */
   situation: number;
   /** A show of force: Physique is a natural roll here. */

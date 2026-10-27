@@ -1,5 +1,5 @@
 import { type CheckDef, type Effect, type ObjectDef, type SceneDef, type SceneState, type Situation, type Token, moodLine, moodWord } from './scene';
-import { type PeopleLibrary, effortOf, leaningFor } from './people';
+import { type PeopleLibrary, effortOf, totalLean } from './people';
 import { MAX_RECEPTION } from './social';
 
 /**
@@ -75,6 +75,8 @@ export interface Visitor {
   kind?: string;
   /** The specific people, e.g. 'asharier'. */
   people?: string;
+  /** The hero's own facets (people library): their homeland, faith and calling. What they share with someone helps. */
+  tags?: string[];
 }
 
 /** From the kind itself up to the root: ['dwarf', 'humanoid', 'creature', 'thing']. */
@@ -146,9 +148,19 @@ export interface Setting {
   tags?: string[];
 }
 
-/** Everything that is true of this person and place, as facet ids: their tags and kinds, and the scene's tags. */
-export function facetsOf(o: Pick<ObjectDef, 'kind' | 'tags'>, lib: Library, place?: Setting): string[] {
-  return [...(o.tags ?? []), ...kindChain(o.kind, lib.parents), ...(place?.tags ?? [])];
+/** Everything that is true of this person, as facet ids: their tags and their kinds. */
+export function personFacets(o: Pick<ObjectDef, 'kind' | 'tags'>, lib: Library): string[] {
+  return [...(o.tags ?? []), ...kindChain(o.kind, lib.parents)];
+}
+
+/**
+ * What the people library does to an effort with a skill: what this person and this place lean, and
+ * what you share with the person (people library). Positive = easier for you.
+ */
+export function leanOf(
+  o: Pick<ObjectDef, 'kind' | 'tags'>, who: Visitor, lib: Library, place: Setting | undefined, intention: string | undefined, skill?: string,
+): { v: number; notes: string[] } {
+  return totalLean(who.tags ?? [], personFacets(o, lib), place?.tags ?? [], effortOf(intention), skill, lib.people ?? {});
 }
 
 /**
@@ -180,7 +192,7 @@ export function disposition(o: Pick<ObjectDef, 'kind'>, who: Visitor, lib: Libra
 /** What the situation does to one single roll: mood, how their people see yours, and advantages you kept. They change the difficulty. */
 export function situation(s: SceneState, c: CheckDef, o: ObjectDef, who: Visitor, lib: Library, place?: Setting, skill?: string): Situation {
   // What kind of person this is and where, for this kind of effort and this skill (people library).
-  const lean = leaningFor(facetsOf(o, lib, place), effortOf(c.intention), skill, lib.people ?? {});
+  const lean = leanOf(o, who, lib, place, c.intention, skill);
   if (!c.talk) return { shift: 0 - 2 * lean.v, spend: [], notes: lean.notes };
   const mood = s.social[c.talk.who]?.mood ?? 0;
   const rel = disposition(o, who, lib, place);
@@ -204,7 +216,7 @@ export function situation(s: SceneState, c: CheckDef, o: ObjectDef, who: Visitor
  * (never more than MAX_RECEPTION either way), and each kept advantage is +1 Control.
  */
 export function conflictBonus(
-  s: SceneState, o: ObjectDef, who: Visitor, lib: Library, place?: Setting, wants: string[] = ['social'],
+  s: SceneState, o: ObjectDef, who: Visitor, lib: Library, place?: Setting, wants: string[] = ['social'], effort?: string,
 ): { control: number; notes: string[]; spend: Token[] } {
   const mood = s.social[o.id]?.mood ?? 0;
   const rel = disposition(o, who, lib, place);
@@ -212,6 +224,10 @@ export function conflictBonus(
   let control = Math.max(-MAX_RECEPTION, Math.min(MAX_RECEPTION, mood + rel.v));
   if (mood) notes.push(mood > 0 ? 'they like you' : 'they are wary of you');
   if (rel.v && rel.why) notes.push(rel.why);
+  // The people library, for the approach's kind of effort (leanings that name particular skills need a roll, so they wait for the single rolls).
+  const lean = leanOf(o, who, lib, place, effort);
+  control += lean.v;
+  notes.push(...lean.notes);
   const spend = s.tokens.filter((t) => wants.includes(t.kind) && (t.against === undefined || t.against === o.id));
   for (const t of spend) {
     control += t.n;

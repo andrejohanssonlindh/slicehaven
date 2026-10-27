@@ -16,6 +16,12 @@ import { RELIGIONS } from '../chargen/religions';
 const slug = (s: string) =>
   s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
+/** The facet id of a calling (a creator background) from its English name. */
+export const backgroundFacet = (en: string): string => `job-${slug(en)}`;
+
+/** The facet id of a creator people: the tirak are split by size, but the facet is the house. */
+export const peopleFacet = (id: string): string => id.replace(/-(gurder|tiraker|trukher)$/, '');
+
 const out: Facet[] = [];
 const add = (dim: Dimension, id: string, label: string, blurb: string, parent?: string) => out.push({ id, dim, label, parent, blurb });
 
@@ -136,7 +142,7 @@ const GROUP_OF: Record<string, number[]> = {
 const groupOfBackground = new Map<number, string>();
 for (const [g, ns] of Object.entries(GROUP_OF)) for (const n of ns) groupOfBackground.set(n, g);
 for (const b of BACKGROUNDS) {
-  add('station', `job-${slug(b.en)}`, b.en, b.blurb, groupOfBackground.get(b.n) ?? 'station');
+  add('station', backgroundFacet(b.en), b.en, b.blurb, groupOfBackground.get(b.n) ?? 'station');
 }
 
 // ——— Settings: where it happens ———
