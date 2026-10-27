@@ -134,7 +134,7 @@ describe('social conflict', () => {
     );
     expect(outcome(c, a, 2)).toMatchObject({ mine: 3, theirs: 2, left: 1, success: false });
     expect(outcome(c, { ...a, situation: 2 }, 2)).toMatchObject({ left: 3, success: true });
-    expect(outcome(c, { ...a, situation: -2 }, 2)).toMatchObject({ left: 0, success: false });
+    expect(outcome(c, { ...a, situation: -2 }, 2)).toMatchObject({ left: -1, success: false });
   });
 });
 

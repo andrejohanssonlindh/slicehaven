@@ -1,5 +1,9 @@
 # Devlog
 
+## 2026-10-27 — Session 13d: difficulty, framing, negative Control
+
+See the fourth-pass status in [Skill web](design/skill-web.md): side-try limits for people with a social challenge (easy 3 / normal 1 / hard 0, a "Game" switch under the map), "(social challenge)" on the talk option, "starts the round" wording, and Control balances that can go negative.
+
 ## 2026-10-27 — Session 13c: one screen per round
 
 - Each conflict round now ends on its own result screen (what was rolled, who won, his line, the score) with a Next round button. Only then do you see what he does in his round. Before, the next round's screen still showed the last round's result under a new header, so "You lead" read wrong during his turn.

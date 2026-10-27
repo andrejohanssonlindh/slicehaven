@@ -1,4 +1,5 @@
 import type { ChallengeDef } from './challenge';
+import { DIFFICULTY_RULES, DEFAULT_DIFFICULTY } from './difficulty';
 import { type Dice, type TestResult, DIFFICULTY, test } from './checks';
 import type { Rng } from './rng';
 import type { Approach } from './social';
@@ -80,7 +81,7 @@ export interface CheckDef {
   /** Came from the skill-web library rather than the scene itself. */
   fromLibrary?: boolean;
   /** A social try with this person: costs one of their talks, and their mood colours it. */
-  talk?: { who: string; patience: number };
+  talk?: { who: string; patience: number; /** They also have a social challenge for you: the game's difficulty caps side tries. */ side?: boolean };
   /** Kinds of kept advantage (Token.kind) this check can spend. */
   wants?: string[];
   /**
@@ -205,6 +206,8 @@ export interface SceneState {
   /** Failed attempts per check id. */
   fails: Record<string, number>;
   removed: string[];
+  /** Social tries allowed on someone who has a social challenge, outside it (from the game's difficulty). */
+  sideTalks: number;
   /** What each person remembers of you, by object id. */
   social: Record<string, Memory>;
   /** Advantages you're holding for later. */
@@ -216,7 +219,7 @@ export interface SceneState {
 }
 
 export const newSceneState = (def: SceneDef): SceneState => ({
-  time: def.start.time, silver: def.start.silver, flags: {}, fails: {}, removed: [], looked: [], social: {}, tokens: [],
+  time: def.start.time, silver: def.start.silver, flags: {}, fails: {}, removed: [], looked: [], sideTalks: DIFFICULTY_RULES[DEFAULT_DIFFICULTY].sideTalks, social: {}, tokens: [],
 });
 
 export function met(s: SceneState, c?: Cond): boolean {
@@ -242,7 +245,7 @@ export const talkFor = (o: ObjectDef, s: SceneState): TalkDef | undefined => o.t
 export const talksLeft = (s: SceneState, who: string, patience: number): number => patience - (s.social[who]?.talks ?? 0);
 
 export const checkOpen = (c: CheckDef, s: SceneState): boolean =>
-  met(s, c.when) && !(c.hidden && s.flags[`tried:${c.id}`]) && (c.tries === undefined || (s.fails[c.id] ?? 0) < c.tries) && (!c.talk || talksLeft(s, c.talk.who, c.talk.patience) > 0);
+  met(s, c.when) && !(c.hidden && s.flags[`tried:${c.id}`]) && (c.tries === undefined || (s.fails[c.id] ?? 0) < c.tries) && (!c.talk || talksLeft(s, c.talk.who, c.talk.side ? Math.min(c.talk.patience, s.sideTalks) : c.talk.patience) > 0);
 
 /** Checks you can try on this thing right now. */
 export const openChecks = (o: ObjectDef, s: SceneState): CheckDef[] => (o.checks ?? []).filter((c) => checkOpen(c, s));

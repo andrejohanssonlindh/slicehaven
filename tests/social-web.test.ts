@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { Rng } from '../src/core/rng';
 import { apply, attempt, checkFor, checkOpen, moodLine, newSceneState, openChecks } from '../src/core/scene';
-import { outcome, newConflict } from '../src/core/social';
+import { type Approach, outcome, newConflict } from '../src/core/social';
+import { DIFFICULTY_RULES } from '../src/core/difficulty';
 import type { CheckDef, ObjectDef, SceneState } from '../src/core/scene';
-import { conflictBonus, disposition, expandObject, expandScene, hooksFor, kindChain, patienceOf, readPerson, situation, talksLeftWith } from '../src/core/skillweb';
+import { conflictBonus, disposition, expandObject, expandScene, hooksFor, kindChain, limitOf, patienceOf, readPerson, situation, talksLeftWith } from '../src/core/skillweb';
 import { defaultHero, isRollable } from '../src/content/rollables';
 import { GATE_SCENE } from '../src/content/scenes/gate';
 import { KIND_PARENTS, LIBRARY } from '../src/content/skillweb';
@@ -274,5 +275,55 @@ describe('library data and the gate', () => {
     const h = defaultHero();
     expect(h.kind).toBe('human');
     expect(GATE_SCENE.locals).toContain(h.people);
+  });
+});
+
+describe('people with a social challenge, and the game difficulty', () => {
+  const def = expandScene(GATE_SCENE, LIBRARY);
+  const guard = def.objects.find((o) => o.id === 'guard')!;
+  const drifter = def.objects.find((o) => o.id === 'drifter')!;
+  const tries = (diff: keyof typeof DIFFICULTY_RULES, o: ObjectDef) => {
+    const s = newSceneState(def);
+    s.sideTalks = DIFFICULTY_RULES[diff].sideTalks;
+    let n = 0;
+    while (n < 10 && openChecks(o, s).some((c) => c.talk)) {
+      const c = openChecks(o, s).find((x) => x.talk)!;
+      attempt(s, c, { n: 3, mod: 0 }, dice(5, 5, 5));
+      n++;
+    }
+    return n;
+  };
+
+  it('the guard has a social challenge, so side tries come from the difficulty: 3, 1 or 0', () => {
+    expect(guard.social).toBeDefined();
+    expect(tries('easy', guard)).toBe(3);
+    expect(tries('normal', guard)).toBe(1);
+    expect(tries('hard', guard)).toBe(0);
+  });
+
+  it('people without a social challenge keep their own patience at every difficulty', () => {
+    for (const d of ['easy', 'normal', 'hard'] as const) expect(tries(d, drifter)).toBe(2);
+  });
+
+  it('the side tries never exceed his own patience', () => {
+    const s = newSceneState(def);
+    s.sideTalks = 99;
+    expect(limitOf(guard, s, LIBRARY)).toBe(4);
+  });
+
+  it('the conflict itself is not a side try', () => {
+    const s = newSceneState(def);
+    s.sideTalks = 1;
+    s.social.guard = { talks: 1, mood: 0 };
+    expect(talksLeftWith(guard, s, LIBRARY)).toBe(0);
+    // Playing the conflict does not touch the count: it is separate machinery.
+    expect(s.social.guard.talks).toBe(1);
+  });
+
+  it('a conflict that ends 2 Control against 2 with a −1 situation is −1, not 0', () => {
+    const c = newConflict('x');
+    c.rounds.push({ mine: 2, theirs: 0 } as never, { mine: 0, theirs: 2 } as never);
+    const a: Approach = { id: 'x', label: '', skills: [], locked: '', situation: -1, answers: [] };
+    expect(outcome(c, a, 2)).toMatchObject({ mine: 2, theirs: 2, situation: -1, left: -1, success: false });
   });
 });

@@ -22,7 +22,8 @@ import type { Ground } from '../art/terrain';
 import type { PropKind } from '../art/mapScene';
 import { SKILL_SETS, byGroup, rollableName } from '../content/rollables';
 import { LIBRARY } from '../content/skillweb';
-import { conflictBonus, expandScene, patienceOf, readPerson, situation, talksLeftWith } from '../core/skillweb';
+import { DEFAULT_DIFFICULTY, DIFFICULTIES, DIFFICULTY_RULES, type GameDifficulty } from '../core/difficulty';
+import { conflictBonus, expandScene, limitOf, readPerson, situation, talksLeftWith } from '../core/skillweb';
 import type { SandboxCell } from '../content/sandbox';
 import { GameConsole, type LogTone } from '../ui/console';
 import { Sheet, type SheetOption, type SheetSection, esc } from '../ui/sheet';
@@ -51,6 +52,7 @@ const LEGEND: Record<string, { ground: Ground; prop?: PropKind; obstacle?: boole
 const TIME_LABEL = { night: 'Night', dawn: 'Dawn', day: 'Day' } as const;
 const HERO_ID = 'hero';
 const HINTS_KEY = 'slicehaven.hints';
+const DIFFICULTY_KEY = 'slicehaven.difficulty';
 
 const toHex = ([c, r]: [number, number]): Hex => offsetToHex(c, r);
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -145,6 +147,12 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
   /** Flag skills that would do something ("✓ Useful here"). A test aid; the real game will hide them. */
   let hints = localStorage.getItem(HINTS_KEY) !== '0';
 
+  let difficulty = ((): GameDifficulty => {
+    const v = localStorage.getItem(DIFFICULTY_KEY);
+    return DIFFICULTIES.includes(v as GameDifficulty) ? (v as GameDifficulty) : DEFAULT_DIFFICULTY;
+  })();
+  state.sideTalks = DIFFICULTY_RULES[difficulty].sideTalks;
+
   const bar = document.getElementById('scene-bar')!;
   barButton('Use a skill', 'Here, where you stand', () => {
     if (!busy) skillHere();
@@ -153,6 +161,15 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
     hints = !hints;
     localStorage.setItem(HINTS_KEY, hints ? '1' : '0');
     say(hints ? 'Hints on: useful skills are marked.' : 'Hints off: nothing is marked.', 'info');
+    refreshInfo();
+  });
+
+  const difficultyBtn = barButton('', 'Game difficulty', () => {
+    difficulty = DIFFICULTIES[(DIFFICULTIES.indexOf(difficulty) + 1) % DIFFICULTIES.length];
+    localStorage.setItem(DIFFICULTY_KEY, difficulty);
+    state.sideTalks = DIFFICULTY_RULES[difficulty].sideTalks;
+    const n = state.sideTalks;
+    say(`${DIFFICULTY_RULES[difficulty].label}: people with a social challenge for you allow ${n === 0 ? 'no' : n} other social ${n === 1 ? 'try' : 'tries'} outside it.`, 'info');
     refreshInfo();
   });
 
@@ -186,6 +203,7 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
       + `<br><span>${state.ended ? 'You made it in. Look around, or play again.' : 'Tap something to look, talk or use a skill. Tap the ground to walk.'}</span>`;
     hintBtn.querySelector('b')!.textContent = hints ? 'Hints: on' : 'Hints: off';
     hintBtn.classList.toggle('on', hints);
+    difficultyBtn.querySelector('b')!.textContent = `Game: ${DIFFICULTY_RULES[difficulty].label}`;
   }
 
   // --- input ----------------------------------------------------------------------
@@ -280,7 +298,7 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
   function menu(o: ObjectDef): void {
     const look = lookText(o, state);
     say(`${o.name}: ${look}`, 'info');
-    const feel = moodLine(o.name, state.social[o.id], patienceOf(o, LIBRARY));
+    const feel = moodLine(o.name, state.social[o.id], limitOf(o, state, LIBRARY));
     if (feel) say(feel, 'info');
     const opts: SheetOption[] = [];
     const talk = talkFor(o, state);
@@ -304,7 +322,7 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
     if (!t) return;
     say(`${o.name}: ${t.line}`, 'speech');
     const opts: SheetOption[] = t.options.filter((x) => met(state, x.when)).map((x) => ({
-      label: x.label,
+      label: x.argue ? `${x.label} (social challenge)` : x.label,
       style: x.argue ? 'primary' : x.effects ? 'good' : 'muted',
       onPick: () => void safe(async () => {
         if (x.argue) return approaches(o);
@@ -359,7 +377,9 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
       if (c) return void safe(() => rollCheck(o, c, id));
       const tired = (talksLeftWith(o, state, LIBRARY) ?? 1) <= 0;
       const line = tired
-        ? `${o.name} has had enough of talking to you.`
+        ? o.social && !state.social[o.id]?.talks
+          ? `${o.name} isn't one for idle talk. If you want something from him, make your case to him.`
+          : `${o.name} has had enough of talking to you.`
         : (o.noUse ?? 'You can\'t see how {skill} would help here.').replace('{skill}', rollableName(id));
       say(line, 'info');
       open(o, { title: rollableName(id), body: `<p>${esc(line)}</p>`, sections: [{ options: [{ label: 'Back', onPick: () => skillMenu(o) }] }] });
@@ -605,15 +625,16 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
     const theirs = c.rounds.reduce((s, r) => s + r.theirs, 0);
     const total = a.situation + (c.bonus?.control ?? 0);
     const sit = total ? ` · situation ${total > 0 ? '+' : '−'}${Math.abs(total)}` : '';
+    const balance = mine + total - theirs;
     const why = c.bonus?.notes.length ? `<br><small>${esc(c.bonus.notes.join('; '))}</small>` : '';
-    return `<p class="score">You <b>${mine}</b> · Guard <b>${theirs}</b>${sit}${why}</p>`;
+    return `<p class="score">You <b>${mine}</b> · Guard <b>${theirs}</b>${sit} → <b>${balance < 0 ? '−' : ''}${Math.abs(balance)}</b>${why}</p>`;
   }
 
   function roundText(c: Conflict): string {
     const r = c.rounds[c.rounds.length - 1];
     if (!r) return '';
     const who = r.mine && r.theirs ? 'A tie: 1 Control each.' : r.mine ? `You win: +${r.mine} Control.` : `He wins: +${r.theirs} Control to him.`;
-    const lead = r.lead === 'me' ? 'You led' : 'He led';
+    const lead = r.lead === 'me' ? 'You started the round' : 'He started the round';
     return `<p class="roll">${lead}. ${esc(rollableName(r.skill))} ${diceText(r.dice)}: <b>${r.roll.total}</b> vs his ${esc(rollableName(r.answer))} `
       + `${diceText(r.answerDice)}: <b>${r.answerRoll.total}</b>. ${who}<br><small>You: ${esc(rollText(r.roll))} · Him: ${esc(rollText(r.answerRoll))}</small></p>`;
   }
@@ -640,7 +661,7 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
     const their: Side = { dice: (k) => o.social!.dice[k] ?? NO_DICE, ids: Object.keys(o.social!.dice) };
     if (heLeads && !attack) {
       attack = theirMove(c, a, their, rng);
-      say(`He leads with ${rollableName(attack)}.`, 'info');
+      say(`He starts the round with ${rollableName(attack)}.`, 'info');
     }
     const forced = mustUseLocked(c, a);
     // Your own nature (attributes) is always possible, for when nothing else fits.
@@ -665,7 +686,7 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
         style: ok && (has || locked) ? (locked ? 'primary' : 'good') : 'muted',
         onPick: () => void safe(() => {
           const r = playRound(c, a, id, (k) => diceOf(hero, k), their, rng, attack);
-          say(`Round ${c.rounds.length} (${r.lead === 'me' ? 'you lead' : 'he leads'}): ${rollableName(r.skill)} ${diceText(r.dice)} → ${rollText(r.roll)} vs guard's `
+          say(`Round ${c.rounds.length} (${r.lead === 'me' ? 'you start' : 'he starts'}): ${rollableName(r.skill)} ${diceText(r.dice)} → ${rollText(r.roll)} vs guard's `
             + `${rollableName(r.answer)} ${diceText(r.answerDice)} → ${rollText(r.answerRoll)}. `
             + (r.mine && r.theirs ? 'Tie, 1 Control each.' : r.mine ? `+${r.mine} Control to you.` : `+${r.theirs} Control to him.`), 'roll');
           roundResult(o, a, c);
@@ -674,12 +695,12 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
     });
     const intro = n === 0 ? `<p class="you">${esc(a.pitch)}</p>` : '';
     const turn = heLeads
-      ? `<p><b>His turn:</b> he leads with <b>${esc(rollableName(attack!))}</b>. Answer with a skill that fits.</p>`
-      : '<p><b>Your turn:</b> lead with a skill. He will answer with one that fits, and you cannot tell which.</p>';
+      ? `<p><b>His move:</b> he starts the round with <b>${esc(rollableName(attack!))}</b>. Answer with a skill that fits.</p>`
+      : '<p><b>Your move:</b> start the round with a skill. He answers with one of his own, and you cannot tell which.</p>';
     open(o, {
       title: `${a.label} · round ${n + 1} of ${ROUNDS}`,
       body: `${intro}${score(c, a)}${turn}<p class="hint">Locked roll: <b>${esc(rollableName(a.locked))}</b>. Using a skill again costs −2D6.</p>`,
-      sections: [{ title: heLeads ? 'Answer with' : 'Lead with', options: opts }],
+      sections: [{ title: heLeads ? 'Answer with' : 'Start with', options: opts }],
       closable: false,
     });
   }
@@ -688,7 +709,7 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
     const soc = o.social!;
     const res = outcome(c, a, soc.cost);
     const sit = res.situation ? ` ${res.situation > 0 ? '+' : '−'} ${Math.abs(res.situation)} situation` : '';
-    const sum = `You won ${res.mine} Control${sit}; he spends his ${res.theirs} cancelling yours. You have <b>${res.left}</b> left, `
+    const sum = `You won ${res.mine} Control${sit}; he spends his ${res.theirs} cancelling yours. You have <b>${res.left < 0 ? '−' : ''}${Math.abs(res.left)}</b> left, `
       + `and need ${soc.cost} to make him ${esc(soc.goal)}.`;
     say(`${a.label}: ${res.mine} Control${sit} − his ${res.theirs} = ${res.left} (need ${soc.cost}). ${res.success ? 'Success!' : 'Not enough.'}`, res.success ? 'good' : 'bad');
     sheet.close();

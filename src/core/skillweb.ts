@@ -123,9 +123,15 @@ export function patienceOf(o: Pick<ObjectDef, 'kind' | 'patience'>, lib: Library
   return undefined;
 }
 
+/** Their limit right now: their patience, and for someone with a social challenge also what the game's difficulty allows outside it. */
+export function limitOf(o: ObjectDef, s: SceneState, lib: Library): number | undefined {
+  const p = patienceOf(o, lib);
+  return p === undefined ? undefined : o.social ? Math.min(p, s.sideTalks) : p;
+}
+
 /** Social tries they'd still put up with (undefined if they don't count). */
 export function talksLeftWith(o: ObjectDef, s: SceneState, lib: Library): number | undefined {
-  const p = patienceOf(o, lib);
+  const p = limitOf(o, s, lib);
   return p === undefined ? undefined : p - (s.social[o.id]?.talks ?? 0);
 }
 
@@ -206,7 +212,7 @@ export function conflictBonus(
 export function readPerson(o: ObjectDef, s: SceneState, who: Visitor, lib: Library, place?: Setting, truthful = true): string[] {
   const out: string[] = [];
   const mem = s.social[o.id] ?? { talks: 0, mood: 0 };
-  const patience = patienceOf(o, lib);
+  const patience = limitOf(o, s, lib);
   const rel = disposition(o, who, lib, place);
   const left = patience === undefined ? undefined : patience - mem.talks;
   if (truthful) {
@@ -228,7 +234,7 @@ export function readPerson(o: ObjectDef, s: SceneState, who: Visitor, lib: Libra
 export function instantiate(h: HookDef, o: ObjectDef, lib?: Library): CheckDef {
   const patience = lib ? patienceOf(o, lib) : o.patience;
   return {
-    ...(h.social && patience !== undefined ? { talk: { who: o.id, patience } } : {}),
+    ...(h.social && patience !== undefined ? { talk: { who: o.id, patience, ...(o.social ? { side: true } : {}) } } : {}),
     ...(h.wants ? { wants: h.wants } : {}),
     id: `${o.id}/${h.id}`,
     intention: h.intention,

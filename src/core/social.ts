@@ -168,6 +168,7 @@ export function outcome(c: Conflict, a: Approach, goalCost: number): Outcome {
   const mine = c.rounds.reduce((s, r) => s + r.mine, 0);
   const theirs = c.rounds.reduce((s, r) => s + r.theirs, 0);
   const situation = a.situation + (c.bonus?.control ?? 0);
-  const left = Math.max(0, Math.max(0, mine + situation) - theirs);
+  // Can go below zero: the balance after he has spent his Control (and what your situation did to yours).
+  const left = mine + situation - theirs;
   return { mine, theirs, situation, left, success: left >= goalCost };
 }

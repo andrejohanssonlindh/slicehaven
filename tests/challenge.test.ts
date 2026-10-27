@@ -229,6 +229,7 @@ describe('knowledge and insight: a hidden roll with a plausible wrong answer', (
 
   it('a misreading of a person is wrong in every part, and always says something', () => {
     const s = newSceneState(def);
+    s.sideTalks = 99; // the difficulty's limit is not what this test is about
     s.social.guard = { talks: 1, mood: -1 };
     const who = { kind: 'elf' };
     const place = { majority: 'human' };

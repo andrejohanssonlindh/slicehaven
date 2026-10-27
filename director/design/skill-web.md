@@ -92,6 +92,12 @@ Built: steps 3, 4 and the people-vs-people part of 8. Code: `content/skillweb/so
 - **Survey the area** (`content/skillweb/challenges.ts`): the standard "larger search". Locked Alertness; Search, Scouting, Orienteering, Nature Lore, Tracking, and night eyes at night. Each scene gives it its own results. At the gate: 0 = you blunder and the guard's torch swings your way; 3 = the near things worth a look are shown; 4–5 = everything is shown and you've learned how the guard stands his watch (a *social* advantage against him); 6+ = also when he looks away (a *sneak* advantage). Found under **Bigger efforts** in "Use a skill here". Once per scene.
 - **Not built yet:** consequences tables for conflicts (what Control buys: secrets, changed opinions…), "deny a consequence", challenges started on a thing rather than the place, party rolls, a challenge library beyond Survey, hidden versions of more knowledge skills.
 
+## Status (2026-10-27, fourth pass): social challenges and game difficulty
+- **People with a social challenge** (the guard) allow only a few *other* social tries outside it, set by the **game difficulty**: easy 3, **normal 1**, hard 0 (`core/difficulty.ts`; switch under the map, saved in the browser). The limit is the lower of that and their own patience, and the conflict itself never counts. On hard they won't hear small talk: "make your case to him". People without a social challenge keep their own patience at every difficulty.
+- The talk option now reads **Argue your way in (social challenge)**.
+- **Framing in conflicts:** rounds are described by who *starts* them ("You started the round", "His move: he starts the round with…"), not who "leads", which read as who is ahead. Each round has its own result screen with a Next round button.
+- **A negative balance shows as negative.** Control balance = what you won + situation − what he spends; 2 vs 2 with a −1 situation is −1, not 0 (it can't buy the goal either way).
+
 ## Build order (each a vignette, one push)
 1. ✅ **Shape only.** Types in `core/` for: thing kinds, intentions, outcomes, effects, advantage tokens. A resolver that walks layers 3→2→1. Unit tests. No content beyond a few examples.
 2. ✅ **Search fix** in the gate scene: make it a check, stop listing solutions; give the boulder and the guard layer 2 / layer 1 hooks instead of hand-written ones where they exist.
