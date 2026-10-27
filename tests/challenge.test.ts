@@ -35,7 +35,7 @@ describe('conflicts alternate who leads', () => {
     expect([0, 1, 2].map(leadOf)).toEqual(['me', 'them', 'me']);
     const c = newConflict('sweet');
     const r1 = playRound(c, a, 'Charm', mine, side({ A: 2, X: 2, Y: 2 }), dice());
-    const r2 = playRound(c, a, 'Argumentera', mine, side({ A: 2, X: 2, Y: 2 }), dice(), 'Y');
+    const r2 = playRound(c, a, 'Argumentera', mine, side({ A: 2, X: 2, Y: 2 }), dice(), { theirSkill: 'Y' });
     const r3 = playRound(c, a, 'attr:Intryck', mine, side({ A: 2, X: 2, Y: 2 }), dice());
     expect([r1.lead, r2.lead, r3.lead]).toEqual(['me', 'them', 'me']);
     expect(r2.answer).toBe('Y'); // his pick, not an answer to your skill
@@ -60,7 +60,7 @@ describe('conflicts alternate who leads', () => {
     expect([...seen].sort()).toEqual(['attr:Intryck', 'attr:Vaksamhet']);
     // Used before: tough luck, it costs him 2D6.
     const r1 = playRound(c, a, 'Charm', mine, him, dice());
-    const r2 = playRound(c, a, 'Argumentera', mine, him, dice(), r1.answer);
+    const r2 = playRound(c, a, 'Argumentera', mine, him, dice(), { theirSkill: r1.answer });
     expect(r2.answerDice.n).toBeLessThan(him.dice(r1.answer).n);
   });
 
@@ -73,9 +73,9 @@ describe('conflicts alternate who leads', () => {
     for (let seed = 1; seed < 30; seed++) expect(theirMove(c, a, him, Rng.fromSeed(seed))).not.toBe(first);
   });
 
-  it('you may always use an attribute, even if the approach does not list it', () => {
+  it('with no skill that fits you may use any attribute, at −2D6', () => {
     const c = newConflict('sweet');
-    expect(allowed(c, a, 'attr:Kroppsbyggnad')).toBe(true);
+    expect(allowed(c, a, 'attr:Kroppsbyggnad', { budget: 1, hasOther: false })).toBe(true);
     expect(allowed(c, a, 'Klättra')).toBe(false);
   });
 
@@ -94,7 +94,7 @@ describe('conflicts alternate who leads', () => {
     const c = newConflict('sweet');
     const him = side({ A: 3, B: 3, C: 3 });
     playRound(c, a, 'Charm', mine, him, dice());
-    const r = playRound(c, a, 'Argumentera', mine, him, dice(), c.rounds[0].answer);
+    const r = playRound(c, a, 'Argumentera', mine, him, dice(), { theirSkill: c.rounds[0].answer });
     expect(r.answerDice).toEqual({ n: 1, mod: 0 });
   });
 });

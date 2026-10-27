@@ -12,6 +12,7 @@ export default defineConfig({
         artlab: 'artlab/index.html',
         chargen: 'chargen/index.html',
         scene: 'scene/index.html',
+        skills: 'skills/index.html',
       },
     },
   },

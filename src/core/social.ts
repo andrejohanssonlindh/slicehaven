@@ -1,3 +1,4 @@
+import { type AttributeUse, attributeUse } from './attributes';
 import { type Dice, type OpenRoll, modify, rollOpen } from './checks';
 import type { Rng } from './rng';
 
@@ -32,6 +33,8 @@ export interface Approach {
   locked: string;
   /** Upper hand (+2), even (0) or weak position (−2). */
   situation: number;
+  /** A show of force: Physique is a natural roll here. */
+  aggressive?: boolean;
   /** Skills that fit as an answer here (he uses those he has). */
   answers: string[];
   /** Skills that fit when he leads (defaults to `answers`). */
@@ -75,10 +78,25 @@ export const timesUsed = (c: Conflict, skill: string): number => c.rounds.filter
 /** The pool after the repeat penalty. */
 export const pooled = (c: Conflict, skill: string, base: Dice): Dice => modify(base, -2 * timesUsed(c, skill));
 
+/** Presence is always a natural roll, and Physique when the approach is a show of force. */
+export const naturalAttrs = (a: Approach): string[] => ['attr:Intryck', ...(a.aggressive ? ['attr:Kroppsbyggnad'] : [])];
+
+/** Whether your attribute roll is possible (and what it costs), given the game's attribute budget. */
+export function attrUseIn(c: Conflict, a: Approach, skill: string, hasOther: boolean, budget: number): AttributeUse {
+  const lockedUsed = c.rounds.some((r) => r.skill === a.locked) ? [a.locked] : [];
+  const attrRolls = c.rounds.filter((r) => r.skill.startsWith('attr:')).length;
+  const extrasUsed = Math.max(0, attrRolls - (a.locked.startsWith('attr:') && lockedUsed.length ? 1 : 0));
+  return attributeUse({ skill, locked: [a.locked], lockedUsed, natural: naturalAttrs(a), extrasUsed, budget, hasOther });
+}
+
+/** Do you have any skill (not attribute) that fits this approach? */
+export const hasOtherChoice = (a: Approach, mine: (id: string) => Dice): boolean => a.skills.some((id) => !id.startsWith('attr:') && mine(id).n > 0);
+
 /** Is this skill allowed this round? Reasonable for the approach, and the locked roll is forced last. */
-export function allowed(c: Conflict, a: Approach, skill: string): boolean {
-  // Your own nature is always possible when nothing else fits.
-  if (!a.skills.includes(skill) && !skill.startsWith('attr:')) return false;
+export function allowed(c: Conflict, a: Approach, skill: string, ctx: { budget: number; hasOther: boolean } = { budget: 1, hasOther: true }): boolean {
+  if (skill.startsWith('attr:')) {
+    if (!attrUseIn(c, a, skill, ctx.hasOther, ctx.budget).ok) return false;
+  } else if (!a.skills.includes(skill)) return false;
   const last = c.rounds.length === ROUNDS - 1;
   const lockedUsed = c.rounds.some((r) => r.skill === a.locked);
   return !last || lockedUsed || skill === a.locked;
@@ -137,12 +155,15 @@ export const replyTo = (c: Conflict, a: Approach, side: Side, rng: Rng): string 
  */
 export function playRound(
   c: Conflict, a: Approach, skill: string,
-  mineDice: (id: string) => Dice, their: Side, rng: Rng, theirSkill?: string,
+  mineDice: (id: string) => Dice, their: Side, rng: Rng, opts: { theirSkill?: string; attrBudget?: number } = {},
 ): Round {
   if (conflictOver(c)) throw new Error('conflict is over');
-  if (!allowed(c, a, skill)) throw new Error(`${skill} is not allowed now`);
+  const ctx = { budget: opts.attrBudget ?? 1, hasOther: hasOtherChoice(a, mineDice) };
+  if (!allowed(c, a, skill, ctx)) throw new Error(`${skill} is not allowed now`);
+  const theirSkill = opts.theirSkill;
   const lead = leadOf(c.rounds.length);
-  const dice = pooled(c, skill, mineDice(skill));
+  // Using an attribute because nothing else fits costs 2D6.
+  const dice = modify(pooled(c, skill, mineDice(skill)), -attrUseIn(c, a, skill, ctx.hasOther, ctx.budget).penalty);
   const answer = lead === 'me' ? replyTo(c, a, their, rng) : theirSkill ?? theirMove(c, a, their, rng);
   const answerDice = modify(their.dice(answer), -2 * c.rounds.filter((r) => r.answer === answer).length);
   const roll = rollOpen(dice, rng);

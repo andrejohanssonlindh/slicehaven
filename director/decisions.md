@@ -6,6 +6,9 @@ Only decisions that still stand. Ones that were replaced are removed (git histor
 |---|---|---|
 | 2026-10-27 | **Social tries linger:** most people put up with a limited number of talks, and the outcome of a try leaves a mood that colours the next | Director (Q18). |
 | 2026-10-27 | **One kept advantage = 5 points off a later difficulty**, tied to a person; spending it uses it up | Matches the margin that earns an advantage on a roll. My choice; say if it feels wrong. |
+| 2026-10-27 | **Attributes are a fallback in conflicts and challenges:** locked roll free; Presence natural, Physique when aggressive; extras by difficulty (easy 2, normal 1, hard 0); with no fitting skill any attribute at −2D6 | Director, checked against the manual (attributes are locked rolls and defences; skills do the rest). Hard reading to confirm. |
+| 2026-10-27 | **Starting Control is shown only on Easy** | Director. |
+| 2026-10-27 | **Skills carry tags for the kinds of effort they suit** (single source for the skill sets) | Director: Physique helps to threaten or distract, hardly to barter. |
 | 2026-10-27 | **Game difficulty sets how many side tries you get on someone with a social challenge:** easy 3, normal 1, hard 0 | Director: harder games make you earn trust the proper way. |
 | 2026-10-27 | **People use what they have:** every character has their own skills; in a conflict they pick among the fitting skills they own, and fall back on an attribute (always allowed, for everyone) | Director. The generic guard is the first NPC sheet; many generics follow. |
 | 2026-10-27 | **Knowledge and insight rolls are hidden 50/50 reads** (a plausible wrong answer on failure, one try) | Director. |

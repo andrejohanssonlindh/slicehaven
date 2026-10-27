@@ -1,5 +1,9 @@
 # Devlog
 
+## 2026-10-27 — Session 14: attributes by difficulty, tags, skill map
+
+See the fifth-pass status in [Skill web](design/skill-web.md): Control hidden except on Easy (with the true figure, reception included), attribute rolls limited by difficulty with a −2D6 escape hatch, skill tags as the single source for skill sets, and a new Skill map page at `/skills/`. 167 tests; not checked in a browser.
+
 ## 2026-10-27 — Session 13d: difficulty, framing, negative Control
 
 See the fourth-pass status in [Skill web](design/skill-web.md): side-try limits for people with a social challenge (easy 3 / normal 1 / hard 0, a "Game" switch under the map), "(social challenge)" on the talk option, "starts the round" wording, and Control balances that can go negative.

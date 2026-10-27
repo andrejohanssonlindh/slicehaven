@@ -1,3 +1,4 @@
+import { type AttributeUse, attributeUse } from './attributes';
 import { type Dice, type OpenRoll, advantages, modify, rollOpen } from './checks';
 import type { Cond, Effect, SceneState, SceneTime } from './scene';
 import { met } from './scene';
@@ -10,7 +11,8 @@ import type { Rng } from './rng';
  *   +1 per Advantage (every full 5 over).
  * - Locked rolls (usually an attribute) must each be used once; you choose when.
  * - Any other roll can be any reasonable skill, expertise, mark or ability.
- *   Using the same skill again costs −2D6 each time.
+ *   Using the same skill again costs −2D6 each time. Attributes are a fallback beyond the locked
+ *   roll (see core/attributes): a few by game difficulty, or at −2D6 if nothing else fits.
  * - The situation can be an upper hand (+2 Control) or a weak position (−2).
  * - 'Everyday' challenges give 1 to 3 Control whatever you roll; 'important' ones
  *   give what you earn.
@@ -84,7 +86,7 @@ export const challengeOpen = (d: ChallengeDef, s: SceneState): boolean => met(s,
 
 /** Is this skill reasonable now? Locked rolls always are. */
 export function reasonable(d: ChallengeDef, skill: string, time: SceneTime): boolean {
-  if (d.locked.includes(skill) || skill.startsWith('attr:')) return true; // your own nature is always possible
+  if (d.locked.includes(skill)) return true;
   const s = d.skills.find((x) => x.id === skill);
   return !!s && (!s.time || s.time.includes(time));
 }
@@ -106,9 +108,26 @@ export function mustLock(d: ChallengeDef, c: Challenge): string[] {
   return left.length >= CHALLENGE_ROLLS - c.rolls.length ? left : [];
 }
 
+/** Can this attribute be rolled now, and at what cost? */
+export function attrUseInChallenge(d: ChallengeDef, c: Challenge, skill: string, hasOther: boolean, budget: number): AttributeUse {
+  const lockedUsed = d.locked.filter((id) => c.rolls.some((r) => r.skill === id));
+  const attrRolls = c.rolls.filter((r) => r.skill.startsWith('attr:')).length;
+  const extrasUsed = Math.max(0, attrRolls - lockedUsed.filter((id) => id.startsWith('attr:')).length);
+  return attributeUse({ skill, locked: d.locked, lockedUsed, natural: [], extrasUsed, budget, hasOther });
+}
+
+export interface AttrContext {
+  budget: number;
+  /** Do you have any non-attribute skill that is reasonable here? */
+  hasOther: boolean;
+}
+
 /** May this skill be rolled next? (Reasonable, and the locked rolls still fit in the rolls that remain.) */
-export function challengeAllowed(d: ChallengeDef, c: Challenge, skill: string, time: SceneTime): boolean {
-  if (challengeOver(c) || !reasonable(d, skill, time)) return false;
+export function challengeAllowed(d: ChallengeDef, c: Challenge, skill: string, time: SceneTime, ctx: AttrContext = { budget: 1, hasOther: true }): boolean {
+  if (challengeOver(c)) return false;
+  if (skill.startsWith('attr:')) {
+    if (!attrUseInChallenge(d, c, skill, ctx.hasOther, ctx.budget).ok) return false;
+  } else if (!reasonable(d, skill, time)) return false;
   const must = mustLock(d, c);
   return must.length === 0 || must.includes(skill);
 }
@@ -126,9 +145,11 @@ export function edgeControl(d: ChallengeDef, time: SceneTime, has: (skill: strin
   return { control: Math.max(-2, Math.min(2, control)), notes };
 }
 
-export function rollChallenge(d: ChallengeDef, c: Challenge, skill: string, base: Dice, time: SceneTime, rng: Rng): ChallengeRoll {
-  if (!challengeAllowed(d, c, skill, time)) throw new Error(`${skill} is not allowed now`);
-  const dice = challengePool(c, skill, base);
+export function rollChallenge(
+  d: ChallengeDef, c: Challenge, skill: string, base: Dice, time: SceneTime, rng: Rng, ctx: AttrContext = { budget: 1, hasOther: true },
+): ChallengeRoll {
+  if (!challengeAllowed(d, c, skill, time, ctx)) throw new Error(`${skill} is not allowed now`);
+  const dice = modify(challengePool(c, skill, base), -attrUseInChallenge(d, c, skill, ctx.hasOther, ctx.budget).penalty);
   const difficulty = difficultyAt(d, time);
   const roll = rollOpen(dice, rng);
   const hit = dice.n > 0 && roll.total >= difficulty;

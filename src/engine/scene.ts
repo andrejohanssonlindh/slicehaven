@@ -1,9 +1,9 @@
 import { type Battle, type Unit, cellAt, unitAt, unitHexes, walkReach, pathFromReach } from '../core/battle';
 import {
   type Challenge, challengeAllowed, challengeOpen, challengeOutcome, challengePool, challengeSkills, difficultyAt, edgeControl,
-  mustLock, newChallenge, rollChallenge, timesRolled, CHALLENGE_ROLLS, challengeOver, type ChallengeDef,
+  mustLock, newChallenge, rollChallenge, timesRolled, CHALLENGE_ROLLS, challengeOver, type ChallengeDef, attrUseInChallenge, reasonable,
 } from '../core/challenge';
-import { type Dice, difficultyName, rollText } from '../core/checks';
+import { type Dice, difficultyName, modify, rollText } from '../core/checks';
 import { around, gap } from '../core/footprint';
 import { type Hex, hexEquals, hexKey, offsetToHex, parseHexKey } from '../core/hex';
 import { type Hero, NO_DICE, canRoll, diceOf } from '../core/hero';
@@ -14,7 +14,7 @@ import {
   talkFor, usefulSkills,
 } from '../core/scene';
 import {
-  type Conflict, type Side, ROUNDS, allowed, conflictOver, leadOf, mustUseLocked, newConflict, outcome, playRound, pooled, theirMove,
+  type Conflict, type Side, ROUNDS, allowed, attrUseIn, conflictOver, hasOtherChoice, leadOf, mustUseLocked, naturalAttrs, newConflict, outcome, playRound, pooled, theirMove,
 } from '../core/social';
 import { diceText } from '../core/chargen/tables';
 import { SCENE_ART } from '../art/sceneArt';
@@ -425,18 +425,25 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
     const n = c.rolls.length;
     const must = mustLock(d, c);
     const edge = edgeControl(d, time, (id) => canRoll(hero, id));
-    const difficulty = difficultyAt(d, time);
-    const natural = Object.keys(hero.dice).filter((id) => id.startsWith('attr:') && !challengeSkills(d, time).includes(id));
-    const opts: SheetOption[] = [...challengeSkills(d, time), ...natural].map((id) => {
+    const target = difficultyAt(d, time);
+    // Attributes are a fallback: the locked roll, and a few by game difficulty, or any at −2D6 with nothing else that fits.
+    const budget = DIFFICULTY_RULES[difficulty].attrBudget;
+    const skillIds = challengeSkills(d, time).filter((id) => !id.startsWith('attr:'));
+    const other = skillIds.some((id) => canRoll(hero, id) && reasonable(d, id, time));
+    const ctx = { budget, hasOther: other };
+    const attrIds = other ? d.locked.filter((id) => id.startsWith('attr:')) : Object.keys(hero.dice).filter((id) => id.startsWith('attr:'));
+    const opts: SheetOption[] = [...skillIds, ...attrIds].map((id) => {
       const base = diceOf(hero, id);
-      const dice = challengePool(c, id, base);
-      const ok = challengeAllowed(d, c, id, time);
+      const use = attrUseInChallenge(d, c, id, other, budget);
+      const dice = modify(challengePool(c, id, base), -use.penalty);
+      const ok = challengeAllowed(d, c, id, time, ctx);
       const locked = d.locked.includes(id);
       const has = base.n > 0;
       const used = timesRolled(c, id);
       const notes = [
         locked ? (must.includes(id) && must.length >= CHALLENGE_ROLLS - n ? 'Must be rolled now' : 'Locked: must be rolled once') : '',
         used ? `Used ${used}×: −${2 * used}D6` : '',
+        id.startsWith('attr:') && !locked ? use.note : '',
         !has ? (locked ? 'You lack it: rolls 0' : 'You don\'t have this') : '',
         edge.notes.length && d.edges?.some((e) => e.skill === id) && has ? edge.notes[0] : '',
       ].filter(Boolean).join(' · ');
@@ -447,7 +454,7 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
         disabled: !ok || (!has && !locked),
         style: ok && (has || locked) ? (locked ? 'primary' : 'good') : 'muted',
         onPick: () => void safe(() => {
-          const r = rollChallenge(d, c, id, base, time, rng);
+          const r = rollChallenge(d, c, id, base, time, rng, ctx);
           say(`${d.label}, roll ${c.rolls.length}: ${rollableName(r.skill)} ${diceText(r.dice)} vs ${r.difficulty} → ${rollText(r.roll)}`
             + `${r.control ? `, +${r.control} Control` : ', no Control'}.`, 'roll');
           challengeSheet(d, c);
@@ -462,9 +469,9 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
     const sit = edge.control ? ` · situation ${edge.control > 0 ? '+' : '−'}${Math.abs(edge.control)}` : '';
     open(undefined, {
       title: `${d.label} · roll ${n + 1} of ${CHALLENGE_ROLLS}`,
-      body: `${prev}<p class="score">Control <b>${got}</b>${sit} · difficulty ${difficulty} (${difficultyName(difficulty)})`
+      body: `${prev}<p class="score">Control <b>${got}</b>${sit} · difficulty ${target} (${difficultyName(target)})`
         + `${edge.notes.length ? `<br><small>${esc(edge.notes.join(' '))}</small>` : ''}</p>`
-        + `<p class="hint">A roll at ${difficulty} or more gives 1 Control, +1 per 5 over. Locked: ${d.locked.map((id) => `<b>${esc(rollableName(id))}</b>`).join(', ')}. Using a skill again costs −2D6.</p>`,
+        + `<p class="hint">A roll at ${target} or more gives 1 Control, +1 per 5 over. Locked: ${d.locked.map((id) => `<b>${esc(rollableName(id))}</b>`).join(', ')}. Using a skill again costs −2D6. Attributes are a fallback: ${budget} extra ${budget === 1 ? 'roll' : 'rolls'} on ${DIFFICULTY_RULES[difficulty].label}${other ? '' : ' (nothing fits, so any attribute works at −2D6)'}.</p>`,
       sections: [{ title: 'Pick a skill', options: opts }],
       closable: false,
     });
@@ -591,15 +598,23 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
 
   // --- social conflict ---------------------------------------------------------------------
 
+  /** What you start with in the conversation (easy only): the approach's own footing plus how he sees you. */
+  function situationText(o: ObjectDef, a: SceneApproach): string {
+    const b = conflictBonus(state, o, hero, LIBRARY, def);
+    const total = a.situation + b.control;
+    return `Situation ${total > 0 ? '+' : total < 0 ? '−' : ''}${Math.abs(total)} Control${b.notes.length ? ` (${b.notes.join('; ')})` : ''}.`;
+  }
+
   function approaches(o: ObjectDef): void {
     const soc = o.social;
     if (!soc) return;
+    const easy = difficulty === 'easy';
     const opts: SheetOption[] = soc.approaches.map((a) => {
       const openNow = approachOpen(a, state);
       const names = a.skills.map(rollableName);
       return {
         label: a.label,
-        sub: openNow ? `${a.why} Reasonable: ${names.join(', ')}.` : 'You\'ve tried that. He won\'t fall for it twice.',
+        sub: openNow ? `${a.why}${easy ? ` ${situationText(o, a)}` : ''} Reasonable: ${names.join(', ')}.` : 'You\'ve tried that. He won\'t fall for it twice.',
         disabled: !openNow,
         style: openNow ? 'good' : 'muted',
         onPick: () => {
@@ -623,6 +638,7 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
   function score(c: Conflict, a: SceneApproach): string {
     const mine = c.rounds.reduce((s, r) => s + r.mine, 0);
     const theirs = c.rounds.reduce((s, r) => s + r.theirs, 0);
+    if (difficulty !== 'easy') return `<p class="score">You <b>${mine}</b> · Guard <b>${theirs}</b></p>`;
     const total = a.situation + (c.bonus?.control ?? 0);
     const sit = total ? ` · situation ${total > 0 ? '+' : '−'}${Math.abs(total)}` : '';
     const balance = mine + total - theirs;
@@ -664,18 +680,27 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
       say(`He starts the round with ${rollableName(attack)}.`, 'info');
     }
     const forced = mustUseLocked(c, a);
-    // Your own nature (attributes) is always possible, for when nothing else fits.
-    const natural = Object.keys(hero.dice).filter((id) => id.startsWith('attr:') && !a.skills.includes(id));
-    const opts: SheetOption[] = [...a.skills, ...natural].map((id) => {
+    // Attributes are a fallback: the locked roll, Presence, Physique when it is a show of force, and a
+    // few by difficulty. With no skill that fits you can use any of them, at −2D6.
+    const budget = DIFFICULTY_RULES[difficulty].attrBudget;
+    const other = hasOtherChoice(a, (k) => diceOf(hero, k));
+    const ctx = { budget, hasOther: other };
+    const attrIds = other
+      ? [...new Set([a.locked, ...naturalAttrs(a)].filter((id) => id.startsWith('attr:')))]
+      : Object.keys(hero.dice).filter((id) => id.startsWith('attr:'));
+    const ids = [...a.skills.filter((id) => !id.startsWith('attr:')), ...attrIds];
+    const opts: SheetOption[] = ids.map((id) => {
       const base = diceOf(hero, id);
-      const d = pooled(c, id, base);
-      const ok = allowed(c, a, id);
+      const use = attrUseIn(c, a, id, other, budget);
+      const d = modify(pooled(c, id, base), -use.penalty);
+      const ok = allowed(c, a, id, ctx);
       const locked = id === a.locked;
       const has = base.n > 0;
       const used = c.rounds.filter((r) => r.skill === id).length;
       const notes = [
         locked ? (forced ? 'Must be rolled now' : 'Locked: must be rolled once') : '',
         used ? `Used ${used}×: −${2 * used}D6` : '',
+        id.startsWith('attr:') && !locked ? use.note : '',
         !has ? (locked ? 'You lack it: rolls 0' : 'You don\'t have this') : '',
       ].filter(Boolean).join(' · ');
       return {
@@ -685,7 +710,7 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
         disabled: !ok || (!has && !locked),
         style: ok && (has || locked) ? (locked ? 'primary' : 'good') : 'muted',
         onPick: () => void safe(() => {
-          const r = playRound(c, a, id, (k) => diceOf(hero, k), their, rng, attack);
+          const r = playRound(c, a, id, (k) => diceOf(hero, k), their, rng, { theirSkill: attack, attrBudget: budget });
           say(`Round ${c.rounds.length} (${r.lead === 'me' ? 'you start' : 'he starts'}): ${rollableName(r.skill)} ${diceText(r.dice)} → ${rollText(r.roll)} vs guard's `
             + `${rollableName(r.answer)} ${diceText(r.answerDice)} → ${rollText(r.answerRoll)}. `
             + (r.mine && r.theirs ? 'Tie, 1 Control each.' : r.mine ? `+${r.mine} Control to you.` : `+${r.theirs} Control to him.`), 'roll');
@@ -699,7 +724,7 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
       : '<p><b>Your move:</b> start the round with a skill. He answers with one of his own, and you cannot tell which.</p>';
     open(o, {
       title: `${a.label} · round ${n + 1} of ${ROUNDS}`,
-      body: `${intro}${score(c, a)}${turn}<p class="hint">Locked roll: <b>${esc(rollableName(a.locked))}</b>. Using a skill again costs −2D6.</p>`,
+      body: `${intro}${score(c, a)}${turn}<p class="hint">Locked roll: <b>${esc(rollableName(a.locked))}</b>. Using a skill again costs −2D6. Attributes are a fallback: ${budget} extra ${budget === 1 ? 'roll' : 'rolls'} on ${DIFFICULTY_RULES[difficulty].label}${other ? '' : ' (you have no fitting skill, so any attribute works at −2D6)'}.</p>`,
       sections: [{ title: heLeads ? 'Answer with' : 'Start with', options: opts }],
       closable: false,
     });

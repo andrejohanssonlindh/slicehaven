@@ -2,41 +2,37 @@ import { ATTR_EN, type Derived } from '../core/chargen/derive';
 import { attrDice, skillDice } from '../core/chargen/tables';
 import type { Hero } from '../core/hero';
 import { GROUP_EN, SKILL_BY_ID } from './chargen/skills';
+import { skillsWith } from './skillweb/tags';
 
 /**
  * Skill sets: which skills are reasonable for a kind of task. Scenes build
  * their checks and conversations from these, so "what counts as climbing"
- * is decided once. Ids are the character creator's (attributes as "attr:…").
+ * is decided once, in content/skillweb/tags (one tag per kind of effort).
+ * Ids are the character creator's (attributes as "attr:…").
  */
 export const SKILL_SETS = {
-  climb: ['Klättra', 'E:Akrobatik', 'K:Apfotad', 'K:Starka nypor'],
-  search: ['Genomsöka', 'attr:Vaksamhet'],
-  readPeople: ['Genomskåda', 'attr:Vaksamhet'],
+  climb: skillsWith('climb'),
+  search: skillsWith('search'),
+  readPeople: skillsWith('read-people'),
   /** Smooth words, charm and a good story. */
-  sweetTalk: [
-    'attr:Intryck', 'Charm', 'Berättarkonst', 'Argumentera', 'Sång & musik',
-    'E:Flörta', 'E:Lova', 'K:Charmerande leende', 'K:Smort munläder', 'K:Hederligt intryck',
-  ],
+  sweetTalk: skillsWith('sweet-talk'),
   /** Fear, size and a hard voice. */
-  threaten: [
-    'attr:Kroppsbyggnad', 'Injaga fruktan', 'Slagsmål', 'Ledarskap', 'Dupera',
-    'K:Hotfull stämma', 'K:Stark stämma',
-  ],
-  /** Making a case: reasoning, standing, a plain good argument. */
-  argue: ['Argumentera', 'Berättarkonst', 'Ledarskap', 'attr:Intryck'],
-  /** Winning someone over. */
-  charm: ['Charm', 'Sång & musik', 'E:Flörta', 'K:Charmerande leende', 'K:Hederligt intryck', 'attr:Intryck'],
-  /** Holding attention while something else happens. */
-  distract: ['Charm', 'Berättarkonst', 'Sång & musik', 'Dupera'],
-  /** Getting someone to tell you things. */
-  ask: ['Argumentera', 'Charm', 'Berättarkonst', 'attr:Intryck'],
-  /** Manners, rank and who bows to whom. */
-  etiquette: ['Hovliv'],
-  /** Knowing how the street works. */
-  streetwise: ['Skumraskaffärer', 'Charm', 'Handel', 'attr:Intryck'],
+  threaten: skillsWith('threaten'),
   /** Coin, haggling and knowing how these things are done. */
-  bribe: ['Handel', 'E:Muta', 'Skumraskaffärer', 'Argumentera', 'Dupera', 'E:Lova'],
-} as const satisfies Record<string, readonly string[]>;
+  bribe: skillsWith('bribe'),
+  /** Making a case: reasoning, standing, a plain good argument. */
+  argue: skillsWith('persuade'),
+  /** Winning someone over. */
+  charm: skillsWith('charm'),
+  /** Holding attention while something else happens. */
+  distract: skillsWith('distract'),
+  /** Getting someone to tell you things. */
+  ask: skillsWith('ask'),
+  /** Manners, rank and who bows to whom. */
+  etiquette: skillsWith('etiquette'),
+  /** Knowing how the street works. */
+  streetwise: skillsWith('streetwise'),
+} satisfies Record<string, readonly string[]>;
 
 /** English name of a skill or attribute id. */
 export function rollableName(id: string): string {
