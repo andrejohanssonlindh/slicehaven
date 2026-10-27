@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { Rng } from '../src/core/rng';
-import { apply, attempt, checkFor, checkOpen, newSceneState, openChecks } from '../src/core/scene';
+import { apply, attempt, checkFor, checkOpen, moodLine, newSceneState, openChecks } from '../src/core/scene';
+import { outcome, newConflict } from '../src/core/social';
 import type { CheckDef, ObjectDef, SceneState } from '../src/core/scene';
-import { disposition, expandObject, expandScene, hooksFor, kindChain, patienceOf, situation, talksLeftWith } from '../src/core/skillweb';
+import { conflictBonus, disposition, expandObject, expandScene, hooksFor, kindChain, patienceOf, readPerson, situation, talksLeftWith } from '../src/core/skillweb';
 import { defaultHero, isRollable } from '../src/content/rollables';
 import { GATE_SCENE } from '../src/content/scenes/gate';
 import { KIND_PARENTS, LIBRARY } from '../src/content/skillweb';
@@ -18,22 +19,23 @@ function dice(...faces: number[]): Rng {
 
 const npc = (kind: string, over: Partial<ObjectDef> = {}): ObjectDef =>
   expandObject({ id: 'npc', name: 'Old Rae', kind, hexes: [[0, 0]], look: '', ...over }, LIBRARY);
+const PLACE = { locals: ['asharier'], majority: 'human' };
 const fresh = (): SceneState => newSceneState(GATE_SCENE);
 const use = (o: ObjectDef, s: SceneState, skill: string, who = { kind: 'human', people: 'asharier' }, rng = dice(5, 5, 5, 5, 5, 5)) => {
   const c = checkFor(o, s, skill)!;
-  const sit = situation(s, c, o, who, LIBRARY, ['asharier']);
+  const sit = situation(s, c, o, who, LIBRARY, PLACE);
   const r = attempt(s, c, { n: 6, mod: 0 }, rng, sit);
   return { c, sit, ...r, events: apply(s, r.effects) };
 };
 
 describe('humans and their subkinds', () => {
-  it('guard and outcast are kinds of human, which are humanoids', () => {
-    expect(kindChain('guard', KIND_PARENTS)).toEqual(['guard', 'human', 'humanoid', 'creature', 'thing']);
-    expect(kindChain('outcast', KIND_PARENTS)).toContain('human');
+  it('guard and outcast are kinds of rural human, which are humanoids', () => {
+    expect(kindChain('guard', KIND_PARENTS)).toEqual(['guard', 'rural', 'human', 'humanoid', 'creature', 'thing']);
+    expect(kindChain('outcast', KIND_PARENTS)).toEqual(['outcast', 'rural', 'human', 'humanoid', 'creature', 'thing']);
   });
 
   it('every humanoid can be argued with, charmed, asked and frightened', () => {
-    for (const kind of ['humanoid', 'human', 'dwarf', 'elf', 'tirak', 'guard', 'outcast']) {
+    for (const kind of ['humanoid', 'human', 'rural', 'dwarf', 'elf', 'tirak', 'guard', 'outcast']) {
       expect(hooksFor({ kind }, LIBRARY).map((h) => h.intention), kind).toEqual(
         expect.arrayContaining(['persuade', 'impress', 'distract', 'ask', 'etiquette', 'intimidate', 'size-up']),
       );
@@ -66,7 +68,7 @@ describe('Court Life depends on who it is done to', () => {
     // Six dice is a strong success: one token from the success, one more from the strong effects.
     expect(s.tokens.length).toBeGreaterThanOrEqual(1);
     expect(s.tokens.every((t) => t.kind === 'barter' && t.against === 'npc')).toBe(true);
-    expect(events.map((e) => e.kind === 'say' && e.text).join(' ')).toMatch(/warms to you/);
+    expect(events.map((e) => e.kind === 'say' && e.text).join(' ')).toMatch(/warmer toward you/);
   });
 
   it('an outcast hears mockery, however it goes', () => {
@@ -87,7 +89,7 @@ describe('Court Life depends on who it is done to', () => {
 });
 
 describe('how peoples see each other', () => {
-  const look = (observer: string, hero: string) => disposition({ kind: observer }, { kind: hero }, LIBRARY);
+  const look = (observer: string, hero: string, place = {}) => disposition({ kind: observer }, { kind: hero }, LIBRARY, place);
 
   it('dwarves and elves distrust each other, both ways; almost nobody likes the tirak', () => {
     expect(look('dwarf', 'elf').v).toBeLessThan(0);
@@ -95,40 +97,59 @@ describe('how peoples see each other', () => {
     for (const k of ['human', 'dwarf', 'elf']) expect(look(k, 'tirak').v, k).toBeLessThan(0);
   });
 
-  it('the observer is the first people in the thing\'s kind chain: a guard looks at you as a human', () => {
-    expect(disposition({ kind: 'guard' }, { kind: 'elf' }, LIBRARY).v).toBe(RELATIONS.human.elf.v);
+  it('country folk are warier than townsfolk of the same people, and fall back to the human row otherwise', () => {
+    expect(look('rural', 'elf').v).toBeLessThan(look('human', 'elf').v);
+    expect(look('rural', 'tirak').v).toBeLessThan(look('human', 'tirak').v);
+    expect(look('rural', 'human').v).toBe(look('human', 'human').v);
+    // A guard is rural, so he looks at you as country folk do.
+    expect(look('guard', 'elf').v).toBe(RELATIONS.rural.elf.v);
   });
 
-  it('a stranger from far off is treated a little warily, a local is not', () => {
+  it('your own kind is kin only where you are not the majority', () => {
+    // Two elves in a human city: kin. Two humans in a human city: neutral. Two dwarves in a dwarf hold: neutral too.
+    expect(look('elf', 'elf', { majority: 'human' }).v).toBe(RELATIONS.elf.elf.v);
+    expect(look('elf', 'elf', { majority: 'human' }).v).toBeGreaterThan(0);
+    expect(look('dwarf', 'dwarf', { majority: 'dwarf' }).v).toBe(0);
+    expect(look('human', 'human', { majority: 'human' }).v).toBe(0);
+    // With no majority named, kin is kin.
+    expect(look('dwarf', 'dwarf').v).toBeGreaterThan(0);
+  });
+
+  it('a stranger from far off is a step cooler, a local is not', () => {
     const o = { kind: 'human' };
-    expect(disposition(o, { kind: 'human', people: 'asharier' }, LIBRARY, ['asharier']).v).toBe(0);
-    expect(disposition(o, { kind: 'human', people: 'adasier' }, LIBRARY, ['asharier']).v).toBe(-1);
+    const at = (people: string, place = { locals: ['asharier'] }) => disposition(o, { kind: 'human', people }, LIBRARY, place).v;
+    expect(at('asharier')).toBe(0);
+    expect(at('adasier')).toBe(-1);
     expect(disposition(o, { kind: 'human', people: 'adasier' }, LIBRARY).v).toBe(0);
   });
 
-  it('a worse reception makes the roll harder and a success grudging', () => {
+  it('single rolls: worse reception raises the difficulty, 2 per point', () => {
     const s = fresh();
     const o = npc('human');
     const c = checkFor(o, s, 'Charm')!;
-    const home = situation(s, c, o, { kind: 'human' }, LIBRARY);
-    const tirak = situation(s, c, o, { kind: 'tirak' }, LIBRARY);
-    expect(tirak.shift).toBeGreaterThan(home.shift);
-    expect(tirak.control).toBe(-2);
-    expect(home.control).toBe(0);
+    const home = situation(s, c, o, { kind: 'human' }, LIBRARY, PLACE);
+    const elf = situation(s, c, o, { kind: 'elf' }, LIBRARY, PLACE);
+    const tirak = situation(s, c, o, { kind: 'tirak' }, LIBRARY, PLACE);
+    expect(elf.shift - home.shift).toBe(2);
+    expect(tirak.shift - home.shift).toBe(4);
     expect(tirak.notes.join()).toMatch(/tirak/);
+    expect('control' in tirak).toBe(false);
   });
 
-  it('charming someone who dislikes your people works, but you get less out of it', () => {
+  it('conflicts: reception moves Control instead, one per point, and tokens add one each', () => {
     const o = npc('dwarf');
-    const strong = fresh();
-    use(o, strong, 'Charm', { kind: 'dwarf', people: 'x' }); // dwarf to dwarf: liked
-    const grudging = fresh();
-    const r = use(o, grudging, 'Charm', { kind: 'elf', people: 'x' }, dice(6, 6, 6, 6, 5, 5, 5, 5, 5, 5, 5, 5));
-    expect(r.result.success).toBe(true);
-    expect(grudging.social.npc.last).toBe('grudging');
-    // The impress hook gives a token of 1; a grudging success of -2 cuts it away.
-    expect(grudging.tokens).toEqual([]);
-    expect(strong.tokens).toHaveLength(1);
+    const home = conflictBonus(fresh(), o, { kind: 'dwarf', people: 'x' }, LIBRARY, { majority: 'human' });
+    const elf = conflictBonus(fresh(), o, { kind: 'elf' }, LIBRARY, { majority: 'human' });
+    expect(home.control).toBe(RELATIONS.dwarf.dwarf.v);
+    expect(elf.control).toBe(RELATIONS.dwarf.elf.v);
+    expect(elf.control).toBe(-2);
+    const s = fresh();
+    s.tokens.push({ kind: 'social', n: 1, against: 'npc', label: 'x' }, { kind: 'barter', n: 1, against: 'npc', label: 'y' });
+    expect(conflictBonus(s, o, { kind: 'elf' }, LIBRARY).control).toBe(-1);
+    // The bonus becomes part of the conflict's situation.
+    const c = newConflict('bribe');
+    c.bonus = { control: -2, notes: [] };
+    expect(outcome(c, { id: 'bribe', label: '', skills: [], locked: '', situation: 2, answers: [] }, 2).situation).toBe(0);
   });
 
   it('every people in the table is a real kind', () => {
@@ -136,6 +157,31 @@ describe('how peoples see each other', () => {
       expect(obs in KIND_PARENTS).toBe(true);
       for (const k of Object.keys(row)) expect(k in KIND_PARENTS).toBe(true);
     }
+  });
+});
+
+describe('what you can tell about someone', () => {
+  it('their mood is a discrete note, and says when they run out of patience', () => {
+    expect(moodLine('Rae', undefined)).toBeUndefined();
+    expect(moodLine('Rae', { talks: 0, mood: -2 })).toBe('Rae seems irritated.');
+    expect(moodLine('Rae', { talks: 2, mood: 1 }, 3)).toMatch(/warmer.*impatient/);
+    expect(moodLine('Rae', { talks: 3, mood: 1 }, 3)).toBe('Rae has had enough of you.');
+  });
+
+  it('mood changes show up as notes in the log', () => {
+    const s = fresh();
+    const ev = apply(s, [{ mood: -1, who: 'npc', name: 'Rae' }, { mood: -1, who: 'npc', name: 'Rae' }]);
+    expect(ev.map((e) => e.kind === 'say' && e.text)).toEqual(['Rae seems wary.', 'Rae seems irritated.']);
+  });
+
+  it('sizing someone up tells you their mood, how they see your people and whether to push', () => {
+    const o = npc('outcast');
+    const s = fresh();
+    s.social.npc = { talks: 1, mood: -1 };
+    const lines = readPerson(o, s, { kind: 'elf' }, LIBRARY, PLACE);
+    expect(lines[0]).toMatch(/wary/);
+    expect(lines.join(' ')).toMatch(/elves/);
+    expect(lines.join(' ')).toMatch(/not push/);
   });
 });
 

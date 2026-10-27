@@ -1,4 +1,5 @@
-import type { CheckDef, Effect, ObjectDef, SceneDef, SceneState, Situation, Token } from './scene';
+import { type CheckDef, type Effect, type ObjectDef, type SceneDef, type SceneState, type Situation, type Token, moodLine, moodWord } from './scene';
+import { MAX_RECEPTION } from './social';
 
 /**
  * The skill web: how skills meet the things in the world (design: director/design/skill-web.md).
@@ -57,7 +58,9 @@ export interface Library {
   hooks: HookDef[];
   /** Defaults for a kind and everything below it (the most specific kind wins). */
   kindDefaults: Record<string, { patience?: number }>;
-  /** observer kind → hero's kind → how the observer sees the hero. Missing = neutral. */
+  /** The kinds that are peoples (human, dwarf…): what 'your own kind' means. */
+  peoples: string[];
+  /** observer kind → hero's kind → how the observer sees the hero. Missing = neutral; a more specific observer kind wins. */
   relations: Record<string, Record<string, Rel>>;
 }
 
@@ -75,9 +78,6 @@ export function kindChain(kind: string | undefined, parents: Library['parents'])
   for (let k = kind; k && !chain.includes(k); k = parents[k]) chain.push(k);
   return chain;
 }
-
-/** Strong success: this many advantages over the difficulty. */
-export const STRONG_AT = 2;
 
 /** Library hooks that apply to a thing, best match first, one per intention. */
 export function hooksFor(o: Pick<ObjectDef, 'kind' | 'tags'>, lib: Library): HookDef[] {
@@ -127,24 +127,46 @@ export function talksLeftWith(o: ObjectDef, s: SceneState, lib: Library): number
   return p === undefined ? undefined : p - (s.social[o.id]?.talks ?? 0);
 }
 
-/** How the thing sees the hero's people: the first people-kind in its own kind chain looks at the visitor. */
-export function disposition(o: Pick<ObjectDef, 'kind'>, who: Visitor, lib: Library, locals?: string[]): Rel {
-  const observer = kindChain(o.kind, lib.parents).find((k) => k in lib.relations);
-  if (!observer || !who.kind) return { v: 0, why: '' };
-  const rel = lib.relations[observer][who.kind] ?? { v: 0, why: '' };
-  // Same sort of people but not from around here: a step cooler than kin would be.
-  if (observer === who.kind && locals && who.people && !locals.includes(who.people)) return { v: rel.v - 1, why: 'you are a stranger here' };
+/** Where the meeting happens: who belongs here, and who most folk are. */
+export interface Setting {
+  locals?: string[];
+  majority?: string;
+}
+
+/**
+ * How the thing sees the hero's people.
+ * - The row comes from the most specific kind that has an opinion (a rural human before a human).
+ * - Meeting your own kind is kin (a bonus) only when you are not the majority here:
+ *   two elves in a human city are kin, two humans in a human city are just neutral.
+ * - A visitor from a people that doesn't belong here is a step cooler.
+ */
+export function disposition(o: Pick<ObjectDef, 'kind'>, who: Visitor, lib: Library, place: Setting = {}): Rel {
+  if (!who.kind) return { v: 0, why: '' };
+  const chain = kindChain(o.kind, lib.parents);
+  const own = chain.find((k) => lib.peoples.includes(k));
+  let rel: Rel = { v: 0, why: '' };
+  for (const k of chain) {
+    const r = lib.relations[k]?.[who.kind];
+    if (r) {
+      rel = r;
+      break;
+    }
+  }
+  if (own === who.kind) {
+    if (place.majority === who.kind) rel = { v: 0, why: '' };
+    if (place.locals && who.people && !place.locals.includes(who.people)) return { v: rel.v - 1, why: 'you are a stranger here' };
+  }
   return rel;
 }
 
-/** What the situation does to a roll: mood, how their people see yours, and advantages you kept. */
-export function situation(s: SceneState, c: CheckDef, o: ObjectDef, who: Visitor, lib: Library, locals?: string[]): Situation {
-  if (!c.talk) return { shift: 0, control: 0, spend: [], notes: [] };
+/** What the situation does to one single roll: mood, how their people see yours, and advantages you kept. They change the difficulty. */
+export function situation(s: SceneState, c: CheckDef, o: ObjectDef, who: Visitor, lib: Library, place?: Setting): Situation {
+  if (!c.talk) return { shift: 0, spend: [], notes: [] };
   const mood = s.social[c.talk.who]?.mood ?? 0;
-  const rel = disposition(o, who, lib, locals);
+  const rel = disposition(o, who, lib, place);
   const spend: Token[] = [];
   const notes: string[] = [];
-  let shift = -(2 * mood + rel.v);
+  let shift = -2 * (mood + rel.v);
   if (mood) notes.push(mood > 0 ? 'they like you' : 'they are wary of you');
   if (rel.v && rel.why) notes.push(rel.why);
   for (const t of s.tokens) {
@@ -153,7 +175,45 @@ export function situation(s: SceneState, c: CheckDef, o: ObjectDef, who: Visitor
     shift -= 5 * t.n;
     notes.push(`+${t.n} advantage: ${t.label}`);
   }
-  return { shift, control: Math.min(0, rel.v), spend, notes };
+  return { shift, spend, notes };
+}
+
+/**
+ * The same things in a conflict, where the currency is Control (not difficulty):
+ * how they feel about you and your people moves the situation by one Control a point
+ * (never more than MAX_RECEPTION either way), and each kept advantage is +1 Control.
+ */
+export function conflictBonus(
+  s: SceneState, o: ObjectDef, who: Visitor, lib: Library, place?: Setting, wants: string[] = ['social'],
+): { control: number; notes: string[]; spend: Token[] } {
+  const mood = s.social[o.id]?.mood ?? 0;
+  const rel = disposition(o, who, lib, place);
+  const notes: string[] = [];
+  let control = Math.max(-MAX_RECEPTION, Math.min(MAX_RECEPTION, mood + rel.v));
+  if (mood) notes.push(mood > 0 ? 'they like you' : 'they are wary of you');
+  if (rel.v && rel.why) notes.push(rel.why);
+  const spend = s.tokens.filter((t) => wants.includes(t.kind) && (t.against === undefined || t.against === o.id));
+  for (const t of spend) {
+    control += t.n;
+    notes.push(`+${t.n} advantage: ${t.label}`);
+  }
+  return { control, notes, spend };
+}
+
+/** What sizing someone up tells you: how they feel, how they see your people, how much they will take. */
+export function readPerson(o: ObjectDef, s: SceneState, who: Visitor, lib: Library, place?: Setting): string[] {
+  const out: string[] = [];
+  const mem = s.social[o.id];
+  const patience = patienceOf(o, lib);
+  out.push(moodLine(o.name, mem ?? { talks: 0, mood: 0 }, patience) ?? `${o.name} ${moodWord(0)}.`);
+  const rel = disposition(o, who, lib, place);
+  if (rel.v < 0 && rel.why) out.push(`It shows: ${rel.why}.`);
+  else if (rel.v > 0 && rel.why) out.push(`It shows: ${rel.why}.`);
+  if (patience !== undefined) {
+    const left = patience - (mem?.talks ?? 0);
+    if (left <= 1 && left > 0) out.push('You would not push it much further.');
+  }
+  return out;
 }
 
 /** A library hook as an ordinary check on this thing. */

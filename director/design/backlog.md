@@ -6,7 +6,7 @@ Effort: **S** under an hour · **M** a session · **L** several sessions, split 
 
 ## Done 2026-10-27 (later)
 | ✅ | Humanoid social set: persuade, impress, distract, ask, intimidate, court manners; human → guard, outcast; patience, mood, kept advantages | Skill web steps 3 and 6. |
-| ✅ | People-vs-people reception table (grudging successes) and "stranger here" | Skill web step 8, the people half. |
+| ✅ | People-vs-people reception table (Control in conflicts, difficulty in single rolls), kin by context, rural kind, "stranger here" | Skill web step 8, the people half. |
 
 ## Done 2026-10-27
 | ✅ | Search is a check, not a win: look-around rolls, hints describe things only | Skill web steps 1 and 2. |

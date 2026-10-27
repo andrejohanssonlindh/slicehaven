@@ -19,9 +19,11 @@ export const KIND_PARENTS: Library['parents'] = {
   elf: 'humanoid',
   tirak: 'humanoid',
   missla: 'humanoid',
-  // Kinds of human.
-  guard: 'human',
-  outcast: 'human',
+  // Country folk: villages, roads and farms. (A town or city kind can sit beside it later.)
+  rural: 'human',
+  // Kinds of rural human.
+  guard: 'rural',
+  outcast: 'rural',
   animal: 'creature',
   feature: 'thing',
   rock: 'feature',
@@ -30,6 +32,9 @@ export const KIND_PARENTS: Library['parents'] = {
   fire: 'feature',
   item: 'thing',
 };
+
+/** The kinds that are peoples: what "your own kind" means. */
+export const PEOPLES = ['human', 'dwarf', 'elf', 'tirak', 'missla'];
 
 /** How many social tries each kind puts up with before they've had enough. */
 export const KIND_DEFAULTS: Library['kindDefaults'] = {
@@ -85,5 +90,6 @@ export const LIBRARY: Library = {
   parents: KIND_PARENTS,
   hooks: [...OBJECT_HOOKS, ...SOCIAL_HOOKS],
   kindDefaults: KIND_DEFAULTS,
+  peoples: PEOPLES,
   relations: RELATIONS,
 };

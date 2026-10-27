@@ -6,7 +6,7 @@ import { type Hero, canRoll, diceOf } from '../core/hero';
 import { Rng } from '../core/rng';
 import {
   type CheckDef, type Effect, type ObjectDef, type SceneApproach, type SceneDef, type SceneEvent, type SceneState,
-  apply, approachOpen, artOf, attempt, blocks, checkFor, checksHere, lookAround as rollLookAround, lookText, met, newSceneState, openChecks,
+  apply, approachOpen, artOf, attempt, blocks, checkFor, checksHere, lookAround as rollLookAround, lookText, met, moodLine, newSceneState, openChecks,
   talkFor, usefulSkills,
 } from '../core/scene';
 import {
@@ -18,7 +18,7 @@ import type { Ground } from '../art/terrain';
 import type { PropKind } from '../art/mapScene';
 import { SKILL_SETS, byGroup, rollableName } from '../content/rollables';
 import { LIBRARY } from '../content/skillweb';
-import { expandScene, situation, talksLeftWith } from '../core/skillweb';
+import { conflictBonus, expandScene, patienceOf, readPerson, situation, talksLeftWith } from '../core/skillweb';
 import type { SandboxCell } from '../content/sandbox';
 import { GameConsole, type LogTone } from '../ui/console';
 import { Sheet, type SheetOption, type SheetSection, esc } from '../ui/sheet';
@@ -276,6 +276,8 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
   function menu(o: ObjectDef): void {
     const look = lookText(o, state);
     say(`${o.name}: ${look}`, 'info');
+    const feel = moodLine(o.name, state.social[o.id], patienceOf(o, LIBRARY));
+    if (feel) say(feel, 'info');
     const opts: SheetOption[] = [];
     const talk = talkFor(o, state);
     if (talk) opts.push({ label: 'Talk', style: 'primary', onPick: () => talkTo(o) });
@@ -284,7 +286,7 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
       opts.push({ label: a.label, sub: a.sub, onPick: () => void safe(() => doAction(o, a.label, a.effects)) });
     }
     opts.push({ label: 'Use a skill…', sub: 'Climb, search, read people… anything you know', onPick: () => skillMenu(o) });
-    open(o, { title: o.name, body: `<p>${esc(look)}</p>`, sections: [{ options: opts }] });
+    open(o, { title: o.name, body: `<p>${esc(look)}</p>${feel ? `<p class="hint">${esc(feel)}</p>` : ''}`, sections: [{ options: opts }] });
   }
 
   async function doAction(o: ObjectDef, label: string, eff: Effect[]): Promise<void> {
@@ -423,7 +425,7 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
   async function rollCheck(o: ObjectDef, c: CheckDef, skill: string): Promise<void> {
     sheet.close();
     const dice = diceOf(hero, skill);
-    const sit = situation(state, c, o, hero, LIBRARY, def.locals);
+    const sit = situation(state, c, o, hero, LIBRARY, def);
     const { result, effects: eff, difficulty } = attempt(state, c, dice, rng, sit);
     const name = rollableName(skill);
     const verdict = result.success ? 'success' : 'failure';
@@ -437,6 +439,12 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
       if (left === 1) events.push({ kind: 'say', tone: 'info', text: `${o.name} is getting impatient.` });
       else if (left <= 0) events.push({ kind: 'say', tone: 'info', text: `${o.name} has had enough of talking to you.` });
       if (left <= 1) say(left === 1 ? `${o.name} is getting impatient.` : `${o.name} has had enough of talking to you.`, 'info');
+    }
+    if (result.success && c.intention === 'size-up') {
+      for (const l of readPerson(o, state, hero, LIBRARY, def)) {
+        events.push({ kind: 'say', tone: 'good', text: l });
+        say(l, 'good');
+      }
     }
     const text = events.filter((e) => e.kind === 'say').map((e) => `<p>${esc((e as { text: string }).text)}</p>`).join('');
     if (state.ended) return showEnd();
@@ -474,7 +482,10 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
         style: openNow ? 'good' : 'muted',
         onPick: () => {
           say(`You: ${a.pitch}`, 'you');
-          conflictSheet(o, a, newConflict(a.id));
+          const c = newConflict(a.id);
+          const b = conflictBonus(state, o, hero, LIBRARY, def);
+          if (b.control || b.notes.length) c.bonus = { control: b.control, notes: b.notes };
+          conflictSheet(o, a, c);
         },
       };
     });
@@ -490,8 +501,10 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
   function score(c: Conflict, a: SceneApproach): string {
     const mine = c.rounds.reduce((s, r) => s + r.mine, 0);
     const theirs = c.rounds.reduce((s, r) => s + r.theirs, 0);
-    const sit = a.situation ? ` · situation ${a.situation > 0 ? '+' : ''}${a.situation}` : '';
-    return `<p class="score">You <b>${mine}</b> · Guard <b>${theirs}</b>${sit}</p>`;
+    const total = a.situation + (c.bonus?.control ?? 0);
+    const sit = total ? ` · situation ${total > 0 ? '+' : '−'}${Math.abs(total)}` : '';
+    const why = c.bonus?.notes.length ? `<br><small>${esc(c.bonus.notes.join('; '))}</small>` : '';
+    return `<p class="score">You <b>${mine}</b> · Guard <b>${theirs}</b>${sit}${why}</p>`;
   }
 
   function roundText(c: Conflict): string {
@@ -551,6 +564,8 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
       + `and need ${soc.cost} to make him ${esc(soc.goal)}.`;
     say(`${a.label}: ${res.mine} Control${sit} − his ${res.theirs} = ${res.left} (need ${soc.cost}). ${res.success ? 'Success!' : 'Not enough.'}`, res.success ? 'good' : 'bad');
     sheet.close();
+    // Advantages you brought into the conversation are used up by it.
+    for (const t of conflictBonus(state, o, hero, LIBRARY, def).spend) state.tokens.splice(state.tokens.indexOf(t), 1);
     if (!res.success) state.flags[`tried:${a.id}`] = true;
     const events = await run(res.success ? a.success : a.failure, o, true);
     const text = events.filter((e) => e.kind === 'say').map((e) => `<p class="speech">${esc((e as { text: string }).text)}</p>`).join('');

@@ -6,7 +6,7 @@ See the status section in [Skill web](design/skill-web.md). Short version:
 - Every humanoid can be persuaded, won over, distracted, asked, frightened or shown court manners, with results per outcome. Humans have two subkinds, **guard** and **outcast**, that change single hooks.
 - Each person puts up with a few talks and keeps a mood; the outcome of one try colours the next (Q18).
 - Advantages can be kept for later against a person (one advantage = 5 points off a difficulty).
-- Peoples see each other differently (dwarf/elf, tirak, human/elf, misslor) and a bad reception makes a success grudging. Strangers to the scene's region are treated a little more coolly.
+- Peoples see each other differently (dwarf/elf, tirak, human/elf, misslor) and a bad reception raises the difficulty of a single roll and changes the Control of a conflict. Strangers to the scene's region are treated a little more coolly.
 - Gate: the guard is a `guard`, and a new **drifter** (outcast) waits by a tree at the southern edge.
 - 122 tests. Not checked in a browser (no Playwright on this machine).
 

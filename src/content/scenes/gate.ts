@@ -56,6 +56,7 @@ export const GATE_SCENE: SceneDef = {
   ],
   start: { time: 'night', silver: 100, hero: [4, 11] },
   locals: ['asharier'],
+  majority: 'human',
   objects: [
     {
       id: 'palisade',

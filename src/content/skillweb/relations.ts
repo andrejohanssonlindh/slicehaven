@@ -5,16 +5,25 @@ import type { Library } from '../../core/skillweb';
  * reasons, no book text. Rows are the one looking; columns are who they look at.
  * v: −3 hostile … +3 kin. Missing = neutral. Edit freely: it is balance data.
  *
- * What it does (core/skillweb `situation`):
- * - every point makes the roll 1 harder (or easier);
- * - below zero a success is *grudging*: you get less out of it (mood and kept
- *   advantages are cut by the same number), so charming a hostile elf as a dwarf
- *   can work and still leave you with nothing to build on.
- * Humans are the people most scenes are full of, so their row matters most.
+ * What it does:
+ * - single rolls: every point makes the difficulty 2 higher (or lower);
+ * - conflicts: every point is 1 Control of situation, so winning over a hostile
+ *   elf as a dwarf takes real work;
+ * - kin (your own people) only counts when you are *not* the majority where you
+ *   are: two elves in a human city are kin, two humans in a human city are neutral.
+ * A more specific kind overrides single entries: rural folk are warier of the unusual
+ * than the human row says. Entries a kind doesn't have fall back to its parent's.
  */
 const r = (v: number, why: string) => ({ v, why });
 
 export const RELATIONS: Library['relations'] = {
+  // Country folk have seen fewer strangers.
+  rural: {
+    elf: r(-2, 'country folk are uneasy around elves'),
+    dwarf: r(-1, 'country folk keep an eye on dwarves'),
+    tirak: r(-3, 'country folk have heard the stories and run from tirak'),
+    missla: r(1, 'the misslor are easy to like'),
+  },
   human: {
     human: r(0, ''),
     elf: r(-1, 'elves unsettle ordinary folk'),

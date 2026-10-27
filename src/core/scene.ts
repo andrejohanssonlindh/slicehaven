@@ -1,6 +1,5 @@
 import { type Dice, type TestResult, DIFFICULTY, test } from './checks';
 import type { Rng } from './rng';
-import { STRONG_AT } from './skillweb';
 import type { Approach } from './social';
 
 /**
@@ -57,7 +56,7 @@ export interface Memory {
   /** −3..+3; colours the next try. */
   mood: number;
   /** How the last try went. */
-  last?: 'fail' | 'success' | 'strong' | 'grudging';
+  last?: 'fail' | 'success' | 'strong';
 }
 
 export interface CheckDef {
@@ -181,6 +180,8 @@ export interface SceneDef {
   start: { time: SceneTime; silver: number; hero: [number, number] };
   /** Peoples that belong here; anyone else is a stranger (and humans treat strangers a little warily). */
   locals?: string[];
+  /** The kind of people most folk here are (e.g. 'human' in a human city). Meeting your own kind only counts as kin when you are not the majority. */
+  majority?: string;
   objects: ObjectDef[];
   exits: ExitDef[];
 }
@@ -295,19 +296,38 @@ export function lookAround(
 
 export const approachOpen =(a: SceneApproach, s: SceneState): boolean => met(s, a.when) && !s.flags[`tried:${a.id}`];
 
-/** What the situation does to one roll (worked out by skillweb.situation). */
+/** Strong success: this many advantages over the difficulty. */
+export const STRONG_AT = 2;
+
+/** How someone seems to feel about you, for the log and for clicking on them. */
+export function moodWord(mood: number): string {
+  if (mood <= -3) return 'is furious with you';
+  if (mood === -2) return 'seems irritated';
+  if (mood === -1) return 'seems wary';
+  if (mood === 1) return 'seems warmer toward you';
+  if (mood === 2) return 'seems friendly';
+  if (mood >= 3) return 'is clearly taken with you';
+  return 'seems neutral';
+}
+
+/** What one person's memory of you looks like from outside (nothing if you haven't met). */
+export function moodLine(name: string, mem: Memory | undefined, patience?: number): string | undefined {
+  if (!mem || (!mem.talks && !mem.mood)) return undefined;
+  const out = patience !== undefined && mem.talks >= patience ? 'has had enough of you' : patience !== undefined && mem.talks === patience - 1 ? `${moodWord(mem.mood)}, and is getting impatient` : moodWord(mem.mood);
+  return `${name} ${out}.`;
+}
+
+/** What the situation does to one single roll (worked out by skillweb.situation): it changes the difficulty. */
 export interface Situation {
   /** Added to the difficulty (negative = easier). */
   shift: number;
-  /** 0 or negative: how much less you get out of a success (they don't like your sort). */
-  control: number;
   /** Tokens this roll uses up. */
   spend: Token[];
   /** Why, for the roll's log line. */
   notes: string[];
 }
 
-export const NO_SITUATION: Situation = { shift: 0, control: 0, spend: [], notes: [] };
+export const NO_SITUATION: Situation = { shift: 0, spend: [], notes: [] };
 
 /** Roll a check and work out what happens (effects are applied by the caller). */
 export function attempt(
@@ -324,21 +344,9 @@ export function attempt(
     const last = c.tries !== undefined && s.fails[c.id] >= c.tries;
     return { result, difficulty, effects: [...c.failure, ...(last ? c.outOfTries ?? [] : [])] };
   }
-  const adv = Math.max(0, result.advantages + sit.control);
-  const grudging = sit.control < 0;
-  let effects = adv >= STRONG_AT && c.strong ? [...c.success, ...c.strong] : c.success;
-  if (grudging) {
-    // They go along with it, but you get less out of it.
-    const cut = -sit.control;
-    effects = effects.flatMap((e): Effect[] => {
-      if ('mood' in e && e.mood > 0) return e.mood - cut > 0 ? [{ ...e, mood: e.mood - cut }] : [];
-      if ('token' in e) return e.token.n - cut > 0 ? [{ token: { ...e.token, n: e.token.n - cut } }] : [];
-      return [e];
-    });
-    effects = [...effects, { say: 'It works, but they stay guarded: you are not their kind.', tone: 'info' }];
-  }
-  if (mem) mem.last = grudging ? 'grudging' : adv >= STRONG_AT && c.strong ? 'strong' : 'success';
-  return { result, difficulty, effects };
+  const strong = result.advantages >= STRONG_AT && !!c.strong;
+  if (mem) mem.last = strong ? 'strong' : 'success';
+  return { result, difficulty, effects: strong ? [...c.success, ...c.strong!] : c.success };
 }
 
 /** What applying effects did, for the log and the visuals. */
@@ -375,11 +383,7 @@ export function apply(s: SceneState, effects: Effect[]): SceneEvent[] {
       const mem = (s.social[who] ??= { talks: 0, mood: 0 });
       const before = mem.mood;
       mem.mood = Math.max(-3, Math.min(3, mem.mood + e.mood));
-      const name = e.name ?? 'They';
-      if (mem.mood !== before) {
-        const big = Math.abs(e.mood) >= 2;
-        out.push({ kind: 'say', tone: 'info', text: e.mood > 0 ? `${name} ${big ? 'warms to you a good deal' : 'warms to you a little'}.` : `${name} ${big ? 'turns cold toward you' : 'cools toward you'}.` });
-      }
+      if (mem.mood !== before) out.push({ kind: 'say', tone: 'info', text: `${e.name ?? 'They'} ${moodWord(mem.mood)}.` });
     } else if ('token' in e) {
       s.tokens.push({ ...e.token });
       out.push({ kind: 'say', tone: 'info', text: `You keep +${e.token.n} advantage for later (${e.token.label}).` });

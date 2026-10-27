@@ -46,7 +46,12 @@ export interface Round {
 export interface Conflict {
   approach: string;
   rounds: Round[];
+  /** How they already feel about you and your people, and advantages you brought: extra situation Control. */
+  bonus?: { control: number; notes: string[] };
 }
+
+/** The most Control that mood, reception and kept advantages can add or take away together. */
+export const MAX_RECEPTION = 4;
 
 export const newConflict = (approach: string): Conflict => ({ approach, rounds: [] });
 
@@ -116,6 +121,7 @@ export interface Outcome {
 export function outcome(c: Conflict, a: Approach, goalCost: number): Outcome {
   const mine = c.rounds.reduce((s, r) => s + r.mine, 0);
   const theirs = c.rounds.reduce((s, r) => s + r.theirs, 0);
-  const left = Math.max(0, Math.max(0, mine + a.situation) - theirs);
-  return { mine, theirs, situation: a.situation, left, success: left >= goalCost };
+  const situation = a.situation + (c.bonus?.control ?? 0);
+  const left = Math.max(0, Math.max(0, mine + situation) - theirs);
+  return { mine, theirs, situation, left, success: left >= goalCost };
 }
