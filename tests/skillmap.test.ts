@@ -183,10 +183,8 @@ describe('examples per skill and kind of effort', () => {
     expect(examplesOf('attr:Kroppsbyggnad').find((e) => e.tag === 'impress')!.ways.join(' ')).toMatch(/lift something heavy/);
   });
 
-  it('what is left to write can be listed', () => {
-    const left = missingExamples();
-    expect(left.length).toBeGreaterThan(0); // the model is a start, not the full map
-    for (const m of left) expect(TAGGED[m.tag]).toContain(m.skill);
+  it('every tagged skill has examples for the tag', () => {
+    expect(missingExamples()).toEqual([]);
   });
 });
 
