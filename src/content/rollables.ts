@@ -22,6 +22,18 @@ export const SKILL_SETS = {
     'attr:Kroppsbyggnad', 'Injaga fruktan', 'Slagsmål', 'Ledarskap', 'Dupera',
     'K:Hotfull stämma', 'K:Stark stämma',
   ],
+  /** Making a case: reasoning, standing, a plain good argument. */
+  argue: ['Argumentera', 'Berättarkonst', 'Ledarskap', 'attr:Intryck'],
+  /** Winning someone over. */
+  charm: ['Charm', 'Sång & musik', 'E:Flörta', 'K:Charmerande leende', 'K:Hederligt intryck', 'attr:Intryck'],
+  /** Holding attention while something else happens. */
+  distract: ['Charm', 'Berättarkonst', 'Sång & musik', 'Dupera'],
+  /** Getting someone to tell you things. */
+  ask: ['Argumentera', 'Charm', 'Berättarkonst', 'attr:Intryck'],
+  /** Manners, rank and who bows to whom. */
+  etiquette: ['Hovliv'],
+  /** Knowing how the street works. */
+  streetwise: ['Skumraskaffärer', 'Charm', 'Handel', 'attr:Intryck'],
   /** Coin, haggling and knowing how these things are done. */
   bribe: ['Handel', 'E:Muta', 'Skumraskaffärer', 'Argumentera', 'Dupera', 'E:Lova'],
 } as const satisfies Record<string, readonly string[]>;
@@ -72,13 +84,16 @@ export function defaultHero(): Hero {
   const dice: Hero['dice'] = {};
   for (const [a, v] of Object.entries(SHEPHERD_ATTRS)) dice[`attr:${a}`] = attrDice(v);
   for (const [s, v] of Object.entries(SHEPHERD_SKILLS)) dice[s] = skillDice(v);
-  return { name: 'Shepherd', from: 'Default shepherd', dice };
+  return { name: 'Shepherd', from: 'Default shepherd', dice, kind: 'human', people: 'asharier' };
 }
+
+/** The creator's families as skill-web kinds. */
+const FAMILY_KIND: Record<string, string> = { manniska: 'human', alv: 'elf', dvarg: 'dwarf', tirak: 'tirak', missla: 'missla' };
 
 /** A character from the creator, as something the scene can roll. */
 export function heroFromChar(name: string, d: Derived): Hero {
   const dice: Hero['dice'] = {};
   for (const a of d.attrs) dice[`attr:${a.attr}`] = a.dice;
   for (const s of d.skills) if (s.dice.n > 0) dice[s.id] = s.dice;
-  return { name: name || 'Unnamed hero', from: 'Character creator', dice };
+  return { name: name || 'Unnamed hero', from: 'Character creator', dice, kind: d.people ? FAMILY_KIND[d.people.family] : undefined, people: d.people?.id };
 }

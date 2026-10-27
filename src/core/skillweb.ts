@@ -1,4 +1,4 @@
-import type { CheckDef, Effect, ObjectDef, SceneDef } from './scene';
+import type { CheckDef, Effect, ObjectDef, SceneDef, SceneState, Situation, Token } from './scene';
 
 /**
  * The skill web: how skills meet the things in the world (design: director/design/skill-web.md).
@@ -39,12 +39,34 @@ export interface HookDef {
   failure: Effect[];
   /** Added to `success` when you beat the difficulty by 2+ advantages. */
   strong?: Effect[];
+  /** A social try: costs one of their talks; their mood and how they see your people colour the roll. */
+  social?: boolean;
+  /** Kept advantages (Token.kind) this hook can spend. */
+  wants?: string[];
+}
+
+/** How one people sees another: −3 (hostile) … +3 (kin). */
+export interface Rel {
+  v: number;
+  why: string;
 }
 
 export interface Library {
   /** kind → its parent kind (the root has none). */
   parents: Record<string, string | undefined>;
   hooks: HookDef[];
+  /** Defaults for a kind and everything below it (the most specific kind wins). */
+  kindDefaults: Record<string, { patience?: number }>;
+  /** observer kind → hero's kind → how the observer sees the hero. Missing = neutral. */
+  relations: Record<string, Record<string, Rel>>;
+}
+
+/** What the hero brings to a social try. */
+export interface Visitor {
+  /** Kind of people: 'human', 'elf', 'dwarf'… */
+  kind?: string;
+  /** The specific people, e.g. 'asharier'. */
+  people?: string;
 }
 
 /** From the kind itself up to the root: ['dwarf', 'humanoid', 'creature', 'thing']. */
@@ -84,12 +106,62 @@ function fillEffect(e: Effect, o: ObjectDef): Effect {
   if ('say' in e) return { ...e, say: fill(e.say, o) };
   if ('set' in e) return { set: e.set.replaceAll('{id}', o.id) };
   if ('unset' in e) return { unset: e.unset.replaceAll('{id}', o.id) };
+  if ('mood' in e) return { mood: e.mood, who: o.id, name: o.name };
+  if ('token' in e) return { token: { ...e.token, label: fill(e.token.label, o), against: e.token.against === '{id}' ? o.id : e.token.against } };
   return e;
 }
 
+/** How many social tries they put up with: their own, else from the most specific kind. */
+export function patienceOf(o: Pick<ObjectDef, 'kind' | 'patience'>, lib: Library): number | undefined {
+  if (o.patience !== undefined) return o.patience;
+  for (const k of kindChain(o.kind, lib.parents)) {
+    const p = lib.kindDefaults[k]?.patience;
+    if (p !== undefined) return p;
+  }
+  return undefined;
+}
+
+/** Social tries they'd still put up with (undefined if they don't count). */
+export function talksLeftWith(o: ObjectDef, s: SceneState, lib: Library): number | undefined {
+  const p = patienceOf(o, lib);
+  return p === undefined ? undefined : p - (s.social[o.id]?.talks ?? 0);
+}
+
+/** How the thing sees the hero's people: the first people-kind in its own kind chain looks at the visitor. */
+export function disposition(o: Pick<ObjectDef, 'kind'>, who: Visitor, lib: Library, locals?: string[]): Rel {
+  const observer = kindChain(o.kind, lib.parents).find((k) => k in lib.relations);
+  if (!observer || !who.kind) return { v: 0, why: '' };
+  const rel = lib.relations[observer][who.kind] ?? { v: 0, why: '' };
+  // Same sort of people but not from around here: a step cooler than kin would be.
+  if (observer === who.kind && locals && who.people && !locals.includes(who.people)) return { v: rel.v - 1, why: 'you are a stranger here' };
+  return rel;
+}
+
+/** What the situation does to a roll: mood, how their people see yours, and advantages you kept. */
+export function situation(s: SceneState, c: CheckDef, o: ObjectDef, who: Visitor, lib: Library, locals?: string[]): Situation {
+  if (!c.talk) return { shift: 0, control: 0, spend: [], notes: [] };
+  const mood = s.social[c.talk.who]?.mood ?? 0;
+  const rel = disposition(o, who, lib, locals);
+  const spend: Token[] = [];
+  const notes: string[] = [];
+  let shift = -(2 * mood + rel.v);
+  if (mood) notes.push(mood > 0 ? 'they like you' : 'they are wary of you');
+  if (rel.v && rel.why) notes.push(rel.why);
+  for (const t of s.tokens) {
+    if (!(c.wants ?? []).includes(t.kind) || (t.against !== undefined && t.against !== c.talk.who)) continue;
+    spend.push(t);
+    shift -= 5 * t.n;
+    notes.push(`+${t.n} advantage: ${t.label}`);
+  }
+  return { shift, control: Math.min(0, rel.v), spend, notes };
+}
+
 /** A library hook as an ordinary check on this thing. */
-export function instantiate(h: HookDef, o: ObjectDef): CheckDef {
+export function instantiate(h: HookDef, o: ObjectDef, lib?: Library): CheckDef {
+  const patience = lib ? patienceOf(o, lib) : o.patience;
   return {
+    ...(h.social && patience !== undefined ? { talk: { who: o.id, patience } } : {}),
+    ...(h.wants ? { wants: h.wants } : {}),
     id: `${o.id}/${h.id}`,
     intention: h.intention,
     label: fill(h.label, o),
@@ -108,7 +180,7 @@ export function instantiate(h: HookDef, o: ObjectDef): CheckDef {
 export function expandObject(o: ObjectDef, lib: Library): ObjectDef {
   const own = o.checks ?? [];
   const taken = new Set(own.map((c) => c.intention ?? c.id));
-  const added = hooksFor(o, lib).filter((h) => !taken.has(h.intention)).map((h) => instantiate(h, o));
+  const added = hooksFor(o, lib).filter((h) => !taken.has(h.intention)).map((h) => instantiate(h, o, lib));
   return added.length ? { ...o, checks: [...own, ...added] } : o;
 }
 

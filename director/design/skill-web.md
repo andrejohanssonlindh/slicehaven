@@ -70,10 +70,21 @@ Steps 1 and 2 below are built. Code: `core/skillweb.ts` (types, kind tree, looku
 - **Strong success:** 2+ advantages over the difficulty adds the hook's `strong` effects.
 - **Not built yet:** tags with real content (only the lookup rule exists), advantage tokens, mood and talk limits, gear choice, people tables, terrain.
 
+## Status (2026-10-27, later): the humanoid social set
+Built: steps 3, 4 and the people-vs-people part of 8. Code: `content/skillweb/social.ts` (hooks), `content/skillweb/relations.ts` (the table), `core/skillweb.ts` (`situation`, `disposition`, patience), `core/scene.ts` (mood, tokens, memory), tests in `tests/social-web.test.ts`.
+- **Kinds:** humanoid → human → **guard**, **outcast**; also dwarf, elf, tirak, missla (the creator's families). Subkinds change single hooks: a guard is much harder to frighten (very hard), an outcast hears mockery in court manners (always, mood −2) and talks shop easily.
+- **Hooks on every humanoid:** persuade (Argue), impress (Charm), distract, ask, intimidate, court manners, and size-up (looking, so no talk is spent). **Court Life by who it's done to:** a *rich* human is flattered (mood +1 and a kept advantage for bartering); an outcast takes it as mockery; others are puzzled.
+- **Patience (talks):** each social try costs one of their talks. By kind: humanoid 3, guard 4, outcast 2. They say when they get impatient and when they have had enough, and then social skills do nothing on them. Observing (size-up) is free. *Not yet decided:* whether the player should see a number.
+- **Mood:** −3..+3 per person. Each point makes the next try 2 easier or harder. Outcomes move it.
+- **Kept advantages (tokens):** one advantage = 5 points off a later difficulty (the margin that earns one). Tied to a person, spent by the next roll that wants that kind, used up either way. *Impress/persuade* leave a *social* token against that person; *distract* leaves *sneak* and *pickpocket* tokens against them (nothing spends those yet); rich-flattery leaves *barter* (nothing spends it yet).
+- **How peoples see each other:** `RELATIONS[observer][you]` from −3 to +3 with a short reason, e.g. dwarf and elf distrust (−2 both ways), almost nobody likes the tirak (−2), humans are wary of elves (−1) and fond of the misslor (+1). The observer is the first people in the thing's kind chain, so a guard sees you as a human. A human from a people that isn't local to the scene is one step cooler ("a stranger here"). Each point of dislike makes the roll 1 harder, **and a success is grudging**: mood and kept advantages are cut by the same amount ("−n control"). So charming an elf as a dwarf can work, and still leave you with nothing to build on. This is balance data: tune freely.
+- **Gate:** the guard is a `guard`; a new **drifter** (an `outcast`) sits by a tree. Heroes now carry a kind and a people (the creator's character, or the default shepherd, a local human).
+- **Not built:** drive hooks, haggling and a barter scene to spend the tokens, sneaking and pickpocketing, gear choice, status tags beyond `rich`, real content tables beyond these ten hooks, a visible patience meter.
+
 ## Build order (each a vignette, one push)
 1. ✅ **Shape only.** Types in `core/` for: thing kinds, intentions, outcomes, effects, advantage tokens. A resolver that walks layers 3→2→1. Unit tests. No content beyond a few examples.
 2. ✅ **Search fix** in the gate scene: make it a check, stop listing solutions; give the boulder and the guard layer 2 / layer 1 hooks instead of hand-written ones where they exist.
-3. **Humanoid social set.** Argue (persuade, haggle, stall) and Charm on any humanoid. Then Court life / Streetwise-style skills with status tags.
+3. ✅ **Humanoid social set.** Argue (persuade, haggle, stall) and Charm on any humanoid. Then Court life / Streetwise-style skills with status tags.
 4. **Wilderness set.** Gather food, light a fire, find a trail on terrain tiles.
 5. **Object set.** Rocks (Geology), plants (Botany-style), locks (Lockpick), doors, water.
 6. **Advantage tokens** stored in scene state, used by later rolls.

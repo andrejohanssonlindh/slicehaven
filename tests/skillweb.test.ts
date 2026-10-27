@@ -20,7 +20,7 @@ const hook = (over: Partial<HookDef>): HookDef => ({
   success: [{ say: 'ok {name}' }], failure: [{ say: 'no' }], ...over,
 });
 const obj = (over: Partial<ObjectDef> = {}): ObjectDef => ({ id: 'o', name: 'Thing', hexes: [[0, 0]], look: '', ...over });
-const lib = (...hooks: HookDef[]): Library => ({ parents: { thing: undefined, creature: 'thing', humanoid: 'creature', dwarf: 'humanoid' }, hooks });
+const lib = (...hooks: HookDef[]): Library => ({ parents: { thing: undefined, creature: 'thing', humanoid: 'creature', dwarf: 'humanoid' }, hooks, kindDefaults: {}, relations: {} });
 
 describe('skill web: kinds and lookup', () => {
   it('walks a kind up to the root', () => {
@@ -157,6 +157,6 @@ describe('skill web: library data', () => {
     expect(checkFor(by('rock'), s, 'Naturlära')?.fromLibrary).toBe(true);
     expect(checkFor(by('palisade'), s, 'Klättra')).toBeUndefined();
     // The travellers' own, one-shot check is not duplicated by the library.
-    expect(by('travellers').checks).toHaveLength(1);
+    expect(by('travellers').checks!.filter((c) => c.intention === 'size-up')).toHaveLength(1);
   });
 });

@@ -57,6 +57,7 @@ export const VILLAGER_COLORS: Record<string, Record<string, string>> = {
   guard: { H: '#a8aebb', h: '#6e7484', d: '#41455a', w: '#a8322c', W: '#6e1e1e', b: '#2a1a12', p: '#4a4038', s: '#e0a882', S: '#a87458' },
   tinker: { H: '#7a5a8a', h: '#56406a', d: '#382a48', w: '#a8824f', W: '#7a5a38' },
   crone: { H: '#6e6a74', h: '#4c4852', d: '#2e2c36', w: '#5a6e7a', W: '#3c4c58', s: '#e8c0a0', S: '#b08870' },
+  drifter: { H: '#6a5a46', h: '#4a3e30', d: '#2c241c', w: '#7a6a52', W: '#51463a', s: '#d09a78', S: '#98705a' },
   youth: { H: '#4b7d40', h: '#36623a', d: '#1c3326', w: '#c9a66b', W: '#a8824f', s: '#d8a078', S: '#a07050' },
 };
 

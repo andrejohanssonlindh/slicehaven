@@ -17,6 +17,7 @@ export const GATE_KINDS: Record<string, { sprite: MobKind; variant?: string; too
   tinker: { sprite: 'villager', variant: 'tinker', tool: 'stick' },
   crone: { sprite: 'villager', variant: 'crone', tool: 'stick' },
   youth: { sprite: 'villager', variant: 'youth', tool: 'stick' },
+  drifter: { sprite: 'villager', variant: 'drifter', tool: 'stick' },
 };
 
 const REST: Effect[] = [
@@ -54,6 +55,7 @@ export const GATE_SCENE: SceneDef = {
     'TPggpgwTPT',
   ],
   start: { time: 'night', silver: 100, hero: [4, 11] },
+  locals: ['asharier'],
   objects: [
     {
       id: 'palisade',
@@ -81,7 +83,7 @@ export const GATE_SCENE: SceneDef = {
     {
       id: 'guard',
       name: 'Gate guard',
-      kind: 'human',
+      kind: 'guard',
       units: ['guard'],
       hexes: [[4, 4]],
       look: [
@@ -314,6 +316,15 @@ export const GATE_SCENE: SceneDef = {
         },
       ],
       noUse: 'You can\'t see how {skill} would help with them.',
+    },
+    {
+      id: 'drifter',
+      name: 'Drifter',
+      kind: 'outcast',
+      units: ['drifter'],
+      hexes: [[6, 10]],
+      look: 'A ragged man sitting against a tree a little way from everyone, with a bundle and a wary eye. He does not come near the fire.',
+      noUse: 'You can\'t see how {skill} would help with him.',
     },
     {
       id: 'cottage-w',

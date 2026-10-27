@@ -18,7 +18,7 @@ import type { Ground } from '../art/terrain';
 import type { PropKind } from '../art/mapScene';
 import { SKILL_SETS, byGroup, rollableName } from '../content/rollables';
 import { LIBRARY } from '../content/skillweb';
-import { expandScene } from '../core/skillweb';
+import { expandScene, situation, talksLeftWith } from '../core/skillweb';
 import type { SandboxCell } from '../content/sandbox';
 import { GameConsole, type LogTone } from '../ui/console';
 import { Sheet, type SheetOption, type SheetSection, esc } from '../ui/sheet';
@@ -351,7 +351,10 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
     skillPicker(o, `Use a skill: ${o.name}`, useful, (id) => {
       const c = checkFor(o, state, id);
       if (c) return void safe(() => rollCheck(o, c, id));
-      const line = (o.noUse ?? 'You can\'t see how {skill} would help here.').replace('{skill}', rollableName(id));
+      const tired = (talksLeftWith(o, state, LIBRARY) ?? 1) <= 0;
+      const line = tired
+        ? `${o.name} has had enough of talking to you.`
+        : (o.noUse ?? 'You can\'t see how {skill} would help here.').replace('{skill}', rollableName(id));
       say(line, 'info');
       open(o, { title: rollableName(id), body: `<p>${esc(line)}</p>`, sections: [{ options: [{ label: 'Back', onPick: () => skillMenu(o) }] }] });
     });
@@ -420,29 +423,37 @@ export function startScene(rawDef: SceneDef, kinds: Record<string, MobDef>, star
   async function rollCheck(o: ObjectDef, c: CheckDef, skill: string): Promise<void> {
     sheet.close();
     const dice = diceOf(hero, skill);
-    const { result, effects: eff } = attempt(state, c, dice, rng);
+    const sit = situation(state, c, o, hero, LIBRARY, def.locals);
+    const { result, effects: eff, difficulty } = attempt(state, c, dice, rng, sit);
     const name = rollableName(skill);
     const verdict = result.success ? 'success' : 'failure';
-    say(`${c.label}: ${name} ${diceText(dice)} vs ${c.difficulty} → ${rollText(result.roll)}, ${verdict}`
+    const why = sit.notes.length ? ` [${sit.notes.join('; ')}]` : '';
+    say(`${c.label}: ${name} ${diceText(dice)} vs ${difficulty}${why} → ${rollText(result.roll)}, ${verdict}`
       + `${result.advantages ? ` (${result.advantages} advantage${result.advantages > 1 ? 's' : ''})` : ''}.`, 'roll');
     floatOverHero(`${result.roll.total}`, result.success ? '#a8ff8a' : '#ff8a6a');
     const events = await run(eff, o, true);
+    const left = c.talk ? talksLeftWith(o, state, LIBRARY) : undefined;
+    if (left !== undefined && c.talk) {
+      if (left === 1) events.push({ kind: 'say', tone: 'info', text: `${o.name} is getting impatient.` });
+      else if (left <= 0) events.push({ kind: 'say', tone: 'info', text: `${o.name} has had enough of talking to you.` });
+      if (left <= 1) say(left === 1 ? `${o.name} is getting impatient.` : `${o.name} has had enough of talking to you.`, 'info');
+    }
     const text = events.filter((e) => e.kind === 'say').map((e) => `<p>${esc((e as { text: string }).text)}</p>`).join('');
     if (state.ended) return showEnd();
     const again = !result.success && openChecks(o, state).includes(c);
-    const left = c.tries !== undefined ? c.tries - (state.fails[c.id] ?? 0) : undefined;
+    const triesLeft = c.tries !== undefined ? c.tries - (state.fails[c.id] ?? 0) : undefined;
     const opts: SheetOption[] = [];
     if (again) {
       opts.push({
         label: 'Try again', style: 'good',
-        sub: left !== undefined ? `${left} more ${left === 1 ? 'try' : 'tries'} before someone notices` : undefined,
+        sub: triesLeft !== undefined ? `${triesLeft} more ${triesLeft === 1 ? 'try' : 'tries'} before someone notices` : undefined,
         onPick: () => void safe(() => rollCheck(o, c, skill)),
       });
     }
     opts.push({ label: again ? 'Leave it' : 'Continue', style: again ? 'muted' : 'primary', onPick: () => sheet.close() });
     open(o, {
       title: c.label,
-      body: `<p class="roll ${verdict}">${esc(name)} ${diceText(dice)} vs ${c.difficulty}: <b>${result.roll.total}</b> · ${verdict}<br>`
+      body: `<p class="roll ${verdict}">${esc(name)} ${diceText(dice)} vs ${difficulty}: <b>${result.roll.total}</b> · ${verdict}<br>${sit.notes.length ? `<small>${esc(sit.notes.join('; '))}</small><br>` : ''}`
         + `<small>${esc(rollText(result.roll))}</small></p>${text}`,
       sections: [{ options: opts }],
     });

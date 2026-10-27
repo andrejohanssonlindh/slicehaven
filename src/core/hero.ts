@@ -10,6 +10,10 @@ export interface Hero {
   /** Where the hero came from ("Default shepherd", "Character creator"). */
   from: string;
   dice: Record<string, Dice>;
+  /** Kind of people ('human', 'elf', 'dwarf', 'tirak', 'missla'): how others see you. */
+  kind?: string;
+  /** The specific people (creator id, e.g. 'asharier'). */
+  people?: string;
 }
 
 export const NO_DICE: Dice = { n: 0, mod: 0 };

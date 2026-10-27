@@ -33,7 +33,32 @@ export type Effect =
   /** Take a thing (or person) out of the scene. */
   | { remove: string }
   /** The hero gets in; the text closes the scene. Climbing lands on `to` (offset col,row). */
-  | { enter: string; via?: 'climb' | 'gate'; to?: [number, number] };
+  | { enter: string; via?: 'climb' | 'gate'; to?: [number, number] }
+  /** How someone feels about you (−3..+3), added to. `who` is the thing's id, `name` what to call them. */
+  | { mood: number; who?: string; name?: string }
+  /** Keep advantages for a later roll of this kind, optionally only against one person (see Token). */
+  | { token: { kind: string; n: number; against?: string; label: string } };
+
+/**
+ * A kept advantage. One advantage is worth 5 points of difficulty: the same margin
+ * that earns one on a roll. Spent (used up) by the next roll that wants its kind.
+ */
+export interface Token {
+  kind: string;
+  n: number;
+  against?: string;
+  label: string;
+}
+
+/** What one person in the scene remembers of you. */
+export interface Memory {
+  /** Social tries so far (successful or not). */
+  talks: number;
+  /** −3..+3; colours the next try. */
+  mood: number;
+  /** How the last try went. */
+  last?: 'fail' | 'success' | 'strong' | 'grudging';
+}
 
 export interface CheckDef {
   id: string;
@@ -52,6 +77,10 @@ export interface CheckDef {
   strong?: Effect[];
   /** Came from the skill-web library rather than the scene itself. */
   fromLibrary?: boolean;
+  /** A social try with this person: costs one of their talks, and their mood colours it. */
+  talk?: { who: string; patience: number };
+  /** Kinds of kept advantage (Token.kind) this check can spend. */
+  wants?: string[];
   when?: Cond;
   /** Failures allowed before the check closes (default: unlimited). */
   tries?: number;
@@ -116,6 +145,8 @@ export interface ObjectDef {
   artWhen?: { flag: string; art: string }[];
   /** Offset (col,row) hexes it covers. */
   hexes: [number, number][];
+  /** How many social tries they put up with (default comes from the kind). */
+  patience?: number;
   /** What kind of thing it is (content/skillweb kinds); library hooks for that kind apply. */
   kind?: string;
   /** Status tags (e.g. 'rich') that tagged library hooks look for. */
@@ -148,6 +179,8 @@ export interface SceneDef {
   /** Offset-coord ground map, one char per hex (see the scene's legend). */
   layout: string[];
   start: { time: SceneTime; silver: number; hero: [number, number] };
+  /** Peoples that belong here; anyone else is a stranger (and humans treat strangers a little warily). */
+  locals?: string[];
   objects: ObjectDef[];
   exits: ExitDef[];
 }
@@ -159,6 +192,10 @@ export interface SceneState {
   /** Failed attempts per check id. */
   fails: Record<string, number>;
   removed: string[];
+  /** What each person remembers of you, by object id. */
+  social: Record<string, Memory>;
+  /** Advantages you're holding for later. */
+  tokens: Token[];
   /** Spots (col,row) where you've already looked around. */
   looked: string[];
   /** Set once the scene is over: the closing text. */
@@ -166,7 +203,7 @@ export interface SceneState {
 }
 
 export const newSceneState = (def: SceneDef): SceneState => ({
-  time: def.start.time, silver: def.start.silver, flags: {}, fails: {}, removed: [], looked: [],
+  time: def.start.time, silver: def.start.silver, flags: {}, fails: {}, removed: [], looked: [], social: {}, tokens: [],
 });
 
 export function met(s: SceneState, c?: Cond): boolean {
@@ -189,8 +226,10 @@ export function blocks(o: ObjectDef, s: SceneState): boolean {
 
 export const talkFor = (o: ObjectDef, s: SceneState): TalkDef | undefined => o.talk?.find((t) => met(s, t.when));
 
+export const talksLeft = (s: SceneState, who: string, patience: number): number => patience - (s.social[who]?.talks ?? 0);
+
 export const checkOpen = (c: CheckDef, s: SceneState): boolean =>
-  met(s, c.when) && (c.tries === undefined || (s.fails[c.id] ?? 0) < c.tries);
+  met(s, c.when) && (c.tries === undefined || (s.fails[c.id] ?? 0) < c.tries) && (!c.talk || talksLeft(s, c.talk.who, c.talk.patience) > 0);
 
 /** Checks you can try on this thing right now. */
 export const openChecks = (o: ObjectDef, s: SceneState): CheckDef[] => (o.checks ?? []).filter((c) => checkOpen(c, s));
@@ -256,13 +295,50 @@ export function lookAround(
 
 export const approachOpen =(a: SceneApproach, s: SceneState): boolean => met(s, a.when) && !s.flags[`tried:${a.id}`];
 
+/** What the situation does to one roll (worked out by skillweb.situation). */
+export interface Situation {
+  /** Added to the difficulty (negative = easier). */
+  shift: number;
+  /** 0 or negative: how much less you get out of a success (they don't like your sort). */
+  control: number;
+  /** Tokens this roll uses up. */
+  spend: Token[];
+  /** Why, for the roll's log line. */
+  notes: string[];
+}
+
+export const NO_SITUATION: Situation = { shift: 0, control: 0, spend: [], notes: [] };
+
 /** Roll a check and work out what happens (effects are applied by the caller). */
-export function attempt(s: SceneState, c: CheckDef, dice: Dice, rng: Rng): { result: TestResult; effects: Effect[] } {
-  const result = test(dice, c.difficulty, rng);
-  if (result.success) return { result, effects: result.advantages >= STRONG_AT && c.strong ? [...c.success, ...c.strong] : c.success };
-  s.fails[c.id] = (s.fails[c.id] ?? 0) + 1;
-  const last = c.tries !== undefined && s.fails[c.id] >= c.tries;
-  return { result, effects: [...c.failure, ...(last ? c.outOfTries ?? [] : [])] };
+export function attempt(
+  s: SceneState, c: CheckDef, dice: Dice, rng: Rng, sit: Situation = NO_SITUATION,
+): { result: TestResult; effects: Effect[]; difficulty: number } {
+  const difficulty = Math.max(2, c.difficulty + sit.shift);
+  const result = test(dice, difficulty, rng);
+  for (const tk of sit.spend) s.tokens.splice(s.tokens.indexOf(tk), 1);
+  const mem = c.talk ? (s.social[c.talk.who] ??= { talks: 0, mood: 0 }) : undefined;
+  if (mem) mem.talks++;
+  if (!result.success) {
+    s.fails[c.id] = (s.fails[c.id] ?? 0) + 1;
+    if (mem) mem.last = 'fail';
+    const last = c.tries !== undefined && s.fails[c.id] >= c.tries;
+    return { result, difficulty, effects: [...c.failure, ...(last ? c.outOfTries ?? [] : [])] };
+  }
+  const adv = Math.max(0, result.advantages + sit.control);
+  const grudging = sit.control < 0;
+  let effects = adv >= STRONG_AT && c.strong ? [...c.success, ...c.strong] : c.success;
+  if (grudging) {
+    // They go along with it, but you get less out of it.
+    const cut = -sit.control;
+    effects = effects.flatMap((e): Effect[] => {
+      if ('mood' in e && e.mood > 0) return e.mood - cut > 0 ? [{ ...e, mood: e.mood - cut }] : [];
+      if ('token' in e) return e.token.n - cut > 0 ? [{ token: { ...e.token, n: e.token.n - cut } }] : [];
+      return [e];
+    });
+    effects = [...effects, { say: 'It works, but they stay guarded: you are not their kind.', tone: 'info' }];
+  }
+  if (mem) mem.last = grudging ? 'grudging' : adv >= STRONG_AT && c.strong ? 'strong' : 'success';
+  return { result, difficulty, effects };
 }
 
 /** What applying effects did, for the log and the visuals. */
@@ -294,6 +370,19 @@ export function apply(s: SceneState, effects: Effect[]): SceneEvent[] {
     } else if ('remove' in e) {
       if (!s.removed.includes(e.remove)) s.removed.push(e.remove);
       out.push({ kind: 'remove', id: e.remove });
+    } else if ('mood' in e) {
+      const who = e.who ?? '';
+      const mem = (s.social[who] ??= { talks: 0, mood: 0 });
+      const before = mem.mood;
+      mem.mood = Math.max(-3, Math.min(3, mem.mood + e.mood));
+      const name = e.name ?? 'They';
+      if (mem.mood !== before) {
+        const big = Math.abs(e.mood) >= 2;
+        out.push({ kind: 'say', tone: 'info', text: e.mood > 0 ? `${name} ${big ? 'warms to you a good deal' : 'warms to you a little'}.` : `${name} ${big ? 'turns cold toward you' : 'cools toward you'}.` });
+      }
+    } else if ('token' in e) {
+      s.tokens.push({ ...e.token });
+      out.push({ kind: 'say', tone: 'info', text: `You keep +${e.token.n} advantage for later (${e.token.label}).` });
     } else if ('enter' in e) {
       s.ended = e.enter;
       out.push({ kind: 'enter', text: e.enter, via: e.via ?? 'gate', to: e.to });
