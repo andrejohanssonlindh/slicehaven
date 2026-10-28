@@ -50,3 +50,28 @@ describe('spike3d', () => {
     expect(errors).toEqual([]);
   });
 });
+
+describe('spike3d streaming', () => {
+  it('streams chunks in and out as the view moves over a bigger world', async () => {
+    const { page, errors } = await openPage(env, '/spike3d/?world=224&tier=low&nogov');
+    await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 30_000 });
+    const count = () => page.evaluate(() => (window as any).spike.world.chunkCount as number);
+    const built = () => page.evaluate(() => (window as any).spike.world.chunksBuilt as number);
+    await page.waitForTimeout(1500);
+    const first = await count();
+    // A phone-sized view of a 224 m world holds only a few of its 64 chunks.
+    expect(first).toBeGreaterThan(0);
+    expect(first).toBeLessThan(16);
+    const b0 = await built();
+    // Walk the focus across the world (the pan clamps to the edge).
+    for (let k = 0; k < 6; k++) {
+      await page.evaluate((x) => { (window as any).spike.world.focus.x = x; }, -80 + k * 32);
+      await page.waitForTimeout(900);
+    }
+    const b1 = await built();
+    expect(b1).toBeGreaterThan(b0);
+    expect(await count()).toBeLessThan(16);
+    await page.screenshot({ path: `${OUT}spike3d-streamed.png` });
+    expect(errors).toEqual([]);
+  });
+});

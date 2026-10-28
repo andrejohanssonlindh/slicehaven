@@ -1,5 +1,7 @@
 import type { Sky, TimeOfDay } from '../core/environment';
-import { TIERS, type Tier, type TierName, pickTier } from '../core/world3d/tiers';
+import { SPIKE_GROUND } from '../content/spike3d';
+import { Governor, TIERS, type DeviceInfo, type Tier, type TierName, atlasSize, pickTier, qualityAt } from '../core/world3d/tiers';
+import { setAtlasSize, spriteAtlas } from '../engine3d/atlas';
 import { Pipeline } from '../engine3d/pipeline';
 import { SpikeWorld } from '../engine3d/world';
 import { t } from '../i18n';
@@ -17,12 +19,32 @@ const statsEl = document.getElementById('stats')!;
 const loading = document.getElementById('loading')!;
 
 const params = new URLSearchParams(location.search);
-const device = {
+
+/** Ask a throwaway WebGL context what the GPU is, before choosing a tier. */
+function probeGpu(): { gpu?: string; maxTexture?: number } {
+  try {
+    const gl = document.createElement('canvas').getContext('webgl2') ?? document.createElement('canvas').getContext('webgl');
+    if (!gl) return {};
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    const out = {
+      gpu: ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : undefined,
+      maxTexture: gl.getParameter(gl.MAX_TEXTURE_SIZE) as number,
+    };
+    gl.getExtension('WEBGL_lose_context')?.loseContext();
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+const device: DeviceInfo = {
   width: stage.clientWidth,
   height: stage.clientHeight,
   dpr: window.devicePixelRatio || 1,
   touch: navigator.maxTouchPoints > 0,
+  ...probeGpu(),
 };
+setAtlasSize(atlasSize(device));
 let tier: Tier = { ...TIERS[(params.get('tier') as TierName) in TIERS ? (params.get('tier') as TierName) : pickTier(device)] };
 let zoomIndex = tier.zoom;
 
@@ -59,6 +81,29 @@ function button(row: string, label: () => string, on: () => boolean, click: () =
   });
   document.getElementById(row)!.appendChild(el);
   buttons.push(b);
+}
+
+// Dynamic scaling: the governor watches frame times and steps quality down (and back up), and says so.
+const governor = new Governor(1000 / 30);
+const noticeEl = document.getElementById('notice')!;
+let noticeT = 0;
+
+function notify(text: string): void {
+  noticeEl.textContent = text;
+  noticeEl.hidden = false;
+  clearTimeout(noticeT);
+  noticeT = window.setTimeout(() => { noticeEl.hidden = true; }, 5000);
+}
+
+/** Apply the tier's quality at the governor's current level. */
+function applyQuality(): void {
+  const q = qualityAt(tier, governor.level);
+  world.settings.shells = Math.min(2, q.shells);
+  world.settings.lights = Math.min(3, q.lights);
+  world.settings.shadowMap = q.shadowMap;
+  world.setShadowMap(q.shadowMap);
+  world.setGrass(q.grass);
+  for (const b of buttons) b.refresh();
 }
 
 const cycle = <T>(list: readonly T[], v: T): T => list[(list.indexOf(v) + 1) % list.length];
@@ -102,11 +147,8 @@ function setTier(name: TierName): void {
   tier = { ...TIERS[name] };
   zoomIndex = tier.zoom;
   pipeline.settings.pixelCss = tier.pixelCss;
-  world.settings.shells = Math.min(2, tier.shells);
-  world.settings.lights = Math.min(3, tier.lights);
-  world.settings.shadowMap = tier.shadowMap;
-  world.setShadowMap(tier.shadowMap);
-  world.setGrass(tier.grass);
+  governor.level = 0;
+  applyQuality();
   fit();
 }
 
@@ -160,6 +202,14 @@ let frames = 0, fpsT = performance.now(), fps = 0, last = performance.now();
 function loop(now: number): void {
   const dt = now - last;
   last = now;
+  // Frame interval drives the governor; long gaps (a hidden tab) are not slowness.
+  if (dt < 250 && !params.has('nogov')) {
+    const r = governor.push(dt);
+    if (r.notice) {
+      applyQuality();
+      notify(r.notice);
+    }
+  }
   const t0 = performance.now();
   world.update(dt);
   const info = pipeline.renderer.info;
@@ -178,7 +228,8 @@ function loop(now: number): void {
       `${fps.toFixed(0)} fps  cpu ${med.toFixed(1)} ms`,
       `calls ${info.render.calls}  tris ${(info.render.triangles / 1000).toFixed(1)}k`,
       `${pipeline.rw}×${pipeline.rh} ×${pipeline.factor}  ${world.ppm} px/m`,
-      `tier ${tier.name}  shadow ${world.settings.shadowMap}`,
+      `tier ${tier.name}${governor.level ? ` -${governor.level}` : ''}  shadow ${world.settings.shadowMap}`,
+      `chunks ${world.chunkCount}  atlases ${spriteAtlas().count}`,
     ].join('\n');
   }
   requestAnimationFrame(loop);
@@ -187,7 +238,9 @@ function loop(now: number): void {
 // Building the world takes a moment (ground painting); let the page paint first.
 setTimeout(() => {
   const t0 = performance.now();
-  world = new SpikeWorld({ shells: Math.min(2, tier.shells), lights: Math.min(3, tier.lights), shadowMap: tier.shadowMap }, TIERS.high.grass);
+  // ?world=192 makes the patch bigger, to see chunks stream in as you pan.
+  const size = Number(params.get('world')) || SPIKE_GROUND.size;
+  world = new SpikeWorld({ shells: Math.min(2, tier.shells), lights: Math.min(3, tier.lights), shadowMap: tier.shadowMap }, TIERS.high.grass, { ...SPIKE_GROUND, size });
   world.setGrass(tier.grass);
   pipeline.renderer.info.autoReset = false;
   fit();
@@ -197,7 +250,7 @@ setTimeout(() => {
   loading.hidden = true;
   const built = performance.now() - t0;
   console.info(`spike3d: world built in ${built.toFixed(0)} ms`);
-  (window as unknown as { spike: unknown }).spike = { world, pipeline, setTier, built, get tier() { return tier; } };
+  (window as unknown as { spike: unknown }).spike = { world, pipeline, setTier, built, governor, get tier() { return tier; } };
   requestAnimationFrame((n) => {
     last = n;
     loop(n);

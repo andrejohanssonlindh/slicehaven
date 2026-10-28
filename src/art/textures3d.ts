@@ -1,3 +1,4 @@
+import { CHUNK } from '../core/world3d/chunks';
 import { type Ground3D, splatAt } from '../core/world3d/terrain';
 import { TEXELS_PER_M } from '../core/world3d/tiers';
 import { THATCH, WOOD, boards, stoneWall } from './buildings';
@@ -147,35 +148,39 @@ export function leafTex(seed: number): Pix {
 }
 
 /**
- * The ground under the whole patch: grass, long grass and flowers, stamped mud,
- * the dirt road, leaf litter under the tree, wet bank by the lake. Painted from
- * the splat with noisy edges, so nothing has a seam.
+ * The ground of one 32 m chunk: grass, long grass and flowers, stamped mud, the
+ * dirt road, leaf litter under the tree, wet bank by the lake. Painted from the
+ * splat with noisy edges. Noise and dither are sampled in world texel
+ * coordinates, so neighbouring chunks continue each other with no seam.
  */
-export function groundTex(g: Ground3D): Pix {
-  const n = Math.round(g.size * TPM);
+export function groundChunkTex(g: Ground3D, ci: number, cj: number): Pix {
+  const n = Math.round(CHUNK * TPM);
   const p = new Pix(n, n);
-  const half = g.size / 2;
+  const ox = ci * n, oy = cj * n; // world texel of this chunk's corner
+  const x0 = ci * CHUNK, z0 = cj * CHUNK;
   // Splat on a coarse grid (every 4 texels), interpolated: the noise does the edges.
   const S = 4, gn = Math.ceil(n / S) + 1;
   const grid = new Array(gn * gn);
-  for (let j = 0; j < gn; j++) for (let i = 0; i < gn; i++) grid[j * gn + i] = splatAt(g, -half + (i * S) / TPM, -half + (j * S) / TPM);
+  for (let j = 0; j < gn; j++) for (let i = 0; i < gn; i++) grid[j * gn + i] = splatAt(g, x0 + (i * S) / TPM, z0 + (j * S) / TPM);
   const cx = TILE_CENTER.x, cy = TILE_CENTER.y;
   const SH = ['#1e1a16', '#2e2820', '#463c2e', '#5e523e', '#7a6c52'];
   for (let y = 0; y < n; y++) {
     const fj = y / S, j = Math.floor(fj), v = fj - j;
+    const wy = y + oy;
     for (let x = 0; x < n; x++) {
       const fi = x / S, i = Math.floor(fi), u = fi - i;
       const a = grid[j * gn + i], b = grid[j * gn + i + 1], c = grid[(j + 1) * gn + i], d = grid[(j + 1) * gn + i + 1];
       const w = (k: 'road' | 'mud' | 'shore' | 'shade' | 'wild'): number => (a[k] * (1 - u) + b[k] * u) * (1 - v) + (c[k] * (1 - u) + d[k] * u) * v;
-      const jit = (white(x, y, 5) - 0.5) * 0.22 + (fbm(x / 6, y / 6, 6) - 0.5) * 0.45;
+      const wx = x + ox;
+      const jit = (white(wx, wy, 5) - 0.5) * 0.22 + (fbm(wx / 6, wy / 6, 6) - 0.5) * 0.45;
       let col: string;
       if (w('shore') + jit > 0.5) {
-        col = ramp(SH, 0.3 + fbm(x / 5, y / 4, 7) * 0.45 + (white(x, y, 8) - 0.5) * 0.25 - w('shore') * 0.2, x, y);
-      } else if (w('mud') + jit > 0.5) col = groundColor('mud', x, y, cx, cy);
-      else if (w('road') + jit > 0.5) col = groundColor('path', x, y, cx, cy);
-      else if (w('shade') + jit > 0.55) col = groundColor('forest', x, y, cx, cy);
-      else if (w('wild') + jit > 0.55) col = groundColor(fbm(x / 30, y / 30, 9) > 0.55 ? 'flowers' : 'tallgrass', x, y, cx, cy);
-      else col = groundColor('grass', x, y, cx, cy);
+        col = ramp(SH, 0.3 + fbm(wx / 5, wy / 4, 7) * 0.45 + (white(wx, wy, 8) - 0.5) * 0.25 - w('shore') * 0.2, wx, wy);
+      } else if (w('mud') + jit > 0.5) col = groundColor('mud', wx, wy, cx, cy);
+      else if (w('road') + jit > 0.5) col = groundColor('path', wx, wy, cx, cy);
+      else if (w('shade') + jit > 0.55) col = groundColor('forest', wx, wy, cx, cy);
+      else if (w('wild') + jit > 0.55) col = groundColor(fbm(wx / 30, wy / 30, 9) > 0.55 ? 'flowers' : 'tallgrass', wx, wy, cx, cy);
+      else col = groundColor('grass', wx, wy, cx, cy);
       p.set(x, y, col);
     }
   }

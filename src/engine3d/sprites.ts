@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import type { Sprite } from '../art/props';
 import { TEXELS_PER_M } from '../core/world3d/tiers';
-import { lit, pixTexture } from './materials';
+import { spriteAtlas } from './atlas';
+import { lit } from './materials';
 
 /**
  * 2D art standing in the 3D world. A sprite is a vertical card turned to face
@@ -15,30 +16,20 @@ import { lit, pixTexture } from './materials';
 
 export interface SpriteCard {
   mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshLambertMaterial>;
-  frames: THREE.Texture[];
   /** Advance the animation (8 frames, ~8 fps). */
   tick(t: number): void;
 }
 
-const cache = new WeakMap<object, THREE.Texture[]>();
+/** One shared material per atlas texture: every sprite in an atlas draws with the same one. */
+const materials = new WeakMap<THREE.Texture, THREE.MeshLambertMaterial>();
+const ids = new WeakMap<object, number>();
+let nextId = 0;
 
-function framesOf(s: Sprite): THREE.Texture[] {
-  let tex = cache.get(s);
-  if (!tex) {
-    const uniq = new Map<object, THREE.Texture>();
-    tex = s.frames.map((f) => {
-      let t = uniq.get(f);
-      if (!t) {
-        t = pixTexture(f.data, f.w, f.h, { flip: true, mips: false });
-        t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
-        uniq.set(f, t);
-      }
-      return t;
-    });
-    cache.set(s, tex);
-  }
-  return tex;
-}
+const idOf = (f: object): number => {
+  let id = ids.get(f);
+  if (id === undefined) ids.set(f, (id = nextId++));
+  return id;
+};
 
 export function spriteCard(s: Sprite, pitch: number, opts: { flat?: boolean; ppm?: number; shadow?: boolean } = {}): SpriteCard {
   const ppm = opts.ppm ?? TEXELS_PER_M;
@@ -50,19 +41,29 @@ export function spriteCard(s: Sprite, pitch: number, opts: { flat?: boolean; ppm
   const ax = s.ax / f0.w, ay = s.ay / f0.h;
   geo.translate((0.5 - ax) * w, (ay - 0.5) * h, 0);
   if (opts.flat) geo.rotateX(-Math.PI / 2);
-  const frames = framesOf(s);
-  const mat = lit({ map: frames[0], sprite: true });
+  // Frames live in the shared atlas; a frame change only rewrites the card's four UVs.
+  const atlas = spriteAtlas();
+  const slots = s.frames.map((f) => atlas.add(`f${idOf(f)}`, f));
+  const tex = slots[0].texture;
+  let mat = materials.get(tex);
+  if (!mat) materials.set(tex, (mat = lit({ map: tex, sprite: true })));
+  const uv = geo.attributes.uv as THREE.BufferAttribute;
+  const setFrame = (i: number): void => {
+    const u = slots[i].uv;
+    uv.setXY(0, u.u0, u.v1).setXY(1, u.u1, u.v1).setXY(2, u.u0, u.v0).setXY(3, u.u1, u.v0);
+    uv.needsUpdate = true;
+  };
+  setFrame(0);
   const mesh = new THREE.Mesh(geo, mat);
   mesh.castShadow = opts.shadow ?? !opts.flat;
   mesh.receiveShadow = true;
-  let last = -1;
+  let last = 0;
   return {
     mesh,
-    frames,
     tick(t: number) {
-      const i = Math.floor(t * 8) % frames.length;
+      const i = Math.floor(t * 8) % slots.length;
       if (i !== last) {
-        mat.map = frames[i];
+        setFrame(i);
         last = i;
       }
     },

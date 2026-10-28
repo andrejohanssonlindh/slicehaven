@@ -7,16 +7,18 @@ import {
 import type { Pix } from '../art/pix';
 import type { Sprite } from '../art/props';
 import {
-  barkTex, doorTex, floorTex, groundTex, leafTex, plasterTex, roofUnderTex, shutterTex, stoneTex, thatchTex,
+  barkTex, doorTex, floorTex, groundChunkTex, leafTex, plasterTex, roofUnderTex, shutterTex, stoneTex, thatchTex,
   timberTex, windowGlowTex, windowTex,
 } from '../art/textures3d';
 import { PEOPLE } from '../content/village/folk';
 import { SPIKE_GROUND, SPIKE_HOUSE, SPIKE_TORCHES, SPIKE_TREE, SPIKE_WALK } from '../content/spike3d';
+import { CHUNK, type ChunkTerrain, TerrainStore, chunkKey, chunksNear } from '../core/world3d/chunks';
+import { type Environment3D, environment } from '../core/world3d/environment3d';
 import { Rng } from '../core/rng';
 import { type HouseMaterial, type HouseModel, buildHouse } from '../core/world3d/house';
 import type { MeshData } from '../core/world3d/mesh';
-import { cloudDrift, cloudThreshold, skyLight } from '../core/world3d/sky';
-import { type Terrain, buildTerrain, groundHeight, heightAt, splatAt } from '../core/world3d/terrain';
+import { cloudDrift, cloudThreshold } from '../core/world3d/sky';
+import { type Ground3D, groundHeight, splatAt } from '../core/world3d/terrain';
 import { TEXELS_PER_M } from '../core/world3d/tiers';
 import { buildTree } from '../core/world3d/tree';
 import { fbm } from '../core/noise';
@@ -67,6 +69,13 @@ interface Torch {
   seed: number;
 }
 
+/** What a resident chunk holds on the GPU. */
+interface LoadedChunk {
+  id: ChunkTerrain;
+  ground: THREE.Mesh;
+  grass: THREE.InstancedMesh | null;
+}
+
 interface Shell {
   mesh: THREE.Mesh;
   layer: number;
@@ -83,7 +92,13 @@ export class SpikeWorld {
   private sun = new THREE.DirectionalLight(0xffffff, 2);
   private hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
   private fog = new THREE.Fog(0xcccccc, 80, 200);
-  private terrain: Terrain;
+  readonly ground: Ground3D;
+  readonly store: TerrainStore;
+  private chunks = new Map<string, LoadedChunk>();
+  /** What the world is like right now (sky, wind, clouds): the one interface the rules and the renderer read. */
+  env!: Environment3D;
+  private grassCount = 0;
+  private chunkBuilds = 0;
   readonly house = new THREE.Group();
   private model: HouseModel;
   private cut: CutPart[] = [];
@@ -103,11 +118,13 @@ export class SpikeWorld {
   private time = 0;
   private cloudOff = new THREE.Vector2();
   settings: WorldSettings;
-  private grass: THREE.InstancedMesh | null = null;
 
-  constructor(settings: WorldSettings, grassCount: number) {
+  constructor(settings: WorldSettings, grassCount: number, ground: Ground3D = SPIKE_GROUND) {
     this.settings = settings;
-    const g = SPIKE_GROUND;
+    const g = ground;
+    this.ground = ground;
+    this.store = new TerrainStore(ground, 0.5);
+    this.grassCount = grassCount;
     this.scene.fog = this.fog;
     this.camera.layers.set(0);
 
@@ -121,24 +138,15 @@ export class SpikeWorld {
     this.setShadowMap(settings.shadowMap);
     this.scene.add(this.sun, this.sun.target);
 
-    // Ground.
-    this.terrain = buildTerrain(g, 0.5);
-    const groundMap = tex(groundTex(g), false, undefined);
-    groundMap.wrapS = groundMap.wrapT = THREE.ClampToEdgeWrapping;
-    groundMap.repeat.set(1 / g.size, 1 / g.size);
-    groundMap.offset.set(0.5, 0.5);
-    const ground = new THREE.Mesh(geometryOf(this.terrain.mesh), lit({ map: groundMap, ao: true, wettable: true }));
-    ground.receiveShadow = true;
-    this.scene.add(ground);
+    // Ground chunks stream in once the view is sized (see `frame`); until then the exact height function stands in.
+    this.model = buildHouse(SPIKE_HOUSE.spec);
 
     // The house.
-    this.model = buildHouse(SPIKE_HOUSE.spec);
     this.buildHouse();
 
     // Tree, grass, water, torches, people.
     this.buildTree();
-    this.grass = this.buildGrass(grassCount);
-    this.water = makeWater(g, this.terrain);
+    this.water = makeWater(g);
     if (this.water) this.scene.add(this.water.mesh);
     this.buildTorches();
     this.scene.add(this.rain.lines);
@@ -149,7 +157,7 @@ export class SpikeWorld {
     this.sprites.push(this.walker);
     const stander = spriteCard(makeFolk(PEOPLE.farmer), PITCH);
     const d = this.toWorld(this.model.door[0] + 1.7, this.model.door[2] + 1.1);
-    stander.mesh.position.set(d.x, heightAt(this.terrain, g.size, d.x, d.z), d.z);
+    stander.mesh.position.set(d.x, this.store.heightAt(d.x, d.z), d.z);
     stander.mesh.rotation.y = YAW;
     const sb = blobShadow(0.32);
     sb.position.copy(stander.mesh.position).add(new THREE.Vector3(0, 0.03, 0));
@@ -246,7 +254,7 @@ export class SpikeWorld {
     this.house.add(hearth);
     this.torches.push({ light: hearth, flame: new THREE.Mesh(), base: 4, seed: 3 });
 
-    const y = groundHeight(SPIKE_GROUND, h.x, h.z) - 0.05;
+    const y = groundHeight(this.ground, h.x, h.z) - 0.05;
     this.house.position.set(h.x, y, h.z);
     this.house.rotation.y = h.rot;
     this.scene.add(this.house);
@@ -301,46 +309,63 @@ export class SpikeWorld {
     leaves.castShadow = leaves.receiveShadow = true;
     group.add(leaves);
     const gx = SPIKE_TREE.x, gz = SPIKE_TREE.z;
-    group.position.set(gx, heightAt(this.terrain, SPIKE_GROUND.size, gx, gz), gz);
+    group.position.set(gx, this.store.heightAt(gx, gz), gz);
     this.scene.add(group);
     this.addShells(leaves, leafOpts, { density: 0.55, tint: 1.18, step: 0.12 }, false);
   }
 
-  private buildGrass(count: number): THREE.InstancedMesh | null {
-    if (count <= 0) return null;
-    // A tuft: three thin blades crossed, dark at the root, light at the tip.
-    const pos: number[] = [], col: number[] = [], nrm: number[] = [];
-    for (let b = 0; b < 3; b++) {
-      const a = (b / 3) * Math.PI + 0.3;
-      const ca = Math.cos(a), sa = Math.sin(a);
-      const lean = (b - 1) * 0.06, hgt = 0.28 + b * 0.06, w = 0.05;
-      // Both windings, front-sided: a double-sided material would flip the up-normal on the back.
-      pos.push(-ca * w, 0, -sa * w, ca * w, 0, sa * w, lean * ca, hgt, lean * sa);
-      pos.push(ca * w, 0, sa * w, -ca * w, 0, -sa * w, lean * ca, hgt, lean * sa);
-      for (let k = 0; k < 2; k++) col.push(0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 1.15, 1.15, 1.15);
-      for (let k = 0; k < 6; k++) nrm.push(0, 1, 0);
+  private grassGeo: THREE.BufferGeometry | null = null;
+  private grassMat: THREE.MeshLambertMaterial | null = null;
+
+  /** A tuft: three thin blades crossed, dark at the root, light at the tip. Shared by every chunk. */
+  private grassParts(): { geo: THREE.BufferGeometry; mat: THREE.MeshLambertMaterial } {
+    if (!this.grassGeo || !this.grassMat) {
+      const pos: number[] = [], col: number[] = [], nrm: number[] = [];
+      for (let b = 0; b < 3; b++) {
+        const a = (b / 3) * Math.PI + 0.3;
+        const ca = Math.cos(a), sa = Math.sin(a);
+        const lean = (b - 1) * 0.06, hgt = 0.28 + b * 0.06, w = 0.05;
+        // Both windings, front-sided: a double-sided material would flip the up-normal on the back.
+        pos.push(-ca * w, 0, -sa * w, ca * w, 0, sa * w, lean * ca, hgt, lean * sa);
+        pos.push(ca * w, 0, sa * w, -ca * w, 0, -sa * w, lean * ca, hgt, lean * sa);
+        for (let k = 0; k < 2; k++) col.push(0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 1.15, 1.15, 1.15);
+        for (let k = 0; k < 6; k++) nrm.push(0, 1, 0);
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      this.grassGeo = geo;
+      this.grassMat = lit({ ao: true, sway: { from: 0, amount: 0.3 } });
     }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
-    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-    const mat = lit({ ao: true, sway: { from: 0, amount: 0.3 } });
+    return { geo: this.grassGeo, mat: this.grassMat };
+  }
+
+  /** The tufts of one chunk, seeded by the chunk so a reload plants the same grass. */
+  private buildGrass(c: ChunkTerrain): THREE.InstancedMesh | null {
+    // Tier grass is a count for a 64 m patch; a chunk gets its area's share.
+    const count = Math.round((this.grassCount * CHUNK * CHUNK) / (64 * 64));
+    if (count <= 0) return null;
+    const { geo, mat } = this.grassParts();
     const mesh = new THREE.InstancedMesh(geo, mat, count);
-    const rng = Rng.fromSeed(91);
-    const g = SPIKE_GROUND;
+    const rng = Rng.fromSeed(91 + c.i * 7919 + c.j * 104729);
+    const g = this.ground;
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
+    const up = new THREE.Vector3(0, 1, 0);
     const tint = new THREE.Color();
+    const half = g.size / 2;
     let n = 0;
     for (let tries = 0; n < count && tries < count * 20; tries++) {
-      const x = (rng.next() - 0.5) * g.size * 0.9, z = (rng.next() - 0.5) * g.size * 0.9;
+      const x = c.x0 + rng.next() * CHUNK, z = c.z0 + rng.next() * CHUNK;
+      if (Math.abs(x) > half * 0.95 || Math.abs(z) > half * 0.95) continue;
       const sp = splatAt(g, x, z);
       if (sp.road > 0.3 || sp.mud > 0.3 || sp.shore > 0.2) continue;
-      const hl = this.model.footprint, c = this.toLocal(x, z);
-      if (c.x > hl.x0 - 0.3 && c.x < hl.x1 + 0.3 && c.z > hl.z0 - 0.3 && c.z < hl.z1 + 0.3) continue;
+      const hl = this.model.footprint, l = this.toLocal(x, z);
+      if (l.x > hl.x0 - 0.3 && l.x < hl.x1 + 0.3 && l.z > hl.z0 - 0.3 && l.z < hl.z1 + 0.3) continue;
       // Thicker where the grass grows wild.
       if (rng.next() > 0.35 + sp.wild * 0.65) continue;
-      p.set(x, heightAt(this.terrain, g.size, x, z) - 0.02, z);
-      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rng.next() * Math.PI * 2);
+      p.set(x, this.store.heightAt(x, z) - 0.02, z);
+      q.setFromAxisAngle(up, rng.next() * Math.PI * 2);
       const k = 0.7 + rng.next() * 0.6 + sp.wild * 0.6;
       s.set(k, k, k);
       mesh.setMatrixAt(n, m.compose(p, q, s));
@@ -348,10 +373,87 @@ export class SpikeWorld {
       n++;
     }
     mesh.count = n;
+    mesh.userData.full = n;
     mesh.receiveShadow = true;
-    this.scene.add(mesh);
+    // The tufts are spread over the whole chunk; cull by the chunk's box, not the one tuft geometry.
+    mesh.frustumCulled = false;
     return mesh;
   }
+
+  /** Build one chunk's ground mesh, painted texture and grass, and add it to the scene. */
+  private loadChunk(i: number, j: number): void {
+    const c = this.store.ensure(i, j);
+    const map = pixTexture(groundChunkTex(this.ground, i, j).data, Math.round(CHUNK * TEXELS_PER_M), Math.round(CHUNK * TEXELS_PER_M), { flip: false });
+    map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
+    // Mesh UVs are world metres; this chunk's texture covers x0..x0+CHUNK.
+    map.repeat.set(1 / CHUNK, 1 / CHUNK);
+    map.offset.set(-c.x0 / CHUNK, -c.z0 / CHUNK);
+    const mesh = new THREE.Mesh(geometryOf(c.mesh), lit({ map, ao: true, wettable: true }));
+    mesh.receiveShadow = true;
+    this.scene.add(mesh);
+    const grass = this.buildGrass(c);
+    if (grass) {
+      grass.count = Math.min(grass.userData.full as number, this.grassLimit(grass));
+      this.scene.add(grass);
+    }
+    this.chunks.set(chunkKey(i, j), { id: c, ground: mesh, grass });
+    this.chunkBuilds++;
+  }
+
+  private unloadChunk(key: string): void {
+    const lc = this.chunks.get(key);
+    if (!lc) return;
+    this.scene.remove(lc.ground);
+    lc.ground.geometry.dispose();
+    const mat = lc.ground.material as THREE.MeshLambertMaterial;
+    mat.map?.dispose();
+    mat.dispose();
+    if (lc.grass) {
+      this.scene.remove(lc.grass);
+      lc.grass.dispose();
+    }
+    this.chunks.delete(key);
+    this.store.drop(lc.id.i, lc.id.j);
+  }
+
+  /** Metres from the focus out to the edge of what the view can show, plus a margin. */
+  viewRadius(): number {
+    const hw = this.camera.right, hh = this.camera.top;
+    // Up the screen the ground is foreshortened by sin(pitch).
+    return Math.hypot(hw, hh / Math.sin(PITCH)) + 6;
+  }
+
+  /**
+   * Keep the chunks near the view resident. Builds at most one per call (a
+   * chunk costs a texture paint), nearest first; drops those well outside.
+   */
+  private streamChunks(all = false): void {
+    const r = this.viewRadius();
+    const want = chunksNear(this.ground, this.focus.x, this.focus.z, r);
+    for (const id of want) {
+      if (this.chunks.has(chunkKey(id.i, id.j))) continue;
+      this.loadChunk(id.i, id.j);
+      if (!all) break;
+    }
+    // Hysteresis: a chunk is dropped only well past the load radius.
+    const keep = new Set(chunksNear(this.ground, this.focus.x, this.focus.z, r + CHUNK * 0.75).map((c) => chunkKey(c.i, c.j)));
+    for (const k of [...this.chunks.keys()]) if (!keep.has(k)) this.unloadChunk(k);
+  }
+
+  get chunkCount(): number {
+    return this.chunks.size;
+  }
+
+  /** Chunks built over the page's life (a streaming counter for the stats and tests). */
+  get chunksBuilt(): number {
+    return this.chunkBuilds;
+  }
+
+  private grassLimit(m: THREE.InstancedMesh): number {
+    return Math.round((m.userData.full as number) * this.grassShare);
+  }
+
+  private grassShare = 1;
 
   private toLocal(x: number, z: number): { x: number; z: number } {
     const dx = x - SPIKE_HOUSE.x, dz = z - SPIKE_HOUSE.z;
@@ -360,7 +462,6 @@ export class SpikeWorld {
   }
 
   private buildTorches(): void {
-    const g = SPIKE_GROUND;
     const postMat = lit({ map: tex(timberTex(21)) });
     const flameMat = new THREE.MeshBasicMaterial({ color: 0xffb040 });
     const place = (x: number, y: number, z: number, post: boolean): void => {
@@ -378,7 +479,7 @@ export class SpikeWorld {
       this.scene.add(light);
       this.torches.push({ light, flame, base: 6, seed: this.torches.length * 7 + 1 });
     };
-    for (const [x, z] of SPIKE_TORCHES) place(x, heightAt(this.terrain, g.size, x, z) + 1.9, z, true);
+    for (const [x, z] of SPIKE_TORCHES) place(x, this.store.heightAt(x, z) + 1.9, z, true);
     // On a bracket beside the door.
     const d = this.model.door;
     const w = this.toWorld(d[0] + 0.95, d[2] + 0.25);
@@ -393,8 +494,10 @@ export class SpikeWorld {
     sh.map = null as unknown as THREE.WebGLRenderTarget;
   }
 
+  /** Tier grass count (for a 64 m patch); chunks show that share of the tufts they hold. */
   setGrass(count: number): void {
-    if (this.grass) this.grass.count = Math.min(count, this.grass.instanceMatrix.count);
+    this.grassShare = this.grassCount > 0 ? Math.min(1, count / this.grassCount) : 0;
+    for (const c of this.chunks.values()) if (c.grass) c.grass.count = Math.round((c.grass.userData.full as number) * this.grassShare);
   }
 
   /** Size the camera for a low-res target of rw × rh pixels at the current zoom. */
@@ -406,7 +509,12 @@ export class SpikeWorld {
     const c = this.sun.shadow.camera;
     Object.assign(c, { left: -span, right: span, top: span, bottom: -span, near: 1, far: 90 });
     c.updateProjectionMatrix();
+    // The first sizing builds every chunk the view needs; later ones stream a chunk per frame.
+    this.streamChunks(!this.framed);
+    this.framed = true;
   }
+
+  private framed = false;
 
   /** Screen-space pan (rendered pixels) to world movement on the ground. */
   pan(dxPx: number, dyPx: number): void {
@@ -415,7 +523,7 @@ export class SpikeWorld {
     const fwd = new THREE.Vector3(-Math.sin(YAW), 0, -Math.cos(YAW));
     // Moving up the screen covers more ground (the view is foreshortened by sin(pitch)).
     this.focus.addScaledVector(right, -dxPx * px).addScaledVector(fwd, (dyPx * px) / Math.sin(PITCH));
-    const lim = SPIKE_GROUND.size / 2 - 4;
+    const lim = this.ground.size / 2 - 4;
     this.focus.x = Math.max(-lim, Math.min(lim, this.focus.x));
     this.focus.z = Math.max(-lim, Math.min(lim, this.focus.z));
   }
@@ -466,28 +574,30 @@ export class SpikeWorld {
     const w = this.weather;
     w.update(dtMs);
     if (w.sky === 'storm' && Math.random() < dt / 5) w.flash = 1;
-    const sky = skyLight(w.tod, w.cloud, w.rain, w.flash);
-    const lin = (c: number[]): THREE.Color => new THREE.Color().setRGB(c[0], c[1], c[2], THREE.SRGBColorSpace);
-
-    this.sunDir.set(...sky.sunDir);
-    this.sun.color.copy(lin(sky.sunColor));
-    this.sun.intensity = sky.sunIntensity;
-    this.hemi.color.copy(lin(sky.skyTop));
-    this.hemi.groundColor.copy(lin(sky.groundBounce));
-    this.hemi.intensity = sky.ambient;
-    const fogC = lin(sky.fog);
-    this.fog.color.copy(fogC);
-    this.fog.near = CAM_DIST + sky.fogNear - 30;
-    this.fog.far = CAM_DIST + sky.fogFar;
-    this.scene.background = fogC;
-
-    // World uniforms: time, clouds drifting downwind, wetness, wind.
-    WORLD.uTime.value = this.time;
+    // The clouds drift downwind; the offset is part of the environment so the rules can ask the same field.
     const drift = cloudDrift(w.windForce);
     this.cloudOff.x += w.wx * drift * dt;
     this.cloudOff.y += w.wy * drift * dt;
-    WORLD.uCloud.value.set(cloudThreshold(w.cloud), 0.72 * (1 - sky.night * 0.7), this.cloudOff.x, this.cloudOff.y);
-    this.wet += ((w.rain > 0.1 ? 1 : 0) - this.wet) * (1 - Math.exp(-dt / (w.rain > 0.1 ? 6 : 25)));
+    const env = environment(w, { x: this.cloudOff.x, z: this.cloudOff.y });
+    this.env = env;
+    const lin = (c: number[]): THREE.Color => new THREE.Color().setRGB(c[0], c[1], c[2], THREE.SRGBColorSpace);
+
+    this.sunDir.set(...env.sunDir);
+    this.sun.color.copy(lin(env.sunColor));
+    this.sun.intensity = env.sunIntensity;
+    this.hemi.color.copy(lin(env.skyTop));
+    this.hemi.groundColor.copy(lin(env.groundBounce));
+    this.hemi.intensity = env.ambient;
+    const fogC = lin(env.fog);
+    this.fog.color.copy(fogC);
+    this.fog.near = CAM_DIST + env.fogNear - 30;
+    this.fog.far = CAM_DIST + env.fogFar;
+    this.scene.background = fogC;
+
+    // World uniforms: time, clouds, wetness, wind.
+    WORLD.uTime.value = this.time;
+    WORLD.uCloud.value.set(cloudThreshold(env.cloudCover), 0.72 * (1 - env.night * 0.7), this.cloudOff.x, this.cloudOff.y);
+    this.wet += (env.wetness - this.wet) * (1 - Math.exp(-dt / (env.wetness > 0.5 ? 6 : 25)));
     WORLD.uWet.value = this.wet;
     WORLD.uWind.value.set(w.windX, w.windY, w.wind);
 
@@ -496,10 +606,10 @@ export class SpikeWorld {
     order.forEach((t, i) => {
       t.light.visible = i < this.settings.lights;
       const f = 0.82 + 0.18 * Math.sin(this.time * 11 + t.seed) * Math.sin(this.time * 7.3 + t.seed * 2);
-      t.light.intensity = t.base * f * (0.35 + 0.65 * sky.night);
+      t.light.intensity = t.base * f * (0.35 + 0.65 * env.night);
       t.flame.scale.set(1, 0.8 + f * 0.4, 1);
     });
-    for (const m of this.windowMats) m.emissive.setScalar(sky.night * 1.4);
+    for (const m of this.windowMats) m.emissive.setScalar(env.night * 1.4);
 
     // The cut-away fades the roof and the front wall with a dither.
     this.cutT += ((this.inside ? 1 : 0) - this.cutT) * (1 - Math.exp(-dt / 0.12));
@@ -514,9 +624,10 @@ export class SpikeWorld {
     for (const s of this.sprites) s.tick(this.time);
 
     this.placeCamera();
+    this.streamChunks();
     const span = Math.max(this.camera.right, this.camera.top) * 1.1;
-    this.rain.update(dt, w.rain, this.focus, span, { x: w.windX, z: w.windY }, sky.ambient * 0.6 + sky.sunIntensity * 0.15 + w.flash);
-    if (this.water) this.water.light(this.sun.color, this.sun.intensity, lin(sky.skyHorizon), this.hemi.color.clone().multiplyScalar(sky.ambient * 0.5), sky.night);
+    this.rain.update(dt, w.rain, this.focus, span, { x: w.windX, z: w.windY }, env.ambient * 0.6 + env.sunIntensity * 0.15 + w.flash);
+    if (this.water) this.water.light(this.sun.color, this.sun.intensity, lin(env.skyHorizon), this.hemi.color.clone().multiplyScalar(env.ambient * 0.5), env.night);
   }
 
   private walkVillager(dt: number): void {
@@ -530,7 +641,7 @@ export class SpikeWorld {
     while (i < lens.length - 1 && s > lens[i]) s -= lens[i++];
     const a = pts[i], b = pts[i + 1], k = s / lens[i];
     const x = a[0] + (b[0] - a[0]) * k, z = a[1] + (b[1] - a[1]) * k;
-    const y = heightAt(this.terrain, SPIKE_GROUND.size, x, z);
+    const y = this.store.heightAt(x, z);
     const m = this.walker.mesh;
     m.position.set(x, y + Math.abs(Math.sin(this.time * 9)) * 0.03, z);
     // Facing: the art only has a front view for now, so walking left mirrors it. Turning the

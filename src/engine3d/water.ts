@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { type Ground3D, WATER_Y, type Terrain, heightAt } from '../core/world3d/terrain';
+import { type Ground3D, WATER_Y, groundHeight } from '../core/world3d/terrain';
 import { TEXELS_PER_M } from '../core/world3d/tiers';
 import { NOISE_GLSL, WORLD } from './materials';
 
@@ -70,7 +70,7 @@ export interface Water {
   light(sun: THREE.Color, sunI: number, sky: THREE.Color, ambient: THREE.Color, night: number): void;
 }
 
-export function makeWater(g: Ground3D, t: Terrain): Water | null {
+export function makeWater(g: Ground3D): Water | null {
   if (!g.lake) return null;
   const span = g.lake.r * 3.2;
   const x0 = g.lake.x - span / 2, z0 = g.lake.z - span / 2;
@@ -79,7 +79,7 @@ export function makeWater(g: Ground3D, t: Terrain): Water | null {
   const data = new Uint8Array(n * n * 4);
   for (let j = 0; j < n; j++) {
     for (let i = 0; i < n; i++) {
-      const d = WATER_Y - heightAt(t, g.size, x0 + ((i + 0.5) / n) * span, z0 + ((j + 0.5) / n) * span);
+      const d = WATER_Y - groundHeight(g, x0 + ((i + 0.5) / n) * span, z0 + ((j + 0.5) / n) * span);
       const v = Math.max(0, Math.min(255, Math.round((d / 2) * 255)));
       data.set([v, v, v, 255], (j * n + i) * 4);
     }

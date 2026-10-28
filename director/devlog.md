@@ -1,5 +1,13 @@
 # Devlog
 
+## 2026-10-28 — Session 24: 3D world, M1 core
+
+- **Chunked ground** (`core/world3d/chunks.ts`): 32 m chunks, each sampling the world's height function with a one-vertex apron, so neighbours agree exactly on shared edges (heights, normals, AO; tested). A `TerrainStore` keeps the resident chunks and answers `heightAt`. The renderer builds a chunk's mesh, its painted ground texture (`groundChunkTex`, noise in world texel coordinates so chunks continue each other) and its grass (seeded per chunk, instanced) as the view moves, one chunk per frame, nearest first, and frees those well outside the view. `?world=192` on the page makes the patch bigger to see it stream.
+- **Sprite atlas** (`core/world3d/atlas.ts` packer, `engine3d/atlas.ts` GPU side): people and furniture share 1024 px atlases (512 on small or weak GPUs), with one material per atlas; a frame change rewrites the card's four UVs. Repeating material textures stay as they are (atlasing them would need shader wrapping).
+- **Environment interface** (`core/world3d/environment3d.ts`): `environment(weather, cloudOffset)` gives sun, sky, fog, wetness, wind, rain, flash, time and `cloudShadow(x, z)`, the same field the shader draws. The world now reads only this.
+- **Tier detection and dynamic scaling**: the page asks the GPU's name and texture limit (software GPUs start on `low`); a `Governor` watches frame intervals and steps quality down through `qualityAt` (fringe and grass, then shadow map and lights; never render scale), and back up only with lots of room, with a visible notice at the bottom of the view. The Tier button resets it. `?nogov` turns it off.
+- 14 new tests (385 in all); the Playwright run also checks streaming over a 224 m world.
+
 ## 2026-10-28 — Session 23: the 3D spike (M0)
 
 - **New page `/spike3d/`**, the decision gate from [the brief](design/voxel-engine-brief.md): a code-built thatched, timber-framed house whose **roof and front wall fade away** when you tap it (the humble furniture inside, the hearth glowing), ground with grass, flowers, a dirt road and **stamped mud** (no hexes), a lake with depth, foam and duckweed, a swaying tree and grass, a villager walking the road, two torches, glowing windows, **day / dusk / night**, **clear / cloudy / rain / storm** with drifting cloud shadows and lightning.

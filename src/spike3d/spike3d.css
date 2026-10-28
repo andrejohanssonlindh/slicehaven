@@ -16,6 +16,23 @@
   z-index: 3;
 }
 
+#notice {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  max-width: 90%;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #e6dbb9;
+  background: #0e0a14d0;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  z-index: 5;
+  pointer-events: none;
+}
+#notice[hidden] { display: none; }
+
 #zoom { position: absolute; right: 6px; top: 6px; display: flex; flex-direction: column; gap: 6px; z-index: 3; }
 #zoom button { width: 40px; height: 40px; font-size: 20px; padding: 0; }
 
