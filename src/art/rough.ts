@@ -2,6 +2,7 @@ import { Rng } from '../core/rng';
 import {
   type Prop, type Pt, capsule, chew, column, fbm, grime, mossify, pick, polyFill, selOutline, still, white,
 } from './grit';
+import { LEAF, type Season, leafPalette } from './foliage';
 import { Pix } from './pix';
 import { FRAMES } from './props';
 
@@ -9,9 +10,6 @@ import { FRAMES } from './props';
 
 const ROCK = ['#211f27', '#38353c', '#524d4c', '#706a62', '#928a7a', '#b6ad98', '#d6cdb4'];
 const BARK = ['#1e130e', '#33211a', '#4b3324', '#654630', '#80593c'];
-const LEAF = ['#0f1d16', '#192f20', '#244428', '#335c2d', '#4a7634', '#6a9440', '#91b34c', '#bdd069'];
-const LEAF_OLIVE = ['#1b2412', '#2b3a19', '#40542a', '#5d7330', '#7f9238', '#a5ad48', '#cdc96a'];
-const LEAF_RUST = ['#241a12', '#3b2a17', '#58411f', '#7b5a26', '#a07a30', '#c49a44'];
 
 // --- rocks -----------------------------------------------------------------
 
@@ -153,7 +151,7 @@ const LIGHT3 = (() => {
  * you see branches and sky, a gnarled trunk with a flared, rooty base, moss on
  * the shaded side. Sways row by row.
  */
-export function makeOak(seed: number, wind = 0): Prop {
+export function makeOak(seed: number, wind = 0, season: Season = 'summer'): Prop {
   const rng = Rng.fromSeed(seed);
   const W = 54, H = 64;
   const cx = 26 + rng.int(3) - 1;
@@ -199,8 +197,7 @@ export function makeOak(seed: number, wind = 0): Prop {
   // Crown: lots of clumps, biggest toward the middle, lopsided toward the lean.
   const clumps: Clump[] = [];
   const addClump = (x: number, y: number, r: number): void => {
-    const roll = rng.next();
-    const pal = roll < 0.18 ? LEAF_OLIVE : roll < 0.22 ? LEAF_RUST : LEAF;
+    const pal = leafPalette(season, rng);
     clumps.push({ x, y, r, pal, tone: (rng.next() - 0.5) * 0.18 });
   };
   const sx = cx + lean * 0.5;

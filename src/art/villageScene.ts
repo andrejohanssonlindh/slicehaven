@@ -28,6 +28,19 @@ interface Thing {
   decor: boolean;
 }
 
+/** Neighbour offsets in an odd-r grid, in the art's edge order: E, NE, NW, W, SW, SE. */
+function neighbours(col: number, row: number): [number, number][] {
+  return row & 1
+    ? [[col + 1, row], [col + 1, row - 1], [col, row - 1], [col - 1, row], [col, row + 1], [col + 1, row + 1]]
+    : [[col + 1, row], [col, row - 1], [col - 1, row - 1], [col - 1, row], [col - 1, row + 1], [col, row + 1]];
+}
+
+/** Tell each pond hex which neighbours are water too, so the pond is one body of water. */
+export function joinLakes(cells: VCell[]): VCell[] {
+  const lake = new Set(cells.filter((c) => c.lake).map((c) => `${c.col},${c.row}`));
+  return cells.map((c) => (c.lake ? { ...c, waterEdges: neighbours(c.col, c.row).flatMap(([nc, nr], e) => (lake.has(`${nc},${nr}`) ? [e] : [])) } : c));
+}
+
 /** A hex diorama with the full look pass: cast shadows, light, smoke, grade. */
 export class VillageScene {
   readonly width: number;
@@ -45,6 +58,7 @@ export class VillageScene {
     this.width = Math.ceil(cols * TILE_W) + padSide * 2;
     this.height = padTop + (rows - 1) * TILE_STEP_Y + TILE_H + TILE_DEPTH + 6;
     this.ground = new Pix(this.width, this.height);
+    cells = joinLakes(cells);
     const rng = Rng.fromSeed(opts.seed ?? 3);
     const occupied = new Set(placed.map((p) => `${p.col},${p.row}`));
     const centre = (col: number, row: number): { x: number; y: number } => {

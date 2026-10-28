@@ -13,6 +13,9 @@ import {
 } from '../art/humble';
 import { makeRoom, makeSmithy } from '../art/interior';
 import { makeShrub } from '../art/scrub';
+import { makePalisade } from '../art/village';
+import { makeBankStones, makeDragonfly, makeFloatingLog, makeJetty, makeLilyPads, makeReedClump } from '../art/pond';
+import { makeApple, makeBirch, makeElm, makePoplar, makeWillow } from '../art/leafTrees';
 import { makeBoulder, makeOak, makeOutcrop, makePebbles, makeStump } from '../art/rough';
 import type { Placed, VCell } from '../art/villageScene';
 
@@ -21,12 +24,21 @@ export interface Section {
   note: string;
   cols: number;
   rows?: number;
+  /** Explicit ground, when a plain grass patch will not do. */
+  cells?: VCell[];
   items: Placed[];
   padTop?: number;
   maxWidth?: number;
 }
 
 const folkRow = (names: string[]): Placed[] => names.map((n, i) => ({ col: i, row: 0, prop: makeFolk(FOLK[n]) }));
+
+
+const LAKE = new Set(['2,1', '3,1', '2,2', '3,2', '4,2', '2,3', '3,3', '3,4']);
+const POND_CELLS: VCell[] = Array.from({ length: 7 * 6 }, (_, i): VCell => {
+  const col = i % 7, row = Math.floor(i / 7), key = `${col},${row}`;
+  return LAKE.has(key) ? { col, row, ground: 'grass', lake: true } : { col, row, ground: 'grass' };
+});
 
 export const SECTIONS: Section[] = [
   {
@@ -135,6 +147,74 @@ export const SECTIONS: Section[] = [
       { col: 3, row: 0, ox: 4, prop: makeCloakPegs() },
       { col: 5, row: 0, ox: 4, prop: makeHanging() },
     ],
+  },
+  {
+    title: 'Trees: willow and birch (hanging)',
+    note: 'Weeping willow: a short leaning trunk, a loose dome, curtains of fronds that sway like pendulums. Birch: white bark with black scars, thin drooping branches, airy leaves, short hanging twigs. Seeded: every one differs.',
+    cols: 6,
+    padTop: 90,
+    maxWidth: 400,
+    items: [
+      { col: 1, row: 0, ox: 4, prop: makeWillow(3) },
+      { col: 3, row: 0, ox: 12, prop: makeBirch(4) },
+      { col: 5, row: 0, ox: 2, prop: makeBirch(9, 'summer') },
+    ],
+  },
+  {
+    title: 'Trees: apple, elm, poplar',
+    note: 'An old orchard apple (propped limb, fruit, windfalls), a vase-shaped elm with fine twigs hanging from the rim, a columnar poplar with silver flashing.',
+    cols: 6,
+    padTop: 90,
+    maxWidth: 400,
+    items: [
+      { col: 1, row: 0, ox: 0, prop: makeApple(5) },
+      { col: 3, row: 0, ox: 6, prop: makeElm(3) },
+      { col: 5, row: 0, ox: 0, prop: makePoplar(6) },
+    ],
+  },
+  {
+    title: 'Pond: joined hexes, water plants, jetty',
+    note: 'Eight hexes that join into one body of water (they know which neighbours are wet, so there are no seams). Duckweed on the surface, lily pads with flowers and a frog, reeds, cattails and yellow flag at the edge, a dragonfly, a half-sunk log, wet stones, and a jetty (brygga) with a broken board.',
+    cols: 7,
+    rows: 6,
+    padTop: 104,
+    maxWidth: 400,
+    cells: POND_CELLS,
+    items: [
+      { col: 1, row: 1, ox: 8, oy: 3, prop: makeJetty(3, 'across', 4) },
+      { col: 3, row: 1, ox: 6, oy: 4, prop: makeLilyPads(2) },
+      { col: 2, row: 3, ox: 6, oy: 6, prop: makeLilyPads(5, true) },
+      { col: 4, row: 2, ox: 8, oy: 12, prop: makeReedClump(2, 'cattail') },
+      { col: 1, row: 3, ox: 6, oy: 6, prop: makeReedClump(5, 'reeds') },
+      { col: 4, row: 1, ox: 0, oy: 8, prop: makeReedClump(7, 'iris') },
+      { col: 3, row: 4, ox: 4, oy: 8, prop: makeFloatingLog(3) },
+      { col: 2, row: 4, ox: 6, oy: 4, prop: makeBankStones(4) },
+      { col: 3, row: 2, ox: 0, oy: -26, prop: makeDragonfly(2) },
+      { col: 5, row: 3, ox: 2, oy: 4, prop: makeWillow(3) },
+      { col: 0, row: 3, ox: 10, oy: 2, prop: makeBirch(6) },
+      { col: 5, row: 4, ox: 4, oy: 2, prop: makeShrub(4, 'weeds') },
+      { col: 0, row: 4, ox: 12, oy: 2, prop: makeShrub(5, 'flowering') },
+      { col: 4, row: 5, ox: 2, oy: 2, prop: makeShrub(3, 'bush') },
+    ],
+  },
+  {
+    title: 'Jetties: across and into the water',
+    note: 'Two orientations, any length. Weathered boards, a missing one, a coil of rope, a bucket, posts leaning with a ripple round each.',
+    cols: 8,
+    padTop: 76,
+    maxWidth: 400,
+    items: [
+      { col: 1, row: 0, ox: 0, prop: makeJetty(8, 'across', 3) },
+      { col: 6, row: 0, ox: 4, oy: 4, prop: makeJetty(9, 'into', 4) },
+    ],
+  },
+  {
+    title: 'Palisade: old, uneven, dirty',
+    note: 'Logs of different thickness and height, leaning, some sharpened and some chopped or snapped, one scorched, grey where the bark came off, cracked, mossy low down, mud thrown up the foot with weeds in it, rope frayed and sagging. Sections still join edge to edge. This is the one the game uses.',
+    cols: 6,
+    padTop: 60,
+    maxWidth: 400,
+    items: [0, 1, 2, 3, 4, 5].map((i) => ({ col: i, row: 0, ox: 0, prop: makePalisade(11 + i * 5) })),
   },
   {
     title: 'Stumps (large)',

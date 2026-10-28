@@ -18,11 +18,11 @@ const LEAF_DARK = ['#0c1814', '#142a22', '#1e3c2c', '#2c5236', '#406a40'];
 const SAGE = ['#1c2a26', '#2e443c', '#4a6458', '#6e8878', '#98ae9a'];
 const TWIG = ['#1e150e', '#35261a', '#523a26', '#745238'];
 
-interface Clump { x: number; y: number; r: number; pal: readonly string[]; tone: number }
+export interface Clump { x: number; y: number; r: number; pal: readonly string[]; tone: number }
 
 const L = (() => { const l = [-0.55, -0.7, 0.55]; const n = Math.hypot(...l); return l.map((v) => v / n); })();
 
-function canopy(W: number, H: number, clumps: Clump[], seed: number, squash = 0.85): Pix {
+export function canopy(W: number, H: number, clumps: Clump[], seed: number, squash = 0.85): Pix {
   const out = new Pix(W, H);
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {

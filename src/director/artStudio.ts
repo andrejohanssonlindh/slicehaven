@@ -1,5 +1,7 @@
 import { FOLK, makeFolk } from '../art/folk';
 import { type HouseSpec, ROOF_KINDS, SHUTTER_COLOURS, WALL_STYLES, makeHouse } from '../art/houses';
+import { SEASONS, type Season } from '../art/foliage';
+import { TREE_KINDS, type TreeKind, makeTree } from '../art/leafTrees';
 import { LOOKS, type Look } from '../art/look';
 import { VillageScene, type Placed, type VCell } from '../art/villageScene';
 import { SECTIONS, VILLAGE } from './artSections';
@@ -113,6 +115,51 @@ function mountBuilder(root: HTMLElement): void {
   redraw();
 }
 
+/** A tree you can vary: species, season, seed. */
+function mountTreeBuilder(root: HTMLElement): void {
+  const sec = document.createElement('section');
+  sec.innerHTML = `<h3>Tree builder</h3>
+    <p>Species and season are slots; "Another" rolls a new seed (different limbs, clumps, fronds). Three of the same species side by side, each with its own seed.</p>`;
+  const form = document.createElement('div');
+  form.className = 'builder';
+  const state: Record<string, string> = { kind: 'willow', season: 'summer', seed: '3' };
+  const field = (key: string, label: string, options: readonly string[]): void => {
+    const l = document.createElement('label');
+    l.textContent = label;
+    const sel = document.createElement('select');
+    sel.dataset.key = key;
+    for (const o of options) sel.add(new Option(o, o));
+    sel.value = state[key];
+    sel.addEventListener('change', () => { state[key] = sel.value; redraw(); });
+    l.appendChild(sel);
+    form.appendChild(l);
+  };
+  field('kind', 'Tree', TREE_KINDS);
+  field('season', 'Season', SEASONS);
+  const again = document.createElement('button');
+  again.textContent = 'Another';
+  again.addEventListener('click', () => { state.seed = String(1 + Math.floor(Math.random() * 90)); redraw(); });
+  form.appendChild(again);
+  sec.appendChild(form);
+  const stage = document.createElement('div');
+  stage.className = 'stage';
+  sec.appendChild(stage);
+  root.appendChild(sec);
+  let current: Live | null = null;
+  function redraw(): void {
+    if (current) {
+      live.splice(live.indexOf(current), 1);
+      current.canvas.remove();
+    }
+    const seed = Number(state.seed);
+    const cells: VCell[] = Array.from({ length: 6 }, (_, i) => ({ col: i, row: 0, ground: 'grass' as const }));
+    const placed: Placed[] = [0, 1, 2].map((i) => ({ col: 1 + i * 2, row: 0, ox: 0, prop: makeTree(state.kind as TreeKind, seed + i * 7, state.season as Season) }));
+    current = mount(stage, new VillageScene(cells, placed, { seed: 5, padTop: 96, tufts: false }), 400);
+    lastT = -1;
+  }
+  redraw();
+}
+
 export function mountStudio(root: HTMLElement): void {
   root.innerHTML = '';
   const intro = document.createElement('div');
@@ -158,6 +205,7 @@ export function mountStudio(root: HTMLElement): void {
   mount(stage, new VillageScene(VILLAGE.cells, VILLAGE.placed, { seed: 11, padTop: 76 }), 380);
 
   mountBuilder(root);
+  mountTreeBuilder(root);
 
   for (const s of SECTIONS) {
     const sec = document.createElement('section');
@@ -166,7 +214,7 @@ export function mountStudio(root: HTMLElement): void {
     row.className = 'stage';
     sec.appendChild(row);
     root.appendChild(sec);
-    const cells = strip(s.cols, s.rows ?? 1);
+    const cells = s.cells ?? strip(s.cols, s.rows ?? 1);
     const placed: Placed[] = s.items;
     mount(row, new VillageScene(cells, placed, { seed: 5, padTop: s.padTop ?? 44, tufts: false }), s.maxWidth ?? 380);
   }

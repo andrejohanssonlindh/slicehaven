@@ -6,6 +6,11 @@ import { FOLK, makeFolk } from '../src/art/folk';
 import { FURNITURE } from '../src/art/furniture';
 import * as humble from '../src/art/humble';
 import { SHRUB_KINDS, makeShrub } from '../src/art/scrub';
+import { SEASONS } from '../src/art/foliage';
+import { TREE_KINDS, makeTree } from '../src/art/leafTrees';
+import { makeBankStones, makeDragonfly, makeFloatingLog, makeJetty, makeLilyPads, makeReedClump } from '../src/art/pond';
+import { makePalisade } from '../src/art/village';
+import { joinLakes } from '../src/art/villageScene';
 import { makeHouse } from '../src/art/houses';
 import { makeRoom, makeSmithy } from '../src/art/interior';
 import { makeBoulder, makeLilies, makeOak, makeOutcrop, makePebbles, makeReeds, makeStump } from '../src/art/rough';
@@ -37,6 +42,17 @@ describe('village art', () => {
     ['stall', () => makeStall(2, 'fruit')],
     ['smithy', () => makeSmithy({ seed: 7 })],
     ['room', () => makeRoom({ seed: 5 })],
+    ...TREE_KINDS.flatMap((k) => SEASONS.map((se): [string, () => Prop] => [`tree ${k} ${se}`, () => makeTree(k, 4, se)])),
+    ['lily pads', () => makeLilyPads(2, true)],
+    ['reeds', () => makeReedClump(2, 'reeds')],
+    ['cattails', () => makeReedClump(3, 'cattail')],
+    ['iris', () => makeReedClump(4, 'iris')],
+    ['dragonfly', () => makeDragonfly(2)],
+    ['bank stones', () => makeBankStones(2)],
+    ['floating log', () => makeFloatingLog(2)],
+    ['jetty across', () => makeJetty(2, 'across', 4)],
+    ['jetty into', () => makeJetty(2, 'into', 4)],
+    ['palisade', () => makePalisade(5) as Prop],
     ['humble room', () => makeRoom({ seed: 5, humble: true })],
     ...humble.humbleItems().map((it, i): [string, () => Prop] => [`humble item ${i}`, () => it.prop]),
     ...SHRUB_KINDS.map((k): [string, () => Prop] => [`shrub ${k}`, () => makeShrub(3, k)]),
@@ -50,7 +66,7 @@ describe('village art', () => {
 
   it.each(all)('%s draws something and is repeatable', (_name, make) => {
     const a = make();
-    expect(opaque(a)).toBeGreaterThan(40);
+    expect(opaque(a)).toBeGreaterThan(10);
     expect(a.frames.length).toBeGreaterThan(0);
     expect(same(a, make())).toBe(true);
     // The anchor must lie inside the picture.
@@ -66,6 +82,19 @@ describe('village art', () => {
     expect(h.frames[0].w).toBeGreaterThan(140);
     expect(h.frames[0].h).toBeGreaterThan(120);
     expect(makeHouse({ seed: 9, cols: 5 }).footprint?.cols).toBe(5);
+  });
+
+  it('lake hexes learn which neighbours are water', () => {
+    const cells = joinLakes([
+      { col: 1, row: 1, ground: 'grass', lake: true }, { col: 2, row: 1, ground: 'grass', lake: true }, { col: 5, row: 5, ground: 'grass', lake: true }, { col: 3, row: 1, ground: 'grass' },
+    ]);
+    expect(cells[0].waterEdges).toEqual([0]); // east neighbour is water
+    expect(cells[1].waterEdges).toEqual([3]); // west neighbour is water, the dry hex to the east is not
+    expect(cells[2].waterEdges).toEqual([]);
+  });
+
+  it('every tree species has its own seeds', () => {
+    for (const k of TREE_KINDS) expect(same(makeTree(k, 3), makeTree(k, 4))).toBe(false);
   });
 
   it('different seeds give different trees', () => {

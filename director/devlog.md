@@ -1,5 +1,13 @@
 # Devlog
 
+## 2026-10-28 — Session 21f: more trees, a pond, a dirtier palisade
+
+- **Leaf trees** (`art/leafTrees.ts`, `art/foliage.ts`): weeping **willow** (curtains of fronds that swing like pendulums), **birch** (white bark with black scars, drooping twigs), orchard **apple** (propped limb, fruit, windfalls), vase-shaped **elm** with hanging twigs, columnar **poplar**, plus the oak. Each is seeded (limbs, clumps, fronds all differ) and has **seasons**: summer, spring (fresh green, blossom) and autumn. The studio has a **Tree builder**: species, season, "Another".
+- **Pond**: hexes marked `lake` join into one body of water (they learn which neighbours are wet, so no seams; duckweed floats on the surface). Props in `art/pond.ts`: lily pads with flowers and a frog, reeds, cattails, yellow flag iris, a dragonfly that darts, wet stones, a half-sunk log, and a **jetty (brygga)** in two orientations and any length: boards laid along it, a gap, posts leaning with a ripple round each. A pond mock-up in the studio.
+- **Palisade** (the one the game uses): uneven logs, leaning, some sharp, some chopped, some snapped, one scorched, grey where bark came off, cracked, mossy, mud thrown up the foot with weeds, frayed sagging rope. Edge columns stay solid so sections still join.
+- Not done: the jetty reads best over water; on land it looks like a low table. Pond hexes only come in the one shape (round banks). 330 tests.
+
+
 ## 2026-10-28 — Session 21e: the hearth and the fire
 
 - The humble hearth was a walled stove. It is now an **öppen spis**: about 55 cm across (the opening is 14 px, the whole thing about 22 px), a low hearthstone, a sooty daub chimney breast with a black beam over a small arched opening, a crooked pot on a chain, a poker on the jamb, a few charred sticks.

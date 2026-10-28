@@ -10,6 +10,10 @@ export interface TileArt {
   /** River through this hex, entering and leaving through these edges (0 E .. 5 SE). */
   river?: [number, number];
   pond?: boolean;
+  /** Part of a bigger pond made of several hexes. */
+  lake?: boolean;
+  /** Which neighbours (0 E .. 5 SE) are also water, so this hex joins them. */
+  waterEdges?: number[];
   /** Impassable: drawn with a red border. */
   obstacle?: boolean;
   /** Burnt ground: ash and soot. */
@@ -25,6 +29,8 @@ export interface WaterPx {
   depth: number; // 0 at the bank, 1 in the middle
   fx: number; // flow direction
   fy: number;
+  /** Duckweed / algae cover, 0..1. */
+  weed?: number;
 }
 
 function grassColor(wx: number, wy: number, y: number, bias = 0): string {
@@ -65,6 +71,13 @@ export function groundColor(ground: Ground, wx: number, wy: number, x: number, y
       return ramp(P.dirt.slice(2, 6), 0.2 + fbm(wx / 8, wy / 5, 10) * 0.55 + (white(wx, wy, 10) - 0.5) * 0.2, wx, wy);
     }
   }
+}
+
+/** Distance from a point to a segment. */
+function segDist(px: number, py: number, a: { x: number; y: number }, b: { x: number; y: number }): number {
+  const ex = b.x - a.x, ey = b.y - a.y;
+  const t = Math.max(0, Math.min(1, ((px - a.x) * ex + (py - a.y) * ey) / (ex * ex + ey * ey || 1)));
+  return Math.hypot(px - (a.x + ex * t), py - (a.y + ey * t));
 }
 
 /** Distance from (px,py) to the river's centre curve, plus flow direction there. */
@@ -120,7 +133,7 @@ export function paintTile(buf: Pix, ox: number, oy: number, art: TileArt, water:
       const wy = oy + y;
       let c = groundColor(art.ground, wx, wy, x, y);
 
-      if (art.river || art.pond) {
+      if (art.river || art.pond || art.lake) {
         let d: number;
         let hw: number;
         let fx = 1;
@@ -129,6 +142,12 @@ export function paintTile(buf: Pix, ox: number, oy: number, art: TileArt, water:
           const r = riverDistance(x + 0.5, y + 0.5, art.river[0], art.river[1]);
           ({ d, fx, fy } = r);
           hw = 4.4 + (fbm(wx / 9, wy / 9, 5) - 0.5) * 2.4;
+        } else if (art.lake) {
+          // A pond built from joined hexes: distance to a skeleton of the centre and the corridors to wet neighbours.
+          d = Math.hypot(x + 0.5 - TILE_CENTER.x, (y + 0.5 - TILE_CENTER.y) * 1.1);
+          for (const e of art.waterEdges ?? []) d = Math.min(d, segDist(x + 0.5, y + 0.5, TILE_CENTER, EDGE_MID[e]));
+          hw = 10.2 + (fbm(wx / 6, wy / 6, 5) - 0.5) * 3.4;
+          fy = 0.15;
         } else {
           // Roundish pond, squashed like the board.
           d = Math.hypot(x + 0.5 - TILE_CENTER.x, (y + 0.5 - TILE_CENTER.y) * 1.25);
@@ -137,7 +156,8 @@ export function paintTile(buf: Pix, ox: number, oy: number, art: TileArt, water:
         }
         const bank = hw + 1.6 + fbm(wx / 3, wy / 3, 6) * 1.2;
         if (d < hw) {
-          water.push({ x: wx, y: wy, depth: 1 - d / hw, fx, fy });
+          const weed = art.lake ? Math.max(0, (fbm(wx / 5, wy / 4, 77) - 0.62) * 5) * (d / hw > 0.35 ? 1 : 0.4) : 0;
+          water.push({ x: wx, y: wy, depth: 1 - d / hw, fx, fy, weed: weed > 0.25 ? Math.min(1, weed) : 0 });
           c = P.water[2];
         } else if (d < hw + 0.9) {
           c = P.dirt[1];
@@ -179,6 +199,11 @@ export function paintWater(buf: Pix, water: readonly WaterPx[], t: number): void
     let c = ramp(P.water.slice(0, 6), v, w.x, w.y);
     if (w.depth < 0.22 && white(w.x, w.y, Math.floor(t / 2)) < 0.3) c = P.water[5];
     if (n > 0.8 && white(w.x, w.y, t) < 0.5) c = P.water[6];
+    if (w.weed) {
+      // Duckweed: a bright film that thins out at its edges, with the dark water showing through.
+      const speck = white(w.x, w.y, 61);
+      if (speck < 0.35 + w.weed * 0.6) c = ramp(['#1f4a2a', '#2f6a34', '#4a8c3e', '#7ab04c'], 0.35 + speck * 0.9 + (n - 0.5) * 0.3, w.x, w.y);
+    }
     buf.set(w.x, w.y, c);
   }
 }
