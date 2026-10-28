@@ -67,16 +67,21 @@ export interface FolkSpec {
   left?: Held;
 }
 
-interface Pose {
+export interface Pose {
   bob: number;
+  /** Arm swing in pixels-ish: the left hand drops and the right lifts when positive (negative the other way). */
   arm: number;
   blink: boolean;
+  /** Pixels each foot is raised (left, right), for the walk. */
+  lift?: [number, number];
+  /** Seen from behind: no face, hair all round, the cloak in front. Mirror the result so held things swap sides. */
+  back?: boolean;
 }
 
-const W = 40, H = 44, CX = 17, FOOT = 38;
-const EYE = '#1b1424';
+export const W = 40, H = 44, CX = 17, FOOT = 38;
+export const EYE = '#1b1424';
 
-function drawHeld(p: Pix, what: Held, hx: number, hy: number, top: number, seed: number): void {
+export function drawHeld(p: Pix, what: Held, hx: number, hy: number, top: number, seed: number): void {
   const wood = CLOTH.leather;
   switch (what) {
     case 'hoe': {
@@ -127,7 +132,7 @@ function drawHeld(p: Pix, what: Held, hx: number, hy: number, top: number, seed:
   }
 }
 
-function draw(spec: FolkSpec, pose: Pose): Pix {
+export function drawFront(spec: FolkSpec, pose: Pose): Pix {
   const p = new Pix(W, H);
   const seed = spec.seed;
   const child = spec.build === 'child';
@@ -142,13 +147,15 @@ function draw(spec: FolkSpec, pose: Pose): Pix {
   const boots = spec.boots ?? CLOTH.leather;
   const legX = wa * 0.55;
 
-  // --- behind the body ---
-  if (spec.cloak) {
+  // --- behind the body (from behind, the cloak hangs in front of it instead: drawn after the torso) ---
+  const drawCloak = (): void => {
+    if (!spec.cloak) return;
     polyFill(p, [[CX - sh - 1, shY + 1], [CX + sh + 1, shY + 1], [CX + sh + 3.5, hem + 1], [CX - sh - 3.5, hem + 1]], (x, y) => {
       const u = (x - CX) / (sh + 3);
       return pick(spec.cloak!, 0.5 - u * 0.3 - (y - shY) * 0.012 + (white(x, y, seed + 40) - 0.5) * 0.18 + (white(x, 0, seed + 41) < 0.14 ? -0.2 : 0), x, y);
     });
-  }
+  };
+  if (!pose.back) drawCloak();
   if (spec.style === 'long') {
     column(p, hy + 1, shY + 6, () => CX, (y) => (y < hy + 6 ? 4.4 : 4.2 - (y - hy - 6) * 0.15), spec.hair, seed + 3, 0.3);
   }
@@ -161,11 +168,12 @@ function draw(spec: FolkSpec, pose: Pose): Pix {
     for (const side of [-1, 1]) {
       const hx = CX + side * legX;
       const fx = CX + side * (legX + 0.8 + step * side);
-      capsule(p, hx, hipY - 1, fx, FOOT - 4, wa * 0.42, wa * 0.36, spec.legs, seed + (side > 0 ? 7 : 8), 0.2);
+      const lf = Math.round(pose.lift?.[side < 0 ? 0 : 1] ?? 0);
+      capsule(p, hx, hipY - 1, fx, FOOT - 4 - lf, wa * 0.42, wa * 0.36, spec.legs, seed + (side > 0 ? 7 : 8), 0.2);
       // Boot.
-      capsule(p, fx, FOOT - 5, fx + side * 0.4, FOOT - 1, wa * 0.42 + 0.3, wa * 0.42 + 0.5, boots, seed + 9, 0.22);
-      p.set(Math.round(fx + side * (wa * 0.42 + 1.2)), FOOT - 1, boots[2]);
-      p.set(Math.round(fx + side * (wa * 0.42 + 0.6)), FOOT, boots[1]);
+      capsule(p, fx, FOOT - 5 - lf, fx + side * 0.4, FOOT - 1 - lf, wa * 0.42 + 0.3, wa * 0.42 + 0.5, boots, seed + 9, 0.22);
+      p.set(Math.round(fx + side * (wa * 0.42 + 1.2)), FOOT - 1 - lf, boots[2]);
+      p.set(Math.round(fx + side * (wa * 0.42 + 0.6)), FOOT - lf, boots[1]);
     }
   }
 
@@ -212,7 +220,8 @@ function draw(spec: FolkSpec, pose: Pose): Pix {
       }
     }
   }
-  if (spec.apron) {
+  if (pose.back) drawCloak();
+  if (spec.apron && !pose.back) {
     const a0 = shY + 3;
     for (let y = a0; y <= Math.min(bottom, hipY + 9); y++) {
       const half = y < hipY ? 3.4 : 3.4 + (y - hipY) * 0.25;
@@ -235,7 +244,7 @@ function draw(spec: FolkSpec, pose: Pose): Pix {
   // --- neck and head ---
   const skin = spec.skin;
   p.set(CX - 1, hy + 7, skin[1]); p.set(CX, hy + 7, skin[1]); p.set(CX - 1, hy + 8, skin[0]); p.set(CX, hy + 8, skin[1]);
-  if (spec.garment !== 'shirt' || true) {
+  if (!pose.back) {
     // Collar: a dark V where cloth meets neck.
     p.set(CX - 2, hy + 8, torsoColors[1]); p.set(CX + 1, hy + 8, torsoColors[1]);
   }
@@ -256,12 +265,14 @@ function draw(spec: FolkSpec, pose: Pose): Pix {
   }
   // Ears.
   for (const side of [-1, 1]) p.set(Math.round(CX + side * 3.6 - (side < 0 ? 0 : 0.5)), hy + 3, skin[side < 0 ? 2 : 1]);
-  // Face.
+  // Face (from behind there is none: hair or headgear covers the whole head, see below).
   const ex = [CX - 2, CX + 1];
-  for (const x of ex) p.set(x, hy + 3, pose.blink ? skin[1] : EYE);
-  p.set(CX, hy + 4, skin[1]);
-  p.set(CX - 1, hy + 5, '#8a4a40'); p.set(CX, hy + 5, '#9a5a4c');
-  for (const x of ex) p.set(x, hy + 2, skin[1]);
+  if (!pose.back) {
+    for (const x of ex) p.set(x, hy + 3, pose.blink ? skin[1] : EYE);
+    p.set(CX, hy + 4, skin[1]);
+    p.set(CX - 1, hy + 5, '#8a4a40'); p.set(CX, hy + 5, '#9a5a4c');
+    for (const x of ex) p.set(x, hy + 2, skin[1]);
+  }
 
   // Hair, hats and beards.
   const hair = spec.hair;
@@ -275,6 +286,14 @@ function draw(spec: FolkSpec, pose: Pose): Pix {
       }
     }
   };
+  if (pose.back) {
+    // The back of the head: hair (or the cloth or metal that covers it) to the nape.
+    const covered: Partial<Record<HairStyle, Ramp>> = {
+      short: hair, long: hair, bun: hair, hat: hair, kerchief: spec.head ?? CLOTH.linen, helm: CLOTH.steel, hood: spec.head ?? spec.cloak ?? CLOTH.brown,
+    };
+    const ramp = covered[spec.style];
+    if (ramp) cap(spec.style === 'helm' || spec.style === 'hood' ? 6 : 5, spec.style === 'hood' ? -0.7 : 0.2, ramp, 0);
+  }
   switch (spec.style) {
     case 'short':
       cap(3, 0.6, hair);
@@ -327,7 +346,9 @@ function draw(spec: FolkSpec, pose: Pose): Pix {
     case 'hood':
       break;
   }
-  if (spec.beard === 'full') {
+  if (pose.back) {
+    // No beard to show.
+  } else if (spec.beard === 'full') {
     for (let i = 4; i < 7; i++) {
       const hh = [3.1, 2.8, 1.8][i - 4];
       for (let x = Math.round(CX - hh); x < Math.round(CX + hh); x++) {
@@ -379,7 +400,7 @@ export function makeFolk(spec: FolkSpec): Prop {
     const key = `${pose.bob}${pose.arm}${pose.blink}`;
     let out = cache.get(key);
     if (!out) {
-      out = selOutline(draw(spec, pose));
+      out = selOutline(drawFront(spec, pose));
       cache.set(key, out);
     }
     frames.push(out);

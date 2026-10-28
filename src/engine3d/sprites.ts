@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import type { Sprite } from '../art/props';
 import { TEXELS_PER_M } from '../core/world3d/tiers';
-import { spriteAtlas } from './atlas';
+import type { Pix } from '../art/pix';
+import { VIEWS, type View, type WalkSet } from '../art/folkWalk';
+import { type AtlasSlot, spriteAtlas } from './atlas';
 import { lit } from './materials';
 
 /**
@@ -66,6 +68,70 @@ export function spriteCard(s: Sprite, pitch: number, opts: { flat?: boolean; ppm
         setFrame(i);
         last = i;
       }
+    },
+  };
+}
+
+const materialFor = (tex: THREE.Texture): THREE.MeshLambertMaterial => {
+  let mat = materials.get(tex);
+  if (!mat) materials.set(tex, (mat = lit({ map: tex, sprite: true })));
+  return mat;
+};
+
+export interface WalkCard extends SpriteCard {
+  /** Show a view, standing or walking. The walk restarts from its first frame when it begins. */
+  pose(view: View, moving: boolean, speed?: number): void;
+  readonly view: View;
+  readonly moving: boolean;
+}
+
+/**
+ * A person who can turn and walk: one card holding every view's standing and
+ * walking frames from the shared atlas. Which frame shows is `pose` plus time;
+ * the card itself is turned by the caller (see `faceScreen` in the world).
+ */
+export function walkCard(set: WalkSet, pitch: number, opts: { ppm?: number } = {}): WalkCard {
+  const ppm = opts.ppm ?? TEXELS_PER_M;
+  const f0 = set.views.front.idle[0];
+  const w = f0.w / ppm, h = f0.h / ppm / Math.cos(pitch);
+  const geo = new THREE.PlaneGeometry(w, h);
+  const ax = set.ax / f0.w, ay = set.ay / f0.h;
+  geo.translate((0.5 - ax) * w, (ay - 0.5) * h, 0);
+  const atlas = spriteAtlas();
+  const slotsOf = (frames: Pix[]): AtlasSlot[] => frames.map((f) => atlas.add(`f${idOf(f)}`, f));
+  const table = {} as Record<View, { idle: AtlasSlot[]; walk: AtlasSlot[] }>;
+  for (const v of VIEWS) table[v] = { idle: slotsOf(set.views[v].idle), walk: slotsOf(set.views[v].walk) };
+  const uv = geo.attributes.uv as THREE.BufferAttribute;
+  const mesh = new THREE.Mesh(geo, materialFor(table.front.idle[0].texture));
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  let rate = 8;
+  let view: View = 'front', moving = false, shown: AtlasSlot | null = null, startT: number | null = null;
+  const show = (s: AtlasSlot): void => {
+    if (s === shown) return;
+    shown = s;
+    const u = s.uv;
+    uv.setXY(0, u.u0, u.v1).setXY(1, u.u1, u.v1).setXY(2, u.u0, u.v0).setXY(3, u.u1, u.v0);
+    uv.needsUpdate = true;
+    mesh.material = materialFor(s.texture);
+  };
+  show(table.front.idle[0]);
+  return {
+    mesh,
+    get view() { return view; },
+    get moving() { return moving; },
+    pose(v, m, speed = 1.6) {
+      if (m && !moving) startT = null;
+      view = v;
+      moving = m;
+      // One cycle of six frames is about 1.2 m at a stroll, so the step rate follows the speed.
+      rate = (8 * speed) / 1.6;
+    },
+    tick(t: number) {
+      const slots = moving ? table[view].walk : table[view].idle;
+      if (moving && startT === null) startT = t;
+      const i = Math.floor((moving ? t - (startT ?? t) : t) * (moving ? rate : 8)) % slots.length;
+      show(slots[i]);
     },
   };
 }

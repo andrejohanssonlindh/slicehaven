@@ -1,5 +1,12 @@
 # Devlog
 
+## 2026-10-28 — Session 25b: roofs, props, and people who turn and walk
+
+- **Roofs**: shingle, clay tile and sod have their own textures (`art/textures3d.ts`) and materials; a house's `roof` spec picks one. Only thatch gets shells. The spike now has one of each.
+- **Props** (`core/world3d/props.ts`): shrubs, boulders and woodpiles are placed things in the layout, each with a collision shape, shrubs and boulders also filament sources (thicket, rock). Lumpy-ball geometry is shared with the trees (`lumpGeometry`).
+- **Walking people** (`art/folkWalk.ts`): every person now has a front, back and profile view, each with a breathing idle and a six-frame walk (feet lift, arms swing, body sinks a pixel at full stride). The back view is the front drawn without a face, hair or headgear all round, the cloak in front, then mirrored (so held things swap sides); the profile is its own drawing. A left-facing profile is the right-facing art on a card turned round. `viewFor` picks the view from the way they move, with a dead band so a bending path does not flicker; `walkCard` (`engine3d/sprites.ts`) holds all frames from the atlas and steps at a rate that follows the speed. The hero and the villager use it. Tests: `tests/folkwalk.test.ts`, `e2e/spike3d-walk.e2e.ts`.
+- Rough: held items in profile are held out in front and do not swing; the other cast (smith, elder...) walk too but have only been looked at in a contact sheet; no run, no turn-in-place animation.
+
 ## 2026-10-28 — Session 25: M2 start, the world builds from a layout
 
 - **`core/world3d/layout.ts`**: a `Layout` is the list of placed things (houses, trees, torch posts). Collision (`layoutObstacles`), terrain pads and shade, the filament field's "indoors" and sources, and the renderer all read it, so a thing is added in one place (`SPIKE_LAYOUT` in `content/spike3d.ts`).

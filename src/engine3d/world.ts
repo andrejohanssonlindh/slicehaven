@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { makeFolk } from '../art/folk';
+import { makeWalkSet, viewFor } from '../art/folkWalk';
 import {
   makeBasket, makeBucketBroom, makeClutter, makeCloakPegs, makeCookhearth, makeFootlocker, makeHanging, makeKeg,
   makePallet, makeRagRug, makeRoughShelf, makeSacks, makeStool3, makeStrawBits, makeTrestleTable,
@@ -30,7 +30,7 @@ import { fbm } from '../core/noise';
 import { Weather } from '../engine/weather';
 import { type LitOpts, WORLD, lit, pixTexture, shellOf } from './materials';
 import { Rain } from './rain';
-import { type SpriteCard, blobShadow, spriteCard } from './sprites';
+import { type SpriteCard, type WalkCard, blobShadow, spriteCard, walkCard } from './sprites';
 import { type Heat, makeFloorHeat, makeHeat } from './heat';
 import { type Water, makeWater } from './water';
 
@@ -134,7 +134,7 @@ export class SpikeWorld {
   private windowMats: THREE.MeshLambertMaterial[] = [];
   private water: Water | null;
   private rain = new Rain(1400);
-  private walker: SpriteCard;
+  private walker: WalkCard;
   private walkerBlob: THREE.Mesh;
   private walkS = 0;
   private sprites: SpriteCard[] = [];
@@ -142,7 +142,7 @@ export class SpikeWorld {
   readonly nav: NavGrid;
   /** Where the hero stands, metres. */
   readonly hero: P2 = { x: SPIKE_HERO[0], z: SPIKE_HERO[1] };
-  private heroCard!: SpriteCard;
+  readonly heroCard!: WalkCard;
   private heroBlob!: THREE.Mesh;
   private path: P2[] | null = null;
   private pathS = 0;
@@ -190,12 +190,12 @@ export class SpikeWorld {
     this.buildTorches();
     this.scene.add(this.rain.lines);
 
-    this.walker = spriteCard(makeFolk(PEOPLE.baker), PITCH);
+    this.walker = walkCard(makeWalkSet(PEOPLE.baker), PITCH);
     this.walkerBlob = blobShadow(0.32);
     this.scene.add(this.walker.mesh, this.walkerBlob);
     this.sprites.push(this.walker);
     // The hero: the farmer by the door. Tap the ground and they walk there.
-    this.heroCard = spriteCard(makeFolk(PEOPLE.farmer), PITCH);
+    this.heroCard = walkCard(makeWalkSet(PEOPLE.farmer), PITCH);
     this.heroBlob = blobShadow(0.32);
     this.heroCard.mesh.rotation.y = YAW;
     this.placeHero();
@@ -781,19 +781,25 @@ export class SpikeWorld {
     const p = followPath(this.path, this.pathS);
     this.hero.x = p.x;
     this.hero.z = p.z;
-    this.placeHero(Math.abs(Math.sin(this.time * 9)) * 0.03);
-    this.faceScreen(this.heroCard.mesh, p.dx, p.dz);
+    this.placeHero();
+    this.faceWalker(this.heroCard, p.dx, p.dz, !p.done, 1.6);
     if (p.done) {
       this.path = null;
       this.marker.visible = false;
-      this.placeHero();
     }
   }
 
-  /** Turn a front-view card toward the way it walks: left on screen mirrors it (see the note on the walker). */
-  private faceScreen(m: THREE.Object3D, dirX: number, dirZ: number): void {
-    const screenRight = dirX * Math.cos(YAW) - dirZ * Math.sin(YAW);
-    if (Math.abs(screenRight) > 0.05) m.rotation.y = screenRight < 0 ? YAW + Math.PI : YAW;
+  /**
+   * Show the view that matches the way a person walks (front, back or profile) and
+   * their step. A left-facing profile is the right-facing art on a card turned round,
+   * which keeps its lit side toward the camera.
+   */
+  private faceWalker(card: WalkCard, dirX: number, dirZ: number, moving: boolean, speed: number): void {
+    const m = card.mesh;
+    const wasLeft = Math.cos(m.rotation.y - YAW) < 0;
+    const v = viewFor(dirX, dirZ, YAW, card.view, wasLeft);
+    card.pose(v.view, moving, speed);
+    m.rotation.y = v.left ? YAW + Math.PI : YAW;
   }
 
   private placeCamera(): void {
@@ -922,11 +928,9 @@ export class SpikeWorld {
     const x = a[0] + (b[0] - a[0]) * k, z = a[1] + (b[1] - a[1]) * k;
     const y = this.store.heightAt(x, z);
     const m = this.walker.mesh;
-    m.position.set(x, y + Math.abs(Math.sin(this.time * 9)) * 0.03, z);
-    // Facing: the art only has a front view for now, so walking left mirrors it. Turning the
-    // double-sided card round mirrors it and keeps its lit side toward the camera.
+    m.position.set(x, y, z);
     const dirX = (b[0] - a[0]) * (back ? -1 : 1), dirZ = (b[1] - a[1]) * (back ? -1 : 1);
-    this.faceScreen(m, dirX, dirZ);
+    this.faceWalker(this.walker, dirX, dirZ, true, 1.1);
     this.walkerBlob.position.set(x, y + 0.03, z);
   }
 }
