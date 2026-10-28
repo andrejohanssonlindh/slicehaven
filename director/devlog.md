@@ -1,5 +1,12 @@
 # Devlog
 
+## 2026-10-28 — Session 25: M2 start, the world builds from a layout
+
+- **`core/world3d/layout.ts`**: a `Layout` is the list of placed things (houses, trees, torch posts). Collision (`layoutObstacles`), terrain pads and shade, the filament field's "indoors" and sources, and the renderer all read it, so a thing is added in one place (`SPIKE_LAYOUT` in `content/spike3d.ts`).
+- **`SpikeWorld` builds any number of houses**, each with its own cut-away, floor heat, furniture and hearth (a fire source). The hero opens the house they are in and closes the one they leave; tapping any house walks in through its door; shift-click toggles that roof. Trees share their bark and leaf textures (six trees cost little more than one).
+- The spike now has four houses (home, west, east, far), six trees and two post torches. New `tests/world3d-layout.test.ts` (houses dry, clear of lake, road and each other; every door reachable; the doorway gap holds). 419 tests.
+- Not yet: other roof kinds look like thatch (no shingle or tile textures, and shells would sit on them), house widths are still hand-picked, no props or shrubs, rooms all hold the same humble furniture.
+
 ## 2026-10-28 — Session 24d: reach and the inside alignment
 
 - **Filament reach x1.7** (`REACH` in `filaments3d.ts`): the hex table was tuned for 1.5 m hexes, so sources now reach about 7 m at the very edge and are felt well over a metre out (water is +1 at 1.2 m from the shore, tested). Heat map is a little stronger too.

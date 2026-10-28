@@ -11,16 +11,17 @@ import {
   timberTex, windowGlowTex, windowTex,
 } from '../art/textures3d';
 import { PEOPLE } from '../content/village/folk';
-import { SPIKE_GROUND, SPIKE_HERO, SPIKE_HOUSE, SPIKE_TORCHES, SPIKE_TREE, SPIKE_WALK, spikeFilamentWorld, spikeHouseBox, spikeObstacles } from '../content/spike3d';
+import { SPIKE_GROUND, SPIKE_HERO, SPIKE_LAYOUT, SPIKE_WALK, spikeFilamentWorld } from '../content/spike3d';
 import type { AspectId, HexFilaments } from '../core/filaments';
 import { type FSource, FilamentField } from '../core/world3d/filaments3d';
 import { CHUNK, type ChunkTerrain, TerrainStore, chunkKey, chunksNear } from '../core/world3d/chunks';
 import { type Environment3D, environment } from '../core/world3d/environment3d';
 import { Rng } from '../core/rng';
-import { type HouseMaterial, type HouseModel, buildHouse } from '../core/world3d/house';
+import type { HouseMaterial } from '../core/world3d/house';
+import { type BuiltHouse, type Layout, type PlacedTree, buildHouses, houseAt, houseBox, houseToLocal, houseToWorld, layoutObstacles } from '../core/world3d/layout';
 import type { MeshData } from '../core/world3d/mesh';
 import { cloudDrift, cloudThreshold } from '../core/world3d/sky';
-import { NavGrid, type P2, type Shape, findPath, followPath, pathLength, shapeDist } from '../core/world3d/space';
+import { NavGrid, type P2, type Shape, findPath, followPath, pathLength } from '../core/world3d/space';
 import { type Ground3D, groundHeight, lakeDist, splatAt } from '../core/world3d/terrain';
 import { TEXELS_PER_M } from '../core/world3d/tiers';
 import { buildTree } from '../core/world3d/tree';
@@ -84,7 +85,20 @@ interface LoadedChunk {
 interface Shell {
   mesh: THREE.Mesh;
   layer: number;
-  cut: boolean;
+  /** The house whose cut-away hides this shell (null for trees and the like). */
+  cutOf: HouseInst | null;
+}
+
+/** One placed house on the GPU, with its own cut-away. */
+interface HouseInst {
+  built: BuiltHouse;
+  group: THREE.Group;
+  cut: CutPart[];
+  box: Shape;
+  floorHeat: Heat | null;
+  /** Cut-away: 0 closed, 1 open; eases toward `open`. */
+  cutT: number;
+  open: boolean;
 }
 
 export class SpikeWorld {
@@ -110,11 +124,10 @@ export class SpikeWorld {
   /** Which aspect the heat map shows, if any. */
   private heatAspect: AspectId | null = null;
   private heatT = 0;
-  private floorHeat: Heat | null = null;
   private chunkBuilds = 0;
-  readonly house = new THREE.Group();
-  private model: HouseModel;
-  private cut: CutPart[] = [];
+  /** What is placed in the world (see `core/world3d/layout.ts`). */
+  readonly layout: Layout;
+  readonly houses: HouseInst[] = [];
   private shells: Shell[] = [];
   private torches: Torch[] = [];
   private windowMats: THREE.MeshLambertMaterial[] = [];
@@ -128,7 +141,6 @@ export class SpikeWorld {
   readonly nav: NavGrid;
   /** Where the hero stands, metres. */
   readonly hero: P2 = { x: SPIKE_HERO[0], z: SPIKE_HERO[1] };
-  private houseBox!: Shape;
   private heroCard!: SpriteCard;
   private heroBlob!: THREE.Mesh;
   private path: P2[] | null = null;
@@ -136,15 +148,12 @@ export class SpikeWorld {
   private marker: THREE.Mesh;
   /** The camera follows the hero while it walks, until the player drags the view. */
   follow = false;
-  /** Cut-away: 0 closed, 1 open; eases toward `inside`. */
-  inside = false;
-  private cutT = 0;
   private wet = 0;
   private time = 0;
   private cloudOff = new THREE.Vector2();
   settings: WorldSettings;
 
-  constructor(settings: WorldSettings, grassCount: number, ground: Ground3D = SPIKE_GROUND) {
+  constructor(settings: WorldSettings, grassCount: number, ground: Ground3D = SPIKE_GROUND, layout: Layout = SPIKE_LAYOUT) {
     this.settings = settings;
     const g = ground;
     this.ground = ground;
@@ -164,16 +173,16 @@ export class SpikeWorld {
     this.scene.add(this.sun, this.sun.target);
 
     // Ground chunks stream in once the view is sized (see `frame`); until then the exact height function stands in.
-    this.model = buildHouse(SPIKE_HOUSE.spec);
-    this.houseBox = spikeHouseBox(this.model.footprint);
-    // Feet: the house, trunk and posts block; so does the water.
-    this.nav = new NavGrid(g.size, spikeObstacles(this.model.footprint, this.model.door[0]), { radius: 0.2, blocked: (x, z) => lakeDist(g, x, z) < 0.2 });
+    this.layout = layout;
+    const built = buildHouses(layout);
+    // Feet: the houses' walls, trunks and posts block; so does the water.
+    this.nav = new NavGrid(g.size, layoutObstacles(layout, built), { radius: 0.2, blocked: (x, z) => lakeDist(g, x, z) < 0.2 });
 
-    // The house.
-    this.buildHouse();
+    // The houses.
+    for (const b of built) this.houses.push(this.buildHouse(b));
 
-    // Tree, grass, water, torches, people.
-    this.buildTree();
+    // Trees, grass, water, torches, people.
+    for (const t of layout.trees) this.buildTree(t);
     this.water = makeWater(g);
     if (this.water) this.scene.add(this.water.mesh);
     this.buildTorches();
@@ -198,18 +207,16 @@ export class SpikeWorld {
     this.scene.add(this.marker);
 
     this.weather.setWind(2, 1);
-    this.field = new FilamentField(spikeFilamentWorld(g, this.model.footprint, this.fires));
+    this.field = new FilamentField(spikeFilamentWorld(g, built, this.fires));
   }
 
-  /** House-local (x, z) to world. */
-  private toWorld(x: number, z: number): { x: number; z: number } {
-    const c = Math.cos(SPIKE_HOUSE.rot), s = Math.sin(SPIKE_HOUSE.rot);
-    return { x: SPIKE_HOUSE.x + x * c + z * s, z: SPIKE_HOUSE.z - x * s + z * c };
-  }
+  private houseGlow: THREE.DataTexture | null = null;
+  /** Materials every house shares (the cut parts get their own copies). */
+  private houseMats = new Map<HouseMaterial, { mat: THREE.MeshLambertMaterial; opts: LitOpts }>();
 
-  private buildHouse(): void {
-    const h = SPIKE_HOUSE;
-    const glow = tex(windowGlowTex(), true, undefined);
+  private houseMatOpts(m: HouseMaterial): LitOpts {
+    this.houseGlow ??= tex(windowGlowTex(), true, undefined);
+    const glow = this.houseGlow;
     const maps: Record<HouseMaterial, () => LitOpts> = {
       stone: () => ({ map: tex(stoneTex(3)), ao: true, wettable: true }),
       plaster: () => ({ map: tex(plasterTex(5)), ao: true, wettable: true }),
@@ -221,13 +228,18 @@ export class SpikeWorld {
       shutter: () => ({ map: tex(shutterTex(11), true, undefined), ao: true }),
       floor: () => ({ map: tex(floorTex(12)), ao: true }),
     };
-    const shared = new Map<HouseMaterial, { mat: THREE.MeshLambertMaterial; opts: LitOpts }>();
+    return maps[m]();
+  }
+
+  private buildHouse(built: BuiltHouse): HouseInst {
+    const h = built.place, model = built.model;
+    const inst: HouseInst = { built, group: new THREE.Group(), cut: [], box: houseBox(built), floorHeat: null, cutT: 0, open: false };
     const matFor = (m: HouseMaterial, cut: boolean): { mat: THREE.MeshLambertMaterial; opts: LitOpts } => {
-      let s = shared.get(m);
+      let s = this.houseMats.get(m);
       if (!s) {
-        const opts = maps[m]();
+        const opts = this.houseMatOpts(m);
         s = { mat: lit(opts), opts };
-        shared.set(m, s);
+        this.houseMats.set(m, s);
         if (m === 'window') this.windowMats.push(s.mat);
       }
       if (!cut) return s;
@@ -237,22 +249,22 @@ export class SpikeWorld {
       if (m === 'window') this.windowMats.push(mat);
       return { mat, opts: s.opts };
     };
-    for (const p of this.model.parts) {
+    for (const p of model.parts) {
       const geo = geometryOf(p.mesh);
       const { mat, opts } = matFor(p.material, p.cut);
       const mesh = new THREE.Mesh(geo, mat);
       mesh.receiveShadow = true;
       mesh.castShadow = !p.cut;
-      this.house.add(mesh);
+      inst.group.add(mesh);
       if (p.cut) {
-        this.cut.push({ mesh });
+        inst.cut.push({ mesh });
         // The roof keeps shading the room when it is cut away: a shadow-only twin on layer 1.
         const proxy = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
         proxy.layers.set(1);
         proxy.castShadow = true;
-        this.house.add(proxy);
+        inst.group.add(proxy);
       }
-      if (p.material === 'roof') this.addShells(mesh, opts, { density: 0.5, tint: 1.12, step: 0.06 }, p.cut);
+      if (p.material === 'roof') this.addShells(mesh, opts, { density: 0.5, tint: 1.12, step: 0.06 }, p.cut ? inst : null);
     }
     // Furniture: the humble set, as sprites on the earth floor. u across, d from the front wall to the back.
     const items: { s: Sprite; u: number; d: number; lift?: number; flat?: boolean; wall?: boolean }[] = [
@@ -273,35 +285,36 @@ export class SpikeWorld {
       { s: makeKeg(), u: 0.92, d: 0.5 },
       { s: makeSacks(), u: 0.9, d: 0.16 },
     ];
-    const r = this.model.room;
+    const r = model.room;
     for (const it of items) {
       const card = spriteCard(it.s, PITCH, { flat: it.flat, shadow: false });
       const x = r.x0 + it.u * (r.x1 - r.x0), z = r.z1 - it.d * (r.z1 - r.z0);
-      card.mesh.position.set(x, this.model.floorY + 0.02 + (it.lift ?? 0) / TEXELS_PER_M, z);
+      card.mesh.position.set(x, model.floorY + 0.02 + (it.lift ?? 0) / TEXELS_PER_M, z);
       // Free-standing things face the camera. Rugs and the things against the walls line up with
       // the room itself (stretched sideways a little to keep one art pixel to one screen pixel).
       const aligned = it.flat || it.wall;
       card.mesh.rotation.y = aligned ? 0 : YAW - h.rot;
       if (it.wall) card.mesh.scale.x = 1 / Math.cos(YAW - h.rot);
-      this.house.add(card.mesh);
+      inst.group.add(card.mesh);
       this.sprites.push(card);
     }
     // The hearth's glow.
     const hearth = new THREE.PointLight(0xff9a48, 4, 6, 2);
-    hearth.position.set(r.x0 + 0.8 * (r.x1 - r.x0), this.model.floorY + 0.55, r.z1 - 0.88 * (r.z1 - r.z0));
-    this.house.add(hearth);
-    this.torches.push({ light: hearth, flame: new THREE.Mesh(), base: 4, seed: 3 });
-    const hf = this.toWorld(hearth.position.x, hearth.position.z);
+    hearth.position.set(r.x0 + 0.8 * (r.x1 - r.x0), model.floorY + 0.55, r.z1 - 0.88 * (r.z1 - r.z0));
+    inst.group.add(hearth);
+    this.torches.push({ light: hearth, flame: new THREE.Mesh(), base: 4, seed: 3 + this.houses.length * 5 });
+    const hf = houseToWorld(h, hearth.position.x, hearth.position.z);
     this.fires.push({ x: hf.x, z: hf.z, kind: 'fire', weight: 1 });
 
     const y = groundHeight(this.ground, h.x, h.z) - 0.05;
-    this.house.position.set(h.x, y, h.z);
-    this.house.rotation.y = h.rot;
-    this.scene.add(this.house);
+    inst.group.position.set(h.x, y, h.z);
+    inst.group.rotation.y = h.rot;
+    this.scene.add(inst.group);
+    return inst;
   }
 
   /** Two shells: `step` metres out, then twice that, each sparser than the last. */
-  private addShells(base: THREE.Mesh, opts: LitOpts, s: { density: number; tint: number; step: number }, cut: boolean): void {
+  private addShells(base: THREE.Mesh, opts: LitOpts, s: { density: number; tint: number; step: number }, cutOf: HouseInst | null): void {
     for (const layer of [1, 2]) {
       const mat = shellOf(base.material as THREE.MeshLambertMaterial, opts, {
         layer, offset: s.step * layer, density: s.density / (layer * layer), tint: layer === 1 ? s.tint : s.tint * 1.08,
@@ -312,14 +325,20 @@ export class SpikeWorld {
       m.scale.copy(base.scale);
       m.receiveShadow = true;
       base.parent ? base.parent.add(m) : base.add(m);
-      this.shells.push({ mesh: m, layer, cut });
+      this.shells.push({ mesh: m, layer, cutOf });
     }
   }
 
-  private buildTree(): void {
-    const t = buildTree(SPIKE_TREE.seed);
+  private barkMat: THREE.MeshLambertMaterial | null = null;
+  private leafMat: THREE.MeshLambertMaterial | null = null;
+  private leafOpts: LitOpts | null = null;
+
+  private buildTree(place: PlacedTree): void {
+    const t = buildTree(place.seed);
     const group = new THREE.Group();
-    const wood = new THREE.Mesh(geometryOf(t.wood), lit({ map: tex(barkTex(4)), ao: true, wettable: true }));
+    // Bark and leaf textures are painted once and shared by every tree.
+    this.barkMat ??= lit({ map: tex(barkTex(4)), ao: true, wettable: true });
+    const wood = new THREE.Mesh(geometryOf(t.wood), this.barkMat);
     wood.castShadow = wood.receiveShadow = true;
     group.add(wood);
     const parts: THREE.BufferGeometry[] = [];
@@ -344,14 +363,16 @@ export class SpikeWorld {
       parts.push(geo);
     });
     const merged = mergeAll(parts);
-    const leafOpts: LitOpts = { map: tex(leafTex(5)), ao: true, sway: { from: 2.5, amount: 0.018 } };
-    const leaves = new THREE.Mesh(merged, lit(leafOpts));
+    this.leafOpts ??= { map: tex(leafTex(5)), ao: true, sway: { from: 2.5, amount: 0.018 } };
+    const leafOpts = this.leafOpts;
+    this.leafMat ??= lit(leafOpts);
+    const leaves = new THREE.Mesh(merged, this.leafMat);
     leaves.castShadow = leaves.receiveShadow = true;
     group.add(leaves);
-    const gx = SPIKE_TREE.x, gz = SPIKE_TREE.z;
+    const gx = place.x, gz = place.z;
     group.position.set(gx, this.store.heightAt(gx, gz), gz);
     this.scene.add(group);
-    this.addShells(leaves, leafOpts, { density: 0.55, tint: 1.18, step: 0.12 }, false);
+    this.addShells(leaves, leafOpts, { density: 0.55, tint: 1.18, step: 0.12 }, null);
   }
 
   private grassGeo: THREE.BufferGeometry | null = null;
@@ -400,8 +421,10 @@ export class SpikeWorld {
       if (Math.abs(x) > half * 0.95 || Math.abs(z) > half * 0.95) continue;
       const sp = splatAt(g, x, z);
       if (sp.road > 0.3 || sp.mud > 0.3 || sp.shore > 0.2) continue;
-      const hl = this.model.footprint, l = this.toLocal(x, z);
-      if (l.x > hl.x0 - 0.3 && l.x < hl.x1 + 0.3 && l.z > hl.z0 - 0.3 && l.z < hl.z1 + 0.3) continue;
+      if (this.houses.some((hs) => {
+        const hl = hs.built.model.footprint, l = houseToLocal(hs.built.place, x, z);
+        return l.x > hl.x0 - 0.3 && l.x < hl.x1 + 0.3 && l.z > hl.z0 - 0.3 && l.z < hl.z1 + 0.3;
+      })) continue;
       // Thicker where the grass grows wild.
       if (rng.next() > 0.35 + sp.wild * 0.65) continue;
       p.set(x, this.store.heightAt(x, z) - 0.02, z);
@@ -490,14 +513,17 @@ export class SpikeWorld {
   showFilaments(a: AspectId | null): void {
     this.heatAspect = a;
     for (const lc of this.chunks.values()) this.syncHeat(lc);
-    // The room inside the house shows it on its floor.
-    if (a && !this.floorHeat) {
-      this.floorHeat = makeFloorHeat(this.model.room, this.model.floorY + 0.03, (x, z) => this.toWorld(x, z));
-      this.house.add(this.floorHeat.mesh);
-    } else if (!a && this.floorHeat) {
-      this.house.remove(this.floorHeat.mesh);
-      this.floorHeat.dispose();
-      this.floorHeat = null;
+    // The room inside each house shows it on its floor.
+    for (const hs of this.houses) {
+      const { place, model } = hs.built;
+      if (a && !hs.floorHeat) {
+        hs.floorHeat = makeFloorHeat(model.room, model.floorY + 0.03, (x, z) => houseToWorld(place, x, z));
+        hs.group.add(hs.floorHeat.mesh);
+      } else if (!a && hs.floorHeat) {
+        hs.group.remove(hs.floorHeat.mesh);
+        hs.floorHeat.dispose();
+        hs.floorHeat = null;
+      }
     }
     this.heatT = 0;
   }
@@ -547,12 +573,6 @@ export class SpikeWorld {
 
   private grassShare = 1;
 
-  private toLocal(x: number, z: number): { x: number; z: number } {
-    const dx = x - SPIKE_HOUSE.x, dz = z - SPIKE_HOUSE.z;
-    const c = Math.cos(SPIKE_HOUSE.rot), s = Math.sin(SPIKE_HOUSE.rot);
-    return { x: dx * c - dz * s, z: dx * s + dz * c };
-  }
-
   private buildTorches(): void {
     const postMat = lit({ map: tex(timberTex(21)) });
     const flameMat = new THREE.MeshBasicMaterial({ color: 0xffb040 });
@@ -571,11 +591,13 @@ export class SpikeWorld {
       this.scene.add(light);
       this.torches.push({ light, flame, base: 9, seed: this.torches.length * 7 + 1 });
     };
-    for (const [x, z] of SPIKE_TORCHES) place(x, this.store.heightAt(x, z) + 1.9, z, true);
-    // On a bracket beside the door.
-    const d = this.model.door;
-    const w = this.toWorld(d[0] + 0.95, d[2] + 0.25);
-    place(w.x, this.house.position.y + this.model.floorY + 1.85, w.z, false);
+    for (const [x, z] of this.layout.torches) place(x, this.store.heightAt(x, z) + 1.9, z, true);
+    // On a bracket beside the first house's door.
+    const hs = this.houses[0];
+    if (!hs) return;
+    const d = hs.built.model.door;
+    const w = houseToWorld(hs.built.place, d[0] + 0.95, d[2] + 0.25);
+    place(w.x, hs.group.position.y + hs.built.model.floorY + 1.85, w.z, false);
     this.fires.push({ x: w.x, z: w.z, kind: 'fire', weight: 1 });
   }
 
@@ -622,11 +644,50 @@ export class SpikeWorld {
     this.focus.z = Math.max(-lim, Math.min(lim, this.focus.z));
   }
 
-  pick(ndcX: number, ndcY: number): 'house' | null {
+  /** The index of the house under the pointer, if any (nearest hit). */
+  pick(ndcX: number, ndcY: number): number | null {
     const ray = new THREE.Raycaster();
     ray.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
-    const hit = ray.intersectObject(this.house, true)[0];
-    return hit ? 'house' : null;
+    let best: number | null = null, bestD = Infinity;
+    this.houses.forEach((hs, i) => {
+      const hit = ray.intersectObject(hs.group, true)[0];
+      if (hit && hit.distance < bestD) {
+        bestD = hit.distance;
+        best = i;
+      }
+    });
+    return best;
+  }
+
+  /** The house the hero is in, else the one nearest the view's focus. */
+  private activeHouse(): number {
+    const h = this.heroHouse();
+    if (h >= 0) return h;
+    let best = 0, bestD = Infinity;
+    this.houses.forEach((hs, i) => {
+      const d = Math.hypot(hs.built.place.x - this.focus.x, hs.built.place.z - this.focus.z);
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    });
+    return best;
+  }
+
+  /** Is any roof lifted? Setting it lifts the active house's roof, or lowers every one. */
+  get inside(): boolean {
+    return this.houses.some((h) => h.open);
+  }
+
+  set inside(on: boolean) {
+    if (!on) for (const h of this.houses) h.open = false;
+    else if (this.houses.length) this.houses[this.activeHouse()].open = true;
+  }
+
+  /** Lift or lower one house's roof by hand (dev). */
+  toggleRoof(i: number): void {
+    const h = this.houses[i];
+    if (h) h.open = !h.open;
   }
 
   /** Where a tap on the screen (ndc) lands on the ground; null if it points at the sky. */
@@ -664,29 +725,39 @@ export class SpikeWorld {
 
   private placeHero(lift = 0): void {
     // Indoors the hero stands on the room's floor, not the ground.
-    const y = this.heroIndoors ? this.house.position.y + this.model.floorY : this.store.heightAt(this.hero.x, this.hero.z);
+    const hs = this.houses[this.heroHouse()];
+    const y = hs ? hs.group.position.y + hs.built.model.floorY : this.store.heightAt(this.hero.x, this.hero.z);
     this.heroCard.mesh.position.set(this.hero.x, y + lift, this.hero.z);
     this.heroBlob.position.set(this.hero.x, y + 0.03, this.hero.z);
   }
 
-  get heroIndoors(): boolean {
-    return shapeDist(this.houseBox, this.hero.x, this.hero.z) < -0.1;
+  /** Index of the house the hero is inside, or -1. */
+  heroHouse(): number {
+    return houseAt(this.houses.map((h) => h.built), this.houses.map((h) => h.box), this.hero.x, this.hero.z, -0.1);
   }
 
-  private wasIndoors = false;
+  get heroIndoors(): boolean {
+    return this.heroHouse() >= 0;
+  }
 
-  /** Walk to the middle of the doorway, just inside. */
-  walkIn(): number | null {
-    const p = this.toWorld(this.model.door[0], this.model.door[2] - 0.9);
+  private wasIn = -1;
+
+  /** Walk to the middle of a house's doorway, just inside (the first house by default). */
+  walkIn(i = 0): number | null {
+    const hs = this.houses[i];
+    if (!hs) return null;
+    const m = hs.built.model;
+    const p = houseToWorld(hs.built.place, m.door[0], m.door[2] - 0.9);
     return this.walkTo(p.x, p.z);
   }
 
   private stepHero(dt: number): void {
-    // Crossing the threshold opens or closes the cut-away.
-    const inside = this.heroIndoors;
-    if (inside !== this.wasIndoors) {
-      this.wasIndoors = inside;
-      this.inside = inside;
+    // Crossing a threshold opens that house's cut-away and closes the one left behind.
+    const now = this.heroHouse();
+    if (now !== this.wasIn) {
+      if (this.wasIn >= 0) this.houses[this.wasIn].open = false;
+      if (now >= 0) this.houses[now].open = true;
+      this.wasIn = now;
     }
     if (!this.path) return;
     this.pathS += dt * 1.6;
@@ -785,12 +856,14 @@ export class SpikeWorld {
     for (const m of this.windowMats) m.emissive.setScalar(env.night * 1.4);
 
     // The cut-away fades the roof and the front wall with a dither.
-    this.cutT += ((this.inside ? 1 : 0) - this.cutT) * (1 - Math.exp(-dt / 0.12));
-    for (const c of this.cut) {
-      c.mesh.material.opacity = 1 - this.cutT;
-      c.mesh.visible = this.cutT < 0.98;
+    for (const hs of this.houses) {
+      hs.cutT += ((hs.open ? 1 : 0) - hs.cutT) * (1 - Math.exp(-dt / 0.12));
+      for (const c of hs.cut) {
+        c.mesh.material.opacity = 1 - hs.cutT;
+        c.mesh.visible = hs.cutT < 0.98;
+      }
     }
-    for (const s of this.shells) s.mesh.visible = s.layer <= this.settings.shells && (!s.cut || this.cutT < 0.3);
+    for (const s of this.shells) s.mesh.visible = s.layer <= this.settings.shells && (!s.cutOf || s.cutOf.cutT < 0.3);
 
     // The villager walks the road, there and back.
     this.walkVillager(dt);
@@ -811,7 +884,7 @@ export class SpikeWorld {
       this.feedField();
       if (this.heatAspect) {
         for (const lc of this.chunks.values()) lc.heat?.paint(this.field, this.heatAspect);
-        this.floorHeat?.paint(this.field, this.heatAspect);
+        for (const hs of this.houses) hs.floorHeat?.paint(this.field, this.heatAspect);
       }
     }
     const span = Math.max(this.camera.right, this.camera.top) * 1.1;

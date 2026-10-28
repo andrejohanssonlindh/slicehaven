@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { SPIKE_GROUND, SPIKE_HERO, SPIKE_HOUSE, SPIKE_TREE, spikeFilamentWorld } from '../src/content/spike3d';
+import { SPIKE_GROUND, SPIKE_HERO, SPIKE_HOUSE, SPIKE_LAYOUT, SPIKE_TREE, spikeFilamentWorld } from '../src/content/spike3d';
+import { buildHouses } from '../src/core/world3d/layout';
 import type { Environment } from '../src/core/environment';
 import { ASPECTS } from '../src/core/filaments';
 import { FCELL, type FSource, type FilamentWorld, FilamentField, falloffAt } from '../src/core/world3d/filaments3d';
-import { buildHouse } from '../src/core/world3d/house';
 import { CHUNK } from '../src/core/world3d/chunks';
 
 const DAY: Environment = { time: 'day', sky: 'clear', windForce: 1, windDir: 0 };
@@ -182,8 +182,7 @@ describe('walls and smoothness', () => {
 });
 
 describe('filaments on the spike', () => {
-  const m = buildHouse(SPIKE_HOUSE.spec);
-  const f = new FilamentField(spikeFilamentWorld(SPIKE_GROUND, m.footprint));
+  const f = new FilamentField(spikeFilamentWorld(SPIKE_GROUND, buildHouses(SPIKE_LAYOUT)));
   f.setConditions({ env: DAY });
 
   it('every aspect reads in -3..3 everywhere on the patch', () => {

@@ -49,9 +49,9 @@
 - **Filaments (magic strength) must exist in the 3D world**, stored as a map keyed by cell (a hash map / heat map over the free world), read by position. Today `core/filaments.ts` computes them per hex (`readMap` → `Map<hexKey, HexFilaments>`); the port keeps its rules and contributions, swaps hexes for cells and distances in metres. *Director wrote "hashmat": I read it as a hash map of cells (a heat map when drawn); confirm if meant otherwise.*
 
 ## Next steps (in order, each its own commit + devlog line)
-1. **M2 assets**: house variants (all roof/wall slots, 4–5 widths), more trees and shrubs, props, each with a collision footprint that feeds `NavGrid` and a filament source. `SpikeWorld` is still a one-house world with hard-wired content; the first M2 job is to make it build from a *layout* (list of placed things) instead.
+1. **M2 assets** (layout done, session 25: `core/world3d/layout.ts`, `SPIKE_LAYOUT`; houses, trees and torches are placed things that feed collision, pads, filaments and the renderer). Left: roof textures for shingle, tile and sod (all roofs paint as thatch now; shells only suit thatch), wall variants, shrubs and props (each needs a collision shape in `layoutObstacles` and, where it matters, a filament source), furniture sets per house (all rooms hold the humble set), more tree kinds. Add a new kind of thing to `Layout` first, then the renderer.
 2. **Art**: side and back views + walk cycle for folk (they only have a front view; the hero and villager are mirrored).
-3. **Enter the house**: walk through the door, cut-away opens when the hero is inside (needs a door gap in the footprint obstacle and a floor in the nav grid).
+3. ~~Enter the house~~ done (session 24b, now per house).
 4. Then M3–M6 per the brief (lighting polish, weather polish incl. smoke and puddles, people on routes, Reedwater ported round).
 5. Filaments: spells and the rules that read them; a tap-to-inspect panel; hex-free weather-to-field coupling (wet ground, fire spreading) when fire rules come over.
 

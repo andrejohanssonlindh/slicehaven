@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { SPIKE_GROUND, SPIKE_HERO, SPIKE_HOUSE, SPIKE_TREE, spikeObstacles } from '../src/content/spike3d';
+import { SPIKE_GROUND, SPIKE_HERO, SPIKE_HOUSE, SPIKE_LAYOUT, SPIKE_TREE } from '../src/content/spike3d';
 import { buildHouse } from '../src/core/world3d/house';
+import { buildHouses, layoutObstacles } from '../src/core/world3d/layout';
 import { NavGrid, boxOfFootprint, circle, distance, findPath, followPath, near, pathLength, shapeDist } from '../src/core/world3d/space';
 import { lakeDist } from '../src/core/world3d/terrain';
 
@@ -43,7 +44,7 @@ describe('measurements', () => {
 
 describe('navigation', () => {
   const m = buildHouse(SPIKE_HOUSE.spec);
-  const shapes = spikeObstacles(m.footprint, m.door[0]);
+  const shapes = layoutObstacles(SPIKE_LAYOUT, buildHouses(SPIKE_LAYOUT));
   const grid = new NavGrid(SPIKE_GROUND.size, shapes, { radius: 0.2, blocked: (x, z) => lakeDist(SPIKE_GROUND, x, z) < 0.2 });
 
   it('blocks the house, the tree and the lake, and frees the road and the hero start', () => {

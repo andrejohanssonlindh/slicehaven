@@ -184,13 +184,14 @@ function bindInput(): void {
     if (down.moved < 8) {
       const r = canvas.getBoundingClientRect();
       const nx = ((e.clientX - r.left) / r.width) * 2 - 1, ny = -(((e.clientY - r.top) / r.height) * 2 - 1);
-      if (e.shiftKey && world.pick(nx, ny) === 'house') {
-        // Dev: shift-click lifts or lowers the roof by hand.
-        world.inside = !world.inside;
+      const house = world.pick(nx, ny);
+      if (e.shiftKey && house !== null) {
+        // Dev: shift-click lifts or lowers that roof by hand.
+        world.toggleRoof(house);
         for (const b of buttons) b.refresh();
-      } else if (!world.heroIndoors && world.pick(nx, ny) === 'house') {
-        // Outside, tapping the house walks in through the door.
-        if (world.walkIn() === null) notify(t('spike.noway', 'There is no way there.'));
+      } else if (!world.heroIndoors && house !== null) {
+        // Outside, tapping a house walks in through its door.
+        if (world.walkIn(house) === null) notify(t('spike.noway', 'There is no way there.'));
       } else {
         // Otherwise tap the ground and the hero walks there, round whatever is in the way.
         const at = world.groundAt(nx, ny);

@@ -1,18 +1,38 @@
-import type { House3DSpec } from '../core/world3d/house';
 import { type FSource, type FilamentWorld, type Ground } from '../core/world3d/filaments3d';
-import { type Shape, boxOfFootprint, circle, shapeDist } from '../core/world3d/space';
+import { type BuiltHouse, type Layout, houseOuterBox, layoutPads, layoutShade } from '../core/world3d/layout';
+import { shapeDist } from '../core/world3d/space';
 import { lakeDist, splatAt } from '../core/world3d/terrain';
 import type { Ground3D, XZ } from '../core/world3d/terrain';
 
 /**
- * The M0 spike: one house by a road, stamped mud at its door, a lake, a tree,
- * two torches and a villager walking the road. Metres, origin in the middle.
+ * The spike: a few houses by a road, stamped mud at the first door, a lake,
+ * trees, torches and a villager walking the road. Metres, origin in the middle.
+ * Everything placed lives in `SPIKE_LAYOUT`; the first house is the one with the
+ * mud and the hero's start.
  */
 
-export const SPIKE_HOUSE: { x: number; z: number; rot: number; spec: House3DSpec } = {
-  x: 0, z: -2.5, rot: 0.08,
-  spec: { seed: 7, width: 6.2, depth: 4.6, wallH: 2.5, roof: 'thatch' },
+export const SPIKE_LAYOUT: Layout = {
+  houses: [
+    { id: 'home', x: 0, z: -2.5, rot: 0.08, spec: { seed: 7, width: 6.2, depth: 4.6, wallH: 2.5, roof: 'thatch' } },
+    { id: 'west', x: -22, z: -0.5, rot: -0.05, spec: { seed: 12, width: 5.4, depth: 4.2, wallH: 2.4, roof: 'thatch' } },
+    { id: 'east', x: 15, z: -3.5, rot: 0.14, spec: { seed: 21, width: 5, depth: 4, wallH: 2.4, roof: 'thatch' } },
+    { id: 'far', x: 25, z: -1, rot: -0.1, spec: { seed: 33, width: 7.4, depth: 5, wallH: 2.6, roof: 'thatch' } },
+  ],
+  trees: [
+    { x: 9.5, z: -7.5, seed: 3 },
+    { x: -2, z: -12.5, seed: 8 },
+    { x: 3.5, z: -12.5, seed: 15 },
+    { x: -26.5, z: -9, seed: 4 },
+    { x: 20, z: -10, seed: 19 },
+    { x: 29, z: -9.5, seed: 6 },
+  ],
+  // The first is the one the old spike had; the second lights the west bend.
+  torches: [[6.5, 6.9], [-12, 7.1]],
 };
+
+export const SPIKE_HOUSE = SPIKE_LAYOUT.houses[0];
+export const SPIKE_TREE = SPIKE_LAYOUT.trees[0];
+export const SPIKE_TORCHES = SPIKE_LAYOUT.torches;
 
 export const SPIKE_GROUND: Ground3D = {
   seed: 11,
@@ -21,55 +41,26 @@ export const SPIKE_GROUND: Ground3D = {
   mud: [
     { x: -0.6, z: 1.6, r: 3.2 },
     { x: 3.5, z: 4.4, r: 2.4 },
+    { x: 15, z: 0.4, r: 2 },
   ],
   lake: { x: -13, z: -9, r: 7 },
-  pads: [{ x: SPIKE_HOUSE.x, z: SPIKE_HOUSE.z, hw: 3.4, hd: 2.8, rot: SPIKE_HOUSE.rot }],
-  shade: [{ x: 9.5, z: -7, r: 5 }],
+  pads: layoutPads(SPIKE_LAYOUT),
+  shade: layoutShade(SPIKE_LAYOUT),
 };
-
-export const SPIKE_TREE = { x: 9.5, z: -7, seed: 3 };
-
-/** Torches on posts by the road (x, z). A third hangs beside the house door. */
-export const SPIKE_TORCHES: [number, number][] = [[6.5, 6.9]];
 
 /** The villager's beat along the road, there and back. */
 export const SPIKE_WALK: XZ[] = [[-12, 5.6], [-3, 5.0], [6, 5.8], [12, 4.8]];
 
-/**
- * What blocks feet: the house's four walls (thin, so the inside can be walked, with a
- * gap at the door), the tree trunk, the torch post. `doorX` is the door's x in the house's frame.
- */
-export function spikeObstacles(footprint: { x0: number; x1: number; z0: number; z1: number }, doorX: number): Shape[] {
-  const h = SPIKE_HOUSE;
-  // The footprint is the walls plus a little proud (0.1 at the sides, a 0.6 porch at the front).
-  const hw = (footprint.x1 - footprint.x0) / 2 - 0.1, hd = -footprint.z0 - 0.1, t = 0.12;
-  const wall = (x0: number, x1: number, z0: number, z1: number): Shape => boxOfFootprint({ x0, x1, z0, z1 }, h.x, h.z, h.rot);
-  const gap = 0.65; // half-width of the doorway, wider than the door so the walker fits
-  return [
-    wall(-hw - t, hw + t, -hd - t, -hd + t),
-    wall(-hw - t, -hw + t, -hd, hd),
-    wall(hw - t, hw + t, -hd, hd),
-    wall(-hw - t, doorX - gap, hd - t, hd + t),
-    wall(doorX + gap, hw + t, hd - t, hd + t),
-    circle(SPIKE_TREE.x, SPIKE_TREE.z, 0.5),
-    ...SPIKE_TORCHES.map(([x, z]) => circle(x, z, 0.12)),
-  ];
-}
-
-/** The house's whole footprint as one box (is something inside it?). */
-export const spikeHouseBox = (footprint: { x0: number; x1: number; z0: number; z1: number }): Shape =>
-  boxOfFootprint({ x0: footprint.x0 + 0.1, x1: footprint.x1 - 0.1, z0: footprint.z0 + 0.1, z1: footprint.z1 - 0.6 }, SPIKE_HOUSE.x, SPIKE_HOUSE.z, SPIKE_HOUSE.rot);
-
-/** Where the hero starts: by the door, on the mud. */
+/** Where the hero starts: by the first door, on the mud. */
 export const SPIKE_HERO: [number, number] = [2.4, 1.2];
 
 /**
  * The spike as the filament field sees it: the lake is still water, the road
  * is path, the mud is mud, long grass and leaf litter are what they look like,
- * and inside the house's walls is indoors. The tree and the torches are sources.
+ * and inside a house's walls is indoors. Trees and torches are sources.
  */
-export function spikeFilamentWorld(g: Ground3D, footprint: { x0: number; x1: number; z0: number; z1: number }, extra: FSource[] = []): FilamentWorld {
-  const house = boxOfFootprint(footprint, SPIKE_HOUSE.x, SPIKE_HOUSE.z, SPIKE_HOUSE.rot);
+export function spikeFilamentWorld(g: Ground3D, houses: BuiltHouse[], extra: FSource[] = []): FilamentWorld {
+  const boxes = houses.map(houseOuterBox);
   return {
     size: g.size,
     ground(x, z): Ground {
@@ -81,10 +72,10 @@ export function spikeFilamentWorld(g: Ground3D, footprint: { x0: number; x1: num
       if (s.wild > 0.5) return 'tallgrass';
       return 'grass';
     },
-    indoors: (x, z) => shapeDist(house, x, z) < 0,
+    indoors: (x, z) => boxes.some((b) => shapeDist(b, x, z) < 0),
     sources: [
-      { x: SPIKE_TREE.x, z: SPIKE_TREE.z, kind: 'tree' },
-      ...SPIKE_TORCHES.map(([x, z]): FSource => ({ x, z, kind: 'fire', weight: 1 })),
+      ...SPIKE_LAYOUT.trees.map((t): FSource => ({ x: t.x, z: t.z, kind: 'tree' })),
+      ...SPIKE_LAYOUT.torches.map(([x, z]): FSource => ({ x, z, kind: 'fire', weight: 1 })),
       ...extra,
     ],
   };
