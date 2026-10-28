@@ -95,6 +95,10 @@ export function layoutObstacles(l: Layout, houses: BuiltHouse[]): Shape[] {
   ];
 }
 
+/** What the furniture of a house blocks, from the room plan's footprints (house-local) to the world. */
+export const furnitureObstacles = (b: BuiltHouse, fps: { x: number; z: number; hw: number; hd: number }[]): Shape[] =>
+  fps.map((f) => boxOfFootprint({ x0: f.x - f.hw, x1: f.x + f.hw, z0: f.z - f.hd, z1: f.z + f.hd }, b.place.x, b.place.z, b.place.rot));
+
 /** Flat pads under the houses, for the terrain. */
 export const layoutPads = (l: Layout): { x: number; z: number; hw: number; hd: number; rot: number }[] =>
   l.houses.map((h) => ({ x: h.x, z: h.z, hw: h.spec.width / 2 + 0.3, hd: h.spec.depth / 2 + 0.5, rot: h.rot }));

@@ -72,11 +72,13 @@ export function spriteCard(s: Sprite, pitch: number, opts: { flat?: boolean; ppm
   };
 }
 
-/** People's material: like any sprite, but whatever stands in front of one gets cut, and people in front of people too. */
-const personMaterials = new WeakMap<THREE.Texture, THREE.MeshLambertMaterial>();
+/**
+ * People's material: a plain sprite. It must NOT be see-through: a person's own oval is centred on their chest,
+ * and their head is nearer the camera than that, so the oval would cut their own face. Only trees are cut.
+ */
 const materialFor = (tex: THREE.Texture): THREE.MeshLambertMaterial => {
-  let mat = personMaterials.get(tex);
-  if (!mat) personMaterials.set(tex, (mat = lit({ map: tex, sprite: true, seeThrough: true })));
+  let mat = materials.get(tex);
+  if (!mat) materials.set(tex, (mat = lit({ map: tex, sprite: true })));
   return mat;
 };
 

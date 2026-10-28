@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { makeWalkSet, viewFor } from '../art/folkWalk';
 import type { Pix } from '../art/pix';
-import { ROOM_SETS, type RoomSet, furnitureOf } from '../content/rooms3d';
+import { type Furnished, type RoomSet, furnish } from '../content/furnish';
 import {
   barkTex, doorTex, floorTex, groundChunkTex, leafTex, plasterTex, roofUnderTex, shingleTex, shutterTex, sodTex, stoneTex, thatchTex,
   tileTex, timberTex, windowGlowTex, windowTex,
@@ -14,7 +14,8 @@ import { CHUNK, type ChunkTerrain, TerrainStore, chunkKey, chunksNear } from '..
 import { type Environment3D, environment } from '../core/world3d/environment3d';
 import { Rng } from '../core/rng';
 import type { HouseMaterial } from '../core/world3d/house';
-import { type BuiltHouse, type Layout, type PlacedTree, buildHouses, houseAt, houseBox, houseToLocal, houseToWorld, layoutObstacles } from '../core/world3d/layout';
+import { type BuiltHouse, type Layout, type PlacedTree, buildHouses, furnitureObstacles, houseAt, houseBox, houseToLocal, houseToWorld, layoutObstacles } from '../core/world3d/layout';
+import { footprints } from '../core/world3d/roomplan';
 import type { MeshData } from '../core/world3d/mesh';
 import { type PlacedProp, buildBoulder, buildShrub, buildWoodpile } from '../core/world3d/props';
 import { cloudDrift, cloudThreshold } from '../core/world3d/sky';
@@ -186,11 +187,14 @@ export class SpikeWorld {
     // Ground chunks stream in once the view is sized (see `frame`); until then the exact height function stands in.
     this.layout = layout;
     const built = buildHouses(layout);
-    // Feet: the houses' walls, trunks and posts block; so does the water.
-    this.nav = new NavGrid(g.size, layoutObstacles(layout, built), { radius: 0.2, blocked: (x, z) => lakeDist(g, x, z) < 0.2 });
+    // Each room is furnished by rules (see `content/furnish.ts`); what stands on the floor blocks feet.
+    const rooms = built.map((b) => furnish((b.place.room ?? 'home') as RoomSet, b.model.room, b.model.door[0], b.place.spec.seed));
+    // Feet: the houses' walls and furniture, trunks and posts block; so does the water.
+    const shapes = [...layoutObstacles(layout, built), ...built.flatMap((b, i) => furnitureObstacles(b, footprints(rooms[i].plan)))];
+    this.nav = new NavGrid(g.size, shapes, { radius: 0.2, blocked: (x, z) => lakeDist(g, x, z) < 0.2 });
 
     // The houses.
-    for (const b of built) this.houses.push(this.buildHouse(b));
+    built.forEach((b, i) => this.houses.push(this.buildHouse(b, rooms[i])));
 
     // Trees, grass, water, torches, people.
     for (const t of layout.trees) this.buildTree(t);
@@ -248,7 +252,7 @@ export class SpikeWorld {
     return maps[m]();
   }
 
-  private buildHouse(built: BuiltHouse): HouseInst {
+  private buildHouse(built: BuiltHouse, room: Furnished): HouseInst {
     const h = built.place, model = built.model;
     const inst: HouseInst = { built, group: new THREE.Group(), furniture: [], cut: [], box: houseBox(built), floorHeat: null, cutT: 0, open: false };
     const matFor = (m: HouseMaterial, cut: boolean): { mat: THREE.MeshLambertMaterial; opts: LitOpts } => {
@@ -283,27 +287,28 @@ export class SpikeWorld {
       }
       if (p.material === 'roof') this.addShells(mesh, opts, { density: 0.5, tint: 1.12, step: 0.06 }, p.cut ? inst : null);
     }
-    // Furniture: the house's room set (`content/rooms3d.ts`), as sprites on the floor. u across, d from the front wall to the back.
-    const set = ROOM_SETS[(h.room ?? 'home') as RoomSet] ?? ROOM_SETS.home;
-    const r = model.room;
-    for (const it of furnitureOf((h.room ?? 'home') as RoomSet)) {
-      const flat = !!it.prop.flat;
-      // Things at the back wall or hung on it line up with the room (stretched sideways a little
-      // to keep one art pixel to one screen pixel), as do rugs. Free-standing things face the camera.
-      const wall = !flat && (it.d >= 0.9 || it.lift !== undefined);
-      const card = spriteCard(it.prop, PITCH, { flat, shadow: false });
-      const x = r.x0 + it.u * (r.x1 - r.x0), z = r.z1 - it.d * (r.z1 - r.z0);
-      card.mesh.position.set(x, model.floorY + 0.02 + (it.lift ?? 0) / TEXELS_PER_M, z);
+    // Furniture: the solver's plan (`content/furnish.ts`), as sprites on the floor.
+    let fire: { x: number; z: number } | null = null;
+    for (const it of room.plan.pieces) {
+      const prop = room.props.get(it.id);
+      if (!prop) continue;
+      const flat = it.kind === 'flat';
+      // Things on the back wall and rugs line up with the room (stretched sideways a little to keep
+      // one art pixel to one screen pixel). Free-standing things face the camera.
+      const wall = !flat && it.aligned;
+      const card = spriteCard(prop, PITCH, { flat, shadow: false });
+      card.mesh.position.set(it.x, model.floorY + 0.02 + it.lift, it.z);
       card.mesh.rotation.y = flat || wall ? 0 : YAW - h.rot;
       if (wall) card.mesh.scale.x = 1 / Math.cos(YAW - h.rot);
       inst.group.add(card.mesh);
       inst.furniture.push(card.mesh);
       this.sprites.push(card);
+      if (it.fire) fire = { x: it.x, z: it.z };
     }
     // The hearth's (or oven's, or forge's) glow, if the room has one.
-    if (set.fire) {
+    if (fire) {
       const hearth = new THREE.PointLight(0xff9a48, 4, 6, 2);
-      hearth.position.set(r.x0 + set.fire.u * (r.x1 - r.x0), model.floorY + 0.55, r.z1 - set.fire.d * (r.z1 - r.z0));
+      hearth.position.set(fire.x, model.floorY + 0.55, fire.z + 0.2);
       inst.group.add(hearth);
       this.torches.push({ light: hearth, flame: new THREE.Mesh(), base: 4, seed: 3 + this.houses.length * 5 });
       const hf = houseToWorld(h, hearth.position.x, hearth.position.z);
