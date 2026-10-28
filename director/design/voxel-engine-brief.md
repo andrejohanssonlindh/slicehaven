@@ -1,152 +1,127 @@
-# Brief: the baked-voxel world engine
+# Brief: the live-3D pixel world
 
-*Written 2026-10-28 for the engineer (Opus) who will build it. Read the whole thing once, then work milestone by milestone. This is a brief, not a spec: where it says "your call", it is.*
+*Written 2026-10-28 for the engineer (Opus) who will build it; **rewritten the same day** after the director chose live 3D over baked voxel sprites (the file keeps its old name so links hold). Read it once, then work milestone by milestone. It is a brief, not a spec: where it says "your call", it is.*
 
 ## 0. Why this exists
-The village page ([village.md](village.md), `/village/`) showed that the current renderer cannot scale. `VillageScene.render` redraws the whole map every frame (copy ground, cast every shadow, blit every prop, run a per-pixel lighting pass): about **70 ms a frame at 38 × 31 hexes on a desktop**, with a phone slower. The director wants a **round 50 × 50 hex village**, seen from about **10 hexes around the hero**, that you **walk about in**, with **soft light**, **weather and clouds**, and **houses and people that can face any direction**.
+The village page ([village.md](village.md), `/village/`) showed that the 2D hex renderer cannot scale: `VillageScene.render` redraws the whole map every frame and costs about **70 ms a frame at 38 × 31 hexes on a desktop**, worse on a phone. The director wants a **round village, about 75 to 100 m across (the "50 × 50 hex" idea), that you walk about in, with soft light, weather and clouds, and a world that is not made of hexes.**
 
 Decisions already made by the director (do not reopen them):
-1. **Sprites are baked from voxel models.** Models are voxel grids built by code, rendered once to sprites (colour + normals + depth + more), then used like the old pre-rendered games did (Diablo 2, Fallout, Age of Empires). The camera is fixed; objects get N facing directions.
-2. **We write our own voxel baker.** No three.js, no Blender, no MagicaVoxel in the pipeline. A small pure TypeScript module.
-3. **Soft light is a must.** It is "super important for the feel". See §6; it is the one thing that must not be compromised for speed.
-4. **Weather, clouds, time of day stay**, as a separate system that drives the lighting (§7).
-5. **The final art style is not decided.** This brief builds the pipeline, not the final look. But the pipeline must make a *good-looking* house early, because a spike decides whether the director commits (§9, M0).
+1. **The world is real-time 3D**, rendered live, not baked. Use **three.js** (WebGL2). We are not writing a 3D engine.
+2. **The pixel look comes from the pipeline**, not from the models: render to a **low-resolution target and scale it up with nearest-neighbour**, pixel-sized texture detail, an outline pass, a limited palette, and **1 to 2 "shell" layers** (§4) for the rough, sparse-pixel fringe.
+3. **The world is not hex.** Ground is a continuous terrain (heightmap mesh, painted ground), buildings and props sit at free positions and angles. A hex grid may stay as an invisible logic layer if the rules need one (§8).
+4. **People are sprites** ("sprite-faked"): billboards in the 3D world, using the existing folk art. Everything else (terrain, buildings, trees, props, water) is 3D.
+5. **Soft light is a must.** "Super important for the feel."
+6. **Weather, clouds and time of day stay**, as a separate system driving the lighting (§6).
+7. **Mobile sees less, desktop sees more.** The phone is zoomed in (small view distance) or zooms out only a little; a computer sees much more. Quality tiers (§7) make that explicit rather than hoped for.
+8. The **final art style is still not decided.** This brief builds the pipeline; M0 decides whether the look works.
 
-## 1. How the pieces fit
-```
- voxel models (TS generators)
-        │  bake once, lazily, cached
-        ▼
- SPRITES with a G-buffer: colour · normal · height · AO · emissive · material   (§3, §4)
-        │
-        ├── static ground + static props  → world G-buffer chunks (256 px tiles)   (§5)
-        └── characters, animated things   → live sprites, depth sorted             (§5)
-        │
-        ▼  per frame, over the VIEWPORT only
- compose G-buffer  →  SOFT LIGHTING pass  →  weather overlays  →  screen           (§6, §7)
-```
-The key shift: **lighting is no longer baked per look.** The sprites carry geometry information (normals, height, AO). The world is lit every frame from the G-buffer, but only over the pixels on screen (at 10 hexes around the hero that is roughly 150 × 270 art pixels, about 40 000 pixels, which is cheap even on a CPU). Day, dusk, night, torches, clouds and lightning are all just inputs to that one pass. The expensive part (baking) happens once.
+*(The earlier plan, baking voxel models to sprites with our own baker, is the fallback if M0 fails: see §11.)*
 
-## 2. Hard constraints (from CLAUDE.md, repeated because they bite)
-- **Phone first**: portrait ~400 × 720 logical canvas, touch, no hover. The director plays from a phone. Target **30 fps on a mid-range phone**, load time under about 5 s for the village. Measure on a throttled Chromium in Playwright (CPU 4× slowdown) as the proxy.
-- **TypeScript strict**, Vite, Vitest in `tests/`, Playwright in `e2e/`. `core/` has **no DOM imports** and is **deterministic** (all randomness via `core/rng.ts`). The baker is pure: it must run in Node, in the browser and in the remote container.
-- **Game state is plain JSON** (it goes into the save). Baked sprites are *derived* data and never saved.
-- **No backwards compatibility**, no save migrations.
-- **English only, via `t('key', 'English')`** for any new text.
-- **Never write the ruleset's brand name** anywhere in code, UI, commits or docs.
-- Pixel art stays **crisp**: integer zoom, nearest-neighbour, palette-limited albedo. *Only the light is smooth.*
-- Commit and push after every meaningful step; run `npm test` and `npm run build` first. Edit with the file tools, not shell redirects.
+## 1. Hard constraints (from CLAUDE.md, repeated because they bite)
+- **Phone first**: portrait about 400 × 720 logical px, touch, no hover. The director plays on a phone. **Target 30 fps minimum, 60 if possible, on a mid-range phone at the default tier**, and no thermal collapse over a 5-minute soak. First paint of the village under about 5 s.
+- **TypeScript strict**, Vite, Vitest in `tests/`, Playwright in `e2e/`. **`core/` has no DOM and is deterministic** (randomness through `core/rng.ts`). World generation (terrain, house meshes, layouts) must be **seeded and pure**, producing plain data that the renderer turns into GPU objects.
+- **Game state is plain JSON** (it goes into the save). Meshes, textures and GPU objects are derived and never saved.
+- **No backwards compatibility.** No save migrations.
+- **English only through `t('key', 'English')`** for new text. **Never write the ruleset's brand name** anywhere.
+- **Dependencies**: three.js is allowed *for the 3D world pages only*, code-split so the other pages (sandbox, character creator, skills) do not pay for it. Say what else you want to add and why (the director has asked to be asked).
+- Commit and push after every meaningful step; run `npm test` and `npm run build` first. Edit with the file tools, not shell redirects. Pushing to `main` deploys to Pages, which is how the director tests on the phone.
 
-## 3. Part A: the voxel baker (`src/voxel/`, pure)
+## 2. Look: the pixel pipeline
+This is what makes it feel like our game and not a generic 3D scene. Do it first, in M0.
+1. **Low-resolution render target.** Render the scene to a target of about **1/3 of the screen** (so one rendered pixel is about 3 device pixels; tune per tier), then draw it to the screen with **nearest-neighbour at an integer scale**. This is the largest single cost saver on a phone (1/3 resolution is about 9× fewer pixels) and the main source of the pixel look.
+2. **Orthographic camera, fixed pitch and yaw**, chosen to read like the current 3/4 view (houses seen from the front and a little above, side wall visible). **Pan in whole-pixel steps** (snap the camera to the target's pixel grid, and snap shadow-map texels too) to stop texture swimming and shadow shimmer. Zoom in **discrete steps**. Free rotation is out of scope at first; 90° steps may come later.
+3. **Texture detail sized to the render pixel**: about 20 to 21 texels per metre, which matches the old art (a person is 36 px ≈ 1.7 m). Nearest filtering, no mip blur at the base zoom. **Textures are drawn by our existing painters** (`src/art/`: thatch, limewash, timber, stone, grime, moss, grass, mud) onto canvases and uploaded; add a small texture-atlas manager so memory stays low (512 or 1024 atlases on phones).
+4. **Outline pass** from depth and normal edges, drawn in a **darkened version of the local albedo**, never pure black.
+5. **Palette limiting**: a colour LUT in post (cheap), strength adjustable, so light stays smooth but albedo stays in a palette.
+6. **Pixel shimmer budget**: it is allowed to move when the sun moves; it must not crawl when the camera pans.
 
-### 3.1 Models
-- `VoxelModel`: a 3-D grid (dense `Uint8/16Array` of palette indices plus sparse extras, your call) with size, origin and **tags** per region (e.g. `roof`, `wall-front`, `floor`, `interior`) so parts can be shown or hidden when baking.
-- Generators are TypeScript functions like the current art (`houses.ts` and friends): seeded, parametric, with variation slots (roof, walls, shutters, size, sign). Reuse the **palettes and noise** from `src/art/` (`buildings.ts`, `houses.ts`, `grit.ts`, `noise.ts`). Materials are procedural: fbm and white noise evaluated in 3-D per voxel, so thatch, limewash, grime and moss survive.
-- Prefer **real geometry for detail that matters** (timbers that stand proud of the plaster, overhanging eaves, thatch layers) over painted-on detail: that is what makes light look right.
-- Provide a small **kit/builder API** (box, slab, extrude polygon, cylinder, noise displace, mirror, paint by rule) so a house is 100 lines, not 1000.
+## 3. The world and its assets (no hexes)
+- **Units**: 1 world unit = 1 metre. Person 1.7 m, door about 2 m, a village house about 5 to 6 m wide. Round world, **about 75 to 100 m across**; village in the middle, fields, woods, water and the road fading out at an irregular soft edge.
+- **Terrain**: a heightmap mesh in **chunks** (for example 32 m), gently undulating, with ground painted by a **splat map** (grass, tall grass, flowers, forest floor, dirt road, **stamped mud**, shore). Roads, lanes and the plaza are painted into the splat, not tiles. **No hex seams anywhere.** Reuse the ground painters in `art/terrain.ts` for the textures.
+- **Water**: a lake plane with a shader (flowing ripples, depth tint, shoreline foam, duckweed, reflections of the sky if cheap), plus pond props (lily pads, reeds) as billboards or small meshes. Include a **river** option.
+- **Buildings**: procedural meshes built by seeded TS generators, parametric with the existing slots (roof: thatch, shingle, tile, sod; walls: white, ochre, rose, sage, brick, tarred; shutters; size; sign; seed). Proper geometry where it matters (timbers standing proud of the plaster, eaves overhanging, a stone footing, a chimney), textured from our painters. **Real interiors**: a house is a shell with a room inside; the **cut-away is real** (the roof and the front wall dissolve with a dithered fade or a clip plane when the hero is inside), furnished with props. First pass: furniture as billboards of the existing sprites (`art/furniture.ts`, `humble.ts`, `shopItems.ts`); real meshes later.
+- **Trees, shrubs, grass, reeds, props**: simple generated meshes or crossed/billboard cards with **instancing** (grass and small plants by the thousand). Wind sway in the vertex shader.
+- **Walkable world**: obstacles come from each placed object's collision footprint (a polygon or a few circles/boxes), not from hex cells.
+- **Reedwater content**: the existing data (`src/content/village/`: 15 houses with owners, 9 furnished rooms, 24 outside villagers, shop art) is the *design* to port, not a layout to copy. Re-lay it out in continuous space as a round village: an old core by the lake, the main street and plaza, the bypass road curving round the outside, 25 to 30 houses if the director confirms (open question Q21).
 
-### 3.2 Projection (must match the existing ground)
-The current art uses an oblique 3/4 view: **a step of depth `d` moves the screen by `(+0.5·d, −0.8·d)`, a step up by `(0, −1)`** (`OBX, OBY` in `furniture.ts`; `houseGeom` in `houses.ts`). Hex tiles are `TILE_W = 32` wide, row step 20, with a 6-px earth face (`hexTile.ts`). **One voxel is one art pixel at base scale**; a person is about 36 voxels tall, a door 42, a wall 58.
-- Derive the exact projection and **prove it with a test**: a one-hex-footprint slab model must tile onto a `paintTile` hex exactly.
-- Depth-buffer splatting is enough (no triangles): for each filled voxel, project, write the nearest. Fill holes between voxels so surfaces are solid.
+## 4. Shell texturing (the voxel-feel layer)
+The director's idea: after the base model, draw **1 or at most 2 extra layers** slightly larger than the model (about **2.5 % and 5 %**), with a mostly transparent texture of **sparse pixels**, to give the model a rough, pixel-fringed, crumbly feel instead of a smooth CG edge.
+- Implement with a vertex shader that **extrudes along the normal** by a small amount (in render-pixel units so it stays one pixel thick at any zoom, your call), a fragment shader that **alpha-tests** (`discard`, no blending, so no sorting and less overdraw), and a **screen-pixel-aligned noise** so it does not crawl. Tint slightly lighter or darker than the base.
+- Apply **per material**, not to everything: thatch, foliage, grass, moss, rough stone, fur, hay. Not to glass, water or planks unless it looks good.
+- **Be honest about what it does.** It adds fringe and roughness; the pixel look mainly comes from §2. M0 must show it on and off, so the director can see whether it earns its overdraw. It must be **switchable by quality tier** and must disappear with distance or low tier.
+- Watch for shells self-intersecting on eaves and concave parts, and overdraw on phones.
 
-### 3.3 What a bake outputs (the G-buffer, per sprite and frame)
-| Channel | Use |
-|---|---|
-| **albedo** RGBA (palette-quantised) | the crisp pixel look; alpha for silhouette |
-| **normal** (xyz, 8 bits each) | soft lighting, from voxel face normals **smoothed** over neighbours so the light has gradients, not 3 flat tones |
-| **height** (world height of the visible surface, in voxels) | soft shadows, height-based fog, depth-aware effects |
-| **depth** (distance toward the camera) | correct sorting and intersection of overlapping sprites |
-| **AO** | ambient occlusion from voxel neighbours: contact shading in creases, under eaves, between planks. Cheap and a large part of why voxels look good. |
-| **emissive** | windows, fire, embers, lanterns: lit independent of the sun |
-| **material id** | foliage (sways), wet-able surfaces, metal/glint, water, glass, cloth. Drives rain wetness, wind shear, specular glints |
+## 5. People and small things: sprites in a 3D world
+- People (and animals, later) are **camera-facing billboards** with alpha test, drawn with the existing folk art (`art/folk.ts`, `content/village/folk.ts`). The z-buffer sorts them against 3D things, so a hero walks behind a house with no special code.
+- **Facing**: the current art only shows people from the front. Needed from the art side: a **side view** (left and right, mirrored if the art is symmetric) and a **back view**, with a walk cycle for each (4-way, or 8 if affordable). Treat this as an art task alongside the engine; in the interim, mirror left and right with a front view and say so.
+- **Lighting sprites**: give each sprite a **fake normal** (facing the camera, rounded a little) so sun, torches and ambient colour affect them and they sit in the scene; they **cast a shadow** (a soft blob shadow plus, on high tier, an alpha-tested quad in the shadow map) and **receive cloud shadow**. They must not look pasted on in dusk and night.
+- **Selection and tapping**: ray-pick against billboards and the 3D scene.
 
-### 3.4 Directions, variants, frames
-- **Buildings and props: 4 directions** (90° steps, clean). **People: 8 directions.** Anything else: your call.
-- Because the view is fixed, a rotated model is re-projected from the same oblique camera. For non-90° angles **supersample 2–4× and take the dominant colour per pixel (mode), not the average**, to avoid mush. Then an **outline pass** (like `selOutline`): outline colour = darkened albedo, never pure black, and the outline pixels keep the object's normal so they light properly.
-- **Variants** from the same model by tags: roof on/off, front wall cut away (the **interior cut-away** is a slice of the same model; furniture can be voxels or existing 2D sprites placed into the room, your call, but the cut-away must swap in place with the exterior at the same anchor and footprint).
-- **Animation**: people are voxel parts (head, torso, arms, legs, held items) posed procedurally (the way `folk.ts` poses today); walk 6–8 frames × 8 directions plus idle. Trees and shrubs: either pre-baked sway frames or a **runtime horizontal shear by height** driven by wind (material `foliage`). Your call; justify it by measurement.
-- **Caching**: key = (model id, seed, variant, direction, frame). Bake **lazily** on first use and keep a **memory budget** with eviction. People are baked on demand when they come into range. Also support **exporting a baked set to PNG** (one image per channel) so we can move to build-time baking later *without changing the engine*: the engine only consumes the sprite contract (§4).
+## 6. Soft light, weather, clouds and time of day
+**Soft light** is required, in all tiers (cheaper means fewer features, not hard light):
+1. **Hemisphere ambient**: sky colour from above, ground-bounce from below; shadows are tinted by the sky, never black.
+2. **Sun or moon**: direction, colour and intensity from a **continuous time of day**; long warm light at dusk and dawn, cool dim moonlight at night.
+3. **Soft cast shadows**: one directional shadow map around the camera focus (1024 to 2048 on phones, more on desktop), soft-filtered (PCF or similar), texel-snapped, with a view-distance fade.
+4. **Ambient occlusion**: baked AO in vertex colours or textures from the generators (contact darkening under eaves, in creases, at wall feet) on every tier; **SSAO** optional on the high tier.
+5. **Point lights** (torches, lanterns, hearth glow, the forge): smooth falloff, normal-aware, coloured, flickering. Limit the real lights to the **nearest handful** (6 to 8 on phones); the rest as **emissive glow** and light-spill sprites at windows and doors. Windows glow from inside at dusk and night.
+6. **Bloom** at half resolution, subtle.
+7. **Smooth light over crisp pixels**: lighting is computed at the low render resolution, so gradients are smooth while albedo stays palette-limited. Offer an optional stepped/dithered "retro" ramp.
+8. **Interior lighting** that reads warm and enclosed.
+9. **Fog and haze**, height and distance based, tinted by the sky (mornings, rain).
 
-## 4. The sprite contract
-This is the seam that lets the style or the bake method change later. The engine must depend on **this and nothing else**:
-```ts
-interface Sprite {
-  w: number; h: number;
-  frames: Frame[];            // 1 for static things
-  anchor: { x: number; y: number };        // feet / ground contact, in sprite px
-  footprint?: Cell[];         // hex cells relative to the anchor that it blocks (see core/footprint.ts)
-  directions?: 1 | 4 | 8;
-  castsShadow: boolean;
-  animated?: boolean;
-  lights?: PointLight[];      // emissive sources: offset, radius, colour, flicker
-  smoke?: { dx: number; dy: number }[];
-}
-interface Frame { albedo: Uint8ClampedArray; normal: Uint8ClampedArray; height: Uint8ClampedArray;
-                  ao: Uint8ClampedArray; emissive: Uint8ClampedArray; material: Uint8ClampedArray }
-```
-The existing painted `Prop` (in `art/grit.ts`) must be **adaptable to this** (a painted sprite gets a flat normal, height from its footprint, no AO) so old art keeps working while models migrate. That is how we avoid a big-bang rewrite.
-
-## 5. Part B: the world (`src/engine/`, and `core/` for the rules)
-- **Map**: ~**50 × 50 hexes, round**: a village in the middle, fields, woods, water and the road fading out at the edge (a soft, irregular boundary rather than a clean one). About 1900 hexes. Content is data (`content/village/`); do not hard-code the map in the engine.
-- **Ground**: keep the painted hex tiles for now (`art/terrain.ts`, including the new `mud`), but bake them into **G-buffer chunks** (about 256 × 256 art px) with a gentle normal bump and height 0. **Water** is not baked: it is an animated layer (the existing `paintWater` approach), only where visible.
-- **Static things** (buildings, trees, fences, props): sprites with **frustum culling** via a spatial index; they are drawn per frame into the viewport G-buffer, depth sorted. Do not re-bake anything per frame.
-- **Depth sorting** must handle multi-hex things (houses are 4–5 hexes wide and 3 rows deep) so a hero can walk **behind** a house and in front of a fence. Use foot row plus the depth channel; test it.
-- **Camera**: integer zoom, follows the hero with easing, free pan by drag, pinch zoom. **Default zoom shows about 10 hexes around the hero.** The existing `engine/camera.ts` is a starting point.
-- **Walking**: the hero walks hex to hex using the existing rules (`core/battle.ts` `walkReach`, `core/footprint.ts`, the scene engine's `interact`/`walkTo`). Sprite footprints become blocking cells automatically. Keep rules in `core/`, rendering in `engine/`. People can wander on simple routines; nothing is hooked into skills yet.
-- **Entering buildings**: stepping through a door swaps the building for its cut-away (fade the roof), and the lighting inside comes from the room's lights.
-
-## 6. Part C: soft lighting (the non-negotiable)
-Runs every frame over the **viewport only**, reading the G-buffer. Behind a small interface so it can move to a WebGL2 fragment shader if CPU is too slow: **measure first, decide with numbers**. (The project dropped Phaser for its own canvas engine, but WebGL for this one pass is allowed if it earns its place.)
-
-Required, and what "soft" means here:
-1. **Hemisphere ambient.** Sky colour from above, ground-bounce colour from below, blended by the surface normal. Shadows are never black: they are tinted by the sky.
-2. **Sun (or moon) with a continuous direction, colour and intensity from time of day**, shading by `N·L` over the smoothed normals. Dawn and dusk are low, long, warm light; night is a cool dim moon.
-3. **Soft cast shadows** from the height channel, with **soft edges** (penumbra widens with distance from the caster). Direction and length follow the sun. Shadows cast by things outside the viewport must still appear: keep a margin of at least the longest shadow, or use precomputed sun-angle shadow maps blended over time (your call).
-4. **Ambient occlusion** from the baked AO channel, plus contact shadows where things meet the ground.
-5. **Point lights** (torches, hearth glow through windows, lanterns, the forge, fires): smooth radial falloff, **normal-aware** (a wall facing the lantern lights up, the far side doesn't), coloured, flickering, with a little **bloom** around bright emissives. Windows glow from inside at dusk and night; light spills out of doors.
-6. **Smooth light over crisp pixels.** Albedo stays palette-quantised; the light values are **continuous**, no stepped dithering by default. (The old pass used 10 dithered steps: provide that as an optional "retro" mode only.)
-7. **Cloud shadows**: soft, slowly drifting patches over the ground, from the same cloud field the rules read (`weather.cloudShadowAt`/`shadowAt`), so what the player sees matches what the world rules say about sun and shade.
-8. **Interior lighting** that reads as warm, enclosed and different from outside.
-9. Fog and haze (§7) are part of the same pass: distance-from-camera-focus and height-based, tinted by the sky.
-
-Acceptance: side-by-side screenshots (Day, Dusk, Night, Overcast, Storm, torch-lit alley) judged by the director on a phone; plus a frame-time budget (§9).
-
-## 7. Part D: weather, clouds and time of day (separate system, drives §6)
-Keep the existing model and make it the **single source of environmental truth**: `engine/weather.ts` (`Sky`: clear, cloudy, rain, storm; `TimeOfDay`; wind force/direction; smoothed cloud cover, rain, flash; "everything eases toward its target") and `core/environment.ts` (what the rules read). Do **not** fold weather into the renderer. Define one interface:
+**Weather and time of day stay a separate system** that the renderer reads. Keep the existing model and make it the single source of environmental truth: `src/engine/weather.ts` (`Sky`: clear, cloudy, rain, storm; wind force and direction; smoothed cloud cover, rain, flash; everything eases toward its target) and `src/core/environment.ts` (what the rules read). Define one interface:
 ```ts
 environment() → { sunDir, sunColor, sunIntensity, skyTop, skyHorizon, groundBounce,
-                  cloudCover, cloudShadow(x,y), fog, wetness, wind: {x,y,force},
-                  flash, rain, tod }
+                  cloudCover, cloudShadow(x, z), fog, wetness, wind: {x, z, force}, flash, rain, tod }
 ```
-and the lighting pass is a pure function of that plus the G-buffer.
-- **Time of day becomes continuous** (not just day/dusk/night): a day clock that moves sun direction, colours and window/lantern lighting, and can be set or advanced by the game.
-- **Clouds**: drifting soft shadows (above), cloud cover dims and desaturates the sun, optional high-altitude cloud layer visible when zoomed out.
-- **Rain**: particle streaks and splashes (not baked), `wetness` darkens and saturates albedo on wettable materials and adds specular glints; puddles on `mud` ground; sound hooks later.
-- **Wind**: drives foliage sway (shear by height on `foliage` material), washing-line laundry, smoke direction, falling leaves.
-- **Lightning**: flash as a strong, brief directional plus ambient pulse with hard-ish shadows.
-- **Fog/haze** in the morning and in rain.
-- The rules side keeps reading the same environment (fire spread, the Wind scale, sight in rain, cloud cover for sun-dependent effects). Do not break `tests/world.test.ts`.
+- **Clouds**: soft drifting shadows on the ground and objects (a moving noise texture multiplied into the sun term), **from the same cloud field the rules read**, so what the player sees matches what the world rules say about sun and shade. Cover dims and desaturates the sun. An optional cloud layer when zoomed out on desktop.
+- **Rain**: instanced streaks and splashes (not baked); `wetness` darkens and saturates wettable materials, adds specular glints, puddles on mud.
+- **Wind**: drives foliage and grass sway, shells, laundry, smoke direction, falling leaves.
+- **Lightning**: a brief strong directional plus ambient pulse.
+- Do not break the rules tests (`tests/world.test.ts`, fire and wind), and keep the sandbox's 2D weather working until it is retired.
 
-## 8. What exists that you should reuse
-`src/art/` (all procedural art, palettes, `grit.ts` helpers, `terrain.ts`, `hexTile.ts`, `look.ts` for the current lighting pass you will replace, `villageScene.ts`), `src/content/village/` (the first full village, with every house spec, room, and person), `src/engine/{camera,weather,lighting,effects,renderer,scene}.ts`, `src/core/{battle,footprint,hex,environment,rng,noise}.ts`, the Playwright harness in `e2e/harness.ts`, the village page in `src/village/main.ts` (debug hooks `window.village`, `snapshot`). Baseline to beat: **70 ms a frame at 38 × 31**.
+## 7. Quality tiers: mobile sees less
+Phones are zoomed in and see a short distance; computers see much more. Make this a first-class system, not an afterthought.
+| | Phone default ("low") | Tablet / mid ("medium") | Desktop ("high") |
+|---|---|---|---|
+| Render scale | 1/3 of screen | 1/3 to 1/2 | 1/2, optionally 1/1 with the pixel look |
+| Visible radius (start guess) | about 20 to 25 m, max zoom out about 40 m | about 40 to 60 m | up to 100+ m, the whole village |
+| Shadow map | 1024, short range | 2048 | 4096 or cascades |
+| Real point lights | 4 to 6 | 8 | 16 |
+| Shells | off at distance, 1 layer | 1 to 2 | 2 |
+| SSAO, bloom, rain detail | off, subtle bloom | bloom | all |
+| Grass density, instancing | low | medium | high |
+- **Auto-detect a default** (screen size, DPR, GPU hints, a quick benchmark on load), with a **manual setting** the player can change, and **dynamic scaling** (if the frame time creeps up, drop the render scale or shadow quality a step; never drop silently below the minimum without a visible setting).
+- **World streaming**: only chunks within the visible radius plus a margin are drawn or kept resident; merge static geometry per chunk, instance repeated things, frustum-cull the rest. Keep draw calls low (a few hundred at most on a phone).
+- Phone zoom range is discrete and short on purpose; do not try to show the whole village on a phone.
+
+## 8. Rules, movement and the grid (a design question, not yours to decide alone)
+The rules were designed around hexes in the sandbox and the gate scene (`core/battle.ts`, `core/hex.ts`, `core/footprint.ts`). The new world has none. **Do not rewrite the rules.** For this project:
+- Walking is **continuous**: tap or click to walk, path-find on a **navigation grid** (about 0.5 m cells, invisible) or a navmesh built from the collision footprints. Obstacles come from footprints. Keep it in `core/` (pure, tested), with the renderer only drawing the result.
+- Expose `distance(a, b)` in metres and `near(a, b, r)` so scene code can ask "is the hero next to the cart" without hexes. The skill and talk systems (`core/scene.ts`) only ever needed "next to a thing"; make that work for free positions.
+- The 2D hex sandbox and the gate scene keep working untouched until the director decides what replaces them.
+- **Open design question for the director** (will be asked as Q22): how do fights and ranges work in a hex-less world (zones, metres, a grid shown only in combat)? It does not block this work.
 
 ## 9. Milestones (each ends with a commit, tests, and a note in `director/devlog.md`)
-- **M0: the spike. A decision gate for the director.** One voxel-generated house in the baker with the full G-buffer, lit by a throwaway version of the soft lighting, shown **side by side with the current painted house** in the day, dusk and night looks, from four directions, with the roof cut away. Plus one person walking in 8 directions. Stop and let the director judge the *look* before building more. If it loses, we fall back to baking the existing painted sprites through the same contract (the engine work in M2 onward is unchanged).
-- **M1: the baker** (§3) and the **sprite contract** (§4): projection test against the hex tile, determinism test, direction/variant/cache tests, PNG export, adapter for painted `Prop`s.
-- **M2: the world** (§5): round 50 × 50 map, chunked G-buffer ground, culled sorted sprites, camera at ~10 hexes. **Budget: ≥30 fps in 4× throttled Chromium at 400 × 720; first paint of the village under 5 s; resident memory under about 150 MB.** Report the numbers.
-- **M3: soft lighting** (§6) with Day/Dusk/Night and torches, behind the swappable interface. Report CPU versus WebGL2 numbers and which you chose.
-- **M4: weather and time of day** (§7) wired in, including continuous time and all skies, with rules tests still green.
-- **M5: walking** and entering buildings; people wandering on routines.
-- **M6: port Reedwater** to the round 50 × 50 map (a ring of streets round the plaza, the old core by the lake, the bypass curving outside, 25–30 houses if the director confirms; open question Q21), with the nine furnished interiors.
+- **M0: the spike. A decision gate for the director, tested on the phone.** A page (for example `/spike3d/`) with: one procedurally built house with a **working interior cut-away** and the existing humble furniture, a patch of terrain painted with grass and **stamped mud** and a dirt road, a tree, a lake plane, one **sprite villager** walking, a sun with soft shadows, two torches, **day/dusk/night and rain** buttons, **cloud shadows drifting**, and the full pixel pipeline (low-res target, outline, palette, snapped camera). Toggles for **shells on/off**, render scale, shadow quality, light count, a **quality tier selector**, and an **on-screen overlay** with fps, frame ms, draw calls and triangle count. Report phone and desktop numbers. **The director judges the look and the frame rate on the phone before anything else is built.**
+- **M1: the core**: renderer, camera and snapping, tiers and auto-detect, chunked terrain with splat painting, texture-atlas manager, the environment interface wired to the existing weather model.
+- **M2: the asset pipeline**: house generator (all slots, 4 to 5 widths), roof and wall kits, trees, shrubs, grass instancing, props, water, from the existing painters; with tests (seeded determinism, footprint and collision output, bounds).
+- **M3: lighting and shadows** to the §6 standard on all three tiers, with screenshots of Day, Dusk, Night, Overcast, Storm and a torch-lit lane judged by the director on a phone.
+- **M4: weather and time of day** fully wired: continuous clock, clouds, rain, wind, lightning, fog, wetness; rules tests green.
+- **M5: walking and the world**: continuous movement and navigation, entering buildings (cut-away), people wandering on simple routes, sprite facing, streaming and culling to a measured budget.
+- **M6: Reedwater** ported to the round, hex-less world with its nine furnished interiors and its people.
+**Budget at M5**: phone default tier ≥ 30 fps (aim 60), desktop high ≥ 60, five-minute soak without throttling collapse, memory within a phone's limits (aim under about 250 MB), load under about 5 s. Report the numbers, on the director's phone and in 4×-throttled Chromium as a proxy.
 
-## 10. Testing and quality bars
-- Vitest: baker determinism, projection alignment, normal/AO sanity (a flat top has normal up), sprite cache eviction, depth-sort cases (hero behind/in front of a 3-row house), footprint blocking, environment interpolation.
-- Playwright: a scripted walk across the village with the frame-time recorded, screenshots for each sky and time of day, a console-error check. The e2e harness uses `?seed=N` for repeatability.
-- Never push a broken build to `main`. Pushing to `main` deploys to Pages, which is how the director tests on the phone.
+## 10. Testing and quality
+- **Vitest**: seeded generators (determinism, bounds, no overlaps), navigation and collision, environment interpolation, tier selection logic, texture-atlas packing, the unit conversions.
+- **Playwright**: a scripted walk across the village recording frame times, screenshots for each sky and time of day, a console-error check, with `?seed=N` for repeatability. Note that headless Chromium renders WebGL in software, so its frame times are a **pessimistic proxy only**; real numbers come from the phone.
+- Never push a broken build to `main`.
 
-## 11. Left to you, with reasons wanted
-CPU or WebGL2 for the lighting; shadow technique; supersampling factor and downsampling rule; sway by shear or pre-baked; furniture as voxels or 2D inset; atlas layout and eviction policy; chunk size; whether to bake at load or at build (design for both). Write down each choice in `director/design/` with the numbers that justified it.
+## 11. Fallback
+If M0's look or frame rate fails on the phone, the fallback is **baking sprites from voxel models** with a small pure-TypeScript voxel baker, lit live in 2D from a normal/height/AO G-buffer (design notes are in git history, commit e615e33). The 3D asset generators and the environment interface carry over. Do not start the fallback unless the director says so after M0.
 
-## 12. Risks to watch
-Voxel output looking blocky or noisy at 1 voxel per pixel (mitigate with supersample, smoothed normals, AO, outline); mixed painted and voxel styles during migration (mitigate by migrating buildings first and checking them next to the painted people); soft shadows from off-screen casters; memory on phones; bake hitches when something new enters range (mitigate by baking a ring ahead of the camera, in small time slices).
+## 12. Left to you, with reasons wanted
+Render scale and the snapping scheme; shell technique and thickness; shadow technique and range; how to batch and instance; whether grass is cards or shells; the navigation representation; how to light sprites; texture-atlas layout; what to put on a loading screen. Write each choice into `director/design/` with the numbers that justified it.
+
+## 13. Risks
+Pixel shimmer and shadow shimmer when panning (snapping); shells overdraw and self-intersection; GPU differences between phones and iOS WebGL context loss; texture memory; shadow and light costs on phones; mismatch between lit 3D and billboards at dusk and night; heat and battery over long sessions; bundle size (code-split three.js); the look drifting from the existing art (judge early, in M0, not late).

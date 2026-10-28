@@ -3,7 +3,7 @@
 ## 2026-10-28 — Session 22b: brief for the voxel world engine
 
 - After the village sketch the director found the whole-map redraw too slow and the shape wrong (wants round, ~50 × 50, walkable, ~10 hexes in view). We talked through pre-rendering from 3D, and settled on: **voxel models baked to sprites with a G-buffer, our own small baker, soft light computed live over the viewport, weather as a separate system driving it**.
-- Wrote [the brief](design/voxel-engine-brief.md) for Opus: baker, sprite contract, world, soft lighting, weather, milestones M0 to M6 (M0 is a spike judged by the director). No engine code changed.
+- Wrote [the brief](design/voxel-engine-brief.md) for Opus, then **rewrote it after the director chose live 3D** (three.js, low-res nearest-scaled render, shell layers, sprite people, no hexes, soft light, weather as a separate system, quality tiers so phones see less). M0 is a spike judged on the phone; baked voxel sprites are the fallback. No engine code changed.
 
 ## 2026-10-28 — Session 22: Reedwater, the whole village on one map
 

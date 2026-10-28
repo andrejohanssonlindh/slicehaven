@@ -22,7 +22,7 @@ This is the backstage area for Slicehaven: not part of the game, but where I (Cl
 - [Game design overview](design/game-design.md): where we are, what exists, what's undecided.
 - [Character creator](design/character-creator.md): plan, status, handover notes.
 - [Exploration scenes: the village gate](design/exploration-scenes.md): skills, talking, multi-hex things.
-- [Brief: the baked-voxel world engine](design/voxel-engine-brief.md): voxel baker, sprite contract, round 50 × 50 world, soft light, weather. Written for the engineer.
+- [Brief: the live-3D pixel world](design/voxel-engine-brief.md): three.js, pixel pipeline, shells, sprite people, soft light, weather, quality tiers, milestones. Written for the engineer.
 - [Reedwater: the first full village](design/village.md): the map, 15 houses, who lives where, new shop art.
 - [Magic: filaments](design/magic-filaments.md): where magic flows strong or weak, and why.
 - [Magic on the map](design/magic-on-map.md): what each mystic skill could do in play.
