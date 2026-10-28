@@ -1,6 +1,6 @@
 import { Rng } from '../core/rng';
 import type { Prop } from './grit';
-import { TILE_CENTER, TILE_DEPTH, TILE_H, TILE_STEP_Y, TILE_W, tileOrigin } from './hexTile';
+import { EDGE, TILE_CENTER, TILE_DEPTH, TILE_H, TILE_STEP_Y, TILE_W, inHex, tileOrigin } from './hexTile';
 import { type Look, type WorldLight, applyLook, castShadow, contactShadow, drawSmoke } from './look';
 import { Pix } from './pix';
 import { makeTuft } from './props';
@@ -35,6 +35,7 @@ export class VillageScene {
   private ground: Pix;
   private water: WaterPx[] = [];
   private things: Thing[] = [];
+  private foot: { x: number; y: number }[] = [];
 
   constructor(cells: VCell[], placed: Placed[], opts: { padTop?: number; padSide?: number; seed?: number; tufts?: boolean } = {}) {
     const padTop = opts.padTop ?? 40;
@@ -63,16 +64,36 @@ export class VillageScene {
       }
     }
     for (const pl of placed) {
+      const fp = pl.prop.footprint;
+      if (fp) {
+        // Front-centre anchor: the footprint reaches back (up) by its depth and spreads across.
+        for (let r = pl.row - fp.rows + 1; r <= pl.row; r++) {
+          for (let c = pl.col - Math.floor((fp.cols - 1) / 2); c < pl.col - Math.floor((fp.cols - 1) / 2) + fp.cols; c++) {
+            const o = tileOrigin(c, r);
+            this.foot.push({ x: o.x + padSide, y: o.y + padTop });
+          }
+        }
+      }
       const c = centre(pl.col, pl.row);
       this.things.push({ x: c.x + (pl.ox ?? 0), y: c.y + 2 + (pl.oy ?? 0), prop: pl.prop, phase: rng.int(8), decor: false });
     }
     this.things.sort((a, b) => a.y - b.y);
   }
 
-  render(t: number, look: Look): Pix {
+  render(t: number, look: Look, showFootprints = false): Pix {
     const out = new Pix(this.width, this.height);
     out.data.set(this.ground.data);
     paintWater(out, this.water, t);
+    if (showFootprints) {
+      for (const f of this.foot) {
+        for (let y = 0; y < TILE_H; y++) for (let x = 0; x < TILE_W; x++) {
+          if (!inHex(x, y)) continue;
+          const e = EDGE[y][x];
+          if (e <= 2) out.set(f.x + x, f.y + y, e === 1 ? '#46d2ffd0' : '#46d2ff50');
+          else out.set(f.x + x, f.y + y, '#46d2ff18');
+        }
+      }
+    }
 
     const frameOf = (th: Thing): Pix => th.prop.frames[(t + th.phase) % th.prop.frames.length];
     for (const th of this.things) {

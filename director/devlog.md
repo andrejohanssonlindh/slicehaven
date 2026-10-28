@@ -1,5 +1,15 @@
 # Devlog
 
+## 2026-10-28 — Session 21b: village art, round 2 (houses at real size)
+
+- Your notes: houses far too small, a flat facade, frame looked sloppy, roofs too straight and clean, the stump belonged to the old trees.
+- **Houses rebuilt** (`art/houses.ts`, replaces the old one). Scale from the people: 36 px person, 46 px door, 58 px wall. Covers **4×3 hexes** (a 5-hex tavern variant), with `footprint` on the prop. Drawn as a volume: front wall, foreshortened side wall, roof slope, gable-end stone chimney, a dormer. Walls and roof are drawn on separate layers inside the sprite code (roof lifts away when you step in later).
+- **Frame**: built the way a carpenter would: stone footing, sill, mid and top rails, posts at the bays, paired pegged knee braces, one long brace. It is straight; the age is in the limewash (soot under the eaves, splash at the foot, hairline cracks), peeling shutters, window boxes, worn steps.
+- **Roofs**: ridge sags and lumps, eave droops and rises, thick layered thatch edge, bundles, a patch of new straw, moss in clumps, silver-grey old thatch; shingle roof with courses that wave and curled shingles. The smithy, well and stalls got the same wobble.
+- **Stump** redone in the oak's style: same bark and roots, torn top with rings, rot, moss, fungus.
+- Studio: **Footprints** button draws the covered hexes in cyan. Mock-up rebuilt around the house (the smithy no longer fits in 5×5, it stays in the studies).
+- Not done: the cut-away interior (next session); thatch/hat variety; the trees' trunks still look conical to me.
+
 ## 2026-10-28 — Session 21: village art, round 1
 
 - New tab in the Director's Room: **Village art** (`/director/#art`). Concept studies for the village and a 5×5 hex mock-up, with look buttons (Flat, Day, Dusk, Night). Skills untouched (another agent has them).

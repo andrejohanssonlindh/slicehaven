@@ -1,6 +1,6 @@
 import { Rng } from '../core/rng';
 import {
-  type Light, type Prop, type Pt, capsule, chew, dropShadow, fbm, grime, mossify, pick, polyFill, selOutline, speckle, still, white, wobble,
+  type Prop, type Pt, capsule, chew, dropShadow, fbm, grime, mossify, pick, polyFill, selOutline, still, white, wobble,
 } from './grit';
 import { Pix } from './pix';
 
@@ -9,12 +9,12 @@ import { Pix } from './pix';
  * roofs, stained plaster, mossy stone. Light from the top-left.
  */
 
-const STONE = ['#25222a', '#3b3841', '#575149', '#756d60', '#978d7b', '#b9ad94'];
-const WOOD = ['#1d130e', '#33211a', '#4d3524', '#6a4a31', '#876240', '#a07c52'];
+export const STONE = ['#25222a', '#3b3841', '#575149', '#756d60', '#978d7b', '#b9ad94'];
+export const WOOD = ['#1d130e', '#33211a', '#4d3524', '#6a4a31', '#876240', '#a07c52'];
 const PLASTER = ['#5e5446', '#857960', '#a89b7e', '#c4b898', '#dccfae'];
-const THATCH = ['#3a2a18', '#57401f', '#7a5c2c', '#9c7a3c', '#bf9c52', '#dcbc72'];
-const SHINGLE = ['#251a14', '#3d2b20', '#58402e', '#745640', '#917150'];
-const IRON = ['#1c1d24', '#33353f', '#4f525f', '#747887', '#a0a5b3'];
+export const THATCH = ['#3a2a18', '#57401f', '#7a5c2c', '#9c7a3c', '#bf9c52', '#dcbc72'];
+export const SHINGLE = ['#251a14', '#3d2b20', '#58402e', '#745640', '#917150'];
+export const IRON = ['#1c1d24', '#33353f', '#4f525f', '#747887', '#a0a5b3'];
 const CLOTHRED = ['#401a1a', '#6c2a26', '#9a403a', '#c25e50'];
 
 // --- surfaces --------------------------------------------------------------
@@ -126,19 +126,22 @@ interface RoofSpec {
 /** A pitched roof seen from the front: lumpy, patched, drooping at the eaves. */
 function roof(p: Pix, r: RoofSpec): void {
   const { top, eave, cx, halfTop, halfEave, seed } = r;
-  const sag = r.sag ?? 1.5;
+  const sag = r.sag ?? 3;
   const edge = (k: number, side: number): number => {
     const half = halfTop + (halfEave - halfTop) * k;
-    return cx + side * (half + (fbm(k * 9, side * 3, seed) - 0.5) * 3);
+    return cx + side * (half + (fbm(k * 7, side * 3, seed) - 0.5) * 6 + Math.sin(k * 5 + side) * 1.2);
   };
   const pts: Pt[] = [];
-  for (let i = 0; i <= 6; i++) pts.push([edge(i / 6, 1), top + (eave - top) * (i / 6)]);
-  for (let i = 6; i >= 0; i--) pts.push([edge(i / 6, -1), top + (eave - top) * (i / 6) + (i === 0 ? 0 : 0)]);
-  const ridgeY = (x: number): number => top + Math.sin(((x - cx) / halfTop) * 2.2) * sag * 0.6 + (fbm(x / 6, 0, seed + 2) - 0.5) * 1.6;
+  const bottom = eave + 5;
+  for (let i = 0; i <= 6; i++) pts.push([edge(i / 6, 1), top + (bottom - top) * (i / 6)]);
+  for (let i = 6; i >= 0; i--) pts.push([edge(i / 6, -1), top + (bottom - top) * (i / 6)]);
+  // The eave is never a ruler line: it droops and rises along its length.
+  const eaveAt = (x: number): number => eave + (fbm(x / 5, 3, seed + 5) - 0.5) * 6 + Math.sin(x * 0.11 + seed) * 1.5;
+  const ridgeY = (x: number): number => top + Math.sin(((x - cx) / halfTop) * 2.2) * sag * 0.6 + Math.sin((x - cx) * 0.09) * sag * 0.5 + (fbm(x / 6, 0, seed + 2) - 0.5) * 2.2;
   const patchX = cx + (white(1, 1, seed) - 0.3) * halfEave * 0.8;
   const patchY = top + (eave - top) * 0.45;
   polyFill(p, pts, (x, y) => {
-    if (y < ridgeY(x)) return null;
+    if (y < ridgeY(x) || y > eaveAt(x)) return null;
     const k = (y - top) / (eave - top);
     const left = (x - (cx - halfEave)) / (2 * halfEave);
     let v: number;
@@ -187,165 +190,6 @@ function mossyRoof(p: Pix, y0: number, y1: number, seed: number, amount: number)
       if (n > 1 - amount * 0.5 && white(x, y, seed + 22) < 0.85) p.set(x, y, pick(M, 0.25 + (n - 0.5) * 1.4 + (white(x, y, seed + 23) - 0.5) * 0.4, x, y));
     }
   }
-}
-
-function windowAt(p: Pix, cx: number, top: number, w: number, h: number, seed: number, lit: boolean, shutters: 'open' | 'shut' | 'none'): void {
-  const x0 = cx - Math.floor(w / 2);
-  for (let y = top; y < top + h; y++) {
-    for (let x = x0; x < x0 + w; x++) {
-      const inner = lit ? (y < top + h / 2 ? '#ffe9a0' : '#f4c25a') : '#1a1a24';
-      p.set(x, y, shutters === 'shut' ? pick(WOOD, 0.4 + (x - x0) % 3 * 0.1, x, y) : inner);
-    }
-  }
-  if (shutters !== 'shut') {
-    // Cross bars.
-    for (let x = x0; x < x0 + w; x++) p.set(x, top + Math.floor(h / 2), WOOD[1]);
-    for (let y = top; y < top + h; y++) p.set(x0 + Math.floor(w / 2), y, WOOD[1]);
-    // Sill and lintel.
-    for (let x = x0 - 1; x <= x0 + w; x++) {
-      p.set(x, top - 1, WOOD[2]);
-      p.set(x, top + h, pick(WOOD, 0.7, x, 0));
-      p.set(x, top + h + 1, WOOD[1]);
-    }
-    for (let y = top; y < top + h; y++) { p.set(x0 - 1, y, WOOD[2]); p.set(x0 + w, y, WOOD[1]); }
-    if (lit) for (let x = x0; x < x0 + w - 1; x++) p.set(x, top, '#fff7c8');
-    if (shutters === 'open') {
-      for (const side of [-1, 1]) {
-        const sx = side < 0 ? x0 - 3 : x0 + w + 1;
-        for (let y = top; y < top + h; y++) for (let k = 0; k < 2; k++) p.set(sx + k, y, pick(WOOD, 0.55 - k * 0.2 + (white(sx + k, y, seed) - 0.5) * 0.2, sx + k, y));
-      }
-    }
-  }
-}
-
-function door(p: Pix, x0: number, top: number, w: number, bottom: number, seed: number): void {
-  boards(p, x0, top, x0 + w - 1, bottom, seed, true);
-  for (const y of [top + 3, bottom - 4]) {
-    for (let x = x0; x < x0 + w; x++) p.set(x, y, IRON[1 + (x & 1)]);
-    p.set(x0 + w - 2, y, IRON[4]);
-  }
-  p.set(x0 + w - 3, Math.round((top + bottom) / 2), IRON[4]);
-  // Frame.
-  for (let y = top - 1; y <= bottom; y++) { p.set(x0 - 1, y, WOOD[1]); p.set(x0 + w, y, WOOD[1]); }
-  for (let x = x0 - 1; x <= x0 + w; x++) p.set(x, top - 1, WOOD[2]);
-  // Worn step.
-  for (let x = x0 - 2; x <= x0 + w + 1; x++) p.set(x, bottom + 1, pick(STONE, 0.7 - (x - x0) * 0.02, x, bottom));
-  for (let x = x0 - 2; x <= x0 + w + 1; x++) p.set(x, bottom + 2, STONE[1]);
-}
-
-function sign(p: Pix, x: number, y: number, kind: 'tankard' | 'herb' | 'horseshoe' | 'loaf'): void {
-  // Bracket and chains.
-  for (let k = 0; k < 7; k++) p.set(x + k, y, IRON[2]);
-  p.set(x + 1, y + 1, IRON[2]); p.set(x + 5, y + 1, IRON[2]);
-  p.set(x + 1, y + 2, IRON[1]); p.set(x + 5, y + 2, IRON[1]);
-  for (let yy = y + 3; yy < y + 12; yy++) for (let xx = x; xx < x + 7; xx++) p.set(xx, yy, pick(WOOD, 0.6 - (xx - x) * 0.05 + (white(xx, yy, 5) - 0.5) * 0.15, xx, yy));
-  for (let xx = x; xx < x + 7; xx++) { p.set(xx, y + 3, WOOD[1]); p.set(xx, y + 11, WOOD[1]); }
-  for (let yy = y + 3; yy < y + 12; yy++) { p.set(x, yy, WOOD[1]); p.set(x + 6, yy, WOOD[1]); }
-  const ink = (dx: number, dy: number, c: string): void => p.set(x + dx, y + 3 + dy, c);
-  if (kind === 'tankard') {
-    for (let yy = 2; yy < 7; yy++) for (let xx = 2; xx < 5; xx++) ink(xx, yy, yy < 3 ? '#f4eed8' : '#d6a23c');
-    ink(5, 3, '#d6a23c'); ink(5, 5, '#d6a23c'); ink(1, 6, '#d6a23c');
-  } else if (kind === 'herb') {
-    for (const [dx, dy] of [[3, 2], [2, 3], [4, 3], [3, 4], [1, 5], [5, 5], [3, 6]] as const) ink(dx, dy, dy > 4 ? '#6a9a4a' : '#4a7a3a');
-  } else if (kind === 'horseshoe') {
-    for (const [dx, dy] of [[2, 2], [4, 2], [2, 3], [4, 3], [2, 4], [4, 4], [3, 5]] as const) ink(dx, dy, IRON[4]);
-  } else {
-    for (const [dx, dy] of [[2, 3], [3, 3], [4, 3], [2, 4], [3, 4], [4, 4]] as const) ink(dx, dy, '#d49a4a');
-    ink(3, 3, '#f0c070');
-  }
-}
-
-// --- the house -------------------------------------------------------------
-
-export interface HouseSpec {
-  seed: number;
-  /** Bays of wall: 1 is a hut, 2 a cottage, 3 a long house. */
-  bays?: 2 | 3;
-  roof?: 'thatch' | 'shingle';
-  shop?: 'tankard' | 'herb' | 'loaf';
-  /** Lit window glow. */
-  lit?: boolean;
-}
-
-/** Timber-and-daub cottage on a fieldstone footing, a lean-to at the side, a crooked chimney. */
-export function makeHouse(spec: HouseSpec): Prop {
-  const { seed } = spec;
-  const bays = spec.bays ?? 2;
-  const rng = Rng.fromSeed(seed);
-  const wallW = bays === 3 ? 64 : 46;
-  const W = wallW + 34;
-  const H = 74;
-  const p = new Pix(W, H);
-  const wx0 = 14, wx1 = wx0 + wallW - 1;
-  const eaveY = 31, wallTop = 30, wallBot = H - 5;
-  // Lean-to wing on the right, lower and darker.
-  const lx0 = wx1 + 1, lx1 = W - 4;
-  const wingTop = 44;
-  plaster(p, lx0, wingTop, lx1, wallBot, seed + 30);
-  for (let y = wingTop; y <= wallBot; y++) for (let x = lx0; x <= lx1; x++) {
-    const i = (y * W + x) * 4;
-    for (let c = 0; c < 3; c++) p.data[i + c] *= 0.78;
-  }
-  stoneWall(p, lx0, wallBot - 6, lx1, wallBot, seed + 31, STONE, 2);
-  beam(p, lx0, wingTop, lx1, wingTop, 2, seed + 32);
-  beam(p, lx1 - 1, wingTop, lx1 - 1, wallBot - 6, 2, seed + 33);
-  windowAt(p, lx0 + 8, wingTop + 5, 6, 6, seed + 34, false, 'shut');
-
-  // Main wall.
-  plaster(p, wx0, wallTop, wx1, wallBot, seed + 1);
-  stoneWall(p, wx0, wallBot - 7, wx1, wallBot, seed + 2, STONE, 3);
-  // Timber frame: corner posts, a mid post, sill, and a brace or two.
-  beam(p, wx0, wallTop, wx0, wallBot - 7, 3, seed + 3);
-  beam(p, wx1 - 2, wallTop, wx1 - 2, wallBot - 7, 3, seed + 4);
-  beam(p, wx0, wallBot - 8, wx1, wallBot - 8, 2, seed + 5);
-  beam(p, wx0, eaveY + 1, wx1, eaveY + 1, 3, seed + 6);
-  const mid = wx0 + Math.floor(wallW / 2) + rng.int(5) - 2;
-  beam(p, mid, wallTop, mid, wallBot - 7, 2, seed + 7);
-  beam(p, wx0, wallBot - 9, wx0 + 10, wallTop + 4, 2, seed + 8);
-  beam(p, wx1 - 2, wallBot - 9, wx1 - 12, wallTop + 4, 2, seed + 9);
-
-  // Openings.
-  const doorX = mid - 11;
-  door(p, doorX, wallBot - 18, 8, wallBot - 3, seed + 10);
-  windowAt(p, wx0 + 9, wallTop + 7, 8, 8, seed + 11, spec.lit !== false, 'open');
-  windowAt(p, mid + 10, wallTop + 8, 7, 7, seed + 12, false, 'shut');
-  if (bays === 3) windowAt(p, wx1 - 9, wallTop + 7, 8, 8, seed + 13, spec.lit !== false, 'open');
-  if (spec.shop) sign(p, mid - 2, wallTop + 11, spec.shop === 'tankard' ? 'tankard' : spec.shop === 'herb' ? 'herb' : 'loaf');
-
-  // Eave shadow on the wall below the roof.
-  dropShadow(p, wx0, wx1, eaveY + 4, 8, 0.6);
-
-  // Roof.
-  const rk = spec.roof ?? 'thatch';
-  roof(p, { top: 3, eave: eaveY + 3, cx: Math.round((wx0 + wx1) / 2) + 1, halfTop: Math.round(wallW * 0.32), halfEave: Math.round(wallW / 2) + 6, kind: rk, seed: seed + 40, moss: 0.28 });
-  // Wing roof: a short slope.
-  const wing = new Pix(W, H);
-  roof(wing, { top: wingTop - 8, eave: wingTop + 1, cx: Math.round((lx0 + lx1) / 2), halfTop: Math.round((lx1 - lx0) / 2) - 1, halfEave: Math.round((lx1 - lx0) / 2) + 3, kind: rk, seed: seed + 41, moss: 0.15 });
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    if (!wing.alpha(x, y) || (p.alpha(x, y) && y < wingTop - 12)) continue;
-    const c = wing.get(x, y);
-    p.set(x, y, [c[0] * 0.78, c[1] * 0.78, c[2] * 0.82, 255]);
-  }
-  dropShadow(p, lx0, lx1, wingTop + 2, 5, 0.55);
-
-  // Chimney: stone, a little crooked, on the ridge side.
-  const chx = Math.round((wx0 + wx1) / 2) + 8;
-  stoneWall(p, chx, 0, chx + 7, 16, seed + 50, STONE);
-  for (let x = chx - 1; x <= chx + 8; x++) { p.set(x, 0, STONE[4]); p.set(x, 1, STONE[1]); }
-  for (let y = 2; y < 16; y++) { p.set(chx + 7, y, STONE[1]); p.set(chx + 6, y, STONE[2]); }
-
-  // Weather it.
-  mossify(p, seed + 60, 0.5, (_x, y) => (y > wallBot - 9 && y < wallBot - 1 ? 1.2 : 0));
-  grime(p, seed + 61, 0.6, wallBot + 2);
-  speckle(p, seed + 62, 0.025, 0.2, 0.3);
-  chew(p, seed + 63, 0.08);
-
-  const o = selOutline(p);
-  const ax = Math.round((wx0 + wx1) / 2) + 1;
-  const glow = (wxc: number): Light => ({ dx: wxc + 1 - ax, dy: wallTop + 12 - H - 1, r: 22, color: [1, 0.72, 0.3], flicker: 0.3 });
-  const lights: Light[] = spec.lit === false ? [] : [glow(wx0 + 9)];
-  if (bays === 3 && spec.lit !== false) lights.push(glow(wx1 - 9));
-  return still(o, ax, H + 1, 0, { lights, smoke: [{ dx: chx + 4 + 1 - ax, dy: 1 - H - 1 }] });
 }
 
 // --- smaller things --------------------------------------------------------

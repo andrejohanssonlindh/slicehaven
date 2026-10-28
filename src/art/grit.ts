@@ -24,6 +24,10 @@ export interface Prop extends Sprite {
   lights?: Light[];
   /** Chimney tops: where smoke starts (offset from the anchor). */
   smoke?: { dx: number; dy: number }[];
+  /** Ground it covers, in hexes (width across, depth in rows), when bigger than one. */
+  footprint?: { cols: number; rows: number };
+  /** What you see when you step inside: the roof and front walls cut away. */
+  cutaway?: Prop;
 }
 
 export const still = (p: Pix, ax: number, ay: number, shadow = 0, extra: Partial<Prop> = {}): Prop => ({

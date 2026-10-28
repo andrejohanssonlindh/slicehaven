@@ -15,6 +15,7 @@ interface Live {
 
 const live: Live[] = [];
 let look: Look = LOOKS.day;
+let showFoot = false;
 const FRAME_MS = 125;
 
 function fit(canvas: HTMLCanvasElement, w: number, h: number, maxCss: number): void {
@@ -41,14 +42,14 @@ function tick(now: number): void {
     for (const l of live) {
       const r = l.canvas.getBoundingClientRect();
       if (r.bottom < -200 || r.top > window.innerHeight + 200) continue; // off screen
-      l.scene.render(t, look).drawTo(l.ctx);
+      l.scene.render(t, look, showFoot).drawTo(l.ctx);
     }
   }
   requestAnimationFrame(tick);
 }
 
-function strip(count: number, ground: VCell['ground'] = 'grass'): VCell[] {
-  return Array.from({ length: count }, (_, i) => ({ col: i, row: 0, ground }));
+function strip(count: number, rows = 1, ground: VCell['ground'] = 'grass'): VCell[] {
+  return Array.from({ length: count * rows }, (_, i) => ({ col: i % count, row: Math.floor(i / count), ground }));
 }
 
 export function mountStudio(root: HTMLElement): void {
@@ -75,6 +76,15 @@ export function mountStudio(root: HTMLElement): void {
     b.dataset.look = key;
     looks.appendChild(b);
   }
+  const fb = document.createElement('button');
+  fb.textContent = 'Footprints';
+  fb.dataset.look = 'footprints';
+  fb.addEventListener('click', () => {
+    showFoot = !showFoot;
+    fb.classList.toggle('on', showFoot);
+    lastT = -1;
+  });
+  looks.appendChild(fb);
 
   // The 5x5 mock-up comes first: it is the point of all this.
   const hero = document.createElement('section');
@@ -93,7 +103,7 @@ export function mountStudio(root: HTMLElement): void {
     row.className = 'stage';
     sec.appendChild(row);
     root.appendChild(sec);
-    const cells = strip(s.cols);
+    const cells = strip(s.cols, s.rows ?? 1);
     const placed: Placed[] = s.items;
     mount(row, new VillageScene(cells, placed, { seed: 5, padTop: s.padTop ?? 44, tufts: false }), s.maxWidth ?? 380);
   }

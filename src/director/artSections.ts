@@ -1,14 +1,16 @@
 import {
-  makeBarrels, makeCrates, makeFence, makeHaystack, makeHouse, makeLantern, makeSmithy, makeStall, makeWell, makeWoodpile,
+  makeBarrels, makeCrates, makeFence, makeHaystack, makeLantern, makeSmithy, makeStall, makeWell, makeWoodpile,
 } from '../art/buildings';
 import { FOLK, makeFolk } from '../art/folk';
-import { makeBoulder, makeOak, makeOutcrop, makePebbles, makeReeds, makeStump } from '../art/rough';
+import { makeHouse } from '../art/houses';
+import { makeBoulder, makeOak, makeOutcrop, makePebbles, makeStump } from '../art/rough';
 import type { Placed, VCell } from '../art/villageScene';
 
 export interface Section {
   title: string;
   note: string;
   cols: number;
+  rows?: number;
   items: Placed[];
   padTop?: number;
   maxWidth?: number;
@@ -18,26 +20,48 @@ const folkRow = (names: string[]): Placed[] => names.map((n, i) => ({ col: i, ro
 
 export const SECTIONS: Section[] = [
   {
-    title: 'Houses',
-    note: 'A cottage, a longhouse tavern with a tankard sign, an apothecary with a herb sign. Fieldstone footing, daub over wattle with beams that are not quite straight, patched roofs with moss, chimney smoke, a lit window.',
-    cols: 6,
-    padTop: 72,
+    title: 'Houses at real size',
+    note: 'A cottage, 4 hexes across and 3 deep: the door is 42 px for a 36 px person, the walls 48. Front wall, side wall, roof slope, a chimney on the gable end. Timber frame built the way a carpenter would, aged in the plaster, paint and roof. Roofs sag, droop and lump.',
+    cols: 7,
+    rows: 3,
+    padTop: 104,
     maxWidth: 400,
     items: [
-      { col: 1, row: 0, ox: 0, prop: makeHouse({ seed: 5 }) },
-      { col: 4, row: 0, ox: 0, prop: makeHouse({ seed: 9, bays: 3, roof: 'shingle', shop: 'tankard' }) },
+      { col: 3, row: 2, ox: 16, prop: makeHouse({ seed: 5 }) },
+      { col: 5, row: 2, ox: 14, oy: 2, prop: makeFolk(FOLK.farmer) },
     ],
   },
   {
-    title: 'Apothecary, well, barrels, crates',
+    title: 'Houses: tavern and apothecary',
+    note: 'The same builder with other choices: a five-hex shingled tavern with a tankard sign, and an apothecary with a herb sign and green shutters.',
+    cols: 8,
+    rows: 3,
+    padTop: 104,
+    maxWidth: 400,
+    items: [
+      { col: 3, row: 2, ox: 0, prop: makeHouse({ seed: 9, cols: 5, roof: 'shingle', shop: 'tankard', shutters: 'blue' }) },
+    ],
+  },
+  {
+    title: 'Houses: apothecary',
+    note: 'Thatched, a herb sign, green shutters.',
+    cols: 7,
+    rows: 3,
+    padTop: 104,
+    maxWidth: 400,
+    items: [
+      { col: 3, row: 2, ox: 16, prop: makeHouse({ seed: 21, shop: 'herb', shutters: 'green' }) },
+    ],
+  },
+  {
+    title: 'Well, barrels, crates',
     note: 'The well has a mossy fieldstone ring, a little shingled roof and a bucket on a rope.',
-    cols: 5,
+    cols: 4,
     padTop: 64,
     items: [
-      { col: 0, row: 0, prop: makeHouse({ seed: 21, shop: 'herb' }) },
-      { col: 2, row: 0, ox: 6, prop: makeWell(2) },
-      { col: 3, row: 0, ox: 6, prop: makeBarrels(4) },
-      { col: 4, row: 0, ox: 4, prop: makeCrates(3) },
+      { col: 0, row: 0, ox: 6, prop: makeWell(2) },
+      { col: 2, row: 0, ox: 6, prop: makeBarrels(4) },
+      { col: 3, row: 0, ox: 4, prop: makeCrates(3) },
     ],
   },
   {
@@ -109,27 +133,22 @@ const FLOWERS = new Set(['0,2', '4,3', '0,1']);
 export const VILLAGE: { cells: VCell[]; placed: Placed[] } = {
   cells: Array.from({ length: 25 }, (_, i): VCell => {
     const col = i % 5, row = Math.floor(i / 5), key = `${col},${row}`;
-    if (key === '4,4') return { col, row, ground: 'grass', pond: true };
+    
     return { col, row, ground: PATH.has(key) ? 'path' : FLOWERS.has(key) ? 'flowers' : key === '4,1' ? 'tallgrass' : 'grass' };
   }),
   placed: [
-    { col: 0, row: 0, prop: makeOak(3) },
-    { col: 4, row: 0, prop: makeOak(11) },
-    { col: 1, row: 1, ox: 4, prop: makeHouse({ seed: 5 }) },
-    { col: 4, row: 2, ox: -4, prop: makeSmithy(7) },
-    { col: 0, row: 2, ox: 0, prop: makeFence(2) },
-    { col: 1, row: 2, ox: 6, oy: 2, prop: makeFolk(FOLK.farmer) },
-    { col: 2, row: 3, ox: 2, prop: makeWell(2) },
-    { col: 0, row: 3, ox: 10, prop: makeStall(2, 'fruit') },
-    { col: 3, row: 3, ox: 14, prop: makeBarrels(4) },
-    { col: 1, row: 3, ox: 12, oy: 2, prop: makeLantern() },
-    { col: 0, row: 1, ox: 6, oy: 2, prop: makeBoulder(4) },
-    { col: 1, row: 4, ox: -2, prop: makeHaystack(3) },
+    { col: 0, row: 1, ox: -4, prop: makeOak(3) },
+    { col: 4, row: 1, ox: 4, prop: makeOak(11) },
+    { col: 2, row: 2, ox: 16, prop: makeHouse({ seed: 5 }) },
+    { col: 0, row: 2, ox: 2, prop: makeFence(2) },
+    { col: 1, row: 3, ox: 6, oy: 3, prop: makeFolk(FOLK.farmer) },
+    { col: 3, row: 3, ox: 6, prop: makeWell(2) },
+    { col: 0, row: 3, ox: 2, oy: 2, prop: makeBarrels(4) },
+    { col: 4, row: 3, ox: -2, prop: makeStall(2, 'fruit') },
+    { col: 1, row: 4, ox: 0, prop: makeHaystack(3) },
     { col: 2, row: 4, ox: 6, prop: makeFolk(FOLK.baker) },
     { col: 3, row: 4, ox: -2, prop: makeFolk(FOLK.guard) },
-    { col: 4, row: 4, ox: 0, oy: -6, prop: makeReeds(3) },
-    { col: 3, row: 2, ox: 2, oy: 4, prop: makeFolk(FOLK.smith) },
+    { col: 4, row: 4, ox: 4, oy: -2, prop: makeLantern() },
     { col: 0, row: 4, ox: 6, prop: makeWoodpile(2) },
-    { col: 4, row: 3, ox: 0, oy: 4, prop: makeFolk(FOLK.child) },
   ],
 };

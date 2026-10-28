@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  makeBarrels, makeCrates, makeFence, makeHaystack, makeHouse, makeLantern, makeSmithy, makeStall, makeWell, makeWoodpile,
+  makeBarrels, makeCrates, makeFence, makeHaystack, makeLantern, makeSmithy, makeStall, makeWell, makeWoodpile,
 } from '../src/art/buildings';
 import { FOLK, makeFolk } from '../src/art/folk';
+import { makeHouse } from '../src/art/houses';
 import { makeBoulder, makeLilies, makeOak, makeOutcrop, makePebbles, makeReeds, makeStump } from '../src/art/rough';
 import type { Prop } from '../src/art/grit';
 
@@ -25,7 +26,7 @@ describe('village art', () => {
     ['reeds', () => makeReeds(3)],
     ['lilies', () => makeLilies(3)],
     ['house', () => makeHouse({ seed: 5 })],
-    ['tavern', () => makeHouse({ seed: 9, bays: 3, roof: 'shingle', shop: 'tankard' })],
+    ['tavern', () => makeHouse({ seed: 9, cols: 5, roof: 'shingle', shop: 'tankard' })],
     ['well', () => makeWell(2)],
     ['barrels', () => makeBarrels(4)],
     ['crates', () => makeCrates(3)],
@@ -47,6 +48,15 @@ describe('village art', () => {
     expect(a.ax).toBeGreaterThanOrEqual(0);
     expect(a.ax).toBeLessThan(a.frames[0].w);
     expect(a.ay).toBeLessThanOrEqual(a.frames[0].h + 2);
+  });
+
+  it('a house is a person-scaled volume covering about 4 by 3 hexes', () => {
+    const h = makeHouse({ seed: 5 });
+    expect(h.footprint).toEqual({ cols: 4, rows: 3 });
+    // 32 px hex across, 4 hexes: the front wall is at least 100 px wide; a 36 px person fits a door with room above.
+    expect(h.frames[0].w).toBeGreaterThan(140);
+    expect(h.frames[0].h).toBeGreaterThan(120);
+    expect(makeHouse({ seed: 9, cols: 5 }).footprint?.cols).toBe(5);
   });
 
   it('different seeds give different trees', () => {

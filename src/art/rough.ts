@@ -281,22 +281,59 @@ export function makeOak(seed: number, wind = 0): Prop {
   return { frames, ax: cx + 1, ay: baseY + 2, shadow: 30 };
 }
 
-/** A dead stump with a split top and fungus; a place to put the axe. */
+/**
+ * What is left of one of the old oaks: the same bark, grooves and flared roots,
+ * a torn splintered top with rings, a split down one side, moss and a bracket
+ * fungus. Wider and lower than the tree it came from.
+ */
 export function makeStump(seed: number): Prop {
-  const p = new Pix(24, 20);
-  const cx = 11.5;
-  column(p, 8, 16, () => cx, (y) => 5.4 + Math.max(0, y - 13) * 0.9 + (white(y, 0, seed) - 0.5), BARK, seed, 0.25);
-  // Cut top: a tilted ellipse with rings.
-  polyFill(p, wobble([[5, 8], [10, 5], [17, 6], [19, 9], [14, 11], [7, 11]], seed, 0.6), (x, y) => {
-    const d = Math.hypot((x - 12) / 6, (y - 8) / 2.6);
-    const ring = Math.sin(d * 9) > 0.3 ? 0.18 : 0;
-    return pick(['#6b4c33', '#8a6a46', '#a98860', '#c4a67c'], 0.55 - d * 0.25 + ring + (white(x, y, seed + 3) - 0.5) * 0.2, x, y);
+  const rng = Rng.fromSeed(seed);
+  const W = 36, H = 32;
+  const p = new Pix(W, H);
+  const cx = 18, baseY = H - 4, topY = 15;
+  const lean = (rng.next() - 0.5) * 2;
+  const half = (y: number): number => 7.5 + Math.max(0, y - (baseY - 6)) * 0.55 + (fbm(y / 3, 4, seed) - 0.5) * 1.6;
+  column(p, topY, baseY, (y) => cx + lean * (baseY - y) / 16, half, BARK, seed + 2, 0.22);
+  // Roots, like the trees': flaring out and gripping the ground.
+  for (const [dx, k] of [[-1, 1], [1, 1], [-1, 0.5], [1, 0.6]] as const) {
+    capsule(p, cx + dx * 5, baseY - 5, cx + dx * (11 + rng.int(4)) * k, baseY + 1, 2.4, 0.8, BARK, seed + 5 + dx);
+  }
+  // Bark grooves, as on the oaks.
+  for (let y = topY; y <= baseY + 1; y++) {
+    for (let x = 0; x < W; x++) {
+      if (!p.alpha(x, y)) continue;
+      const g = fbm(x * 1.7, y / 9, seed + 12);
+      if (g > 0.6) p.set(x, y, BARK[1]);
+      else if (g < 0.32 && white(x, y, seed + 13) < 0.5) p.set(x, y, BARK[4]);
+    }
+  }
+  // Torn top: an uneven ellipse of cut wood, with splinters standing up on one side.
+  const tcx = cx + lean * 0.6, tcy = topY - 1;
+  polyFill(p, wobble([[tcx - 9, tcy + 1], [tcx - 5, tcy - 3], [tcx + 3, tcy - 4], [tcx + 9, tcy], [tcx + 6, tcy + 4], [tcx - 4, tcy + 4]], seed, 0.9, 2), (x, y) => {
+    const d = Math.hypot((x - tcx) / 9, (y - tcy) / 4);
+    const ring = Math.sin(d * 11 + fbm(x / 4, y / 4, seed) * 2) > 0.35 ? -0.14 : 0.06;
+    return pick(['#3e3022', '#5a4834', '#7a6448', '#96805f', '#b09a78'], 0.55 - d * 0.22 + ring - (x - tcx) * 0.012 + (white(x, y, seed + 3) - 0.5) * 0.22, x, y);
   });
-  p.set(11, 5, '#2b1c12'); p.set(12, 6, '#2b1c12');
-  mossify(p, seed + 4, 0.8, (_x, y) => (y > 12 ? 1.3 : 0.2));
+  // Heart rot at the middle, and a radial split.
+  for (let y = -1; y <= 1; y++) for (let x = -2; x <= 2; x++) if (Math.abs(x) + Math.abs(y) < 3) p.set(Math.round(tcx + x), Math.round(tcy + y), white(x, y, seed) < 0.5 ? '#2a1c12' : '#3e2a1a');
+  for (let i = 0; i < 6; i++) p.set(Math.round(tcx + 2 + i), Math.round(tcy + 1 + i * 0.3), '#2a1c12');
+  // Splinters: tall jagged shards on the back edge.
+  for (const [dx, h] of [[-7, 2], [-5, 4], [-3, 3], [-1, 5], [1, 3], [4, 2]] as const) {
+    for (let k = 0; k < h; k++) {
+      const x = Math.round(tcx + dx + (k > h - 3 ? 0.5 : 0)), y = Math.round(tcy - 3 - k + Math.abs(dx) * 0.15);
+      p.set(x, y, pick(['#4a3626', '#6a5238', '#8a7050'], 0.7 - k * 0.06 - (dx > 0 ? 0.2 : 0) + (white(x, y, seed) - 0.5) * 0.2, x, y));
+      p.set(x + 1, y, BARK[1]);
+    }
+  }
+  mossify(p, seed + 14, 0.8, (x, y) => (y > baseY - 12 ? 1.3 : 0.4) * (x < cx ? 1.2 : 0.6));
+  // Bracket fungus climbing the side.
+  for (const [fx, fy] of [[cx + 7, baseY - 9], [cx + 8, baseY - 5]] as const) {
+    for (let k = 0; k < 4; k++) { p.set(fx + k, fy, pick(['#7a4a22', '#b07a3a', '#e0b868'], 0.9 - k * 0.2, k, 0)); p.set(fx + k, fy + 1, '#3a2414'); }
+  }
+  chew(p, seed + 15, 0.1);
   const o = selOutline(p);
-  bedIn(o, 3, 21, 18, seed);
-  return still(o, 12, 18, 16);
+  bedIn(o, 3, 33, H - 2, seed);
+  return still(o, 19, H - 2, 24);
 }
 
 // --- water details ---------------------------------------------------------
