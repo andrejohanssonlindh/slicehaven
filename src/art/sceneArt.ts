@@ -18,6 +18,7 @@ export interface SceneArt {
 
 export const SCENE_ART: Record<string, SceneArt> = {
   palisade: { make: (_w, seed) => makePalisade(seed), feature: 'wall' },
+  'palisade-rundown': { make: (_w, seed) => makePalisade(seed, 'rundown'), feature: 'wall' },
   gate: { make: () => makeGate(false), feature: 'gate', flame: { dx: GATE_TORCH.dx, dy: GATE_TORCH.dy + 1, size: 0.4 } },
   'gate-open': { make: () => makeGate(true), feature: 'gate', flame: { dx: GATE_TORCH.dx, dy: GATE_TORCH.dy + 1, size: 0.4 } },
   'ivy-rock': { make: (_w, seed) => makeIvyRock(seed), feature: 'rock' },

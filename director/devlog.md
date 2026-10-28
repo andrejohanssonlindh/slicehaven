@@ -1,5 +1,12 @@
 # Devlog
 
+## 2026-10-28 — Session 21g: barrels, palisade states, dragonfly
+
+- **Barrels** redrawn as real cylinders: staves that curve round (narrower at the ends, a belly), shaded across, iron hoops that follow the curve (some rusty), a rim with thickness, board lid or open top (water, apples), stains down from the rim, shade where it meets the ground. `drawBarrel` in `buildings.ts`; the village keg uses it too.
+- **Palisade** now has two states: `worn` (the village's own, the default the game uses: uneven and weathered but kept up) and `rundown` (the earlier very ragged one, saved for ruins and abandoned places; scene key `palisade-rundown`). Both in the studio.
+- **Dragonfly** was too small to see; it is now about three times the size with banded body, red eyes and beating wings, and there are two in the pond mock-up and two in the jetty study.
+
+
 ## 2026-10-28 — Session 21f: more trees, a pond, a dirtier palisade
 
 - **Leaf trees** (`art/leafTrees.ts`, `art/foliage.ts`): weeping **willow** (curtains of fronds that swing like pendulums), **birch** (white bark with black scars, drooping twigs), orchard **apple** (propped limb, fruit, windfalls), vase-shaped **elm** with hanging twigs, columnar **poplar**, plus the oak. Each is seeded (limbs, clumps, fronds all differ) and has **seasons**: summer, spring (fresh green, blossom) and autumn. The studio has a **Tree builder**: species, season, "Another".

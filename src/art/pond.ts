@@ -94,21 +94,36 @@ export function makeReedClump(seed: number, kind: 'reeds' | 'cattail' | 'iris' =
   return { frames, ax: 19, ay: baseY + 3, shadow: 0 };
 }
 
-/** A tiny dragonfly: hovers, darts, hovers. The whole path is inside the sprite. */
+/** A dragonfly: hovers, darts, hovers. Big enough to see. The whole flight is inside the sprite. */
 export function makeDragonfly(seed: number): Prop {
-  const W = 40, H = 24;
+  const W = 56, H = 34;
   const rng = Rng.fromSeed(seed);
-  const pts = Array.from({ length: FRAMES }, (_, i) => [8 + Math.round(Math.sin(i * 0.9 + seed) * 8) + i * 2, 12 + Math.round(Math.cos(i * 1.3) * 4)] as [number, number]);
-  const col = rng.next() < 0.5 ? ['#2a6ac8', '#58a0f0'] : ['#2a8a5a', '#58d09a'];
+  const blue = rng.next() < 0.5;
+  const body = blue ? ['#14407a', '#2a80e0', '#7cc4ff', '#d8f0ff'] : ['#145a3a', '#2aa870', '#7ce8b4', '#d8fff0'];
+  const pts = Array.from({ length: FRAMES }, (_, i) => {
+    const t = i / FRAMES;
+    return [10 + Math.round(t * 30 + Math.sin(t * 12 + seed) * 4), 16 + Math.round(Math.cos(t * 9) * 5)] as [number, number];
+  });
   const frames: Pix[] = pts.map(([x, y], f) => {
     const p = new Pix(W, H);
-    for (let k = 0; k < 6; k++) p.set(x - k, y, k < 2 ? col[1] : col[0]);
-    p.set(x + 1, y, '#101820'); p.set(x + 1, y - 1, '#101820');
+    // Long banded abdomen trailing back, thorax, head with two big eyes.
+    for (let k = 0; k < 10; k++) p.set(x - k, y, k % 3 === 2 ? body[0] : k < 3 ? body[2] : body[1]);
+    for (let k = 1; k < 8; k++) p.set(x - k, y - 1, k % 3 === 2 ? body[0] : body[1]);
+    for (const [dx, dy] of [[1, 0], [2, 0], [1, -1], [2, -1], [2, 1], [1, 1]] as const) p.set(x + dx, y + dy, dy < 0 ? '#101820' : '#1c2a3a');
+    p.set(x + 3, y - 1, '#e84040'); p.set(x + 3, y, '#c02828');
+    // Four wings, beating: up and down, never quite the same twice.
     const up = f % 2 === 0;
-    for (const dx of [-1, -3]) { p.set(x + dx, y + (up ? -2 : 2), '#d8eef8a0'); p.set(x + dx + 1, y + (up ? -2 : 2), '#d8eef8a0'); p.set(x + dx, y + (up ? 2 : -2), '#d8eef860'); }
-    return p;
+    for (const [dx, len] of [[-1, 7], [-3, 6]] as const) {
+      for (let k = 0; k < len; k++) {
+        const wy = up ? -2 - Math.round(k * 0.5) : 2 + Math.round(k * 0.5);
+        p.set(x + dx - (k > 2 ? 1 : 0), y + wy - 1, '#e8f6ffc0');
+        p.set(x + dx + (k > 2 ? 0 : 1), y + wy, k % 2 ? '#b8d8f0a0' : '#e8f6ffb0');
+      }
+      for (let k = 0; k < len - 2; k++) p.set(x + dx, y + (up ? 2 + Math.round(k * 0.4) : -2 - Math.round(k * 0.4)), '#d8eef880');
+    }
+    return selOutline(p, 0.3);
   });
-  return { frames, ax: 20, ay: 12, shadow: 0 };
+  return { frames, ax: 28, ay: 17, shadow: 0 };
 }
 
 /** Wet stones and mud at the bank. */

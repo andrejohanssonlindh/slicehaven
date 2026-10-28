@@ -1,5 +1,5 @@
 import { Rng } from '../core/rng';
-import { IRON, STONE, stoneWall } from './buildings';
+import { IRON, STONE, drawBarrel, stoneWall } from './buildings';
 import { OBX, OBY, box, ellipse, fire, stoneP } from './furniture';
 import { type Light, type Prop, capsule, chew, fbm, grime, pick, polyFill, selOutline, still, white, wobble } from './grit';
 import type { RoomItem } from './interior';
@@ -108,15 +108,9 @@ export function makeBucketBroom(seed = 5): Prop {
 }
 
 export function makeKeg(seed = 6): Prop {
-  const p = new Pix(22, 26);
-  for (let y = 8; y < 24; y++) {
-    const belly = 6 + Math.sin(((y - 8) / 16) * Math.PI) * 1.2;
-    for (let x = Math.round(11 - belly); x < Math.round(11 + belly); x++) p.set(x, y, pick(GW, 0.78 - (x - 11 + belly) * 0.06 + (Math.floor(x / 2) % 2 ? 0.08 : -0.08) + (white(x, y, seed) - 0.5) * 0.14, x, y));
-  }
-  for (const y of [11, 20]) for (let x = 5; x < 18; x++) p.set(x, y, y === 20 ? '#6b4a32' : IRON[2 + (x & 1)]);
-  ellipse(p, 11, 8, 6, 2.2, (x, y) => pick(GW, 0.62 + (white(x, y, seed) - 0.5) * 0.3, x, y));
-  for (let x = 6; x < 17; x++) p.set(x, 6, GW[4]);
-  return finish(p, 11, 24, seed, 14);
+  const p = new Pix(28, 28);
+  drawBarrel(p, 14, 24, 6.5, 13, seed, seed % 2 ? 'closed' : 'water', GW);
+  return finish(p, 14, 24, seed, 14);
 }
 
 /** Slumped sacks: one patched, one split with grain on the floor. */

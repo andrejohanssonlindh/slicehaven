@@ -53,7 +53,7 @@ const LOGW = ['#17120e', '#2a2118', '#41352a', '#5c4b38', '#786448'];
 const PALE = ['#6a6456', '#8a8472', '#a8a28e'];
 const JUTE = ['#241c10', '#443822', '#5e4e30', '#7a6844'];
 
-interface RoughLog { x0: number; w: number; top: number; slope: number; kind: 'sharp' | 'blunt' | 'broken' | 'tall'; cut: number; seed: number; scorched: boolean }
+interface RoughLog { x0: number; w: number; top: number; slope: number; kind: 'sharp' | 'blunt' | 'broken' | 'tall'; cut: number; seed: number; scorched: boolean; tame: boolean }
 
 /** One old log of the palisade: leaning, weathered, peeled in patches, cracked, its top cut or broken however it came. */
 function roughLog(p: Pix, l: RoughLog, bottom: number): void {
@@ -76,13 +76,13 @@ function roughLog(p: Pix, l: RoughLog, bottom: number): void {
       let v = 0.66 - u * 0.5 + (white(x, y, seed) - 0.5) * 0.22 + (fbm(x * 2.2, y / 9, seed + 1) - 0.5) * 0.4;
       if (white(x, y >> 2, seed + 2) < 0.07) v -= 0.25; // grooves in the bark
       let c = pick(LOGW, v, x, y);
-      if (fbm(x * 1.3, y / 4.5, seed + 3) > 0.74 && y > top + 4) c = pick(PALE, 0.45 + (white(x, y, seed + 4) - 0.5) * 0.5 - u * 0.3, x, y); // bark gone, grey wood showing
+      if (fbm(x * 1.3, y / 4.5, seed + 3) > (l.tame ? 0.84 : 0.74) && y > top + 4) c = pick(PALE, 0.45 + (white(x, y, seed + 4) - 0.5) * 0.5 - u * 0.3, x, y); // bark gone, grey wood showing
       if (l.scorched && y < top + 14 && white(x, y, seed + 5) < 0.85) c = pick(['#0a0808', '#1c1816', '#322c28'], 0.3 + white(x, y, seed + 6) * 0.5, x, y);
       p.set(x, y, c);
     }
     // A crack down the log.
     const cx = x0 + shift + Math.floor(w * 0.6);
-    if (y > top + 7 && y < top + 24 + (seed % 9) && cx >= 0 && cx <= 31 && p.alpha(cx, y)) p.set(cx, y, LOGW[0]);
+    if ((!l.tame || seed % 3 === 0) && y > top + 7 && y < top + 24 + (seed % 9) && cx >= 0 && cx <= 31 && p.alpha(cx, y)) p.set(cx, y, LOGW[0]);
   }
   // Axe notch near the top and a knot.
   if (white(seed, 9, 3) < 0.6) { const ny = top + tipH + 3; for (let k = 0; k < 3; k++) p.set(Math.max(0, Math.min(31, x0 + Math.round(slope * (ny - bottom)) + k)), ny + (k === 1 ? 1 : 0), LOGW[0]); }
@@ -94,8 +94,14 @@ function roughLog(p: Pix, l: RoughLog, bottom: number): void {
  * bark peeled grey in patches, mud splashed up the foot and weeds in it, the
  * rope frayed and sagging. The first and last columns stay solid so sections
  * still join.
+ *
+ * `worn` is the village's own wall: weathered and uneven but kept up. `rundown`
+ * is the same wall left to rot: snapped logs, gaps, scorch, mud, weeds, frayed rope.
  */
-export function makePalisade(seed: number): Sprite {
+export type PalisadeState = 'worn' | 'rundown';
+
+export function makePalisade(seed: number, state: PalisadeState = 'worn'): Sprite {
+  const rundown = state === 'rundown';
   const rng = Rng.fromSeed(seed);
   const W = 32;
   const H = 42;
@@ -108,31 +114,32 @@ export function makePalisade(seed: number): Sprite {
     const w = 4 + rng.int(4);
     const r = rng.next();
     const interior = x > 5 && x < 24;
-    const kind: RoughLog['kind'] = interior && r < 0.16 ? 'broken' : r < 0.3 ? 'blunt' : r < 0.45 ? 'tall' : 'sharp';
+    const kind: RoughLog['kind'] = rundown ? (interior && r < 0.16 ? 'broken' : r < 0.3 ? 'blunt' : r < 0.45 ? 'tall' : 'sharp') : r < 0.14 ? 'blunt' : r < 0.3 ? 'tall' : 'sharp';
     const top = kind === 'broken' ? 11 + rng.int(7) : kind === 'tall' ? 1 : 3 + rng.int(5);
-    roughLog(p, { x0: x, w, top, slope: (rng.next() - 0.5) * 0.22, kind, cut: rng.next() - 0.5, seed: seed + n * 13, scorched: rng.next() < 0.1 }, H - 1);
+    roughLog(p, { x0: x, w, top, slope: (rng.next() - 0.5) * (rundown ? 0.22 : 0.09), kind, cut: rng.next() - 0.5, seed: seed + n * 13, scorched: rundown && rng.next() < 0.1, tame: !rundown }, H - 1);
     // An occasional gap between logs (never at the edges).
-    x += w + (interior && rng.next() < 0.18 ? 1 + rng.int(2) : 0);
+    x += w + (rundown && interior && rng.next() < 0.18 ? 1 + rng.int(2) : 0);
     n++;
   }
   // Rope: two lashings, dull jute, twisted, one sagging, ends frayed and hanging.
-  for (const [ly, sagAmt] of [[10 + rng.int(3), rng.next() * 1.5], [H - 14 + rng.int(3), 0]] as const) {
+  for (const [ly, sagAmt] of [[10 + rng.int(3), rundown ? rng.next() * 1.5 : 0], [H - 14 + rng.int(3), 0]] as const) {
     for (let xx = 0; xx < W; xx++) {
       const yy = ly + Math.round(Math.sin(xx * 0.5) * 0.5 + Math.sin((xx / W) * Math.PI) * sagAmt);
       if (!p.alpha(xx, yy) || p.get(xx, yy)[0] < 16) continue;
       p.set(xx, yy, JUTE[(xx + (xx >> 2)) % 3 + 1]);
       p.set(xx, yy + 1, JUTE[(xx >> 1) % 2]);
-      if (white(xx, ly, seed + 8) < 0.07) { for (let k = 2; k < 5; k++) p.set(xx, yy + k, JUTE[1 + (k & 1)]); }
+      if (rundown && white(xx, ly, seed + 8) < 0.07) { for (let k = 2; k < 5; k++) p.set(xx, yy + k, JUTE[1 + (k & 1)]); }
     }
   }
   // Moss and lichen where it stays damp, soot high up.
-  mossify(p, seed + 20, 0.55, (xx, yy) => (yy > 18 ? 1.2 : 0.15) * (xx < 16 ? 1.2 : 0.6));
+  mossify(p, seed + 20, rundown ? 0.55 : 0.16, (xx, yy) => (yy > 18 ? 1.2 : 0.15) * (xx < 16 ? 1.2 : 0.6));
   // Mud thrown up the foot, and the earth heaped round it.
-  for (let yy = H - 12; yy < H; yy++) {
-    const t = (yy - (H - 12)) / 11;
+  const mudRows = rundown ? 12 : 7;
+  for (let yy = H - mudRows; yy < H; yy++) {
+    const t = (yy - (H - mudRows)) / (mudRows - 1);
     for (let xx = 0; xx < W; xx++) {
       if (!p.alpha(xx, yy)) continue;
-      if (white(xx, yy, seed + 21) < t * 0.8 + fbm(xx / 3, yy / 2, seed + 22) * 0.25) p.set(xx, yy, ramp(P.dirt.slice(0, 4), 0.18 + t * 0.35 + (white(xx, yy, seed + 23) - 0.5) * 0.3, xx, yy));
+      if (white(xx, yy, seed + 21) < t * (rundown ? 0.8 : 0.45) + fbm(xx / 3, yy / 2, seed + 22) * (rundown ? 0.25 : 0.12)) p.set(xx, yy, ramp(P.dirt.slice(0, 4), 0.18 + t * 0.35 + (white(xx, yy, seed + 23) - 0.5) * 0.3, xx, yy));
     }
   }
   for (let x2 = 0; x2 < W; x2++) {
@@ -141,12 +148,12 @@ export function makePalisade(seed: number): Sprite {
   }
   // Weeds and tufts growing up through it, a couple of stones.
   for (let x2 = 0; x2 < W; x2++) {
-    if (white(x2, 5, seed + 30) < 0.3) {
+    if (white(x2, 5, seed + 30) < (rundown ? 0.3 : 0.1)) {
       const h = 2 + Math.floor(white(x2, 6, seed + 30) * 5);
       for (let k = 0; k < h; k++) p.set(x2 + (k > 3 ? 1 : 0), H - 2 - k, ['#2f5a2c', '#4a7a36', '#6e9e44', '#92bc58'][Math.min(3, k)]);
     }
   }
-  for (let k = 0; k < 2; k++) { const sx = 3 + rng.int(25); for (const [dx, dy, c] of [[0, 0, '#6e7280'], [1, 0, '#8e94a0'], [0, -1, '#8e94a0'], [1, -1, '#b0b6c0'], [2, 0, '#4e515c']] as const) p.set(sx + dx, H - 2 + dy, c); }
+  for (let k = 0; k < (rundown ? 2 : 1); k++) { const sx = 3 + rng.int(25); for (const [dx, dy, c] of [[0, 0, '#6e7280'], [1, 0, '#8e94a0'], [0, -1, '#8e94a0'], [1, -1, '#b0b6c0'], [2, 0, '#4e515c']] as const) p.set(sx + dx, H - 2 + dy, c); }
   const out = selOutline(p, 0.7);
   clearEdges(out);
   return still(out, 17, H, 0);

@@ -176,54 +176,91 @@ function mossyRoof(p: Pix, y0: number, y1: number, seed: number, amount: number)
 
 // --- smaller things --------------------------------------------------------
 
-/** One barrel, hand-built: staves, hoops, a belly, a moss line. */
-function paintBarrel(p: Pix, cx: number, base: number, rx: number, h: number, seed: number, kind: 'closed' | 'open' | 'apples'): void {
-  const topY = base - h;
-  for (let y = topY; y <= base; y++) {
-    const k = (y - topY) / h;
-    const belly = rx + Math.sin(k * Math.PI) * 1.3 - 1;
-    for (let x = Math.round(cx - belly); x < Math.round(cx + belly); x++) {
-      const u = (x + 0.5 - cx) / belly;
-      const stave = Math.floor((x - cx + 20) / 2.2);
-      let v = 0.86 - (u + 1) * 0.4 + (white(stave, 0, seed) - 0.5) * 0.3 + (white(x, y, seed + 1) - 0.5) * 0.1;
-      if (Math.abs((x - cx + 20) % 2.2) < 0.5) v -= 0.18;
-      p.set(x, y, pick(WOOD, v, x, y));
+/**
+ * One barrel as a real cylinder: staves that curve round it (narrower at the
+ * ends, belly in the middle), shaded across, iron hoops that follow the curve,
+ * a rim with thickness, a lid of boards or an open top with its contents,
+ * stains running down from the rim, and dirt at the foot. `bottom` is the lowest pixel row.
+ */
+export function drawBarrel(
+  p: Pix, cx: number, bottom: number, rx: number, h: number, seed: number,
+  kind: 'closed' | 'open' | 'apples' | 'water' = 'closed', pal: readonly string[] = WOOD,
+): void {
+  const ry = Math.max(2, Math.round(rx * 0.42));
+  const botCy = bottom - ry, topCy = botCy - h;
+  const hw = (k: number): number => rx * (0.86 + 0.14 * Math.sin(Math.PI * Math.min(1, Math.max(0, k))));
+  const N = 9;
+  const hoopK = [0.09, 0.3, 0.7, 0.91];
+  const rust = white(seed, 1, 5) < 0.5 ? 1 : 2;
+  for (let y = topCy; y <= botCy + ry; y++) {
+    const k = (y - topCy) / (botCy - topCy);
+    const w = hw(k);
+    for (let x = Math.floor(cx - w); x <= Math.ceil(cx + w); x++) {
+      const u = (x + 0.5 - cx) / w;
+      if (Math.abs(u) > 1) continue;
+      const n = Math.sqrt(1 - u * u);
+      const yTop = topCy + ry * n * (hw(0) / rx);
+      const yBot = botCy + ry * n * (hw(1) / rx);
+      if (y < yTop || y > yBot) continue;
+      const a = Math.asin(u);
+      const sid = Math.floor((a / Math.PI + 0.5) * N);
+      const seam = ((a / Math.PI + 0.5) * N) % 1;
+      const lam = Math.max(0, Math.min(1, -u * 0.5 + n * 0.85));
+      let v = 0.16 + lam * 0.6 + (white(sid, 0, seed) - 0.5) * 0.2 + (fbm(x * 0.4, y / 7, seed + sid) - 0.5) * 0.18 + (white(x, y, seed + 1) - 0.5) * 0.06;
+      if (seam < 0.1 || seam > 0.94) v -= 0.22;
+      v -= Math.max(0, (y - (botCy - 1)) / (ry + 2)) * 0.18; // shade where it meets the ground
+      p.set(x, y, pick(pal, v, x, y));
+      // Hoops follow the curve of the barrel.
+      for (const hk of hoopK) {
+        const hy = topCy + hk * (botCy - topCy) + ry * n * (hw(hk) / rx);
+        if (Math.abs(y - hy) < 1.1 && Math.abs(u) <= hw(hk) / w + 0.001) {
+          const rusty = (hk < 0.5) === (rust === 1) && fbm(x / 3, hk * 9, seed) > 0.4;
+          p.set(x, y, rusty ? pick(['#2a1810', '#5a3a22', '#8a5a34'], 0.5 - u * 0.3, x, y) : pick(IRON, 0.42 + lam * 0.5 - (y > hy ? 0.12 : 0), x, y));
+        }
+      }
     }
   }
-  // Hoops (one rusty).
-  for (const [i, k] of [0.14, 0.78].entries()) {
-    const y = Math.round(topY + h * k);
-    const belly = rx + Math.sin(k * Math.PI) * 1.3 - 1;
-    for (let x = Math.round(cx - belly); x < Math.round(cx + belly); x++) {
-      p.set(x, y, i === 1 ? '#6b4a32' : IRON[2 + ((x + y) & 1)]);
-      p.set(x, y + 1, i === 1 ? '#3e2a1e' : IRON[1]);
-    }
+  // Stains running down from the rim, one patch of green at the foot.
+  for (let i = 0; i < 3; i++) {
+    const x = Math.round(cx - rx * 0.7 + white(i, 0, seed + 3) * rx * 1.4);
+    const len = 3 + Math.floor(white(i, 1, seed + 3) * 7);
+    for (let k = 0; k < len; k++) if (p.alpha(x, topCy + ry + 1 + k)) { const c = p.get(x, topCy + ry + 1 + k); p.set(x, topCy + ry + 1 + k, [c[0] * 0.7, c[1] * 0.66, c[2] * 0.62, 255]); }
   }
-  // Lid / opening: an ellipse on top.
-  for (let y = topY - 2; y <= topY + 2; y++) {
-    for (let x = Math.round(cx - rx + 0.5); x < Math.round(cx + rx - 0.5); x++) {
-      const d = ((x + 0.5 - cx) / (rx - 0.6)) ** 2 + ((y + 0.5 - topY) / 2.3) ** 2;
+  // The top: rim with thickness, then the lid or the open mouth.
+  const rt = hw(0) * 0.98;
+  for (let y = Math.floor(topCy - ry); y <= Math.ceil(topCy + ry); y++) {
+    for (let x = Math.floor(cx - rt); x <= Math.ceil(cx + rt); x++) {
+      const dx = (x + 0.5 - cx) / rt, dy = (y + 0.5 - topCy) / ry;
+      const d = dx * dx + dy * dy;
       if (d > 1) continue;
-      if (kind === 'closed') p.set(x, y, pick(WOOD, 0.7 - d * 0.35 + (white(x, y, seed + 2) - 0.5) * 0.2, x, y));
-      else if (d > 0.72) p.set(x, y, WOOD[3]);
-      else if (kind === 'open') p.set(x, y, white(x, y, seed + 3) < 0.25 ? '#4a7ab0' : '#243e60');
-      else p.set(x, y, white(x, y, seed + 3) < 0.3 ? '#b4503e' : white(x, y, seed + 4) < 0.5 ? '#86302a' : '#a8683a');
+      if (d > 0.74) { p.set(x, y, pick(pal, 0.74 + (dy > 0 ? -0.2 : 0.06) - dx * 0.1 + (white(x, y, seed + 5) - 0.5) * 0.2, x, y)); continue; }
+      if (kind === 'closed') {
+        const board = Math.floor((x - cx + rt) / 3);
+        p.set(x, y, pick(pal, 0.66 + (white(board, 2, seed) - 0.5) * 0.3 - dx * 0.1 - ((x - cx + rt) % 3 === 0 ? 0.2 : 0) + (white(x, y, seed + 6) - 0.5) * 0.1, x, y));
+      } else if (kind === 'water') {
+        p.set(x, y, white(x, y, seed + 7) < 0.2 || (dx < -0.2 && dy < 0 && white(x, y, seed + 8) < 0.5) ? '#7ab4d8' : pick(['#0e1c2c', '#1c3558', '#2e5a8a'], 0.45 - dy * 0.3, x, y));
+      } else if (kind === 'apples') {
+        const c = white(x >> 1, y >> 1, seed + 9);
+        p.set(x, y, c < 0.55 ? pick(['#6a1c1a', '#a8302a', '#d4503a', '#f08a64'], 0.62 - (dx + dy) * 0.25 + (white(x, y, seed) - 0.5) * 0.2, x, y) : c < 0.8 ? pick(['#7a5a1c', '#b88a2c', '#e0b84a'], 0.6 - dy * 0.2, x, y) : pick(['#3a5a1e', '#6a8a30', '#9ab848'], 0.6, x, y));
+      } else {
+        p.set(x, y, pick(['#060505', '#14100e', '#26201a'], 0.3 + (dy > 0 ? 0.25 : 0) + (white(x, y, seed + 10) - 0.5) * 0.3, x, y));
+      }
     }
   }
 }
 
 export function makeBarrels(seed: number, count: 1 | 3 = 3): Prop {
-  const p = new Pix(36, 30);
+  const p = new Pix(46, 40);
   if (count === 1) {
-    paintBarrel(p, 17, 24, 6.5, 14, seed, 'closed');
+    drawBarrel(p, 22, 34, 8, 17, seed, 'closed');
   } else {
-    paintBarrel(p, 20, 20, 6.5, 13, seed, 'open');
-    paintBarrel(p, 9, 25, 6.5, 14, seed + 1, 'closed');
-    paintBarrel(p, 25, 26, 6, 13, seed + 2, 'apples');
+    drawBarrel(p, 28, 25, 8, 17, seed, 'water');
+    drawBarrel(p, 13, 33, 8.5, 18, seed + 1, 'closed');
+    drawBarrel(p, 33, 35, 7.5, 14, seed + 2, 'apples');
   }
-  grime(p, seed + 5, 0.5, 28);
-  mossify(p, seed + 6, 0.3, (_x, y) => (y > 18 ? 1 : 0));
-  return still(selOutline(p), 18, 27, 24);
+  grime(p, seed + 5, 0.4, 36);
+  mossify(p, seed + 6, 0.25, (_x, y) => (y > 28 ? 1 : 0));
+  return still(selOutline(p), 23, 36, 28);
 }
 
 /** Open crates, one with a lid propped on it, sacks leaning. */
