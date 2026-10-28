@@ -7,7 +7,12 @@ import {
   makeToolRack, makeTrough, makeWorkbench,
 } from '../art/furniture';
 import { makeHouse } from '../art/houses';
+import {
+  makeBasket, makeBucketBroom, makeClutter, makeCloakPegs, makeCookhearth, makeFootlocker, makeHanging, makeKeg, makeKindling, makePallet,
+  makeRoughShelf, makeSacks, makeStool3, makeTrestleTable,
+} from '../art/humble';
 import { makeRoom, makeSmithy } from '../art/interior';
+import { makeShrub } from '../art/scrub';
 import { makeBoulder, makeOak, makeOutcrop, makePebbles, makeStump } from '../art/rough';
 import type { Placed, VCell } from '../art/villageScene';
 
@@ -25,8 +30,8 @@ const folkRow = (names: string[]): Placed[] => names.map((n, i) => ({ col: i, ro
 
 export const SECTIONS: Section[] = [
   {
-    title: 'Interior: furniture',
-    note: 'For inside the houses. Same scale as the people (they sit on a 14 px stool), same slanted view as the houses: front, top, right side. Wood grain, worn edges, a candle that lights the table at dusk.',
+    title: 'Rich interior: furniture (kept for manors, castles, richer homes)',
+    note: 'Heavy oak, a big bed, a grand hearth. Too fine for the village, saved for later.  Same scale as the people (they sit on a 14 px stool), same slanted view as the houses: front, top, right side. Wood grain, worn edges, a candle that lights the table at dusk.',
     cols: 9,
     padTop: 84,
     maxWidth: 400,
@@ -38,7 +43,7 @@ export const SECTIONS: Section[] = [
     ],
   },
   {
-    title: 'Interior: hearth and small things',
+    title: 'Rich interior: hearth and small things',
     note: 'The hearth has a live fire, an iron crane and a pot, and lights the room. Stool, bench, shelf, rug, ladder.',
     cols: 9,
     padTop: 100,
@@ -80,8 +85,108 @@ export const SECTIONS: Section[] = [
     ],
   },
   {
-    title: 'Inside a cottage (the roof and front wall cut away)',
-    note: 'What you see when you step in: the same box as the house, so the two swap in place. Floor, back and left walls from inside, the right wall still showing outside. Bed, cupboard, shelf, hearth with a live fire, table with a candle, stool, bench, chest, rug. The villager is for scale.',
+    title: 'Inside a village house (roof and front wall cut away)',
+    note: 'The humble version: beaten earth, straw on boards for a bed, a foot-wide strongbox, a board on trestles, three-legged stools, a cooking fire under a sooty hood with a pot on a chain, a keg, sacks, kindling, onions and a fish hung from the rafters, a cloak on a peg, a bucket and a broom, scraps on the floor. Compare with the manor version further down.',
+    cols: 7,
+    rows: 3,
+    padTop: 104,
+    maxWidth: 400,
+    items: [
+      { col: 3, row: 2, ox: 16, prop: makeRoom({ seed: 5, humble: true }) },
+      { col: 3, row: 2, ox: 28, oy: -4, prop: makeFolk(FOLK.baker) },
+    ],
+  },
+  {
+    title: 'Village interior: bed, chest, table, stools',
+    note: 'A pallet of straw with a patched blanket and a sack for a pillow. The chest is a foot wide. The table is a board on trestles with a heel of bread and a candle stub. Everything is a bit crooked.',
+    cols: 9,
+    padTop: 60,
+    maxWidth: 400,
+    items: [
+      { col: 1, row: 0, ox: 6, prop: makePallet() },
+      { col: 3, row: 0, ox: 8, prop: makeFootlocker() },
+      { col: 5, row: 0, ox: 0, prop: makeTrestleTable() },
+      { col: 6, row: 0, ox: 16, prop: makeStool3() },
+      { col: 8, row: 0, ox: 0, prop: makeBucketBroom() },
+    ],
+  },
+  {
+    title: 'Village interior: hearth and clutter',
+    note: 'Cooking fire under a sooty daub hood (it lights the room), keg, slumped sacks, a basket of turnips, kindling, scraps for the floor.',
+    cols: 9,
+    padTop: 80,
+    maxWidth: 400,
+    items: [
+      { col: 1, row: 0, ox: 4, prop: makeCookhearth() },
+      { col: 3, row: 0, ox: 4, prop: makeKeg() },
+      { col: 4, row: 0, ox: 10, prop: makeSacks() },
+      { col: 6, row: 0, ox: 0, prop: makeBasket() },
+      { col: 7, row: 0, ox: 6, prop: makeKindling() },
+      { col: 8, row: 0, ox: 16, prop: makeClutter() },
+    ],
+  },
+  {
+    title: 'Village interior: wall things',
+    note: 'A warped shelf with pots, a cloak and a felt hat on pegs, onions, herbs and a dried fish strung up.',
+    cols: 6,
+    padTop: 60,
+    items: [
+      { col: 1, row: 0, ox: 4, prop: makeRoughShelf() },
+      { col: 3, row: 0, ox: 4, prop: makeCloakPegs() },
+      { col: 5, row: 0, ox: 4, prop: makeHanging() },
+    ],
+  },
+  {
+    title: 'Stumps (large)',
+    note: 'Snapped, not sawn: lopsided, a tall splintered jag, a rotten hollow, fungus, chunks at the foot. Three seeds, drawn big so you can judge them.',
+    cols: 3,
+    padTop: 44,
+    maxWidth: 400,
+    items: [
+      { col: 0, row: 0, prop: makeStump(5) },
+      { col: 1, row: 0, prop: makeStump(12) },
+      { col: 2, row: 0, prop: makeStump(23) },
+    ],
+  },
+  {
+    title: 'Shrubs: bush, flowering, berry',
+    note: 'Lumpy, lopsided, with dead twigs poking out and bare stems showing, grass growing up round the foot. Flowers where they happened to take, some already browned. Seeded, so each differs.',
+    cols: 5,
+    padTop: 40,
+    maxWidth: 400,
+    items: [
+      { col: 0, row: 0, ox: 8, prop: makeShrub(3, 'bush') },
+      { col: 1, row: 0, ox: 12, prop: makeShrub(4, 'flowering') },
+      { col: 2, row: 0, ox: 16, prop: makeShrub(5, 'flowering') },
+      { col: 3, row: 0, ox: 14, prop: makeShrub(6, 'berry') },
+    ],
+  },
+  {
+    title: 'Shrubs: hedges',
+    note: 'Overgrown, with a gap where it died back and bare stems showing through.',
+    cols: 6,
+    padTop: 40,
+    maxWidth: 400,
+    items: [
+      { col: 1, row: 0, ox: 6, prop: makeShrub(4, 'hedge') },
+      { col: 4, row: 0, ox: 6, prop: makeShrub(8, 'hedge') },
+    ],
+  },
+  {
+    title: 'Shrubs: bramble, weeds, kitchen garden',
+    note: 'Bramble with thorns and blackberries; nettles, dock and thistle; a garden bed with cabbages gone to seed, leeks and a leaning bean pole.',
+    cols: 6,
+    padTop: 40,
+    maxWidth: 400,
+    items: [
+      { col: 0, row: 0, ox: 14, prop: makeShrub(3, 'bramble') },
+      { col: 2, row: 0, ox: 14, prop: makeShrub(4, 'weeds') },
+      { col: 4, row: 0, ox: 10, prop: makeShrub(2, 'garden') },
+    ],
+  },
+  {
+    title: 'Inside a manor-grade house (kept for richer homes)',
+    note: 'The first, too-fine interior, kept for later. What you see when you step in: the same box as the house, so the two swap in place. Floor, back and left walls from inside, the right wall still showing outside. Bed, cupboard, shelf, hearth with a live fire, table with a candle, stool, bench, chest, rug. The villager is for scale.',
     cols: 7,
     rows: 3,
     padTop: 104,
@@ -212,7 +317,10 @@ export const VILLAGE: { cells: VCell[]; placed: Placed[] } = {
     { col: 0, row: 1, ox: -4, prop: makeOak(3) },
     { col: 4, row: 1, ox: 4, prop: makeOak(11) },
     { col: 2, row: 2, ox: 16, prop: makeHouse({ seed: 5 }) },
-    { col: 0, row: 2, ox: 2, prop: makeFence(2) },
+    { col: 0, row: 2, ox: 2, prop: makeShrub(4, 'hedge') },
+    { col: 1, row: 2, ox: -4, oy: 2, prop: makeShrub(5, 'flowering') },
+    { col: 4, row: 2, ox: 8, oy: 3, prop: makeShrub(9, 'bush') },
+    { col: 4, row: 4, ox: 6, prop: makeShrub(4, 'weeds') },
     { col: 1, row: 3, ox: 6, oy: 3, prop: makeFolk(FOLK.farmer) },
     { col: 3, row: 3, ox: 6, prop: makeWell(2) },
     { col: 0, row: 3, ox: 2, oy: 2, prop: makeBarrels(4) },

@@ -1,6 +1,7 @@
 import { STONE, stoneWall, WOOD } from './buildings';
 import { makeAnvil, makeCoalBin, makeForge, makeToolRack, makeTrough, makeWorkbench, makeBed, makeChest, makeCupboard, makeHearth, makeRug, makeShelf, makeStool, makeTable } from './furniture';
 import { type Light, type Prop, fbm, grime, pick, polyFill, selOutline, white } from './grit';
+import { humbleItems } from './humble';
 import { type HouseSpec, glassWindow, houseGeom, infill, paintRoof, stack, timber } from './houses';
 import { Pix } from './pix';
 import { FRAMES } from './props';
@@ -20,8 +21,11 @@ export interface RoomItem {
   lift?: number;
 }
 
-/** The default furnishing of a one-room cottage. */
-export function cottageItems(): RoomItem[] {
+/**
+ * The rich furnishing: heavy oak, a big bed, a grand hearth. Kept for manors,
+ * richer town houses and castles. Village houses use humble.ts instead.
+ */
+export function manorItems(): RoomItem[] {
   return [
     { prop: makeRug(), u: 0.5, d: 0.4 },
     { prop: makeBed(), u: 0.17, d: 0.93 },
@@ -60,7 +64,7 @@ function paintFloor(p: Pix, g: ReturnType<typeof houseGeom>, seed: number, earth
       const cell = fbm(x / 6, y / 3.5, seed + 9);
       const flag = cell > 0.58 && u > 0.2;
       const e = flag ? pick(STONE, 0.3 + white(Math.floor(x / 7), Math.floor(y / 4), seed) * 0.3 + (white(x, y, seed + 2) - 0.5) * 0.1, x, y)
-        : pick(['#1a120d', '#2b1f17', '#3e2e20', '#564030'], 0.3 + fbm(x / 4, y / 3, seed + 3) * 0.5 + (white(x, y, seed + 4) - 0.5) * 0.14 - Math.abs(u - 0.5) * 0.1, x, y);
+        : pick(['#3e2e1e', '#5a4430', '#7a6040', '#9a7c54'], 0.3 + fbm(x / 4, y / 3, seed + 3) * 0.5 + (white(x, y, seed + 4) - 0.5) * 0.14 - Math.abs(u - 0.5) * 0.1, x, y);
       return e;
     }
     const row = Math.floor(d * 11);
@@ -74,10 +78,10 @@ function paintFloor(p: Pix, g: ReturnType<typeof houseGeom>, seed: number, earth
   });
 }
 
-export function makeRoom(spec: HouseSpec & { items?: RoomItem[]; mode?: 'cutaway' | 'workshop' }): Prop {
+export function makeRoom(spec: HouseSpec & { items?: RoomItem[]; mode?: 'cutaway' | 'workshop'; humble?: boolean }): Prop {
   const { seed } = spec;
   const workshop = spec.mode === 'workshop';
-  const cols = spec.cols ?? (workshop ? 4 : 5);
+  const cols = spec.cols ?? (workshop || spec.humble ? 4 : 5);
   const g = houseGeom(cols);
   const { Wf, Hw, DX, DY, FX0, FX1, FB, W, H } = g;
   const walls = workshop ? 'tarred' : spec.walls ?? 'white';
@@ -117,7 +121,7 @@ export function makeRoom(spec: HouseSpec & { items?: RoomItem[]; mode?: 'cutaway
   glassWindow(back, Math.round(FX0 + DX * 0.5), Math.round(FB + DY * 0.5 - Hw * 0.78), 8, 12, false, null, false, seed + 24);
 
   // Floor.
-  paintFloor(back, g, seed + 30, workshop);
+  paintFloor(back, g, seed + 30, workshop || !!spec.humble);
 
   // Right wall: the outer face stays, so the box still reads as a house.
   const rw = new Pix(W, H);
@@ -161,7 +165,7 @@ export function makeRoom(spec: HouseSpec & { items?: RoomItem[]; mode?: 'cutaway
   grime(front, seed + 51, 0.5, FB + 2);
 
   // Furniture, back to front.
-  const items = (spec.items ?? (workshop ? smithyItems() : cottageItems())).map((it) => ({
+  const items = (spec.items ?? (workshop ? smithyItems() : spec.humble ? humbleItems() : manorItems())).map((it) => ({
     ...it,
     x: Math.round(FX0 + it.u * Wf + it.d * DX),
     y: Math.round(FB + it.d * DY),

@@ -4,6 +4,8 @@ import {
 } from '../src/art/buildings';
 import { FOLK, makeFolk } from '../src/art/folk';
 import { FURNITURE } from '../src/art/furniture';
+import * as humble from '../src/art/humble';
+import { SHRUB_KINDS, makeShrub } from '../src/art/scrub';
 import { makeHouse } from '../src/art/houses';
 import { makeRoom, makeSmithy } from '../src/art/interior';
 import { makeBoulder, makeLilies, makeOak, makeOutcrop, makePebbles, makeReeds, makeStump } from '../src/art/rough';
@@ -35,6 +37,9 @@ describe('village art', () => {
     ['stall', () => makeStall(2, 'fruit')],
     ['smithy', () => makeSmithy({ seed: 7 })],
     ['room', () => makeRoom({ seed: 5 })],
+    ['humble room', () => makeRoom({ seed: 5, humble: true })],
+    ...humble.humbleItems().map((it, i): [string, () => Prop] => [`humble item ${i}`, () => it.prop]),
+    ...SHRUB_KINDS.map((k): [string, () => Prop] => [`shrub ${k}`, () => makeShrub(3, k)]),
     ...Object.entries(FURNITURE).map(([k, f]): [string, () => Prop] => [`furniture ${k}`, f]),
     ['haystack', () => makeHaystack(3)],
     ['woodpile', () => makeWoodpile(2)],

@@ -1,5 +1,14 @@
 # Devlog
 
+## 2026-10-28 — Session 21d: humble interiors, shrubs, the stump
+
+- The first interior is **kept** as the rich set (`furniture.ts`, `manorItems()` in `interior.ts`), labelled in the studio for manors, castles and richer homes. It was too fine for a village.
+- **Village interior** (`art/humble.ts`, `makeRoom({ humble: true })`): small, patched, dirty. Straw pallet with a patched blanket and a sack pillow, a foot-wide strongbox, a board on trestles with a bread heel and a candle stub, three-legged stools, a cooking fire in a ring of stones under a sooty daub hood with a pot on a chain, keg, slumped sacks, basket of turnips, onions and a fish hung from the rafters, a cloak and hat on pegs, a warped shelf of pots, bucket and broom, scraps on the floor, straw, a rag rug. Beaten-earth floor. About a third the size of the rich pieces.
+- **Stump** redone and shown properly: a big three-seed study. Snapped, lopsided, tall splintered jag, small ragged rotten hollow, fungus, chunks at the foot; the moss that made it look like a face is gone.
+- **Shrubs** (`art/scrub.ts`): bush, flowering (pink, white or mixed, some blooms browned), berry, hedge (with a gap where it died back), bramble, weeds (nettle, dock, thistle) and a kitchen-garden bed. Seeded: lumpy, lopsided, dead twigs, bare stems, grass at the foot. They sway. Several are in the mock-up.
+- Known: the humble room is dense and dark when seen small; if it is too busy, say which pieces to drop.
+
+
 ## 2026-10-28 — Session 21c: smithy at scale, variation slots, interiors
 
 - **Stump** redone again: snapped, not sawn. Lopsided, one tall splintered jag, a rotten hollow, fungus, chunks at the foot. Same bark and roots as the oaks.

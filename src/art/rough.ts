@@ -292,13 +292,13 @@ export function makeStump(seed: number): Prop {
   const p = new Pix(W, H);
   const cx = 19, baseY = H - 4;
   const lean = (rng.next() - 0.5) * 3;
-  const half = (y: number): number => 7 + Math.max(0, y - (baseY - 8)) * 0.6 + (fbm(y / 2.5, 4, seed) - 0.5) * 3.2;
+  const half = (y: number): number => 8.2 + Math.max(0, y - (baseY - 8)) * 0.6 + (fbm(y / 2.5, 4, seed) - 0.5) * 3.2;
   column(p, 6, baseY, (y) => cx + lean * (baseY - y) / 24, half, BARK, seed + 2, 0.24);
   for (const [dx, k] of [[-1, 1], [1, 1], [-1, 0.5], [1, 0.7]] as const) {
     capsule(p, cx + dx * 5, baseY - 5, cx + dx * (11 + rng.int(5)) * k, baseY + 1, 2.4, 0.7, BARK, seed + 5 + dx);
   }
   // Break line: high on the left, low on the right, ragged all along.
-  const cut = (x: number): number => 16 + (x - cx) * 0.55 + (fbm(x / 2, 9, seed) - 0.5) * 7 + (white(x, 0, seed + 1) < 0.18 ? -4 : 0);
+  const cut = (x: number): number => 18 + (x - cx) * 0.3 + (fbm(x / 2.2, 9, seed) - 0.5) * 9 + (white(x >> 1, 0, seed + 1) < 0.2 ? -3 : 0);
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (p.alpha(x, y) && y < cut(x)) p.data[(y * W + x) * 4 + 3] = 0;
   // Bark grooves.
   for (let y = 6; y <= baseY + 1; y++) {
@@ -321,13 +321,14 @@ export function makeStump(seed: number): Prop {
     }
     if (white(x, 2, seed + 4) < 0.3) p.set(x, y0 - 1, '#7a6a52'); // a loose splinter
   }
-  // Rotten hollow low on the front, black and wet, with a lip of crumbling wood.
-  for (let y = 20; y < 31; y++) for (let x = 12; x < 24; x++) {
-    const d = ((x - 17.5) / 5.5) ** 2 + ((y - 26) / 5) ** 2 + (fbm(x / 2, y / 2, seed + 6) - 0.5) * 0.5;
-    if (d < 1 && p.alpha(x, y)) p.set(x, y, pick(['#050404', '#120d0a', '#251a12', '#3a2a1c'], 0.16 + (30 - y) * 0.02 + (white(x, y, seed) - 0.5) * 0.2, x, y));
-    else if (d < 1.35 && d >= 1 && p.alpha(x, y) && white(x, y, seed + 7) < 0.7) p.set(x, y, BARK[0]);
+  // Rotten hollow low on the front: small, ragged, black and wet.
+  const hx = 14 + rng.int(6), hy = 27;
+  for (let y = hy - 6; y < hy + 5; y++) for (let x = hx - 6; x < hx + 6; x++) {
+    const d = ((x - hx) / 3.6) ** 2 + ((y - hy) / 3.4) ** 2 + (fbm(x / 1.6, y / 1.6, seed + 6) - 0.5) * 0.9;
+    if (d < 1 && p.alpha(x, y)) p.set(x, y, pick(['#050404', '#120d0a', '#251a12', '#3a2a1c'], 0.16 + (hy - y) * 0.03 + (white(x, y, seed) - 0.5) * 0.25, x, y));
+    else if (d < 1.5 && d >= 1 && p.alpha(x, y) && white(x, y, seed + 7) < 0.6) p.set(x, y, BARK[0]);
   }
-  mossify(p, seed + 14, 0.9, (x, y) => (y > baseY - 14 ? 1.4 : 0.5) * (x < cx ? 1.3 : 0.5));
+  mossify(p, seed + 14, 0.4, (x, y) => (y > baseY - 7 ? 1.2 : 0.1) * (x < cx ? 1.2 : 0.5));
   // Fungus: a shelf of it, not pretty.
   for (const [fx, fy] of [[cx + 7, baseY - 12], [cx + 8, baseY - 8], [cx + 6, baseY - 5]] as const) {
     for (let k = 0; k < 5 - Math.round(white(fx, fy, seed) * 2); k++) { p.set(fx + k, fy, pick(['#4a3220', '#7a5a38', '#a8885a'], 0.8 - k * 0.2, k, 0)); p.set(fx + k, fy + 1, '#2a1a10'); }

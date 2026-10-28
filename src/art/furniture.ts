@@ -12,19 +12,19 @@ import { FRAMES } from './props';
  * 3/4 view as the houses: you see the front, the top, and the right side.
  */
 
-type Painter = (x: number, y: number) => string;
+export type Painter = (x: number, y: number) => string;
 
 /** Depth runs up and to the right, like the houses'. */
-const OBX = 0.5, OBY = -0.8;
+export const OBX = 0.5, OBY = -0.8;
 
 const woodP = (seed: number, shade: number, vertical = false): Painter => (x, y) =>
   pick(WOOD, shade + (fbm(vertical ? x * 1.6 : x / 6, vertical ? y / 6 : y * 1.6, seed) - 0.5) * 0.42 + (white(x, y, seed + 1) - 0.5) * 0.1, x, y);
 
-const stoneP = (seed: number, shade: number): Painter => (x, y) =>
+export const stoneP = (seed: number, shade: number): Painter => (x, y) =>
   pick(STONE, shade + (fbm(x / 3, y / 3, seed) - 0.5) * 0.5 + (white(x >> 1, y >> 1, seed + 1) - 0.5) * 0.3, x, y);
 
 /** A box seen from above-front-right: top, front, right side. (x, y) is the front-bottom-left corner. */
-function box(p: Pix, x: number, y: number, w: number, h: number, d: number, top: Painter, front: Painter, side: Painter, edge: string | null = WOOD[5]): void {
+export function box(p: Pix, x: number, y: number, w: number, h: number, d: number, top: Painter, front: Painter, side: Painter, edge: string | null = WOOD[5]): void {
   const ox = d * OBX, oy = d * OBY;
   polyFill(p, [[x + w, y - h], [x + w + ox, y - h + oy], [x + w + ox, y + oy], [x + w, y]], side);
   polyFill(p, [[x, y - h], [x + w, y - h], [x + w + ox, y - h + oy], [x + ox, y - h + oy]], top);
@@ -32,7 +32,7 @@ function box(p: Pix, x: number, y: number, w: number, h: number, d: number, top:
   if (edge) for (let xx = Math.round(x); xx < Math.round(x + w); xx++) p.set(xx, Math.round(y - h), edge);
 }
 
-const ellipse = (p: Pix, cx: number, cy: number, rx: number, ry: number, paint: Painter): void => {
+export const ellipse = (p: Pix, cx: number, cy: number, rx: number, ry: number, paint: Painter): void => {
   for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++) {
     for (let x = Math.floor(cx - rx); x <= Math.ceil(cx + rx); x++) {
       if (((x + 0.5 - cx) / rx) ** 2 + ((y + 0.5 - cy) / ry) ** 2 <= 1) p.set(x, y, paint(x, y));
@@ -156,7 +156,7 @@ export function makeShelf(seed = 7): Prop {
   return finish(p, 28, 33, seed, 0);
 }
 
-function flame(p: Pix, x0: number, x1: number, base: number, h: number, f: number, seed: number): void {
+export function flame(p: Pix, x0: number, x1: number, base: number, h: number, f: number, seed: number): void {
   for (let x = x0; x < x1; x++) {
     const mid = 1 - Math.abs((x - (x0 + x1) / 2) / ((x1 - x0) / 2));
     const hh = h * mid * (0.55 + fbm(x * 0.55 + f * 0.9, f * 0.7, seed) * 0.9);
