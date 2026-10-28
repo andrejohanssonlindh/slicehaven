@@ -48,6 +48,9 @@
 - **Distances are measurements (metres)**, in the engine too: no hex grid in the 3D world, fights included. (Q22)
 - **Filaments (magic strength) must exist in the 3D world**, stored as a map keyed by cell (a hash map / heat map over the free world), read by position. Today `core/filaments.ts` computes them per hex (`readMap` → `Map<hexKey, HexFilaments>`); the port keeps its rules and contributions, swaps hexes for cells and distances in metres. *Director wrote "hashmat": I read it as a hash map of cells (a heat map when drawn); confirm if meant otherwise.*
 
+## Authoring (session 25e): read [world3d-authoring](world3d-authoring.md) before adding a map, a room or a house
+Rooms are recipes of rules (`content/furnish.ts`, solver `core/world3d/roomplan.ts`); maps are `MapSpec`s compiled to ground and layout (`content/maps/`, `core/world3d/mapgen.ts`), with `problems` that tests require to be empty. `SpikeWorld` takes a compiled map; `/spike3d/?map=hamlet`. **Next, before any big map: stream placed things per chunk and instance trees and props.**
+
 ## Next steps (in order, each its own commit + devlog line)
 1. **M2 assets** (layout, roofs and props done, session 25: `core/world3d/layout.ts`, `props.ts`, `SPIKE_LAYOUT`; houses, trees, torches and props are placed things that feed collision, pads, filaments and the renderer). Left: wall variants, more prop kinds (fences, wells, carts, crates), furniture that blocks feet and feeds filaments (sets per house are done: `content/rooms3d.ts`, `PlacedHouse.room`), more tree kinds (pine, dead, young). Add a new kind of thing to `Layout` first, then the renderer.
 2. ~~Art: side and back views + walk cycle~~ done (session 25b, `art/folkWalk.ts`, `walkCard`). Left: walking art for animals, a run, turning in place, items that swing in profile.

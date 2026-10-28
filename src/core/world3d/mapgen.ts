@@ -1,0 +1,323 @@
+import { Rng } from '../rng';
+import type { House3DSpec, RoofKind } from './house';
+import { type Layout, type PlacedHouse, type PlacedTree, buildHouses, houseOuterBox, houseToWorld, layoutObstacles, layoutPads, layoutShade } from './layout';
+import { type PlacedProp } from './props';
+import { NavGrid, type Shape, findPath, shapeDist } from './space';
+import { type Ground3D, type Road, type XZ, lakeDist, roadDist } from './terrain';
+
+/**
+ * Maps as data. A `MapSpec` says what is where in terms a person (or Claude) thinks
+ * in: "a bakery on the north side of the main road a third of the way along",
+ * "forty trees in the woods", "torches every 14 m". `compileMap` turns that into the
+ * ground and layout the world builds from, places the things that have no fixed spot
+ * without overlapping anything, and reports problems instead of hiding them. The
+ * result is pure data, so a map is tested like any other content.
+ */
+
+export type HouseSize = 'small' | 'medium' | 'large' | { width: number; depth: number };
+
+const SIZES: Record<'small' | 'medium' | 'large', { width: number; depth: number }> = {
+  small: { width: 5, depth: 4 },
+  medium: { width: 6, depth: 4.6 },
+  large: { width: 7.4, depth: 5 },
+};
+
+/** Where a house goes: a spot, or a place along a road (it then faces the road). */
+export type HouseAt =
+  | { x: number; z: number; rot?: number }
+  | {
+    /** Index into `roads`. */
+    road: number;
+    /** How far along the road, 0 (start) to 1 (end). */
+    t: number;
+    /** Which side of the road, as a compass point: north is up the screen (-z), south down (+z). */
+    side: 'north' | 'south' | 'east' | 'west';
+    /** Space between the road's edge and the house's porch, metres (default 2). */
+    gap?: number;
+  };
+
+export interface MapHouse {
+  id: string;
+  /** What is inside: a key of `RECIPES` in `content/furnish.ts` (default the humble home). */
+  room?: string;
+  size?: HouseSize;
+  roof?: RoofKind;
+  wallH?: number;
+  seed?: number;
+  at: HouseAt;
+}
+
+export type Area =
+  | { circle: [x: number, z: number, r: number] }
+  | { rect: [x0: number, z0: number, x1: number, z1: number] }
+  | { ring: [x: number, z: number, rInner: number, rOuter: number] }
+  /** The whole map, minus a margin at its edge. */
+  | { all: true };
+
+export interface Scatter {
+  kind: 'tree' | 'shrub' | 'boulder';
+  count: number;
+  area: Area;
+  /** Extra space kept clear around each, metres. */
+  gap?: number;
+  seed?: number;
+}
+
+export interface MapSpec {
+  name: string;
+  seed: number;
+  /** Side of the square map, metres. */
+  size: number;
+  roads: Road[];
+  lake?: { x: number; z: number; r: number };
+  mud?: { x: number; z: number; r: number }[];
+  /** Stamp mud in front of every door. */
+  doorMud?: boolean;
+  houses: MapHouse[];
+  /** Things dropped wherever there is room. */
+  scatter?: Scatter[];
+  /** Things at exact spots. */
+  trees?: PlacedTree[];
+  props?: PlacedProp[];
+  /** Torch posts: exact spots, or along a road every so many metres. */
+  torches?: [number, number][];
+  torchLines?: { road: number; every: number; side: 'north' | 'south' | 'east' | 'west'; offset?: number }[];
+  /** Where the hero starts: a spot, or in front of a house's door. */
+  hero?: [number, number] | { house: string };
+  /** The villager's beat; by default along the first road. */
+  walk?: XZ[];
+}
+
+export interface CompiledMap {
+  name: string;
+  ground: Ground3D;
+  layout: Layout;
+  hero: [number, number];
+  walk: XZ[];
+  /** Everything that did not work out: a thing that would not fit, a house in the lake, an unreachable door. Empty for a good map. */
+  problems: string[];
+}
+
+// --- roads ----------------------------------------------------------------
+
+export function roadLength(r: Road): number {
+  let s = 0;
+  for (let i = 1; i < r.pts.length; i++) s += Math.hypot(r.pts[i][0] - r.pts[i - 1][0], r.pts[i][1] - r.pts[i - 1][1]);
+  return s;
+}
+
+/** The point `s` metres along a road, with its unit tangent. */
+export function roadPoint(r: Road, s: number): { x: number; z: number; tx: number; tz: number } {
+  let left = Math.max(0, s);
+  for (let i = 1; i < r.pts.length; i++) {
+    const a = r.pts[i - 1], b = r.pts[i];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (left <= len || i === r.pts.length - 1) {
+      const k = len > 0 ? Math.min(1, left / len) : 0;
+      return { x: a[0] + (b[0] - a[0]) * k, z: a[1] + (b[1] - a[1]) * k, tx: (b[0] - a[0]) / (len || 1), tz: (b[1] - a[1]) / (len || 1) };
+    }
+    left -= len;
+  }
+  return { x: r.pts[0][0], z: r.pts[0][1], tx: 1, tz: 0 };
+}
+
+const COMPASS = { north: [0, -1], south: [0, 1], east: [1, 0], west: [-1, 0] } as const;
+
+/** The unit normal of a road at a point that points toward a compass side. */
+function sideNormal(tx: number, tz: number, side: keyof typeof COMPASS): [number, number] {
+  const n: [number, number] = [-tz, tx];
+  const c = COMPASS[side];
+  return n[0] * c[0] + n[1] * c[1] >= 0 ? n : [-n[0], -n[1]];
+}
+
+const hashStr = (s: string): number => {
+  let h = 2166136261;
+  for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return h >>> 0;
+};
+
+// --- compiling -------------------------------------------------------------
+
+export function compileMap(spec: MapSpec): CompiledMap {
+  const problems: string[] = [];
+  const rng = Rng.fromSeed(spec.seed);
+  const half = spec.size / 2;
+  const edge = 4;
+
+  // The ground's own shoreline (it is not a perfect circle), so scatter and validation agree with what is drawn.
+  const shape: Ground3D = { seed: spec.seed, size: spec.size, roads: spec.roads, mud: [], lake: spec.lake, pads: [], shade: [] };
+  const lakeD = (x: number, z: number): number => lakeDist(shape, x, z);
+  const roadD = (x: number, z: number): number => spec.roads.reduce((m, r) => Math.min(m, roadDist(r, x, z) - r.width / 2), Infinity);
+
+  // Houses.
+  const houses: PlacedHouse[] = spec.houses.map((h) => {
+    const dims = typeof h.size === 'object' ? h.size : SIZES[h.size ?? 'medium'];
+    const hs: House3DSpec = { seed: h.seed ?? hashStr(h.id) % 1000, width: dims.width, depth: dims.depth, wallH: h.wallH ?? 2.5, roof: h.roof ?? 'thatch' };
+    if ('road' in h.at) {
+      const road = spec.roads[h.at.road];
+      if (!road) {
+        problems.push(`house ${h.id}: no road ${h.at.road}`);
+        return { id: h.id, x: 0, z: 0, rot: 0, spec: hs, room: h.room };
+      }
+      const p = roadPoint(road, h.at.t * roadLength(road));
+      const [nx, nz] = sideNormal(p.tx, p.tz, h.at.side);
+      // The house's front (local +z) faces the road; its footprint runs 0.6 m past the front wall for the porch.
+      const dist = road.width / 2 + (h.at.gap ?? 2) + dims.depth / 2 + 0.6;
+      const rot = Math.atan2(-nx, -nz) + (rng.next() - 0.5) * 0.12;
+      return { id: h.id, x: p.x + nx * dist, z: p.z + nz * dist, rot, spec: hs, room: h.room };
+    }
+    return { id: h.id, x: h.at.x, z: h.at.z, rot: h.at.rot ?? 0, spec: hs, room: h.room };
+  });
+
+  const layout: Layout = {
+    houses,
+    trees: [...(spec.trees ?? [])],
+    torches: [...(spec.torches ?? [])],
+    props: [...(spec.props ?? [])],
+  };
+  for (const tl of spec.torchLines ?? []) {
+    const road = spec.roads[tl.road];
+    if (!road) {
+      problems.push(`torch line: no road ${tl.road}`);
+      continue;
+    }
+    const len = roadLength(road);
+    for (let s = tl.every / 2; s < len; s += tl.every) {
+      const p = roadPoint(road, s);
+      const [nx, nz] = sideNormal(p.tx, p.tz, tl.side);
+      const d = road.width / 2 + (tl.offset ?? 0.9);
+      layout.torches.push([p.x + nx * d, p.z + nz * d]);
+    }
+  }
+
+  const built = buildHouses(layout);
+  const boxes = built.map(houseOuterBox);
+
+  // Scatter: seeded random spots that keep clear of everything already there.
+  const KEEP = { tree: 0.9, shrub: 0.5, boulder: 0.8 } as const;
+  const placed: { x: number; z: number; r: number }[] = [
+    ...layout.trees.map((t) => ({ x: t.x, z: t.z, r: KEEP.tree })),
+    ...layout.props.map((p) => ({ x: p.x, z: p.z, r: p.kind === 'woodpile' ? 1 : KEEP[p.kind === 'boulder' ? 'boulder' : 'shrub'] })),
+    ...layout.torches.map(([x, z]) => ({ x, z, r: 0.4 })),
+  ];
+  const inArea = (a: Area): (() => [number, number]) => {
+    if ('circle' in a) return () => {
+      const r = a.circle[2] * Math.sqrt(rng.next()), t = rng.next() * Math.PI * 2;
+      return [a.circle[0] + Math.cos(t) * r, a.circle[1] + Math.sin(t) * r];
+    };
+    if ('rect' in a) return () => [a.rect[0] + rng.next() * (a.rect[2] - a.rect[0]), a.rect[1] + rng.next() * (a.rect[3] - a.rect[1])];
+    if ('ring' in a) return () => {
+      const [cx, cz, r0, r1] = a.ring;
+      const r = Math.sqrt(r0 * r0 + rng.next() * (r1 * r1 - r0 * r0)), t = rng.next() * Math.PI * 2;
+      return [cx + Math.cos(t) * r, cz + Math.sin(t) * r];
+    };
+    return () => [(rng.next() * 2 - 1) * (half - edge), (rng.next() * 2 - 1) * (half - edge)];
+  };
+  for (const sc of spec.scatter ?? []) {
+    const pick = inArea(sc.area);
+    const r = KEEP[sc.kind] + (sc.gap ?? (sc.kind === 'tree' ? 2.6 : 0.8));
+    let got = 0;
+    for (let tries = 0; got < sc.count && tries < sc.count * 80; tries++) {
+      const [x, z] = pick();
+      if (Math.abs(x) > half - edge || Math.abs(z) > half - edge) continue;
+      if (lakeD(x, z) < 1.6 || roadD(x, z) < 1.4) continue;
+      if (boxes.some((b) => shapeDist(b, x, z) < (sc.kind === 'tree' ? 2.4 : 1.2))) continue;
+      if (placed.some((o) => Math.hypot(o.x - x, o.z - z) < r + o.r)) continue;
+      placed.push({ x, z, r: KEEP[sc.kind] });
+      got++;
+      if (sc.kind === 'tree') layout.trees.push({ x, z, seed: 1 + Math.floor(rng.next() * 60) });
+      else layout.props.push({ kind: sc.kind === 'boulder' ? 'boulder' : 'shrub', x, z, seed: 1 + Math.floor(rng.next() * 60), size: 0.8 + rng.next() * 0.5 });
+    }
+    if (got < sc.count) problems.push(`scatter ${sc.kind}: only room for ${got} of ${sc.count}`);
+  }
+
+  // Ground.
+  const mud = [...(spec.mud ?? [])];
+  if (spec.doorMud) {
+    for (const b of built) {
+      const d = b.model.door;
+      const p = houseToWorld(b.place, d[0], d[2] + 1.1);
+      mud.push({ x: p.x, z: p.z, r: 1.9 });
+    }
+  }
+  const ground: Ground3D = { seed: spec.seed, size: spec.size, roads: spec.roads, mud, lake: spec.lake, pads: layoutPads(layout), shade: layoutShade(layout) };
+
+  // The hero.
+  let hero: [number, number] = [0, 0];
+  if (Array.isArray(spec.hero)) hero = spec.hero;
+  else if (spec.hero) {
+    const i = built.findIndex((b) => b.place.id === (spec.hero as { house: string }).house);
+    if (i < 0) problems.push(`hero: no house ${(spec.hero as { house: string }).house}`);
+    else {
+      const d = built[i].model.door;
+      const p = houseToWorld(built[i].place, d[0] + 1.2, d[2] + 2.4);
+      hero = [p.x, p.z];
+    }
+  } else if (spec.roads[0]) {
+    const p = roadPoint(spec.roads[0], roadLength(spec.roads[0]) * 0.5);
+    hero = [p.x, p.z];
+  }
+
+  // The villager's beat.
+  let walk: XZ[] = spec.walk ?? [];
+  if (!walk.length && spec.roads[0]) {
+    const r = spec.roads[0], len = roadLength(r);
+    walk = [0.2, 0.4, 0.6, 0.8].map((t) => {
+      const p = roadPoint(r, len * t);
+      return [p.x + p.tz * 0.6, p.z - p.tx * 0.6] as XZ;
+    });
+  }
+
+  const compiled: CompiledMap = { name: spec.name, ground, layout, hero, walk, problems };
+  problems.push(...validate(spec, compiled, built.map((b, i) => ({ id: b.place.id, box: boxes[i], door: houseToWorld(b.place, b.model.door[0], b.model.door[2] - 0.9) }))));
+  return compiled;
+}
+
+/** What is wrong with a compiled map (empty if nothing). */
+function validate(spec: MapSpec, c: CompiledMap, houses: { id: string; box: Shape; door: { x: number; z: number } }[]): string[] {
+  const out: string[] = [];
+  const g = c.ground;
+  const half = g.size / 2;
+  const inMap = (x: number, z: number, m = 1): boolean => Math.abs(x) < half - m && Math.abs(z) < half - m;
+  const lakeD = (x: number, z: number): number => lakeDist(g, x, z);
+  const built = buildHouses(c.layout);
+  const problem = (s: string): void => {
+    if (!out.includes(s)) out.push(s);
+  };
+  built.forEach((b, i) => {
+    const id = b.place.id;
+    const fp = b.model.footprint;
+    const corners = [[fp.x0, fp.z0], [fp.x1, fp.z0], [fp.x0, fp.z1], [fp.x1, fp.z1]];
+    // The whole footprint, not just its corners: a house can sit across a road with every corner clear of it.
+    for (let lx = fp.x0; lx <= fp.x1 + 1e-6; lx += 0.5) {
+      for (let lz = fp.z0; lz <= fp.z1 + 1e-6; lz += 0.5) {
+        const w = houseToWorld(b.place, lx, lz);
+        if (!inMap(w.x, w.z)) problem(`house ${id} is off the map`);
+        else if (lakeD(w.x, w.z) < 0.8) problem(`house ${id} is in the lake`);
+        else if (g.roads.some((r) => roadDist(r, w.x, w.z) < r.width / 2 + 0.2)) problem(`house ${id} is on a road`);
+      }
+    }
+    for (let j = i + 1; j < built.length; j++) {
+      const o = built[j];
+      // Footprints with a metre between them.
+      const oc = [[o.model.footprint.x0, o.model.footprint.z0], [o.model.footprint.x1, o.model.footprint.z0], [o.model.footprint.x0, o.model.footprint.z1], [o.model.footprint.x1, o.model.footprint.z1]];
+      const at = (pl: PlacedHouse, lx: number, lz: number): [number, number] => {
+        const w = houseToWorld(pl, lx, lz);
+        return [w.x, w.z];
+      };
+      const hit = oc.some(([lx, lz]) => shapeDist(houses[i].box, ...at(o.place, lx, lz)) < 1)
+        || corners.some(([lx, lz]) => shapeDist(houses[j].box, ...at(b.place, lx, lz)) < 1);
+      if (hit) problem(`houses ${id} and ${o.place.id} touch`);
+    }
+  });
+  for (const t of c.layout.trees) if (!inMap(t.x, t.z, 0.5) || lakeD(t.x, t.z) < 0.5) out.push(`tree at ${t.x.toFixed(1)},${t.z.toFixed(1)} is off the map or in the lake`);
+  for (const p of c.layout.props) if (!inMap(p.x, p.z, 0.5) || lakeD(p.x, p.z) < 0.5) out.push(`${p.kind} at ${p.x.toFixed(1)},${p.z.toFixed(1)} is off the map or in the lake`);
+  // Every door can be reached from where the hero starts.
+  if (!out.length) {
+    const grid = new NavGrid(g.size, layoutObstacles(c.layout, built), { radius: 0.2, blocked: (x, z) => lakeD(x, z) < 0.2 });
+    if (!grid.walkable(c.hero[0], c.hero[1])) out.push('the hero starts somewhere blocked');
+    else for (const h of houses) if (!findPath(grid, { x: c.hero[0], z: c.hero[1] }, h.door)) out.push(`the door of ${h.id} cannot be reached`);
+  }
+  if (spec.houses.length !== new Set(spec.houses.map((h) => h.id)).size) out.push('two houses share an id');
+  return out;
+}

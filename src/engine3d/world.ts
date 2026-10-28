@@ -7,7 +7,9 @@ import {
   tileTex, timberTex, windowGlowTex, windowTex,
 } from '../art/textures3d';
 import { PEOPLE } from '../content/village/folk';
-import { SPIKE_GROUND, SPIKE_HERO, SPIKE_LAYOUT, SPIKE_WALK, spikeFilamentWorld } from '../content/spike3d';
+import { mapNamed } from '../content/maps';
+import { filamentWorld } from '../content/spike3d';
+import type { CompiledMap } from '../core/world3d/mapgen';
 import type { AspectId, HexFilaments } from '../core/filaments';
 import { type FSource, FilamentField } from '../core/world3d/filaments3d';
 import { CHUNK, type ChunkTerrain, TerrainStore, chunkKey, chunksNear } from '../core/world3d/chunks';
@@ -152,7 +154,9 @@ export class SpikeWorld {
   /** The invisible navigation grid the hero walks on. */
   readonly nav: NavGrid;
   /** Where the hero stands, metres. */
-  readonly hero: P2 = { x: SPIKE_HERO[0], z: SPIKE_HERO[1] };
+  readonly hero: P2 = { x: 0, z: 0 };
+  /** The villager's beat (metres), there and back. */
+  private walkPts: [number, number][] = [];
   readonly heroCard!: WalkCard;
   private heroBlob!: THREE.Mesh;
   private path: P2[] | null = null;
@@ -165,10 +169,15 @@ export class SpikeWorld {
   private cloudOff = new THREE.Vector2();
   settings: WorldSettings;
 
-  constructor(settings: WorldSettings, grassCount: number, ground: Ground3D = SPIKE_GROUND, layout: Layout = SPIKE_LAYOUT) {
+  constructor(settings: WorldSettings, grassCount: number, map: Pick<CompiledMap, 'ground' | 'layout' | 'hero' | 'walk'> = mapNamed('spike')) {
     this.settings = settings;
+    const { ground, layout } = map;
     const g = ground;
     this.ground = ground;
+    this.hero.x = map.hero[0];
+    this.hero.z = map.hero[1];
+    this.walkPts = map.walk;
+    this.focus.set(map.hero[0], 0.5, map.hero[1]);
     this.store = new TerrainStore(ground, 0.5);
     this.grassCount = grassCount;
     this.scene.fog = this.fog;
@@ -225,7 +234,7 @@ export class SpikeWorld {
     this.scene.add(this.marker);
 
     this.weather.setWind(2, 1);
-    this.field = new FilamentField(spikeFilamentWorld(g, built, this.fires));
+    this.field = new FilamentField(filamentWorld(g, layout, built, this.fires));
   }
 
   private houseGlow: THREE.DataTexture | null = null;
@@ -945,7 +954,8 @@ export class SpikeWorld {
   }
 
   private walkVillager(dt: number): void {
-    const pts = SPIKE_WALK;
+    const pts = this.walkPts;
+    if (pts.length < 2) return;
     const lens = pts.slice(1).map((p, i) => Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]));
     const total = lens.reduce((a, b) => a + b, 0);
     this.walkS = (this.walkS + dt * 1.1) % (total * 2);

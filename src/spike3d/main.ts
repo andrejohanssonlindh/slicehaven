@@ -1,6 +1,6 @@
 import type { Sky, TimeOfDay } from '../core/environment';
 import { ASPECTS, LEVEL_NAMES } from '../core/filaments';
-import { SPIKE_GROUND } from '../content/spike3d';
+import { MAPS, mapNamed } from '../content/maps';
 import { Governor, TIERS, type DeviceInfo, type Tier, type TierName, atlasSize, pickTier, qualityAt } from '../core/world3d/tiers';
 import { setAtlasSize, spriteAtlas } from '../engine3d/atlas';
 import { Pipeline } from '../engine3d/pipeline';
@@ -266,9 +266,13 @@ function loop(now: number): void {
 // Building the world takes a moment (ground painting); let the page paint first.
 setTimeout(() => {
   const t0 = performance.now();
-  // ?world=192 makes the patch bigger, to see chunks stream in as you pan.
-  const size = Number(params.get('world')) || SPIKE_GROUND.size;
-  world = new SpikeWorld({ shells: Math.min(2, tier.shells), lights: Math.min(3, tier.lights), shadowMap: tier.shadowMap }, TIERS.high.grass, { ...SPIKE_GROUND, size });
+  // ?map=hamlet loads another map (see content/maps). ?world=192 makes the patch bigger, to see chunks stream in as you pan.
+  const name = params.get('map') ?? 'spike';
+  if (!(name in MAPS)) console.warn(`spike3d: no map called ${name}; maps are ${Object.keys(MAPS).join(', ')}`);
+  const map = mapNamed(name in MAPS ? name : 'spike');
+  if (map.problems.length) console.warn(`spike3d: map ${map.name} has problems:\n${map.problems.join('\n')}`);
+  const size = Number(params.get('world')) || map.ground.size;
+  world = new SpikeWorld({ shells: Math.min(2, tier.shells), lights: Math.min(3, tier.lights), shadowMap: tier.shadowMap }, TIERS.high.grass, { ...map, ground: { ...map.ground, size } });
   world.setGrass(tier.grass);
   pipeline.renderer.info.autoReset = false;
   fit();

@@ -1,5 +1,12 @@
 # Devlog
 
+## 2026-10-28 — Session 25e: authoring (rooms by rules, maps as intent), faces fixed
+
+- **Bug, transparent faces**: I had made every person's card see-through, so a person's own oval (centred on the chest) cut their own head, which is nearer the camera. People are plain sprites again; only trees get the oval (what was asked). My mistake: I added that without being asked.
+- **Rooms by rules** (`core/world3d/roomplan.ts`, `content/furnish.ts`): a recipe of pieces and rules ("hearth in the back-right corner, a table in the middle, stools around it, anything else where there is room") replaces coordinates. The solver keeps the door clear, never overlaps, and will not place a floor piece that would cut the door off from the floor. Sizes are measured from the sprites. The footprints block feet (the nav grid), the fire piece is the room's light and filament source. All nine village rooms are recipes (the smithy too). 40 tests across four house sizes.
+- **Maps as intent** (`core/world3d/mapgen.ts`, `content/maps/`): a `MapSpec` places houses along a road (facing it, with a gap), scatters trees, shrubs and boulders over regions without overlaps, lines a road with torches, stamps door mud, starts the hero at a door. `compileMap` returns the ground, layout, hero start, villager's beat and a list of problems; `tests/maps.test.ts` requires none for every map. The spike is now a `MapSpec` with its old coordinates (nothing changed); a new **hamlet** map (11 houses, ~90 trees, a 140 m world) is about 35 lines. `/spike3d/?map=hamlet`.
+- How to add a room or a map: [world3d-authoring](design/world3d-authoring.md). Not done: streaming of placed things for large maps (first job before a big map), a top-down map view, Reedwater as a spec.
+
 ## 2026-10-28 — Session 25d: rooms of their own
 
 - **Furniture sets per house**: a placed house names its room (`room` on `PlacedHouse`, default the humble home); `content/rooms3d.ts` maps each name to the village's furnished room (home, fisher, inn, bakery, herbalist, fishmonger, general, weaver, smithy), with the people left out (`RoomItem.person`, set by the village's `who()`), and says where its fire burns (or that there is none, as in the general store). The spike's houses are now home, herbalist, weaver and inn.
