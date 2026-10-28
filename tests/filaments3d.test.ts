@@ -85,6 +85,14 @@ describe('filaments in the free world', () => {
     expect(f.readAt(-10, 0).nekro.raw).toBeGreaterThan(f.readAt(20, 0).nekro.raw - 0.001);
   });
 
+  it('water is felt a metre and more from the shore, and gone by six', () => {
+    const f = new FilamentField(meadow([], { ground: (x, z) => (Math.hypot(x + 10, z) < 6 ? 'pond' : 'grass') }));
+    f.setConditions({ env: DAY });
+    expect(f.readAt(-4 + 1.2, 0).hydro.level).toBeGreaterThanOrEqual(1);
+    expect(f.readAt(-4 + 2.5, 0).hydro.level).toBeGreaterThanOrEqual(0);
+    expect(f.readAt(-4 + 6.5, 0).hydro.level).toBe(-1);
+  });
+
   it('indoors kills water and air', () => {
     const f = new FilamentField(meadow([], { indoors: (x) => x > 10 }));
     f.setConditions({ env: DAY });

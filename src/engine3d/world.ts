@@ -255,14 +255,14 @@ export class SpikeWorld {
       if (p.material === 'roof') this.addShells(mesh, opts, { density: 0.5, tint: 1.12, step: 0.06 }, p.cut);
     }
     // Furniture: the humble set, as sprites on the earth floor. u across, d from the front wall to the back.
-    const items: { s: Sprite; u: number; d: number; lift?: number; flat?: boolean }[] = [
+    const items: { s: Sprite; u: number; d: number; lift?: number; flat?: boolean; wall?: boolean }[] = [
       { s: makeRagRug(), u: 0.5, d: 0.38, flat: true },
       { s: makeStrawBits(), u: 0.3, d: 0.62, flat: true },
-      { s: makePallet(), u: 0.2, d: 0.86 },
-      { s: makeCookhearth(), u: 0.8, d: 0.95 },
-      { s: makeRoughShelf(), u: 0.46, d: 0.99, lift: 22 },
-      { s: makeCloakPegs(), u: 0.64, d: 0.99, lift: 4 },
-      { s: makeHanging(), u: 0.26, d: 0.99, lift: 14 },
+      { s: makePallet(), u: 0.2, d: 0.86, wall: true },
+      { s: makeCookhearth(), u: 0.8, d: 0.95, wall: true },
+      { s: makeRoughShelf(), u: 0.46, d: 0.99, wall: true, lift: 22 },
+      { s: makeCloakPegs(), u: 0.64, d: 0.99, wall: true, lift: 4 },
+      { s: makeHanging(), u: 0.26, d: 0.99, wall: true, lift: 14 },
       { s: makeBucketBroom(), u: 0.06, d: 0.78 },
       { s: makeFootlocker(), u: 0.07, d: 0.5 },
       { s: makeBasket(), u: 0.2, d: 0.2 },
@@ -278,7 +278,11 @@ export class SpikeWorld {
       const card = spriteCard(it.s, PITCH, { flat: it.flat, shadow: false });
       const x = r.x0 + it.u * (r.x1 - r.x0), z = r.z1 - it.d * (r.z1 - r.z0);
       card.mesh.position.set(x, this.model.floorY + 0.02 + (it.lift ?? 0) / TEXELS_PER_M, z);
-      card.mesh.rotation.y = YAW - h.rot;
+      // Free-standing things face the camera. Rugs and the things against the walls line up with
+      // the room itself (stretched sideways a little to keep one art pixel to one screen pixel).
+      const aligned = it.flat || it.wall;
+      card.mesh.rotation.y = aligned ? 0 : YAW - h.rot;
+      if (it.wall) card.mesh.scale.x = 1 / Math.cos(YAW - h.rot);
       this.house.add(card.mesh);
       this.sprites.push(card);
     }

@@ -19,6 +19,9 @@ import { CHUNK } from './chunks';
 /** Cell width, metres. 32 / 20: whole cells tile a chunk. */
 export const FCELL = CHUNK / 20;
 
+/** How far a source's reach is stretched, against the hex table (which was tuned for 1.5 m hexes). */
+export const REACH = 1.7;
+
 export type SourceKind = 'tree' | 'pine' | 'thicket' | 'rock' | 'fire' | 'burnt' | 'corpse' | 'undead' | 'friend' | 'beast';
 
 export interface FSource {
@@ -156,13 +159,14 @@ export class FilamentField {
     const { env } = this.cond;
     const opts = { isUndead: (u: Unit) => u.kind === 'undead' };
     const inc = new Map<string, Map<string, Gathered>>();
+    const R = Math.ceil(2.5 * REACH);
     const spread = (i: number, j: number, ems: Emission[], scale: number): void => {
       // Walls stop it: what burns indoors reaches only the room, what burns outside stays outside.
       const roofed = this.indoorGrid[j * this.n + i] === 1;
       for (const em of ems) {
-        for (let dj = -2; dj <= 2; dj++) {
-          for (let di = -2; di <= 2; di++) {
-            const d = Math.hypot(di, dj);
+        for (let dj = -R; dj <= R; dj++) {
+          for (let di = -R; di <= R; di++) {
+            const d = Math.hypot(di, dj) / REACH;
             const v = falloffAt(em.fall, d) * scale;
             if (!v || !this.inside(i + di, j + dj) || (this.indoorGrid[(j + dj) * this.n + i + di] === 1) !== roofed) continue;
             const k = `${i + di},${j + dj}`;

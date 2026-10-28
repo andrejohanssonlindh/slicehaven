@@ -30,7 +30,7 @@ function put(data: Uint8Array, o: number, aspect: AspectId, s: number): void {
   data[o + 1] = rgb[1];
   data[o + 2] = rgb[2];
   // Zero at "normal", rising smoothly either way.
-  data[o + 3] = s > 0 ? Math.min(190, s * 62) : Math.min(120, -s * 36);
+  data[o + 3] = s > 0 ? Math.min(200, s * 85) : Math.min(130, -s * 45);
 }
 
 function makeTex(w: number, h: number): { data: Uint8Array; tex: THREE.DataTexture } {

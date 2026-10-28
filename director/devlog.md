@@ -1,5 +1,10 @@
 # Devlog
 
+## 2026-10-28 — Session 24d: reach and the inside alignment
+
+- **Filament reach x1.7** (`REACH` in `filaments3d.ts`): the hex table was tuned for 1.5 m hexes, so sources now reach about 7 m at the very edge and are felt well over a metre out (water is +1 at 1.2 m from the shore, tested). Heat map is a little stronger too.
+- **Inside misalignment fixed**: every furniture card was turned to face the camera, so the room looked skewed against the house (turned 0.08 rad, seen at 24°). The things against the walls (hearth, pallet, shelf, pegs, hanging) and the flat ones (rug, straw, clutter) now line up with the room; wall items are stretched sideways by 1/cos to keep one art pixel to one screen pixel. Free-standing things still face the camera.
+
 ## 2026-10-28 — Session 24c: walking in, walls and smooth filaments
 
 - **Roof is no longer a tap.** Taps always walk (outside, tapping the house walks in through the door); **shift-click** on the house toggles the roof by hand (dev). The roof still follows the hero over the threshold.
