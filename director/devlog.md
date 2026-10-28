@@ -7,6 +7,7 @@
 - Pure, tested core in `src/core/world3d/` (mesh, house, terrain, tree, sky, tiers); 21 new tests (371 in all) and a Playwright run that screenshots every look.
 - Choices and numbers in [the M0 page](design/world3d-m0.md). **Q23**: judge it on the phone. **Q22**: fights without hexes (not urgent).
 - Not yet: side and back views for people, bloom, smoke, puddles, walking the hero, streaming.
+- **Verdict**: the director tried it on the phone: the look is right, never under 60 fps. Go. Q22 answered: metres, and filaments as a cell map. Handover for the next steps: [world3d-handover](design/world3d-handover.md).
 
 ## 2026-10-28 — Session 22b: brief for the voxel world engine
 

@@ -4,6 +4,8 @@ Only decisions that still stand. Ones that were replaced are removed (git histor
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-10-28 | **M0 passed: build the 3D world on the spike's pipeline** (no voxel fallback) | Director (Q23): the look is "nearly exactly what I want", never under 60 fps on the phone. |
+| 2026-10-28 | **Distances in the 3D world are measurements (metres), in the engine and in fights**; filament strength becomes a map over the world keyed by cell, read by position | Director (Q22). Handover: [world3d-handover](design/world3d-handover.md). |
 | 2026-10-28 | **The village world is live 3D (three.js, for the world pages only), not hex tiles.** The pixel look comes from a low-resolution render scaled with nearest-neighbour, pixel-sized textures from our painters, an outline pass, a palette, and one or two "shell" layers. People stay sprites (billboards). A spike (M0) judged on the phone decides before more is built; baked voxel sprites are the fallback | Director: a world that is not hex weighs heavily, and the whole-map 2D redraw (70 ms a frame at 38 × 31) can't scale. Mobile sees less (zoomed in), desktop more. See [the brief](design/voxel-engine-brief.md). |
 | 2026-10-28 | **Soft light is a must, and weather, clouds and time of day stay as their own system** that drives the lighting | Director: soft light is "super important for the feel". |
 | 2026-10-27 | **Skill hooks have one structure:** kinds are what things are, facets are who people are; every hook names an effort (a tag), which gives its skills and leanings; one file per effort; efforts not yet built are listed in code with where they belong | Director (Q19): fix the structure before more content, so the rest can be filled in by the same recipe. |
