@@ -19,6 +19,8 @@ export interface RoomItem {
   d: number;
   /** Pixels above the floor, for things hung on the wall. */
   lift?: number;
+  /** A person rather than furniture (the 3D world has its own people and leaves these out). */
+  person?: boolean;
 }
 
 /**

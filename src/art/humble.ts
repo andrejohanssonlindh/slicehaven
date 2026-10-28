@@ -267,7 +267,7 @@ export function makeClutter(seed = 14): Prop {
   ellipse(p, 24, 11, 3.6, 1.4, () => '#2a1c12');
   capsule(p, 27, 11, 33, 8, 0.6, 0.6, GW, seed, 0.2);
   polyFill(p, [[34, 8], [38, 8], [38, 12], [42, 13], [42, 15], [34, 15]], (x, y) => pick(['#1a120e', '#33261c', '#52402e'], 0.5 + (y < 10 ? 0.1 : 0) + (white(x, y, seed) - 0.5) * 0.3, x, y));
-  return finish(p, 22, 16, seed, 10);
+  return { ...finish(p, 22, 16, seed, 10), flat: true };
 }
 
 /** Straw trodden into the floor. Flat, no outline. */
@@ -278,7 +278,7 @@ export function makeStrawBits(seed = 15): Prop {
     const x = 3 + rng.int(36), y = 3 + rng.int(10), len = 2 + rng.int(4), dy = rng.int(3) - 1;
     for (let k = 0; k < len; k++) p.set(x + k, y + Math.round((k * dy) / 3), STRAW[1 + rng.int(3)]);
   }
-  return still(p, 22, 8, 0);
+  return still(p, 22, 8, 0, { flat: true });
 }
 
 /** A rag rug of whatever strips there were. */
@@ -294,7 +294,7 @@ export function makeRagRug(seed = 16): Prop {
     return pick(pal, 0.5 + (white(x, y, seed) - 0.5) * 0.4, x, y);
   });
   grime(p, seed, 0.5, y0);
-  return still(p, 20, 18, 0);
+  return still(p, 20, 18, 0, { flat: true });
 }
 
 /** The village furnishing of a one-room house. Small, crowded, nothing matching. */

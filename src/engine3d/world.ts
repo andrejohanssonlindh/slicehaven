@@ -1,11 +1,7 @@
 import * as THREE from 'three';
 import { makeWalkSet, viewFor } from '../art/folkWalk';
-import {
-  makeBasket, makeBucketBroom, makeClutter, makeCloakPegs, makeCookhearth, makeFootlocker, makeHanging, makeKeg,
-  makePallet, makeRagRug, makeRoughShelf, makeSacks, makeStool3, makeStrawBits, makeTrestleTable,
-} from '../art/humble';
 import type { Pix } from '../art/pix';
-import type { Sprite } from '../art/props';
+import { ROOM_SETS, type RoomSet, furnitureOf } from '../content/rooms3d';
 import {
   barkTex, doorTex, floorTex, groundChunkTex, leafTex, plasterTex, roofUnderTex, shingleTex, shutterTex, sodTex, stoneTex, thatchTex,
   tileTex, timberTex, windowGlowTex, windowTex,
@@ -287,46 +283,32 @@ export class SpikeWorld {
       }
       if (p.material === 'roof') this.addShells(mesh, opts, { density: 0.5, tint: 1.12, step: 0.06 }, p.cut ? inst : null);
     }
-    // Furniture: the humble set, as sprites on the earth floor. u across, d from the front wall to the back.
-    const items: { s: Sprite; u: number; d: number; lift?: number; flat?: boolean; wall?: boolean }[] = [
-      { s: makeRagRug(), u: 0.5, d: 0.38, flat: true },
-      { s: makeStrawBits(), u: 0.3, d: 0.62, flat: true },
-      { s: makePallet(), u: 0.2, d: 0.86, wall: true },
-      { s: makeCookhearth(), u: 0.8, d: 0.95, wall: true },
-      { s: makeRoughShelf(), u: 0.46, d: 0.99, wall: true, lift: 22 },
-      { s: makeCloakPegs(), u: 0.64, d: 0.99, wall: true, lift: 4 },
-      { s: makeHanging(), u: 0.26, d: 0.99, wall: true, lift: 14 },
-      { s: makeBucketBroom(), u: 0.06, d: 0.78 },
-      { s: makeFootlocker(), u: 0.07, d: 0.5 },
-      { s: makeBasket(), u: 0.2, d: 0.2 },
-      { s: makeTrestleTable(), u: 0.5, d: 0.5 },
-      { s: makeStool3(), u: 0.34, d: 0.32 },
-      { s: makeStool3(7), u: 0.66, d: 0.4 },
-      { s: makeClutter(), u: 0.5, d: 0.12, flat: true },
-      { s: makeKeg(), u: 0.92, d: 0.5 },
-      { s: makeSacks(), u: 0.9, d: 0.16 },
-    ];
+    // Furniture: the house's room set (`content/rooms3d.ts`), as sprites on the floor. u across, d from the front wall to the back.
+    const set = ROOM_SETS[(h.room ?? 'home') as RoomSet] ?? ROOM_SETS.home;
     const r = model.room;
-    for (const it of items) {
-      const card = spriteCard(it.s, PITCH, { flat: it.flat, shadow: false });
+    for (const it of furnitureOf((h.room ?? 'home') as RoomSet)) {
+      const flat = !!it.prop.flat;
+      // Things at the back wall or hung on it line up with the room (stretched sideways a little
+      // to keep one art pixel to one screen pixel), as do rugs. Free-standing things face the camera.
+      const wall = !flat && (it.d >= 0.9 || it.lift !== undefined);
+      const card = spriteCard(it.prop, PITCH, { flat, shadow: false });
       const x = r.x0 + it.u * (r.x1 - r.x0), z = r.z1 - it.d * (r.z1 - r.z0);
       card.mesh.position.set(x, model.floorY + 0.02 + (it.lift ?? 0) / TEXELS_PER_M, z);
-      // Free-standing things face the camera. Rugs and the things against the walls line up with
-      // the room itself (stretched sideways a little to keep one art pixel to one screen pixel).
-      const aligned = it.flat || it.wall;
-      card.mesh.rotation.y = aligned ? 0 : YAW - h.rot;
-      if (it.wall) card.mesh.scale.x = 1 / Math.cos(YAW - h.rot);
+      card.mesh.rotation.y = flat || wall ? 0 : YAW - h.rot;
+      if (wall) card.mesh.scale.x = 1 / Math.cos(YAW - h.rot);
       inst.group.add(card.mesh);
       inst.furniture.push(card.mesh);
       this.sprites.push(card);
     }
-    // The hearth's glow.
-    const hearth = new THREE.PointLight(0xff9a48, 4, 6, 2);
-    hearth.position.set(r.x0 + 0.8 * (r.x1 - r.x0), model.floorY + 0.55, r.z1 - 0.88 * (r.z1 - r.z0));
-    inst.group.add(hearth);
-    this.torches.push({ light: hearth, flame: new THREE.Mesh(), base: 4, seed: 3 + this.houses.length * 5 });
-    const hf = houseToWorld(h, hearth.position.x, hearth.position.z);
-    this.fires.push({ x: hf.x, z: hf.z, kind: 'fire', weight: 1 });
+    // The hearth's (or oven's, or forge's) glow, if the room has one.
+    if (set.fire) {
+      const hearth = new THREE.PointLight(0xff9a48, 4, 6, 2);
+      hearth.position.set(r.x0 + set.fire.u * (r.x1 - r.x0), model.floorY + 0.55, r.z1 - set.fire.d * (r.z1 - r.z0));
+      inst.group.add(hearth);
+      this.torches.push({ light: hearth, flame: new THREE.Mesh(), base: 4, seed: 3 + this.houses.length * 5 });
+      const hf = houseToWorld(h, hearth.position.x, hearth.position.z);
+      this.fires.push({ x: hf.x, z: hf.z, kind: 'fire', weight: 1 });
+    }
 
     const y = groundHeight(this.ground, h.x, h.z) - 0.05;
     inst.group.position.set(h.x, y, h.z);

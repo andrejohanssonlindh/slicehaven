@@ -15,9 +15,9 @@ import type { Ground3D, XZ } from '../core/world3d/terrain';
 export const SPIKE_LAYOUT: Layout = {
   houses: [
     { id: 'home', x: 0, z: -2.5, rot: 0.08, spec: { seed: 7, width: 6.2, depth: 4.6, wallH: 2.5, roof: 'thatch' } },
-    { id: 'west', x: -22, z: -0.5, rot: -0.05, spec: { seed: 12, width: 5.4, depth: 4.2, wallH: 2.4, roof: 'shingle' } },
-    { id: 'east', x: 15, z: -3.5, rot: 0.14, spec: { seed: 21, width: 5, depth: 4, wallH: 2.4, roof: 'sod' } },
-    { id: 'far', x: 25, z: -1, rot: -0.1, spec: { seed: 33, width: 7.4, depth: 5, wallH: 2.6, roof: 'tile' } },
+    { id: 'west', x: -22, z: -0.5, rot: -0.05, room: 'herbalist', spec: { seed: 12, width: 5.4, depth: 4.2, wallH: 2.4, roof: 'shingle' } },
+    { id: 'east', x: 15, z: -3.5, rot: 0.14, room: 'weaver', spec: { seed: 21, width: 5, depth: 4, wallH: 2.4, roof: 'sod' } },
+    { id: 'far', x: 25, z: -1, rot: -0.1, room: 'inn', spec: { seed: 33, width: 7.4, depth: 5, wallH: 2.6, roof: 'tile' } },
   ],
   trees: [
     { x: 9.5, z: -7.5, seed: 3 },

@@ -15,6 +15,8 @@ export interface PlacedHouse {
   z: number;
   rot: number;
   spec: House3DSpec;
+  /** What is inside (a key of `ROOM_SETS` in `content/rooms3d.ts`); the humble home by default. */
+  room?: string;
 }
 
 export interface PlacedTree {

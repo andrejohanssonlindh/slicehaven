@@ -1,5 +1,11 @@
 # Devlog
 
+## 2026-10-28 — Session 25d: rooms of their own
+
+- **Furniture sets per house**: a placed house names its room (`room` on `PlacedHouse`, default the humble home); `content/rooms3d.ts` maps each name to the village's furnished room (home, fisher, inn, bakery, herbalist, fishmonger, general, weaver, smithy), with the people left out (`RoomItem.person`, set by the village's `who()`), and says where its fire burns (or that there is none, as in the general store). The spike's houses are now home, herbalist, weaver and inn.
+- Floor pieces (rug, straw, litter) are marked `flat` on the prop itself; anything at the back wall or hung on it lines up with the room. The hearth light and filament fire come from the set, so a room without a fire has neither.
+- Not yet: furniture does not block feet (the room is walkable through its tables), furniture is not a filament source, and the sets are the village's art at its own proportions (rooms in 3D are bigger, so they look sparse). Tests `rooms3d.test.ts`, e2e `spike3d-rooms.e2e.ts` (a screenshot of every room).
+
 ## 2026-10-28 — Session 25c: no furniture through roofs, see-through ovals
 
 - **Furniture through the roofs**: the specks on the ridges were the tops of the interior cards (hanging, shelf, pegs). A house's furniture is now shown only while its roof is lifted.

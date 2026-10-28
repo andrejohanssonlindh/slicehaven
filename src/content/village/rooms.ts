@@ -17,7 +17,7 @@ import { PEOPLE } from './folk';
  * People are items too: the shopkeeper stands behind the counter.
  */
 
-const who = (key: string, u: number, d: number): RoomItem => ({ prop: makeFolk(PEOPLE[key]), u, d });
+const who = (key: string, u: number, d: number): RoomItem => ({ prop: makeFolk(PEOPLE[key]), u, d, person: true });
 
 /** A fisher's family home: the village's usual one-room house, plus the nets and the catch. */
 export function fisherHomeItems(): RoomItem[] {

@@ -28,6 +28,8 @@ export interface Prop extends Sprite {
   footprint?: { cols: number; rows: number };
   /** What you see when you step inside: the roof and front walls cut away. */
   cutaway?: Prop;
+  /** Lies on the floor (rugs, straw, small litter) rather than standing. */
+  flat?: boolean;
 }
 
 export const still = (p: Pix, ax: number, ay: number, shadow = 0, extra: Partial<Prop> = {}): Prop => ({
