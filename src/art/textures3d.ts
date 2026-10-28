@@ -62,6 +62,61 @@ export function thatchTex(seed: number): Pix {
   return p;
 }
 
+const CLAY = ['#3a1c14', '#5e2c1e', '#8a4129', '#b05a36', '#cf7a4a', '#e29a68'];
+
+/** Wooden shingles: staggered rows, each a little different, dark where they overlap, silvered with age. */
+export function shingleTex(seed: number): Pix {
+  const p = new Pix(128, 128);
+  for (let y = 0; y < p.h; y++) {
+    const row = Math.floor(y / 8), cy = y % 8;
+    const shift = Math.round(white(row, 1, seed) * 9);
+    for (let x = 0; x < p.w; x++) {
+      const bx = Math.floor((x + shift) / 9);
+      const grain = fbm(x / 6, y / 0.9, seed + row) - 0.5;
+      let v = 0.5 + grain * 0.5 + (white(bx, row, seed + 3) - 0.5) * 0.4 + (cy > 5 ? -0.12 * (cy - 5) : 0) + (cy < 2 ? 0.1 : 0);
+      if ((x + shift) % 9 === 0) v -= 0.3;
+      p.set(x, y, pick(WOOD, v * 0.85, x, y));
+    }
+  }
+  return p;
+}
+
+/** Clay tiles: rows of curved, scalloped tiles, each row offset by half a tile. */
+export function tileTex(seed: number): Pix {
+  const p = new Pix(128, 128);
+  const TW = 12, TH = 11;
+  for (let y = 0; y < p.h; y++) {
+    const row = Math.floor(y / TH), cy = y % TH;
+    const off = row % 2 ? TW / 2 : 0;
+    for (let x = 0; x < p.w; x++) {
+      const tx = (x + off) % TW, tile = Math.floor((x + off) / TW);
+      // The tile's curve: lit on one side, dark in the trough, and a shadow under the row above.
+      const curve = Math.cos(((tx + 0.5) / TW) * Math.PI);
+      let v = 0.55 + curve * 0.18 + (white(tile, row, seed) - 0.5) * 0.35 + (fbm(x / 3, y / 3, seed + 2) - 0.5) * 0.25;
+      if (cy < 3) v -= 0.22 - cy * 0.07;
+      if (cy > TH - 3) v += 0.1;
+      if (tx === 0) v -= 0.25;
+      const moss = fbm(x / 7, y / 6, seed + 9);
+      p.set(x, y, moss > 0.78 ? ramp(P.moss, 0.3 + (moss - 0.78) * 3, x, y) : pick(CLAY, v, x, y));
+    }
+  }
+  return p;
+}
+
+/** Sod: turf on a roof, tufted and uneven, with bare earth showing through. */
+export function sodTex(seed: number): Pix {
+  const p = new Pix(128, 128);
+  for (let y = 0; y < p.h; y++) {
+    for (let x = 0; x < p.w; x++) {
+      const tuft = fbm(x / 2.2, y / 2.2, seed) - 0.5;
+      const patch = fbm(x / 14, y / 14, seed + 4);
+      if (patch > 0.8) p.set(x, y, pick(P.dirt, 0.35 + tuft * 0.6, x, y));
+      else p.set(x, y, pick(P.grass, 0.38 + tuft * 0.9 + (patch - 0.5) * 0.3 + (white(x, y, seed + 6) > 0.93 ? 0.25 : 0), x, y));
+    }
+  }
+  return p;
+}
+
 export function roofUnderTex(seed: number): Pix {
   const p = new Pix(64, 64);
   for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) p.set(x, y, pick(THATCH.slice(0, 3), 0.4 + (fbm(x / 1, y / 6, seed) - 0.5) * 0.6, x, y));

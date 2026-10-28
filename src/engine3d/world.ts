@@ -7,8 +7,8 @@ import {
 import type { Pix } from '../art/pix';
 import type { Sprite } from '../art/props';
 import {
-  barkTex, doorTex, floorTex, groundChunkTex, leafTex, plasterTex, roofUnderTex, shutterTex, stoneTex, thatchTex,
-  timberTex, windowGlowTex, windowTex,
+  barkTex, doorTex, floorTex, groundChunkTex, leafTex, plasterTex, roofUnderTex, shingleTex, shutterTex, sodTex, stoneTex, thatchTex,
+  tileTex, timberTex, windowGlowTex, windowTex,
 } from '../art/textures3d';
 import { PEOPLE } from '../content/village/folk';
 import { SPIKE_GROUND, SPIKE_HERO, SPIKE_LAYOUT, SPIKE_WALK, spikeFilamentWorld } from '../content/spike3d';
@@ -20,11 +20,12 @@ import { Rng } from '../core/rng';
 import type { HouseMaterial } from '../core/world3d/house';
 import { type BuiltHouse, type Layout, type PlacedTree, buildHouses, houseAt, houseBox, houseToLocal, houseToWorld, layoutObstacles } from '../core/world3d/layout';
 import type { MeshData } from '../core/world3d/mesh';
+import { type PlacedProp, buildBoulder, buildShrub, buildWoodpile } from '../core/world3d/props';
 import { cloudDrift, cloudThreshold } from '../core/world3d/sky';
 import { NavGrid, type P2, type Shape, findPath, followPath, pathLength } from '../core/world3d/space';
 import { type Ground3D, groundHeight, lakeDist, splatAt } from '../core/world3d/terrain';
 import { TEXELS_PER_M } from '../core/world3d/tiers';
-import { buildTree } from '../core/world3d/tree';
+import { type Clump, buildTree } from '../core/world3d/tree';
 import { fbm } from '../core/noise';
 import { Weather } from '../engine/weather';
 import { type LitOpts, WORLD, lit, pixTexture, shellOf } from './materials';
@@ -183,6 +184,7 @@ export class SpikeWorld {
 
     // Trees, grass, water, torches, people.
     for (const t of layout.trees) this.buildTree(t);
+    for (const p of layout.props) this.buildProp(p);
     this.water = makeWater(g);
     if (this.water) this.scene.add(this.water.mesh);
     this.buildTorches();
@@ -222,6 +224,9 @@ export class SpikeWorld {
       plaster: () => ({ map: tex(plasterTex(5)), ao: true, wettable: true }),
       timber: () => ({ map: tex(timberTex(6)), ao: true, wettable: true }),
       roof: () => ({ map: tex(thatchTex(8)), ao: true, wettable: true }),
+      shingle: () => ({ map: tex(shingleTex(14)), ao: true, wettable: true }),
+      tile: () => ({ map: tex(tileTex(15)), ao: true, wettable: true }),
+      sod: () => ({ map: tex(sodTex(16)), ao: true, wettable: true }),
       roofUnder: () => ({ map: tex(roofUnderTex(9)), ao: true }),
       door: () => ({ map: tex(doorTex(10), true, undefined), ao: true }),
       window: () => ({ map: tex(windowTex(), true, undefined), ao: true, emissiveMap: glow, emissive: 0x000000 }),
@@ -341,28 +346,7 @@ export class SpikeWorld {
     const wood = new THREE.Mesh(geometryOf(t.wood), this.barkMat);
     wood.castShadow = wood.receiveShadow = true;
     group.add(wood);
-    const parts: THREE.BufferGeometry[] = [];
-    t.clumps.forEach((c, i) => {
-      const geo = new THREE.IcosahedronGeometry(1, 2);
-      const pos = geo.attributes.position as THREE.BufferAttribute;
-      const nrm = new Float32Array(pos.count * 3), uv = new Float32Array(pos.count * 2), col = new Float32Array(pos.count * 3);
-      for (let k = 0; k < pos.count; k++) {
-        const x = pos.getX(k), y = pos.getY(k), z = pos.getZ(k);
-        const lump = 1 + (fbm(x * 1.7 + i * 3, z * 1.7 + y, 41 + i) - 0.5) * 0.45;
-        const px = x * c.r[0] * lump, py = y * c.r[1] * lump, pz = z * c.r[2] * lump;
-        pos.setXYZ(k, px + c.at[0], py + c.at[1], pz + c.at[2]);
-        const n = new THREE.Vector3(x / c.r[0], y / c.r[1], z / c.r[2]).normalize();
-        nrm.set([n.x, n.y, n.z], k * 3);
-        uv.set([px + pz * 0.6 + i * 1.3, py], k * 2);
-        const ao = 0.5 + 0.5 * Math.max(0, n.y * 0.5 + 0.5) * Math.min(1, (py + c.at[1]) / t.height + 0.35);
-        col.set([ao, ao, ao], k * 3);
-      }
-      geo.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
-      geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-      geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
-      parts.push(geo);
-    });
-    const merged = mergeAll(parts);
+    const merged = lumpGeometry(t.clumps, t.height, 2);
     this.leafOpts ??= { map: tex(leafTex(5)), ao: true, sway: { from: 2.5, amount: 0.018 } };
     const leafOpts = this.leafOpts;
     this.leafMat ??= lit(leafOpts);
@@ -373,6 +357,39 @@ export class SpikeWorld {
     group.position.set(gx, this.store.heightAt(gx, gz), gz);
     this.scene.add(group);
     this.addShells(leaves, leafOpts, { density: 0.55, tint: 1.18, step: 0.12 }, null);
+  }
+
+  private stoneMat: THREE.MeshLambertMaterial | null = null;
+  private shrubMat: THREE.MeshLambertMaterial | null = null;
+
+  /** A shrub, boulder or woodpile, standing on the ground where it is placed. */
+  private buildProp(p: PlacedProp): void {
+    const group = new THREE.Group();
+    const s = p.size ?? 1;
+    if (p.kind === 'woodpile') {
+      this.barkMat ??= lit({ map: tex(barkTex(4)), ao: true, wettable: true });
+      const m = new THREE.Mesh(geometryOf(buildWoodpile(p.seed)), this.barkMat);
+      m.castShadow = m.receiveShadow = true;
+      group.add(m);
+    } else if (p.kind === 'boulder') {
+      const b = buildBoulder(p.seed);
+      this.stoneMat ??= lit({ map: tex(stoneTex(3)), ao: true, wettable: true });
+      const m = new THREE.Mesh(lumpGeometry(b.clumps, b.height, 1), this.stoneMat);
+      m.castShadow = m.receiveShadow = true;
+      group.add(m);
+    } else {
+      const b = buildShrub(p.seed);
+      this.leafOpts ??= { map: tex(leafTex(5)), ao: true, sway: { from: 2.5, amount: 0.018 } };
+      // Shrubs are low, so they sway from the ground up; trees keep their trunks still.
+      this.shrubMat ??= lit({ ...this.leafOpts, sway: { from: 0, amount: 0.05 } });
+      const m = new THREE.Mesh(lumpGeometry(b.clumps, b.height, 2), this.shrubMat);
+      m.castShadow = m.receiveShadow = true;
+      group.add(m);
+    }
+    group.scale.setScalar(s);
+    group.rotation.y = p.rot ?? 0;
+    group.position.set(p.x, this.store.heightAt(p.x, p.z) - (p.kind === 'woodpile' ? 0.02 : 0), p.z);
+    this.scene.add(group);
   }
 
   private grassGeo: THREE.BufferGeometry | null = null;
@@ -912,6 +929,32 @@ export class SpikeWorld {
     this.faceScreen(m, dirX, dirZ);
     this.walkerBlob.position.set(x, y + 0.03, z);
   }
+}
+
+/** Lumpy balls for leaf clumps and boulders: a noisy icosphere per clump, merged. `detail` is the subdivision. */
+function lumpGeometry(clumps: Clump[], height: number, detail: number): THREE.BufferGeometry {
+  const parts: THREE.BufferGeometry[] = [];
+  clumps.forEach((c, i) => {
+    const geo = new THREE.IcosahedronGeometry(1, detail);
+    const pos = geo.attributes.position as THREE.BufferAttribute;
+    const nrm = new Float32Array(pos.count * 3), uv = new Float32Array(pos.count * 2), col = new Float32Array(pos.count * 3);
+    for (let k = 0; k < pos.count; k++) {
+      const x = pos.getX(k), y = pos.getY(k), z = pos.getZ(k);
+      const lump = 1 + (fbm(x * 1.7 + i * 3, z * 1.7 + y, 41 + i) - 0.5) * 0.45;
+      const px = x * c.r[0] * lump, py = y * c.r[1] * lump, pz = z * c.r[2] * lump;
+      pos.setXYZ(k, px + c.at[0], py + c.at[1], pz + c.at[2]);
+      const n = new THREE.Vector3(x / c.r[0], y / c.r[1], z / c.r[2]).normalize();
+      nrm.set([n.x, n.y, n.z], k * 3);
+      uv.set([px + pz * 0.6 + i * 1.3, py], k * 2);
+      const ao = 0.5 + 0.5 * Math.max(0, n.y * 0.5 + 0.5) * Math.min(1, (py + c.at[1]) / height + 0.35);
+      col.set([ao, ao, ao], k * 3);
+    }
+    geo.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    parts.push(geo);
+  });
+  return mergeAll(parts);
 }
 
 function mergeAll(geos: THREE.BufferGeometry[]): THREE.BufferGeometry {

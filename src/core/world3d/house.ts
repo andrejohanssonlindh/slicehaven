@@ -24,7 +24,8 @@ export interface House3DSpec {
   roof?: RoofKind;
 }
 
-export type HouseMaterial = 'stone' | 'plaster' | 'timber' | 'roof' | 'door' | 'window' | 'shutter' | 'floor' | 'roofUnder';
+/** `roof` is thatch; the other kinds have their own. */
+export type HouseMaterial = 'stone' | 'plaster' | 'timber' | 'roof' | 'shingle' | 'tile' | 'sod' | 'door' | 'window' | 'shutter' | 'floor' | 'roofUnder';
 
 export interface HousePart {
   name: string;
@@ -68,7 +69,7 @@ export function buildHouse(spec: House3DSpec): HouseModel {
   const gables = part('gables', 'plaster', true);
   const timber = part('timber', 'timber');
   const frontTimber = part('frontTimber', 'timber', true);
-  const roof = part('roof', 'roof', true);
+  const roof = part('roof', roofKind === 'thatch' ? 'roof' : roofKind, true);
   const under = part('roofUnder', 'roofUnder', true);
   const chimney = part('chimney', 'stone', true);
   const door = part('door', 'door', true);

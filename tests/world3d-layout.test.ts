@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SPIKE_GROUND, SPIKE_HERO, SPIKE_LAYOUT, SPIKE_TORCHES } from '../src/content/spike3d';
-import { buildHouses, houseAt, houseBox, houseToLocal, houseToWorld, houseWalls, layoutObstacles } from '../src/core/world3d/layout';
+import { buildHouses, houseAt, houseBox, houseOuterBox, houseToLocal, houseToWorld, houseWalls, layoutObstacles } from '../src/core/world3d/layout';
+import { buildBoulder, buildShrub, buildWoodpile, propSource } from '../src/core/world3d/props';
 import { NavGrid, findPath, shapeDist } from '../src/core/world3d/space';
 import { WATER_Y, groundHeight, lakeDist, roadDist } from '../src/core/world3d/terrain';
 
@@ -56,6 +57,27 @@ describe('layout', () => {
       expect(houseAt(houses, boxes, inside.x, inside.z, -0.1)).toBe(i);
     });
     expect(houseAt(houses, boxes, SPIKE_HERO[0], SPIKE_HERO[1], -0.1)).toBe(-1);
+  });
+
+  it('props stand on dry ground, off the road, clear of houses, and block feet', () => {
+    const boxes = houses.map(houseOuterBox);
+    const grid = new NavGrid(g.size, layoutObstacles(SPIKE_LAYOUT, houses), { radius: 0.2 });
+    for (const p of SPIKE_LAYOUT.props) {
+      const id = `${p.kind}@${p.x},${p.z}`;
+      expect(lakeDist(g, p.x, p.z), id).toBeGreaterThan(1);
+      for (const r of g.roads) expect(roadDist(r, p.x, p.z), id).toBeGreaterThan(r.width / 2 + 0.3);
+      for (const b of boxes) expect(shapeDist(b, p.x, p.z), id).toBeGreaterThan(0.4);
+      expect(grid.walkable(p.x, p.z), id).toBe(false);
+    }
+  });
+
+  it('props build deterministically; boulders and shrubs are sources, woodpiles are not', () => {
+    expect(JSON.stringify(buildShrub(4))).toBe(JSON.stringify(buildShrub(4)));
+    expect(buildWoodpile(3).indices.length).toBeGreaterThan(0);
+    expect(buildBoulder(2).clumps.length).toBe(2);
+    expect(propSource({ kind: 'boulder', x: 1, z: 2, seed: 1 })?.kind).toBe('rock');
+    expect(propSource({ kind: 'shrub', x: 1, z: 2, seed: 1 })?.kind).toBe('thicket');
+    expect(propSource({ kind: 'woodpile', x: 1, z: 2, seed: 1 })).toBeNull();
   });
 
   it('each house keeps a doorway gap in its walls', () => {

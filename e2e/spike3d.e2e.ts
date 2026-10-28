@@ -152,3 +152,22 @@ describe('spike3d entering', () => {
     expect(errors).toEqual([]);
   });
 });
+
+describe('spike3d layout', () => {
+  it('shows the other houses, roofs and props, and walks into the east house', async () => {
+    const { page, errors } = await openPage(env, '/spike3d/?nogov');
+    await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 30_000 });
+    const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; return ${fn}; })()`);
+    for (const [name, x, z] of [['east', 18, -2], ['west', -20, 0], ['props', 0, -4]] as const) {
+      await w(`(w.focus.x = ${x}, w.focus.z = ${z}, 0)`);
+      await page.waitForTimeout(2500);
+      await page.screenshot({ path: `${OUT}spike3d-layout-${name}.png` });
+    }
+    expect(await w('w.houses.length')).toBe(4);
+    expect(await w('w.walkIn(2)')).not.toBeNull();
+    await page.waitForFunction(() => !(window as any).spike.world.walking, undefined, { timeout: 60_000 });
+    expect(await w('w.heroHouse()')).toBe(2);
+    expect(await w('w.houses.map((h) => h.open)')).toEqual([false, false, true, false]);
+    expect(errors).toEqual([]);
+  });
+});
