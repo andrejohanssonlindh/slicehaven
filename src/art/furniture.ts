@@ -156,14 +156,42 @@ export function makeShelf(seed = 7): Prop {
   return finish(p, 28, 33, seed, 0);
 }
 
-export function flame(p: Pix, x0: number, x1: number, base: number, h: number, f: number, seed: number): void {
-  for (let x = x0; x < x1; x++) {
-    const mid = 1 - Math.abs((x - (x0 + x1) / 2) / ((x1 - x0) / 2));
-    const hh = h * mid * (0.55 + fbm(x * 0.55 + f * 0.9, f * 0.7, seed) * 0.9);
-    for (let k = 0; k < hh; k++) {
-      const t = k / Math.max(1, hh);
-      p.set(x, base - k, pick(['#7a1a10', '#c43a1e', '#ee7a2a', '#ffc04a', '#fff0a0'], 1 - t * 0.9 - (1 - mid) * 0.3 + (white(x, k, seed + f) - 0.5) * 0.3, x, k));
+const FIRE = ['#3a0c0a', '#8a1a12', '#d4401a', '#f27a24', '#ffb23c', '#ffe27a', '#fff6c8'];
+
+/**
+ * A wood fire that looks like one: several licking tongues that wander and
+ * split, a hot yellow core low down, ragged red tips that break into nothing,
+ * and sparks drifting up. `clip` keeps it inside an opening.
+ */
+export function fire(
+  p: Pix, x0: number, x1: number, base: number, h: number, f: number, seed: number, clip?: (x: number, y: number) => boolean,
+): void {
+  const a = (f / FRAMES) * Math.PI * 2;
+  const cx = (x0 + x1) / 2, hw = Math.max(1, (x1 - x0) / 2);
+  for (let y = base; y > base - h * 1.5; y--) {
+    const dy = base - y;
+    for (let x = x0; x <= x1; x++) {
+      if (clip && !clip(x, y)) continue;
+      const u = (x - cx) / hw;
+      const env = Math.max(0, 1 - u * u * 0.85);
+      const n = fbm(x * 0.6 + Math.cos(a) * 1.4, y * 0.3 + Math.sin(a) * 1.4 + f * 0.4, seed, 3);
+      // Tongues: each column has its own height, shifting from frame to frame.
+      const tongue = 0.5 + 0.5 * Math.sin(x * 1.15 + a * 2 + seed) * Math.sin(x * 0.45 - a + seed * 2);
+      const height = h * env * (0.4 + 0.5 * tongue + 0.45 * n);
+      let I = 1 - dy / Math.max(1, height) + (n - 0.5) * 0.55;
+      I += (1 - Math.abs(u)) * 0.3 * Math.max(0, 1 - dy / (h * 0.8)); // hot core
+      if (I < 0.16) continue;
+      if (I < 0.34 && white(x, y, seed + f) < 0.45) continue; // ragged tips
+      p.set(x, y, pick(FIRE, I * 1.05 - dy * 0.006, x, y));
     }
+  }
+  // Embers along the base and sparks rising.
+  for (let x = x0; x <= x1; x++) if ((!clip || clip(x, base + 1)) && white(x, f, seed) < 0.6) p.set(x, base + 1, FIRE[1 + Math.floor(white(x, f + 9, seed) * 3)]);
+  for (let k = 0; k < 4; k++) {
+    const life = (f * 1.3 + k * 2.1 + seed) % 8;
+    const sx = Math.round(cx + Math.sin(k * 2.3 + seed) * hw * 0.8 + Math.sin(life * 0.9 + k) * 1.4);
+    const sy = Math.round(base - h * 0.5 - life * (h * 0.14));
+    if (life < 7 && (!clip || clip(sx, sy))) p.set(sx, sy, life < 3 ? FIRE[5] : FIRE[3]);
   }
 }
 
@@ -194,7 +222,7 @@ export function makeHearth(seed = 8): Prop {
   const frames: Pix[] = [];
   for (let f = 0; f < FRAMES; f++) {
     const fr = base.scaled(1);
-    flame(fr, 26, 48, g - 4, 24, f, seed);
+    fire(fr, 26, 48, g - 4, 26, f, seed, (x, y) => y > g - 31 + Math.round(Math.abs(x - 36) * 0.2));
     // Glow on the stone around the opening.
     for (let y = g - 32; y < g; y++) for (let x = 14; x < 58; x++) {
       if (!fr.alpha(x, y)) continue;
@@ -273,7 +301,7 @@ export function makeForge(seed = 11): Prop {
       const mask = 1 - Math.min(1, Math.hypot((x - cx) / 24, (y - cy) / 8));
       return pick(['#120a08', '#2a120e', '#7a2414', '#d4521e', '#f29a38', '#ffe08a'], heat * 0.6 + mask * 0.55, x, y);
     });
-    flame(fr, 32, 52, g - 31, 10, f, seed + 3);
+    fire(fr, 30, 52, g - 31, 14, f, seed + 3);
     // A bar of iron heating in the coals.
     for (let x = 22; x < 40; x++) fr.set(x, g - 34 + Math.round((x - 22) * 0.1), x > 32 ? '#ffb050' : '#9a8878');
     frames.push(selOutline(fr));

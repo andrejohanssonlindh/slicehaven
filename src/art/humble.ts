@@ -1,6 +1,6 @@
 import { Rng } from '../core/rng';
 import { IRON, STONE, stoneWall } from './buildings';
-import { OBX, OBY, box, ellipse, flame, stoneP } from './furniture';
+import { OBX, OBY, box, ellipse, fire, stoneP } from './furniture';
 import { type Light, type Prop, capsule, chew, fbm, grime, pick, polyFill, selOutline, still, white, wobble } from './grit';
 import type { RoomItem } from './interior';
 import { Pix } from './pix';
@@ -190,35 +190,60 @@ export function makeHanging(seed = 11): Prop {
   return finish(p, 20, 43, seed, 0);
 }
 
-/** A cooking fire in a ring of fieldstones under a sooty daub hood, a pot on a chain. Animated. */
+/**
+ * An open hearth, öppen spis: about 55 cm across. A low stone slab, a sooty
+ * chimney breast with a beam over a small arched opening, a crooked pot on a
+ * chain, a fire of a few sticks. Animated. Small: the opening is 14 px wide.
+ */
 export function makeCookhearth(seed = 12): Prop {
-  const W = 66, H = 70;
-  const g = 62;
+  const W = 46, H = 54;
+  const g = 50;
   const base = new Pix(W, H);
-  // Hood: daub and wattle, black at the top.
-  polyFill(base, wobble([[14, 36], [50, 36], [43, 12], [21, 12]], seed, 1.3, 2), (x, y) => {
-    const soot = 1 - (y - 4) / 32;
-    return pick(['#16100c', '#3a2c20', '#6a5842', '#9a8662'], 0.75 - soot * 0.5 + (fbm(x / 3, y / 3, seed) - 0.5) * 0.4, x, y);
+  const bx0 = 12, bx1 = 34, faceY = g - 19; // the breast stands on the back of the slab
+  // Chimney breast: daub and plaster, soot-black round the opening and up the middle.
+  polyFill(base, wobble([[bx0, faceY], [bx1, faceY], [bx1 - 3, 2], [bx0 + 3, 2]], seed, 0.9, 3), (x, y) => {
+    const soot = Math.max(0, 1 - Math.abs(x - 23) / 9) * (1 - (y - 2) / (faceY - 2) * 0.35);
+    return pick(['#14100c', '#3a2e22', '#6e5c44', '#a08c68'], 0.82 - soot * 0.62 + (fbm(x / 2.5, y / 3, seed) - 0.5) * 0.4 + (white(x, y, seed) - 0.5) * 0.1, x, y);
   });
-  // Low hearth, stones of all sizes.
-  box(base, 6, g, 40, 12, 20, stoneP(seed + 1, 0.42), stoneP(seed + 2, 0.4), stoneP(seed + 3, 0.26), STONE[4]);
-  stoneWall(base, 6, g - 12, 45, g, seed + 4, STONE, 2);
-  const ox = 20 * OBX, oy = 20 * OBY;
-  polyFill(base, [[9, g - 12], [43, g - 12], [43 + ox - 3, g - 12 + oy + 3], [9 + ox + 3, g - 12 + oy + 3]], (x, y) => pick(['#0a0808', '#1c1612', '#34302c', '#4a4640'], 0.4 + (white(x, y, seed) - 0.5) * 0.6, x, y));
-  // Chain and pot from the hood.
-  for (let y = 12; y < g - 22; y++) base.set(30, y, y % 2 ? IRON[2] : IRON[1]);
-  ellipse(base, 30, g - 18, 7, 5.5, (x, y) => pick(IRON, 0.5 - (x - 24) * 0.04 + (y < g - 20 ? 0.2 : 0), x, y));
-  for (let x = 23; x < 38; x++) base.set(x, g - 23, IRON[3]);
-  ellipse(base, 30, g - 24, 5, 1.2, () => '#5a4a2a');
+  // Stone jambs and the dark opening.
+  const ox0 = 16, ox1 = 30, oy0 = faceY - 12;
+  for (let y = oy0; y <= faceY; y++) for (const [a, b] of [[bx0, ox0], [ox1, bx1]] as const) for (let x = a; x < b; x++) base.set(x, y, pick(STONE, 0.5 + (white(x >> 1, y >> 1, seed + 2) - 0.5) * 0.5 - (x > 25 ? 0.15 : 0), x, y));
+  for (let y = oy0; y <= faceY; y++) for (let x = ox0; x < ox1; x++) {
+    const arch = y < oy0 + 3 && Math.abs(x - 23) > 7 - (oy0 + 3 - y) * 0.9;
+    base.set(x, y, arch ? STONE[2] : pick(['#050403', '#100b08', '#1e1410'], 0.3 + (faceY - y) * 0.02 + (white(x, y, seed) - 0.5) * 0.3, x, y));
+  }
+  // A black oak beam over the opening.
+  for (let x = bx0 - 1; x <= bx1 + 1; x++) for (let k = 0; k < 3; k++) base.set(x, oy0 - 3 + k, pick(['#0e0a08', '#241a12', '#3e2e20'], 0.5 - k * 0.2 + (white(x, k, seed) - 0.5) * 0.2, x, k));
+  // The slab: a low hearthstone, cracked, worn in front.
+  box(base, 6, g, 28, 8, 14, stoneP(seed + 1, 0.42), stoneP(seed + 2, 0.4), stoneP(seed + 3, 0.26), STONE[4]);
+  stoneWall(base, 6, g - 8, 33, g, seed + 4, STONE, 1);
+  const ox = 14 * OBX, oy = 14 * OBY;
+  polyFill(base, [[8, g - 8], [32, g - 8], [32 + ox - 2, g - 8 + oy + 2], [8 + ox + 2, g - 8 + oy + 2]], (x, y) => pick(['#1c1612', '#34302c', '#504a44', '#6c665c'], 0.42 + (fbm(x / 2, y / 2, seed + 5) - 0.5) * 0.7, x, y));
+  // Ash and half-burnt ends on the slab, a scorch mark.
+  for (let i = 0; i < 18; i++) base.set(14 + Math.round(white(i, 0, seed) * 14), g - 8 + Math.round(white(i, 1, seed) * -9), white(i, 2, seed) < 0.5 ? '#2a2622' : '#6a645c');
+  // Chain, pot, and the poker leaning on the jamb.
+  for (let y = oy0 - 1; y < oy0 + 5; y++) base.set(21, y, y % 2 ? IRON[3] : IRON[1]);
+  ellipse(base, 21, oy0 + 7, 4.2, 3.2, (x, y) => pick(IRON, 0.5 - (x - 17) * 0.06 + (y < oy0 + 6 ? 0.2 : 0), x, y));
+  for (let x = 17; x < 26; x++) base.set(x, oy0 + 4, IRON[3]);
+  capsule(base, 31, faceY, 34, oy0 + 1, 0.5, 0.5, IRON, seed, 0.1);
+  // Logs: a few sticks laid across, charred, glowing along their undersides.
+  capsule(base, 17, faceY - 1, 29, faceY - 2, 1.3, 1.3, ['#0c0806', '#1e1410', '#34261a', '#4a3828'], seed + 8, 0.3);
+  capsule(base, 19, faceY - 4, 28, faceY - 1, 1.1, 1.1, ['#0c0806', '#1e1410', '#34261a', '#4a3828'], seed + 9, 0.3);
   const frames: Pix[] = [];
   for (let f = 0; f < FRAMES; f++) {
     const fr = base.scaled(1);
-    flame(fr, 24, 38, g - 13, 14, f, seed);
-    // Smoke thread up into the hood.
-    for (let y = 12; y < 30; y++) if (white(y, f, seed) < 0.3) fr.set(30 + Math.round(Math.sin(y * 0.4 + f) * 2), y, '#4a4440aa');
+    fire(fr, 17, 29, faceY - 2, 10, f, seed, (x, y) => y > oy0 + 1 && x >= ox0 && x < ox1);
+    // Glow on the stone around the opening and a warm lick up the breast.
+    for (let y = oy0 - 4; y <= faceY; y++) for (let x = bx0; x < bx1; x++) {
+      if (!fr.alpha(x, y)) continue;
+      const c = fr.get(x, y);
+      if (c[0] > 190 && c[2] < 150) continue;
+      const d = Math.hypot((x - 23) / 13, (y - (faceY - 5)) / 11);
+      if (d < 1) { const k = (1 - d) * (0.34 + 0.06 * Math.sin(f)); fr.set(x, y, [c[0] + (255 - c[0]) * k, c[1] + (130 - c[1]) * k * 0.6, c[2] * (1 - k * 0.3), 255]); }
+    }
     frames.push(selOutline(fr));
   }
-  return { frames, ax: 26, ay: g + 2, shadow: 24, lights: [{ dx: 4, dy: -12, r: 38, color: [1, 0.52, 0.2], flicker: 1 }] as Light[] };
+  return { frames, ax: 20, ay: g + 2, shadow: 14, lights: [{ dx: 4, dy: -12, r: 36, color: [1, 0.5, 0.2], flicker: 1 }] as Light[] };
 }
 
 /** One warped plank on pegs with a few pots on it. */

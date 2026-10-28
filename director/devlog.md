@@ -1,5 +1,11 @@
 # Devlog
 
+## 2026-10-28 — Session 21e: the hearth and the fire
+
+- The humble hearth was a walled stove. It is now an **öppen spis**: about 55 cm across (the opening is 14 px, the whole thing about 22 px), a low hearthstone, a sooty daub chimney breast with a black beam over a small arched opening, a crooked pot on a chain, a poker on the jamb, a few charred sticks.
+- **Fire**: one new renderer (`fire()` in `furniture.ts`) replaces the gas-ring flame: several tongues that wander and split from frame to frame, a hot yellow core, ragged red tips, embers along the base, sparks rising. Used in the humble hearth, the rich hearth and the forge.
+
+
 ## 2026-10-28 — Session 21d: humble interiors, shrubs, the stump
 
 - The first interior is **kept** as the rich set (`furniture.ts`, `manorItems()` in `interior.ts`), labelled in the studio for manors, castles and richer homes. It was too fine for a village.
