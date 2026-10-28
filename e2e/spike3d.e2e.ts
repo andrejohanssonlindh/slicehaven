@@ -131,3 +131,24 @@ describe('spike3d filaments', () => {
     expect(errors).toEqual([]);
   });
 });
+
+describe('spike3d entering', () => {
+  it('walks in through the door, the roof lifts, and lowers again outside', async () => {
+    const { page, errors } = await openPage(env, '/spike3d/?nogov');
+    await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 30_000 });
+    await page.waitForTimeout(800);
+    const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; return ${fn}; })()`);
+    expect(await w('w.heroIndoors')).toBe(false);
+    expect(await w('w.walkIn()')).not.toBeNull();
+    await page.waitForFunction(() => !(window as any).spike.world.walking, undefined, { timeout: 40_000 });
+    expect(await w('w.heroIndoors')).toBe(true);
+    expect(await w('w.inside')).toBe(true);
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: `${OUT}spike3d-hero-inside.png` });
+    await w('w.walkTo(3, 3)');
+    await page.waitForFunction(() => !(window as any).spike.world.walking, undefined, { timeout: 40_000 });
+    expect(await w('w.heroIndoors')).toBe(false);
+    expect(await w('w.inside')).toBe(false);
+    expect(errors).toEqual([]);
+  });
+});

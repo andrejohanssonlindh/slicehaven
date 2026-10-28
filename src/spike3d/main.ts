@@ -49,7 +49,7 @@ setAtlasSize(atlasSize(device));
 let tier: Tier = { ...TIERS[(params.get('tier') as TierName) in TIERS ? (params.get('tier') as TierName) : pickTier(device)] };
 let zoomIndex = tier.zoom;
 
-const pipeline = new Pipeline(canvas, { pixelCss: tier.pixelCss, outline: 0.85, palette: 0.3 });
+const pipeline = new Pipeline(canvas, { pixelCss: tier.pixelCss, outline: 0, palette: 0.6 });
 let world: SpikeWorld;
 
 function fit(): void {
@@ -185,7 +185,9 @@ function bindInput(): void {
       const r = canvas.getBoundingClientRect();
       const nx = ((e.clientX - r.left) / r.width) * 2 - 1, ny = -(((e.clientY - r.top) / r.height) * 2 - 1);
       if (world.pick(nx, ny) === 'house') {
-        world.inside = !world.inside;
+        // Outside: walk in through the door. Inside: tap the house to lift or lower the roof.
+        if (world.heroIndoors) world.inside = !world.inside;
+        else if (world.walkIn() === null) notify(t('spike.noway', 'There is no way there.'));
         for (const b of buttons) b.refresh();
       } else {
         // Tap the ground and the hero walks there, round whatever is in the way.
@@ -238,6 +240,7 @@ function loop(now: number): void {
     fpsT = now;
     const sorted = [...frameMs].sort((a, b) => a - b);
     const med = sorted[Math.floor(sorted.length / 2)] ?? 0;
+    for (const b of buttons) b.refresh();
     const shown = world.shownAspect;
     let magic = '';
     if (shown) {

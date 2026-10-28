@@ -11,7 +11,7 @@ import {
   timberTex, windowGlowTex, windowTex,
 } from '../art/textures3d';
 import { PEOPLE } from '../content/village/folk';
-import { SPIKE_GROUND, SPIKE_HERO, SPIKE_HOUSE, SPIKE_TORCHES, SPIKE_TREE, SPIKE_WALK, spikeFilamentWorld, spikeObstacles } from '../content/spike3d';
+import { SPIKE_GROUND, SPIKE_HERO, SPIKE_HOUSE, SPIKE_TORCHES, SPIKE_TREE, SPIKE_WALK, spikeFilamentWorld, spikeHouseBox, spikeObstacles } from '../content/spike3d';
 import type { AspectId, HexFilaments } from '../core/filaments';
 import { type FSource, FilamentField } from '../core/world3d/filaments3d';
 import { CHUNK, type ChunkTerrain, TerrainStore, chunkKey, chunksNear } from '../core/world3d/chunks';
@@ -20,7 +20,7 @@ import { Rng } from '../core/rng';
 import { type HouseMaterial, type HouseModel, buildHouse } from '../core/world3d/house';
 import type { MeshData } from '../core/world3d/mesh';
 import { cloudDrift, cloudThreshold } from '../core/world3d/sky';
-import { NavGrid, type P2, findPath, followPath, pathLength } from '../core/world3d/space';
+import { NavGrid, type P2, type Shape, findPath, followPath, pathLength, shapeDist } from '../core/world3d/space';
 import { type Ground3D, groundHeight, lakeDist, splatAt } from '../core/world3d/terrain';
 import { TEXELS_PER_M } from '../core/world3d/tiers';
 import { buildTree } from '../core/world3d/tree';
@@ -127,6 +127,7 @@ export class SpikeWorld {
   readonly nav: NavGrid;
   /** Where the hero stands, metres. */
   readonly hero: P2 = { x: SPIKE_HERO[0], z: SPIKE_HERO[1] };
+  private houseBox!: Shape;
   private heroCard!: SpriteCard;
   private heroBlob!: THREE.Mesh;
   private path: P2[] | null = null;
@@ -163,8 +164,9 @@ export class SpikeWorld {
 
     // Ground chunks stream in once the view is sized (see `frame`); until then the exact height function stands in.
     this.model = buildHouse(SPIKE_HOUSE.spec);
+    this.houseBox = spikeHouseBox(this.model.footprint);
     // Feet: the house, trunk and posts block; so does the water.
-    this.nav = new NavGrid(g.size, spikeObstacles(this.model.footprint), { blocked: (x, z) => lakeDist(g, x, z) < 0.2 });
+    this.nav = new NavGrid(g.size, spikeObstacles(this.model.footprint, this.model.door[0]), { radius: 0.2, blocked: (x, z) => lakeDist(g, x, z) < 0.2 });
 
     // The house.
     this.buildHouse();
@@ -285,7 +287,7 @@ export class SpikeWorld {
     this.house.add(hearth);
     this.torches.push({ light: hearth, flame: new THREE.Mesh(), base: 4, seed: 3 });
     const hf = this.toWorld(hearth.position.x, hearth.position.z);
-    this.fires.push({ x: hf.x, z: hf.z, kind: 'fire', weight: 0.5 });
+    this.fires.push({ x: hf.x, z: hf.z, kind: 'fire', weight: 1 });
 
     const y = groundHeight(this.ground, h.x, h.z) - 0.05;
     this.house.position.set(h.x, y, h.z);
@@ -550,17 +552,17 @@ export class SpikeWorld {
       const flame = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.22, 0.12), flameMat);
       flame.position.set(x, y + 0.12, z);
       this.scene.add(flame);
-      const light = new THREE.PointLight(0xff9a50, 6, 9, 2);
+      const light = new THREE.PointLight(0xffa458, 9, 11, 2);
       light.position.set(x, y + 0.3, z);
       this.scene.add(light);
-      this.torches.push({ light, flame, base: 6, seed: this.torches.length * 7 + 1 });
+      this.torches.push({ light, flame, base: 9, seed: this.torches.length * 7 + 1 });
     };
     for (const [x, z] of SPIKE_TORCHES) place(x, this.store.heightAt(x, z) + 1.9, z, true);
     // On a bracket beside the door.
     const d = this.model.door;
     const w = this.toWorld(d[0] + 0.95, d[2] + 0.25);
     place(w.x, this.house.position.y + this.model.floorY + 1.85, w.z, false);
-    this.fires.push({ x: w.x, z: w.z, kind: 'fire', weight: 0.4 });
+    this.fires.push({ x: w.x, z: w.z, kind: 'fire', weight: 1 });
   }
 
   setShadowMap(size: number): void {
@@ -647,12 +649,31 @@ export class SpikeWorld {
   }
 
   private placeHero(lift = 0): void {
-    const y = this.store.heightAt(this.hero.x, this.hero.z);
+    // Indoors the hero stands on the room's floor, not the ground.
+    const y = this.heroIndoors ? this.house.position.y + this.model.floorY : this.store.heightAt(this.hero.x, this.hero.z);
     this.heroCard.mesh.position.set(this.hero.x, y + lift, this.hero.z);
     this.heroBlob.position.set(this.hero.x, y + 0.03, this.hero.z);
   }
 
+  get heroIndoors(): boolean {
+    return shapeDist(this.houseBox, this.hero.x, this.hero.z) < -0.1;
+  }
+
+  private wasIndoors = false;
+
+  /** Walk to the middle of the doorway, just inside. */
+  walkIn(): number | null {
+    const p = this.toWorld(this.model.door[0], this.model.door[2] - 0.9);
+    return this.walkTo(p.x, p.z);
+  }
+
   private stepHero(dt: number): void {
+    // Crossing the threshold opens or closes the cut-away.
+    const inside = this.heroIndoors;
+    if (inside !== this.wasIndoors) {
+      this.wasIndoors = inside;
+      this.inside = inside;
+    }
     if (!this.path) return;
     this.pathS += dt * 1.6;
     const p = followPath(this.path, this.pathS);

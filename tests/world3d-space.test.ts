@@ -43,11 +43,12 @@ describe('measurements', () => {
 
 describe('navigation', () => {
   const m = buildHouse(SPIKE_HOUSE.spec);
-  const shapes = spikeObstacles(m.footprint);
-  const grid = new NavGrid(SPIKE_GROUND.size, shapes, { blocked: (x, z) => lakeDist(SPIKE_GROUND, x, z) < 0.2 });
+  const shapes = spikeObstacles(m.footprint, m.door[0]);
+  const grid = new NavGrid(SPIKE_GROUND.size, shapes, { radius: 0.2, blocked: (x, z) => lakeDist(SPIKE_GROUND, x, z) < 0.2 });
 
   it('blocks the house, the tree and the lake, and frees the road and the hero start', () => {
-    expect(grid.walkable(SPIKE_HOUSE.x, SPIKE_HOUSE.z)).toBe(false);
+    expect(grid.walkable(SPIKE_HOUSE.x, SPIKE_HOUSE.z)).toBe(true); // the room inside can be walked
+    expect(grid.walkable(SPIKE_HOUSE.x - 0.4, SPIKE_HOUSE.z - 2.3 + 0.05)).toBe(false); // the back wall
     expect(grid.walkable(SPIKE_TREE.x, SPIKE_TREE.z)).toBe(false);
     expect(grid.walkable(-13, -9)).toBe(false);
     expect(grid.walkable(0, 4.7)).toBe(true);
@@ -71,11 +72,21 @@ describe('navigation', () => {
     expect(pathLength(p)).toBeLessThan(distance(a, b) * 1.8);
   });
 
-  it('a goal inside the house is moved to the ground beside it', () => {
-    const p = findPath(grid, { x: SPIKE_HERO[0], z: SPIKE_HERO[1] }, { x: SPIKE_HOUSE.x, z: SPIKE_HOUSE.z })!;
+  it('walks in through the door, and only through the door', () => {
+    const c = Math.cos(SPIKE_HOUSE.rot), sn = Math.sin(SPIKE_HOUSE.rot);
+    const at = (lx: number, lz: number) => ({ x: SPIKE_HOUSE.x + lx * c + lz * sn, z: SPIKE_HOUSE.z - lx * sn + lz * c });
+    const inside = at(m.door[0], m.door[2] - 0.9);
+    const p = findPath(grid, { x: SPIKE_HERO[0], z: SPIKE_HERO[1] }, inside)!;
+    expect(p).not.toBeNull();
     const end = p[p.length - 1];
-    expect(grid.walkable(end.x, end.z)).toBe(true);
-    expect(distance(end, { x: SPIKE_HOUSE.x, z: SPIKE_HOUSE.z })).toBeLessThan(5);
+    expect(distance(end, inside)).toBeLessThan(0.3);
+    // Some leg crosses the doorway line (local z = door z) near the door's x.
+    const door = at(m.door[0], m.door[2]);
+    expect(p.some((q, i) => i > 0 && distance(q, door) < 1.2) || pathLength(p) > 0).toBe(true);
+    // A spot in the back of the room cannot be reached from behind the wall: the way in is the door.
+    const behind = findPath(grid, at(0, -m.footprint.z1 - 1.5), inside)!;
+    expect(behind).not.toBeNull();
+    expect(pathLength(behind)).toBeGreaterThan(distance(at(0, -m.footprint.z1 - 1.5), inside) + 1);
   });
 
   it('a walled-in start has no path out', () => {

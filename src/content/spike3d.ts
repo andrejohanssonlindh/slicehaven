@@ -35,16 +35,30 @@ export const SPIKE_TORCHES: [number, number][] = [[6.5, 6.9]];
 /** The villager's beat along the road, there and back. */
 export const SPIKE_WALK: XZ[] = [[-12, 5.6], [-3, 5.0], [6, 5.8], [12, 4.8]];
 
-/** What blocks feet: the house (its footprint, a little proud of the wall), the tree trunk, the torch post. */
-export function spikeObstacles(footprint: { x0: number; x1: number; z0: number; z1: number }): Shape[] {
+/**
+ * What blocks feet: the house's four walls (thin, so the inside can be walked, with a
+ * gap at the door), the tree trunk, the torch post. `doorX` is the door's x in the house's frame.
+ */
+export function spikeObstacles(footprint: { x0: number; x1: number; z0: number; z1: number }, doorX: number): Shape[] {
   const h = SPIKE_HOUSE;
-  const pad = 0.15;
+  // The footprint is the walls plus a little proud (0.1 at the sides, a 0.6 porch at the front).
+  const hw = (footprint.x1 - footprint.x0) / 2 - 0.1, hd = -footprint.z0 - 0.1, t = 0.12;
+  const wall = (x0: number, x1: number, z0: number, z1: number): Shape => boxOfFootprint({ x0, x1, z0, z1 }, h.x, h.z, h.rot);
+  const gap = 0.65; // half-width of the doorway, wider than the door so the walker fits
   return [
-    boxOfFootprint({ x0: footprint.x0 - pad, x1: footprint.x1 + pad, z0: footprint.z0 - pad, z1: footprint.z1 + pad }, h.x, h.z, h.rot),
+    wall(-hw - t, hw + t, -hd - t, -hd + t),
+    wall(-hw - t, -hw + t, -hd, hd),
+    wall(hw - t, hw + t, -hd, hd),
+    wall(-hw - t, doorX - gap, hd - t, hd + t),
+    wall(doorX + gap, hw + t, hd - t, hd + t),
     circle(SPIKE_TREE.x, SPIKE_TREE.z, 0.5),
     ...SPIKE_TORCHES.map(([x, z]) => circle(x, z, 0.12)),
   ];
 }
+
+/** The house's whole footprint as one box (is something inside it?). */
+export const spikeHouseBox = (footprint: { x0: number; x1: number; z0: number; z1: number }): Shape =>
+  boxOfFootprint({ x0: footprint.x0 + 0.1, x1: footprint.x1 - 0.1, z0: footprint.z0 + 0.1, z1: footprint.z1 - 0.6 }, SPIKE_HOUSE.x, SPIKE_HOUSE.z, SPIKE_HOUSE.rot);
 
 /** Where the hero starts: by the door, on the mud. */
 export const SPIKE_HERO: [number, number] = [2.4, 1.2];
@@ -70,7 +84,7 @@ export function spikeFilamentWorld(g: Ground3D, footprint: { x0: number; x1: num
     indoors: (x, z) => shapeDist(house, x, z) < 0,
     sources: [
       { x: SPIKE_TREE.x, z: SPIKE_TREE.z, kind: 'tree' },
-      ...SPIKE_TORCHES.map(([x, z]): FSource => ({ x, z, kind: 'fire', weight: 0.4 })),
+      ...SPIKE_TORCHES.map(([x, z]): FSource => ({ x, z, kind: 'fire', weight: 1 })),
       ...extra,
     ],
   };

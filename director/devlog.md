@@ -1,5 +1,11 @@
 # Devlog
 
+## 2026-10-28 — Session 24b: entering the house
+
+- The house's collision is now four thin walls with a doorway, so the room can be walked. **Tap the house to walk in** through the door; the roof lifts when the hero crosses the threshold and drops when they leave (tapping the house while inside still toggles it by hand). The hero stands on the room's floor indoors.
+- **Stronger torches**: light 6 to 9 (reach 9 to 11 m), and torches and the hearth count as a full fire for the filament field (pyro +2 on their cell).
+- From the director's notes: palette now defaults to 60 %, outline to off. Open: "Inside is a bit misaligned with the house" (furniture sprites, to look at).
+
 ## 2026-10-28 — Session 24: 3D world, M1 core
 
 - **Chunked ground** (`core/world3d/chunks.ts`): 32 m chunks, each sampling the world's height function with a one-vertex apron, so neighbours agree exactly on shared edges (heights, normals, AO; tested). A `TerrainStore` keeps the resident chunks and answers `heightAt`. The renderer builds a chunk's mesh, its painted ground texture (`groundChunkTex`, noise in world texel coordinates so chunks continue each other) and its grass (seeded per chunk, instanced) as the view moves, one chunk per frame, nearest first, and frees those well outside the view. `?world=192` on the page makes the patch bigger to see it stream.
