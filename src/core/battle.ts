@@ -32,7 +32,7 @@ export interface Cell {
   /** Turns left before a burning hex burns out. */
   burnTurns?: number;
   /** What the ground is, for magic and other terrain rules. */
-  ground?: 'grass' | 'forest' | 'path' | 'tallgrass' | 'flowers' | 'river' | 'pond' | 'ford';
+  ground?: 'grass' | 'forest' | 'path' | 'tallgrass' | 'flowers' | 'mud' | 'river' | 'pond' | 'ford';
   /** What stands on the hex. */
   feature?: 'tree' | 'pine' | 'rock' | 'thicket' | 'mushrooms' | 'wall' | 'gate' | 'cart' | 'house' | 'campfire';
   /** Scenery that sits here (an id from the scene); big things cover several hexes. */

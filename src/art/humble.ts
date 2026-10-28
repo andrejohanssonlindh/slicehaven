@@ -13,18 +13,18 @@ import { FRAMES } from './props';
  * lives in furniture.ts, for manors and castles.)
  */
 
-const GW = ['#1c1612', '#3a3026', '#584a3a', '#7a6850', '#9a8668', '#b8a484'];
-const SACK = ['#2a2218', '#4a3e2a', '#6e5e42', '#8e7c58', '#ac9a70'];
-const WOOL = ['#2a2420', '#4a4038', '#6a5e52', '#8a7c6c'];
-const CLAY = ['#2a1a12', '#4a3022', '#6e4a34', '#92684a'];
-const STRAW = ['#5a4824', '#8a7438', '#b09a4c', '#d0ba68'];
+export const GW = ['#1c1612', '#3a3026', '#584a3a', '#7a6850', '#9a8668', '#b8a484'];
+export const SACK = ['#2a2218', '#4a3e2a', '#6e5e42', '#8e7c58', '#ac9a70'];
+export const WOOL = ['#2a2420', '#4a4038', '#6a5e52', '#8a7c6c'];
+export const CLAY = ['#2a1a12', '#4a3022', '#6e4a34', '#92684a'];
+export const STRAW = ['#5a4824', '#8a7438', '#b09a4c', '#d0ba68'];
 
-const woodR = (seed: number, shade: number, vertical = false) => (x: number, y: number): string => {
+export const woodR = (seed: number, shade: number, vertical = false) => (x: number, y: number): string => {
   const seam = (vertical ? x : y) % 5 === 0 ? -0.26 : 0;
   return pick(GW, shade + seam + (fbm(vertical ? x * 1.6 : x / 5, vertical ? y / 5 : y * 1.6, seed) - 0.5) * 0.5 + (white(x, y, seed + 1) - 0.5) * 0.14, x, y);
 };
 
-function finish(p: Pix, ax: number, ay: number, seed: number, shadow = 12, extra: Partial<Prop> = {}): Prop {
+export function finish(p: Pix, ax: number, ay: number, seed: number, shadow = 12, extra: Partial<Prop> = {}): Prop {
   grime(p, seed, 0.75, ay);
   chew(p, seed + 1, 0.12);
   return still(selOutline(p), ax + 1, ay + 1, shadow, extra);

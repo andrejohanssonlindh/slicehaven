@@ -34,6 +34,7 @@ Read only the handover for the area you're asked about; don't read the whole `di
 | **Skills, people, hooks (current focus)** | `/skills/` | `director/design/skill-map-handover.md` | `src/content/skillweb`, `src/content/people`, `src/core/skillweb.ts`, `src/core/people.ts` |
 | Character creator | `/chargen/` | `director/design/character-creator.md` | `src/core/chargen`, `src/content/chargen`, `src/chargen` |
 | Exploration scenes (gate) | `/scene/` | `director/design/exploration-scenes.md` | `src/core/scene.ts`, `src/content/scenes`, `src/scene`, `src/engine/scene.ts` |
+| Village (full-map sketch) | `/village/` | `director/design/village.md` | `src/content/village`, `src/art/shopItems.ts`, `src/art/villageScene.ts`, `src/village` |
 | Engine sandbox | `/` | `director/design/game-design.md` | `src/engine`, `src/art` |
 | Magic (planned) | | `director/design/magic-on-map.md`, `magic-filaments.md` | `src/core/filaments.ts` |
 

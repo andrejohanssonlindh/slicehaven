@@ -1,5 +1,14 @@
 # Devlog
 
+## 2026-10-28 — Session 22: Reedwater, the whole village on one map
+
+- **New page `/village/`**: a 38 × 31 hex village with the full look pass (shadows, light, smoke, Day/Dusk/Night), pan and zoom, tap a house or person for a card, **Step inside** to lift the roof. About 70 ms a frame. Design and map in [village.md](design/village.md); questions in Q21.
+- **15 houses, 24 villagers outside and 13 inside, 9 furnished insides** (inn, bakery, smithy, herbalist, fishmonger, general store, weaver, two fisher homes). A lake upper left with a jetty and boat landing, an open old palisade gate across the west end of the main street, a mud plaza with well and stalls, a bypass road round the south that joins the main road at both ends.
+- **New art** (`art/shopItems.ts`): shop counters (six kinds), bake oven, kneading trough, wall shelves (six sets), hooks board, herb rack, hung net, fish rack, fish tubs, net heap, net frame, rowboat, washing line, loom, herbalist's bench, inn long table and bench, ale kegs, crate stack. Shop signs for fish, cloth and scales. A `mud` ground type.
+- `VillageScene` gained `hit`, `where` and `swap`. The humble art's palettes and `finish` are exported for reuse.
+- Tests: `tests/village.test.ts` (no overlaps, none in the lake, bypass joins the road, every furnished house has an inside). 350 tests. Hooks not touched, as asked.
+- Rough: interiors are dense when small; the houses' roofs hide the two rows south of the lake, so the landing is on the east shore; the south row's backs face the plaza.
+
 ## 2026-10-28 — Session 21g: barrels, palisade states, dragonfly
 
 - **Barrels** redrawn as real cylinders: staves that curve round (narrower at the ends, a belly), shaded across, iron hoops that follow the curve (some rusty), a rim with thickness, board lid or open top (water, apples), stains down from the rim, shade where it meets the ground. `drawBarrel` in `buildings.ts`; the village keg uses it too.

@@ -51,6 +51,8 @@ const TILE = ['#33170f', '#5e2a1e', '#86402a', '#aa5a38', '#c87a4c', '#dc9a68'];
 const TURF = ['#1c3322', '#2a4d2d', '#3d6a34', '#58883c', '#7fa94a', '#a8c866'];
 const SOIL = ['#1a110c', '#2d1e15', '#47301f', '#64462c'];
 
+export type ShopSign = 'tankard' | 'herb' | 'loaf' | 'fish' | 'cloth' | 'scales';
+
 export interface HouseSpec {
   seed: number;
   /** Width in hexes, 4 or 5. Depth is always 3 rows. */
@@ -58,7 +60,7 @@ export interface HouseSpec {
   roof?: RoofKind;
   /** What fills the panels between the timbers. */
   walls?: WallStyle;
-  shop?: 'tankard' | 'herb' | 'loaf';
+  shop?: ShopSign;
   shutters?: Shutter;
   lit?: boolean;
 }
@@ -196,7 +198,7 @@ export function plankDoor(p: Pix, x0: number, top: number, w: number, bottom: nu
   }
 }
 
-function signBoard(p: Pix, x: number, y: number, kind: 'tankard' | 'herb' | 'loaf'): void {
+function signBoard(p: Pix, x: number, y: number, kind: ShopSign): void {
   for (let k = 0; k < 11; k++) p.set(x + k, y, IRON[2 + (k & 1)]);
   p.set(x + 2, y + 1, IRON[2]); p.set(x + 8, y + 1, IRON[2]);
   p.set(x + 2, y + 2, IRON[1]); p.set(x + 8, y + 2, IRON[1]);
@@ -210,6 +212,18 @@ function signBoard(p: Pix, x: number, y: number, kind: 'tankard' | 'herb' | 'loa
     ink(9, 5, '#d6a23c'); ink(9, 8, '#d6a23c');
   } else if (kind === 'herb') {
     for (const [dx, dy] of [[5, 2], [4, 3], [6, 3], [5, 4], [3, 5], [7, 5], [5, 6], [4, 7], [6, 7], [5, 8], [5, 9]] as const) ink(dx, dy, dy > 5 ? '#6a9a4a' : '#4a7a3a');
+  } else if (kind === 'fish') {
+    for (let xx = 1; xx < 9; xx++) {
+      const half = xx < 7 ? Math.round(1 + Math.sin(((xx - 1) / 6) * Math.PI) * 2) : 3 - (xx - 7) * 1.5;
+      for (let yy = 6 - Math.floor(half); yy <= 6 + Math.floor(half); yy++) ink(xx, yy, yy > 6 ? '#e4eef4' : '#8aa4b8');
+    }
+    ink(2, 5, '#1c2230'); ink(9, 4, '#8aa4b8'); ink(9, 8, '#8aa4b8');
+  } else if (kind === 'cloth') {
+    for (let xx = 2; xx < 9; xx++) for (let yy = 3; yy < 10; yy++) ink(xx, yy, xx % 3 === 0 ? '#e8d8a8' : xx % 3 === 1 ? '#3e64a0' : '#a8423a');
+  } else if (kind === 'scales') {
+    for (let xx = 1; xx < 10; xx++) ink(xx, 3, '#1c1c22');
+    for (let yy = 3; yy < 10; yy++) ink(5, yy, '#1c1c22');
+    for (const [a, b] of [[1, 7], [9, 7]] as const) { ink(a, 4, '#1c1c22'); ink(a, 5, '#1c1c22'); for (let k = -1; k <= 1; k++) ink(b + k, 6 + (k === 0 ? 1 : 0), '#d6a23c'); }
   } else {
     for (let xx = 2; xx < 9; xx++) for (let yy = 4; yy < 9; yy++) if (!((xx < 3 || xx > 7) && (yy < 5 || yy > 7))) ink(xx, yy, yy < 6 ? '#e6b25e' : '#c08438');
   }

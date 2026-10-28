@@ -18,6 +18,8 @@ export interface Placed {
   ox?: number;
   oy?: number;
   prop: Prop;
+  /** Lets a page find this thing again: tap tests and swapping a house for its inside. */
+  id?: string;
 }
 
 interface Thing {
@@ -26,6 +28,7 @@ interface Thing {
   prop: Prop;
   phase: number;
   decor: boolean;
+  id?: string;
 }
 
 /** Neighbour offsets in an odd-r grid, in the art's edge order: E, NE, NW, W, SW, SE. */
@@ -89,9 +92,34 @@ export class VillageScene {
         }
       }
       const c = centre(pl.col, pl.row);
-      this.things.push({ x: c.x + (pl.ox ?? 0), y: c.y + 2 + (pl.oy ?? 0), prop: pl.prop, phase: rng.int(8), decor: false });
+      this.things.push({ x: c.x + (pl.ox ?? 0), y: c.y + 2 + (pl.oy ?? 0), prop: pl.prop, phase: rng.int(8), decor: false, id: pl.id });
     }
     this.things.sort((a, b) => a.y - b.y);
+  }
+
+  /** The id of the frontmost placed thing with a visible pixel at this world point. */
+  hit(wx: number, wy: number): string | undefined {
+    for (let i = this.things.length - 1; i >= 0; i--) {
+      const th = this.things[i];
+      if (!th.id) continue;
+      const f = th.prop.frames[0];
+      const sx = Math.floor(wx - (th.x - th.prop.ax)), sy = Math.floor(wy - (th.y - th.prop.ay));
+      // A few pixels of slack, so a thin person is easy to hit with a finger.
+      for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) if (f.alpha(sx + dx, sy + dy) > 40) return th.id;
+    }
+    return undefined;
+  }
+
+  /** Where a placed thing stands, in world pixels (its anchor). */
+  where(id: string): { x: number; y: number } | undefined {
+    const th = this.things.find((t) => t.id === id);
+    return th && { x: th.x, y: th.y };
+  }
+
+  /** Swap what a placed thing looks like (a house for its inside) without rebuilding the ground. */
+  swap(id: string, prop: Prop): void {
+    const th = this.things.find((t) => t.id === id);
+    if (th) th.prop = prop;
   }
 
   render(t: number, look: Look, showFootprints = false): Pix {

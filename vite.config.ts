@@ -13,6 +13,7 @@ export default defineConfig({
         chargen: 'chargen/index.html',
         scene: 'scene/index.html',
         skills: 'skills/index.html',
+        village: 'village/index.html',
       },
     },
   },

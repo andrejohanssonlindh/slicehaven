@@ -3,7 +3,7 @@ import { fbm, white } from './noise';
 import { OUTLINE, P } from './palette';
 import { type Pix, ramp } from './pix';
 
-export type Ground = 'grass' | 'forest' | 'path' | 'tallgrass' | 'flowers';
+export type Ground = 'grass' | 'forest' | 'path' | 'tallgrass' | 'flowers' | 'mud';
 
 export interface TileArt {
   ground: Ground;
@@ -62,6 +62,16 @@ export function groundColor(ground: Ground, wx: number, wy: number, x: number, y
       if (white(wx, wy, 5) < 0.13) return P.leaf[Math.floor(white(wx, wy, 6) * 4)];
       return ramp(P.floor.slice(1), 0.25 + fbm(wx / 6, wy / 4, 7) * 0.5 + (white(wx, wy, 8) - 0.5) * 0.25, wx, wy);
     }
+    case 'mud': {
+      // Stamped mud: dark, churned by boots and hooves, with puddles of standing water and the odd cart rut.
+      const e = EDGE[y][x];
+      if (e <= 2 && fbm(wx / 4, wy / 3, 13) > 0.5 + e * 0.15) return grassColor(wx, wy, y);
+      const pud = fbm(wx / 7, wy / 4, 41);
+      if (pud > 0.7) return ramp(['#2a2622', '#3c362f', '#5a5a5c', '#7a8088'], 0.25 + (pud - 0.7) * 3 + (white(wx, wy, 42) - 0.5) * 0.3, wx, wy);
+      if (white(wx, wy, 43) < 0.05) return P.dirt[0];
+      if (fbm(wx / 3, wy / 2, 44) > 0.72) return P.dirt[1];
+      return ramp(P.dirt.slice(1, 5), 0.12 + fbm(wx / 6, wy / 4, 45) * 0.5 + (white(wx, wy, 46) - 0.5) * 0.26, wx, wy);
+    }
     case 'path': {
       // Grass creeps in at the edges of the path.
       const e = EDGE[y][x];
@@ -118,7 +128,7 @@ export function paintTile(buf: Pix, ox: number, oy: number, art: TileArt, water:
       const wx = ox + x;
       const wy = oy + yb + k;
       let c: string;
-      if (k === 1) c = art.ground === 'path' ? P.dirt[1] : P.grass[0];
+      if (k === 1) c = art.ground === 'path' || art.ground === 'mud' ? P.dirt[1] : P.grass[0];
       else if (white(wx, wy, 20) < 0.06) c = P.stone[2];
       else c = ramp(P.sideEarth, 1 - k / TILE_DEPTH + (fbm(wx / 3, wy / 2, 21) - 0.5) * 0.5, wx, wy);
       buf.set(wx, wy, c);

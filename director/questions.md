@@ -4,6 +4,16 @@ Newest on top. Answer in chat (just reference the number, e.g. "Q11: option B").
 
 ---
 
+### Q21 — Reedwater, the first full village: what next?
+Open **Village** in the top bar. Pan, zoom, try Dusk and Night, tap houses and people, and **Step inside** the shops. The [design page](design/village.md) has the map and who lives where. Things I need from you:
+
+- **Is the gate scene this village?** I put the old palisade gate standing open across the west end of the main street, as a leftover from when the village was small. If the gate scene is a *different* village, say so and I'll take the gate out.
+- **Which shops matter?** I made nine insides: inn, bakery, smithy, herbalist, fishmonger, general store, weaver and two fisher homes. Names and owners are placeholders. Which ones do you want to play first, and which trades are missing (tanner, chandler, boatwright)?
+- **Houses all face south** because the art has one face, so the south row turns its back on the plaza. **A)** accept it; **B)** I mirror the house art so a row can face north; **C)** I move the plaza to the south edge. I lean B.
+- **Size.** Houses are four to five hexes wide and cover nearly seven rows with the roof, so the village is 38 × 31 hexes. Too big to walk across on a phone, or right?
+
+---
+
 ### Q20 — Village art round 1: what's solid, and how big should buildings be?
 Open **Village art** in the Director's Room (the tab at the top) and try the Dusk and Night buttons. Two things I need from you:
 
