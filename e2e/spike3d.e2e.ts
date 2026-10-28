@@ -100,3 +100,34 @@ describe('spike3d walking', () => {
     expect(errors).toEqual([]);
   });
 });
+
+describe('spike3d filaments', () => {
+  it('draws the heat map per aspect and reads it at the hero', async () => {
+    const { page, errors } = await openPage(env, '/spike3d/?nogov');
+    await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 30_000 });
+    await page.waitForTimeout(800);
+    // Water is the fourth stop: life, light, earth, water.
+    for (let k = 0; k < 4; k++) await clickBtn(page, 'Filaments');
+    expect(await page.evaluate(() => (window as any).spike.world.shownAspect)).toBe('hydro');
+    // Look at the lake's shore.
+    await page.evaluate(() => { const w = (window as any).spike.world; w.focus.x = -9; w.focus.z = -5; });
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: `${OUT}spike3d-heat-water.png` });
+    const txt = await page.textContent('#stats');
+    expect(txt).toMatch(/Hydrotropy at hero/);
+    // Fire by night: the torches warm their ground.
+    await clickBtn(page, 'Night');
+    for (let k = 0; k < 3; k++) await clickBtn(page, 'Filaments');
+    expect(await page.evaluate(() => (window as any).spike.world.shownAspect)).toBe('pyro');
+    await page.evaluate(() => { const w = (window as any).spike.world; w.focus.x = 3; w.focus.z = 3; });
+    await page.waitForTimeout(2500);
+    await page.screenshot({ path: `${OUT}spike3d-heat-fire.png` });
+    // The hero reads the same field the overlay draws.
+    const r = await page.evaluate(() => { const w = (window as any).spike.world; return w.field.readAt(w.hero.x, w.hero.z).pyro.level as number; });
+    expect(r).toBeGreaterThanOrEqual(-2);
+    // Off again after darkness: no overlay left.
+    for (let k = 0; k < 2; k++) await clickBtn(page, 'Filaments');
+    expect(await page.evaluate(() => (window as any).spike.world.shownAspect)).toBeNull();
+    expect(errors).toEqual([]);
+  });
+});

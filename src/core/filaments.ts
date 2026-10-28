@@ -62,9 +62,9 @@ export interface FilamentOptions {
 // --- sources --------------------------------------------------------------------
 
 /** Strength on the source hex, one hex away, two hexes away. */
-type Falloff = [number, number, number];
+export type Falloff = [number, number, number];
 
-interface Emission {
+export interface Emission {
   aspect: AspectId;
   label: string;
   fall: Falloff;
@@ -72,11 +72,11 @@ interface Emission {
   cap: number;
 }
 
-const isWater = (c: Cell): boolean => c.ground === 'river' || c.ground === 'pond' || c.ground === 'ford';
-const isTall = (c: Cell): boolean =>
+export const isWater = (c: Cell): boolean => c.ground === 'river' || c.ground === 'pond' || c.ground === 'ford';
+export const isTall = (c: Cell): boolean =>
   (c.feature === 'tree' || c.feature === 'pine' || c.feature === 'thicket') && c.fire !== 'burnt';
 
-function emissions(c: Cell, units: Unit[], env: Environment, opts: FilamentOptions): Emission[] {
+export function emissions(c: Cell, units: Unit[], env: Environment, opts: FilamentOptions): Emission[] {
   const out: Emission[] = [];
   const e = (aspect: AspectId, label: string, fall: Falloff, cap: number) => out.push({ aspect, label, fall, cap });
   const lit = env.time !== 'night';
@@ -123,7 +123,7 @@ function emissions(c: Cell, units: Unit[], env: Environment, opts: FilamentOptio
 
 // --- conditions on the hex itself ------------------------------------------------------
 
-interface Context {
+export interface Context {
   cell: Cell;
   env: Environment;
   outdoors: boolean;
@@ -132,11 +132,11 @@ interface Context {
   shadowedBy: string | null;
 }
 
-type Base = (x: Context, add: (label: string, value: number) => void) => 'skipSources' | void;
+export type Base = (x: Context, add: (label: string, value: number) => void) => 'skipSources' | void;
 
-const overcast = (env: Environment): boolean => env.sky === 'rain' || env.sky === 'storm';
+export const overcast = (env: Environment): boolean => env.sky === 'rain' || env.sky === 'storm';
 
-const BASE: Record<AspectId, Base> = {
+export const BASE: Record<AspectId, Base> = {
   hydro: ({ cell, env, outdoors }, add) => {
     if (!outdoors) {
       add('Indoors, no water', -3);

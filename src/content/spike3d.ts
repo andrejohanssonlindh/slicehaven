@@ -1,5 +1,7 @@
 import type { House3DSpec } from '../core/world3d/house';
-import { type Shape, boxOfFootprint, circle } from '../core/world3d/space';
+import { type FSource, type FilamentWorld, type Ground } from '../core/world3d/filaments3d';
+import { type Shape, boxOfFootprint, circle, shapeDist } from '../core/world3d/space';
+import { lakeDist, splatAt } from '../core/world3d/terrain';
 import type { Ground3D, XZ } from '../core/world3d/terrain';
 
 /**
@@ -46,3 +48,30 @@ export function spikeObstacles(footprint: { x0: number; x1: number; z0: number; 
 
 /** Where the hero starts: by the door, on the mud. */
 export const SPIKE_HERO: [number, number] = [2.4, 1.2];
+
+/**
+ * The spike as the filament field sees it: the lake is still water, the road
+ * is path, the mud is mud, long grass and leaf litter are what they look like,
+ * and inside the house's walls is indoors. The tree and the torches are sources.
+ */
+export function spikeFilamentWorld(g: Ground3D, footprint: { x0: number; x1: number; z0: number; z1: number }, extra: FSource[] = []): FilamentWorld {
+  const house = boxOfFootprint(footprint, SPIKE_HOUSE.x, SPIKE_HOUSE.z, SPIKE_HOUSE.rot);
+  return {
+    size: g.size,
+    ground(x, z): Ground {
+      if (lakeDist(g, x, z) < 0) return 'pond';
+      const s = splatAt(g, x, z);
+      if (s.mud > 0.5) return 'mud';
+      if (s.road > 0.5) return 'path';
+      if (s.shade > 0.5) return 'forest';
+      if (s.wild > 0.5) return 'tallgrass';
+      return 'grass';
+    },
+    indoors: (x, z) => shapeDist(house, x, z) < 0,
+    sources: [
+      { x: SPIKE_TREE.x, z: SPIKE_TREE.z, kind: 'tree' },
+      ...SPIKE_TORCHES.map(([x, z]): FSource => ({ x, z, kind: 'fire', weight: 0.4 })),
+      ...extra,
+    ],
+  };
+}

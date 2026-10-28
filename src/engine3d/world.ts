@@ -11,7 +11,9 @@ import {
   timberTex, windowGlowTex, windowTex,
 } from '../art/textures3d';
 import { PEOPLE } from '../content/village/folk';
-import { SPIKE_GROUND, SPIKE_HERO, SPIKE_HOUSE, SPIKE_TORCHES, SPIKE_TREE, SPIKE_WALK, spikeObstacles } from '../content/spike3d';
+import { SPIKE_GROUND, SPIKE_HERO, SPIKE_HOUSE, SPIKE_TORCHES, SPIKE_TREE, SPIKE_WALK, spikeFilamentWorld, spikeObstacles } from '../content/spike3d';
+import type { AspectId, HexFilaments } from '../core/filaments';
+import { type FSource, FilamentField } from '../core/world3d/filaments3d';
 import { CHUNK, type ChunkTerrain, TerrainStore, chunkKey, chunksNear } from '../core/world3d/chunks';
 import { type Environment3D, environment } from '../core/world3d/environment3d';
 import { Rng } from '../core/rng';
@@ -27,6 +29,7 @@ import { Weather } from '../engine/weather';
 import { type LitOpts, WORLD, lit, pixTexture, shellOf } from './materials';
 import { Rain } from './rain';
 import { type SpriteCard, blobShadow, spriteCard } from './sprites';
+import { type Heat, makeHeat } from './heat';
 import { type Water, makeWater } from './water';
 
 /**
@@ -75,6 +78,7 @@ interface LoadedChunk {
   id: ChunkTerrain;
   ground: THREE.Mesh;
   grass: THREE.InstancedMesh | null;
+  heat: Heat | null;
 }
 
 interface Shell {
@@ -99,6 +103,13 @@ export class SpikeWorld {
   /** What the world is like right now (sky, wind, clouds): the one interface the rules and the renderer read. */
   env!: Environment3D;
   private grassCount = 0;
+  /** How strongly each aspect of magic flows, by cell: read by position (see `core/world3d/filaments3d.ts`). */
+  field!: FilamentField;
+  /** Fires that belong to the built world (hearth, door torch), as sources for the field. */
+  private fires: FSource[] = [];
+  /** Which aspect the heat map shows, if any. */
+  private heatAspect: AspectId | null = null;
+  private heatT = 0;
   private chunkBuilds = 0;
   readonly house = new THREE.Group();
   private model: HouseModel;
@@ -184,6 +195,7 @@ export class SpikeWorld {
     this.scene.add(this.marker);
 
     this.weather.setWind(2, 1);
+    this.field = new FilamentField(spikeFilamentWorld(g, this.model.footprint, this.fires));
   }
 
   /** House-local (x, z) to world. */
@@ -272,6 +284,8 @@ export class SpikeWorld {
     hearth.position.set(r.x0 + 0.8 * (r.x1 - r.x0), this.model.floorY + 0.55, r.z1 - 0.88 * (r.z1 - r.z0));
     this.house.add(hearth);
     this.torches.push({ light: hearth, flame: new THREE.Mesh(), base: 4, seed: 3 });
+    const hf = this.toWorld(hearth.position.x, hearth.position.z);
+    this.fires.push({ x: hf.x, z: hf.z, kind: 'fire', weight: 0.5 });
 
     const y = groundHeight(this.ground, h.x, h.z) - 0.05;
     this.house.position.set(h.x, y, h.z);
@@ -415,7 +429,9 @@ export class SpikeWorld {
       grass.count = Math.min(grass.userData.full as number, this.grassLimit(grass));
       this.scene.add(grass);
     }
-    this.chunks.set(chunkKey(i, j), { id: c, ground: mesh, grass });
+    const lc: LoadedChunk = { id: c, ground: mesh, grass, heat: null };
+    this.chunks.set(chunkKey(i, j), lc);
+    this.syncHeat(lc);
     this.chunkBuilds++;
   }
 
@@ -427,6 +443,10 @@ export class SpikeWorld {
     const mat = lc.ground.material as THREE.MeshLambertMaterial;
     mat.map?.dispose();
     mat.dispose();
+    if (lc.heat) {
+      this.scene.remove(lc.heat.mesh);
+      lc.heat.dispose();
+    }
     if (lc.grass) {
       this.scene.remove(lc.grass);
       lc.grass.dispose();
@@ -457,6 +477,43 @@ export class SpikeWorld {
     // Hysteresis: a chunk is dropped only well past the load radius.
     const keep = new Set(chunksNear(this.ground, this.focus.x, this.focus.z, r + CHUNK * 0.75).map((c) => chunkKey(c.i, c.j)));
     for (const k of [...this.chunks.keys()]) if (!keep.has(k)) this.unloadChunk(k);
+  }
+
+  /** Show the heat map of one aspect over the ground (null hides it). */
+  showFilaments(a: AspectId | null): void {
+    this.heatAspect = a;
+    for (const lc of this.chunks.values()) this.syncHeat(lc);
+    this.heatT = 0;
+  }
+
+  get shownAspect(): AspectId | null {
+    return this.heatAspect;
+  }
+
+  private syncHeat(lc: LoadedChunk): void {
+    if (this.heatAspect && !lc.heat) {
+      lc.heat = makeHeat(lc.id, lc.ground.geometry);
+      this.scene.add(lc.heat.mesh);
+    } else if (!this.heatAspect && lc.heat) {
+      this.scene.remove(lc.heat.mesh);
+      lc.heat.dispose();
+      lc.heat = null;
+    }
+  }
+
+  /** Tell the field what the weather and the living are doing now. */
+  private feedField(): void {
+    const env = this.env;
+    this.field.setConditions({ env: this.weather.env(), isClouded: (x, z) => env.cloudShadow(x, z) > 0.5, sunDir: env.sunDir });
+    this.field.setMovers([
+      { x: this.hero.x, z: this.hero.z, kind: 'friend' },
+      { x: this.walker.mesh.position.x, z: this.walker.mesh.position.z, kind: 'friend' },
+    ]);
+  }
+
+  /** What the filaments are at the hero's feet. */
+  heroReading(): HexFilaments {
+    return this.field.readAt(this.hero.x, this.hero.z);
   }
 
   get chunkCount(): number {
@@ -503,6 +560,7 @@ export class SpikeWorld {
     const d = this.model.door;
     const w = this.toWorld(d[0] + 0.95, d[2] + 0.25);
     place(w.x, this.house.position.y + this.model.floorY + 1.85, w.z, false);
+    this.fires.push({ x: w.x, z: w.z, kind: 'fire', weight: 0.4 });
   }
 
   setShadowMap(size: number): void {
@@ -711,6 +769,13 @@ export class SpikeWorld {
 
     this.placeCamera();
     this.streamChunks();
+    // The heat map and the reading follow the weather and the living, twice a second.
+    this.heatT -= dt;
+    if (this.heatT <= 0) {
+      this.heatT = 0.5;
+      this.feedField();
+      if (this.heatAspect) for (const lc of this.chunks.values()) lc.heat?.paint(this.field, this.heatAspect);
+    }
     const span = Math.max(this.camera.right, this.camera.top) * 1.1;
     this.rain.update(dt, w.rain, this.focus, span, { x: w.windX, z: w.windY }, env.ambient * 0.6 + env.sunIntensity * 0.15 + w.flash);
     if (this.water) this.water.light(this.sun.color, this.sun.intensity, lin(env.skyHorizon), this.hemi.color.clone().multiplyScalar(env.ambient * 0.5), env.night);

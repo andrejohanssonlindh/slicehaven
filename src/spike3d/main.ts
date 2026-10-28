@@ -1,4 +1,5 @@
 import type { Sky, TimeOfDay } from '../core/environment';
+import { ASPECTS, LEVEL_NAMES } from '../core/filaments';
 import { SPIKE_GROUND } from '../content/spike3d';
 import { Governor, TIERS, type DeviceInfo, type Tier, type TierName, atlasSize, pickTier, qualityAt } from '../core/world3d/tiers';
 import { setAtlasSize, spriteAtlas } from '../engine3d/atlas';
@@ -126,6 +127,15 @@ function buildControls(): void {
     pipeline.settings.palette = cycle([0, 0.3, 0.6, 1], pipeline.settings.palette);
   });
 
+  // Filaments: cycle the heat map through the eight aspects, then off.
+  button('row-magic', () => {
+    const a = world.shownAspect;
+    return a ? t('spike.magic', 'Filaments: {n}', { n: ASPECTS.find((x) => x.id === a)!.gloss }) : t('spike.magicoff', 'Filaments: off');
+  }, () => world.shownAspect !== null, () => {
+    const ids = [null, ...ASPECTS.map((x) => x.id)] as const;
+    world.showFilaments(ids[(ids.indexOf(world.shownAspect as never) + 1) % ids.length]);
+  });
+
   button('row-perf', () => t('spike.tier', 'Tier: {n}', { n: tier.name }), () => false, () => {
     setTier(cycle(['low', 'medium', 'high'] as TierName[], tier.name));
   });
@@ -228,13 +238,21 @@ function loop(now: number): void {
     fpsT = now;
     const sorted = [...frameMs].sort((a, b) => a - b);
     const med = sorted[Math.floor(sorted.length / 2)] ?? 0;
+    const shown = world.shownAspect;
+    let magic = '';
+    if (shown) {
+      const r = world.heroReading()[shown];
+      const info = ASPECTS.find((x) => x.id === shown)!;
+      magic = `${info.name} at hero: ${r.level > 0 ? '+' : ''}${r.level} ${LEVEL_NAMES[r.level]}\n` + r.parts.map((p) => `  ${p.value > 0 ? '+' : ''}${p.value.toFixed(1)} ${p.label}`).join('\n');
+    }
     statsEl.textContent = [
       `${fps.toFixed(0)} fps  cpu ${med.toFixed(1)} ms`,
       `calls ${info.render.calls}  tris ${(info.render.triangles / 1000).toFixed(1)}k`,
       `${pipeline.rw}×${pipeline.rh} ×${pipeline.factor}  ${world.ppm} px/m`,
       `tier ${tier.name}${governor.level ? ` -${governor.level}` : ''}  shadow ${world.settings.shadowMap}`,
       `chunks ${world.chunkCount}  atlases ${spriteAtlas().count}`,
-    ].join('\n');
+      magic,
+    ].filter(Boolean).join('\n');
   }
   requestAnimationFrame(loop);
 }
