@@ -1,5 +1,14 @@
 # Devlog
 
+## 2026-10-28 — Session 21: village art, round 1
+
+- New tab in the Director's Room: **Village art** (`/director/#art`). Concept studies for the village and a 5×5 hex mock-up, with look buttons (Flat, Day, Dusk, Night). Skills untouched (another agent has them).
+- Your notes, applied: **trees** are now lopsided crowns of many leaf clumps with gaps, a gnarled flared trunk and moss (no spheres); **rocks** have chamfered facets, cracks, lichen and moss, and sit in the turf; **houses** are daub over wattle on a fieldstone footing, crooked beams, patched mossy roofs, a lean-to, chimney smoke, a lit window; **people** are about five heads tall with real shoulders, hands and boots, soft-shaded and worn (the "Secret of Mana meets western realism" idea), built from a spec so new villagers are cheap.
+- New things: house (thatch or shingle), tavern and apothecary variants (signs), well, barrels, crates, market stalls (fruit, bread, cloth), smithy with a live forge, haystack, woodpile, fence, lantern post, reeds and lily pads for the water. Eight villagers: farmer, baker, elder, smith, guard, wife, child, traveller.
+- The "later" layer (`art/look.ts`): projected cast shadows, coloured lights with falloff and flicker, bloom, colour grade, vignette, dappled sunlight drifting over the ground, chimney smoke. It runs on top of the unchanged chunky pixels. Not wired into the real game yet; the studio is where it lives.
+- Code: `art/grit.ts` (wobbly shapes, soft outlines, wear), `art/rough.ts`, `art/buildings.ts`, `art/folk.ts`, `art/look.ts`, `art/villageScene.ts`. Grass, flowers, campfire, ground tiles untouched. A test checks every sprite draws and is repeatable (271 tests).
+- Honest finding: buildings are about 2.5 hexes wide, so a 5×5 hex patch holds roughly three of them plus clutter. See Q20.
+
 ## 2026-10-27 — Session 20: person hooks for sweet-talk, comfort, provoke, steal
 
 - Four more efforts have hooks by type of person (recipe in the skills handover §4): **sweet-talk** (19), **comfort** (12), **provoke** (17, a success is a deliberate rise: they get angrier and you keep a social advantage) and **steal** (12, not a talk, so it costs no patience; it spends the `steal` advantage that distract earns; success sets `stolen:{id}`, failure sets `suspicious:{id}` and turns them hostile).

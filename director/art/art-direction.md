@@ -12,7 +12,10 @@
 - Terrain tiles are "near perfect". A kind forest can look like this; other forest types are the same tiles with other palettes.
 - **Mobs are 5/10**: blobby, they merge together, the wolf looks like a cat, the rat like a ball. To do: clearer silhouettes, more contrast between body parts, distinct heads and limbs.
 
-## The current look
+## Round 2 direction (2026-10-28)
+Grass, flowers and the campfire are kept. Everything else moves toward **peak 90s 2D with later-era effects on top**: less clean, more imperfection (crooked, patched, stained, mossy), soft selective outlines instead of one flat dark line, trees that are not round, houses that are not pretty, people with grown-up proportions (Secret of Mana's readable shading, western realism). Effects layered over the pixels: cast shadows, coloured light, bloom, grade, dappled sun, smoke. **See it: Director's Room, "Village art" tab.** Code: `grit.ts`, `rough.ts`, `buildings.ts`, `folk.ts`, `look.ts`, `villageScene.ts`.
+
+## The current look (round 1, still used by the game)
 | | |
 |---|---|
 | Hex shape | Pointy-top, 32 px wide, 2:1 pixel slopes, slightly squashed vertically, so the board reads as tilted toward you. 6 px earth side face for depth. |

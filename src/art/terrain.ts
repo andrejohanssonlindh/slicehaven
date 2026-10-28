@@ -36,7 +36,7 @@ function grassColor(wx: number, wy: number, y: number, bias = 0): string {
   return ramp(P.grass.slice(1, 5), v, wx, wy);
 }
 
-function groundColor(ground: Ground, wx: number, wy: number, x: number, y: number): string {
+export function groundColor(ground: Ground, wx: number, wy: number, x: number, y: number): string {
   switch (ground) {
     case 'grass':
       return grassColor(wx, wy, y);
