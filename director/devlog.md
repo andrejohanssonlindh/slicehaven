@@ -1,5 +1,10 @@
 # Devlog
 
+## 2026-10-28 — Session 22b: brief for the voxel world engine
+
+- After the village sketch the director found the whole-map redraw too slow and the shape wrong (wants round, ~50 × 50, walkable, ~10 hexes in view). We talked through pre-rendering from 3D, and settled on: **voxel models baked to sprites with a G-buffer, our own small baker, soft light computed live over the viewport, weather as a separate system driving it**.
+- Wrote [the brief](design/voxel-engine-brief.md) for Opus: baker, sprite contract, world, soft lighting, weather, milestones M0 to M6 (M0 is a spike judged by the director). No engine code changed.
+
 ## 2026-10-28 — Session 22: Reedwater, the whole village on one map
 
 - **New page `/village/`**: a 38 × 31 hex village with the full look pass (shadows, light, smoke, Day/Dusk/Night), pan and zoom, tap a house or person for a card, **Step inside** to lift the roof. About 70 ms a frame. Design and map in [village.md](design/village.md); questions in Q21.

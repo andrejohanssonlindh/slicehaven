@@ -4,6 +4,8 @@ Only decisions that still stand. Ones that were replaced are removed (git histor
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-10-28 | **The world is rendered from baked voxel sprites, with our own small voxel baker** (no three.js, Blender or MagicaVoxel in the pipeline). Sprites carry colour, normals, height, AO, emissive and material, so the world is lit live over the viewport only | Director: the whole-map redraw (70 ms a frame at 38 × 31) can't scale to a round 50 × 50 village you walk about in; rotation and relighting come with the voxels. See [the brief](design/voxel-engine-brief.md). |
+| 2026-10-28 | **Soft light is a must, and weather, clouds and time of day stay as their own system** that drives the lighting | Director: soft light is "super important for the feel". |
 | 2026-10-27 | **Skill hooks have one structure:** kinds are what things are, facets are who people are; every hook names an effort (a tag), which gives its skills and leanings; one file per effort; efforts not yet built are listed in code with where they belong | Director (Q19): fix the structure before more content, so the rest can be filled in by the same recipe. |
 | 2026-10-27 | **Marks and crafts are skills, tagged like skills, but narrow:** a mark enhances an effort the way a skill does (Scary when threatening); a craft is rarely useful in social challenges but sometimes is (bread knowledge to impress innkeepers). Skills tied to types of people and situations come after the skill map is built | Director. |
 | 2026-10-27 | **Social tries linger:** most people put up with a limited number of talks, and the outcome of a try leaves a mood that colours the next | Director (Q18). |
