@@ -11,14 +11,15 @@ import {
   timberTex, windowGlowTex, windowTex,
 } from '../art/textures3d';
 import { PEOPLE } from '../content/village/folk';
-import { SPIKE_GROUND, SPIKE_HOUSE, SPIKE_TORCHES, SPIKE_TREE, SPIKE_WALK } from '../content/spike3d';
+import { SPIKE_GROUND, SPIKE_HERO, SPIKE_HOUSE, SPIKE_TORCHES, SPIKE_TREE, SPIKE_WALK, spikeObstacles } from '../content/spike3d';
 import { CHUNK, type ChunkTerrain, TerrainStore, chunkKey, chunksNear } from '../core/world3d/chunks';
 import { type Environment3D, environment } from '../core/world3d/environment3d';
 import { Rng } from '../core/rng';
 import { type HouseMaterial, type HouseModel, buildHouse } from '../core/world3d/house';
 import type { MeshData } from '../core/world3d/mesh';
 import { cloudDrift, cloudThreshold } from '../core/world3d/sky';
-import { type Ground3D, groundHeight, splatAt } from '../core/world3d/terrain';
+import { NavGrid, type P2, findPath, followPath, pathLength } from '../core/world3d/space';
+import { type Ground3D, groundHeight, lakeDist, splatAt } from '../core/world3d/terrain';
 import { TEXELS_PER_M } from '../core/world3d/tiers';
 import { buildTree } from '../core/world3d/tree';
 import { fbm } from '../core/noise';
@@ -111,6 +112,17 @@ export class SpikeWorld {
   private walkerBlob: THREE.Mesh;
   private walkS = 0;
   private sprites: SpriteCard[] = [];
+  /** The invisible navigation grid the hero walks on. */
+  readonly nav: NavGrid;
+  /** Where the hero stands, metres. */
+  readonly hero: P2 = { x: SPIKE_HERO[0], z: SPIKE_HERO[1] };
+  private heroCard!: SpriteCard;
+  private heroBlob!: THREE.Mesh;
+  private path: P2[] | null = null;
+  private pathS = 0;
+  private marker: THREE.Mesh;
+  /** The camera follows the hero while it walks, until the player drags the view. */
+  follow = false;
   /** Cut-away: 0 closed, 1 open; eases toward `inside`. */
   inside = false;
   private cutT = 0;
@@ -140,6 +152,8 @@ export class SpikeWorld {
 
     // Ground chunks stream in once the view is sized (see `frame`); until then the exact height function stands in.
     this.model = buildHouse(SPIKE_HOUSE.spec);
+    // Feet: the house, trunk and posts block; so does the water.
+    this.nav = new NavGrid(g.size, spikeObstacles(this.model.footprint), { blocked: (x, z) => lakeDist(g, x, z) < 0.2 });
 
     // The house.
     this.buildHouse();
@@ -155,14 +169,19 @@ export class SpikeWorld {
     this.walkerBlob = blobShadow(0.32);
     this.scene.add(this.walker.mesh, this.walkerBlob);
     this.sprites.push(this.walker);
-    const stander = spriteCard(makeFolk(PEOPLE.farmer), PITCH);
-    const d = this.toWorld(this.model.door[0] + 1.7, this.model.door[2] + 1.1);
-    stander.mesh.position.set(d.x, this.store.heightAt(d.x, d.z), d.z);
-    stander.mesh.rotation.y = YAW;
-    const sb = blobShadow(0.32);
-    sb.position.copy(stander.mesh.position).add(new THREE.Vector3(0, 0.03, 0));
-    this.scene.add(stander.mesh, sb);
-    this.sprites.push(stander);
+    // The hero: the farmer by the door. Tap the ground and they walk there.
+    this.heroCard = spriteCard(makeFolk(PEOPLE.farmer), PITCH);
+    this.heroBlob = blobShadow(0.32);
+    this.heroCard.mesh.rotation.y = YAW;
+    this.placeHero();
+    this.scene.add(this.heroCard.mesh, this.heroBlob);
+    this.sprites.push(this.heroCard);
+    const ring = new THREE.RingGeometry(0.22, 0.32, 16);
+    ring.rotateX(-Math.PI / 2);
+    this.marker = new THREE.Mesh(ring, new THREE.MeshBasicMaterial({ color: 0xffd36a, transparent: true, opacity: 0.8, depthWrite: false }));
+    this.marker.visible = false;
+    this.marker.renderOrder = 3;
+    this.scene.add(this.marker);
 
     this.weather.setWind(2, 1);
   }
@@ -518,6 +537,7 @@ export class SpikeWorld {
 
   /** Screen-space pan (rendered pixels) to world movement on the ground. */
   pan(dxPx: number, dyPx: number): void {
+    this.follow = false;
     const px = 1 / this.ppm;
     const right = new THREE.Vector3(Math.cos(YAW), 0, -Math.sin(YAW));
     const fwd = new THREE.Vector3(-Math.sin(YAW), 0, -Math.cos(YAW));
@@ -533,6 +553,66 @@ export class SpikeWorld {
     ray.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
     const hit = ray.intersectObject(this.house, true)[0];
     return hit ? 'house' : null;
+  }
+
+  /** Where a tap on the screen (ndc) lands on the ground; null if it points at the sky. */
+  groundAt(ndcX: number, ndcY: number): P2 | null {
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const hit = new THREE.Vector3();
+    let y = 0.35;
+    // The ground is not flat: intersect, read the height there, and try again.
+    for (let k = 0; k < 3; k++) {
+      plane.constant = -y;
+      if (!ray.ray.intersectPlane(plane, hit)) return null;
+      y = this.store.heightAt(hit.x, hit.z);
+    }
+    return { x: hit.x, z: hit.z };
+  }
+
+  /** Walk the hero to a point: path-find round the house, the tree and the lake. Returns the metres to walk, or null if there is no way. */
+  walkTo(x: number, z: number): number | null {
+    const path = findPath(this.nav, this.hero, { x, z });
+    if (!path) return null;
+    this.path = path;
+    this.pathS = 0;
+    this.follow = true;
+    const end = path[path.length - 1];
+    this.marker.position.set(end.x, this.store.heightAt(end.x, end.z) + 0.04, end.z);
+    this.marker.visible = true;
+    return pathLength(path);
+  }
+
+  get walking(): boolean {
+    return this.path !== null;
+  }
+
+  private placeHero(lift = 0): void {
+    const y = this.store.heightAt(this.hero.x, this.hero.z);
+    this.heroCard.mesh.position.set(this.hero.x, y + lift, this.hero.z);
+    this.heroBlob.position.set(this.hero.x, y + 0.03, this.hero.z);
+  }
+
+  private stepHero(dt: number): void {
+    if (!this.path) return;
+    this.pathS += dt * 1.6;
+    const p = followPath(this.path, this.pathS);
+    this.hero.x = p.x;
+    this.hero.z = p.z;
+    this.placeHero(Math.abs(Math.sin(this.time * 9)) * 0.03);
+    this.faceScreen(this.heroCard.mesh, p.dx, p.dz);
+    if (p.done) {
+      this.path = null;
+      this.marker.visible = false;
+      this.placeHero();
+    }
+  }
+
+  /** Turn a front-view card toward the way it walks: left on screen mirrors it (see the note on the walker). */
+  private faceScreen(m: THREE.Object3D, dirX: number, dirZ: number): void {
+    const screenRight = dirX * Math.cos(YAW) - dirZ * Math.sin(YAW);
+    if (Math.abs(screenRight) > 0.05) m.rotation.y = screenRight < 0 ? YAW + Math.PI : YAW;
   }
 
   private placeCamera(): void {
@@ -621,6 +701,12 @@ export class SpikeWorld {
 
     // The villager walks the road, there and back.
     this.walkVillager(dt);
+    this.stepHero(dt);
+    if (this.follow) {
+      const k = 1 - Math.exp(-dt / 0.25);
+      this.focus.x += (this.hero.x - this.focus.x) * k;
+      this.focus.z += (this.hero.z - this.focus.z) * k;
+    }
     for (const s of this.sprites) s.tick(this.time);
 
     this.placeCamera();
@@ -647,8 +733,7 @@ export class SpikeWorld {
     // Facing: the art only has a front view for now, so walking left mirrors it. Turning the
     // double-sided card round mirrors it and keeps its lit side toward the camera.
     const dirX = (b[0] - a[0]) * (back ? -1 : 1), dirZ = (b[1] - a[1]) * (back ? -1 : 1);
-    const screenRight = dirX * Math.cos(YAW) - dirZ * Math.sin(YAW);
-    m.rotation.y = screenRight < 0 ? YAW + Math.PI : YAW;
+    this.faceScreen(m, dirX, dirZ);
     this.walkerBlob.position.set(x, y + 0.03, z);
   }
 }

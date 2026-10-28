@@ -152,7 +152,7 @@ function setTier(name: TierName): void {
   fit();
 }
 
-// --- input: drag to pan, tap the house to step inside, zoom buttons and wheel ---
+// --- input: drag to pan, tap the ground to walk, tap the house to step inside, zoom buttons and wheel ---
 
 function bindInput(): void {
   let down: { x: number; y: number; id: number; moved: number } | null = null;
@@ -177,6 +177,10 @@ function bindInput(): void {
       if (world.pick(nx, ny) === 'house') {
         world.inside = !world.inside;
         for (const b of buttons) b.refresh();
+      } else {
+        // Tap the ground and the hero walks there, round whatever is in the way.
+        const at = world.groundAt(nx, ny);
+        if (at && world.walkTo(at.x, at.z) === null) notify(t('spike.noway', 'There is no way there.'));
       }
     }
     down = null;

@@ -7,6 +7,7 @@
 - **Environment interface** (`core/world3d/environment3d.ts`): `environment(weather, cloudOffset)` gives sun, sky, fog, wetness, wind, rain, flash, time and `cloudShadow(x, z)`, the same field the shader draws. The world now reads only this.
 - **Tier detection and dynamic scaling**: the page asks the GPU's name and texture limit (software GPUs start on `low`); a `Governor` watches frame intervals and steps quality down through `qualityAt` (fringe and grass, then shadow map and lights; never render scale), and back up only with lots of room, with a visible notice at the bottom of the view. The Tier button resets it. `?nogov` turns it off.
 - 14 new tests (385 in all); the Playwright run also checks streaming over a 224 m world.
+- **Measurements and walking** (`core/world3d/space.ts`): `distance(a, b)` and `near(a, b, r)` in metres, collision shapes (circles and rotated boxes, `shapeDist`), `boxOfFootprint`, a 0.5 m `NavGrid` (obstacles grown by the walker's radius, water blocked), 8-way A* with no corner cutting and string-pulling, `followPath`. 11 tests. **Tap the ground on `/spike3d/` and the hero (the farmer) walks there round the house, tree and lake**, the camera follows until you drag. Fixed a sign slip: terrain pads turned the opposite way to houses (`rotation.y`), now the same.
 
 ## 2026-10-28 — Session 23: the 3D spike (M0)
 

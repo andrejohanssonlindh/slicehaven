@@ -1,4 +1,5 @@
 import type { House3DSpec } from '../core/world3d/house';
+import { type Shape, boxOfFootprint, circle } from '../core/world3d/space';
 import type { Ground3D, XZ } from '../core/world3d/terrain';
 
 /**
@@ -31,3 +32,17 @@ export const SPIKE_TORCHES: [number, number][] = [[6.5, 6.9]];
 
 /** The villager's beat along the road, there and back. */
 export const SPIKE_WALK: XZ[] = [[-12, 5.6], [-3, 5.0], [6, 5.8], [12, 4.8]];
+
+/** What blocks feet: the house (its footprint, a little proud of the wall), the tree trunk, the torch post. */
+export function spikeObstacles(footprint: { x0: number; x1: number; z0: number; z1: number }): Shape[] {
+  const h = SPIKE_HOUSE;
+  const pad = 0.15;
+  return [
+    boxOfFootprint({ x0: footprint.x0 - pad, x1: footprint.x1 + pad, z0: footprint.z0 - pad, z1: footprint.z1 + pad }, h.x, h.z, h.rot),
+    circle(SPIKE_TREE.x, SPIKE_TREE.z, 0.5),
+    ...SPIKE_TORCHES.map(([x, z]) => circle(x, z, 0.12)),
+  ];
+}
+
+/** Where the hero starts: by the door, on the mud. */
+export const SPIKE_HERO: [number, number] = [2.4, 1.2];

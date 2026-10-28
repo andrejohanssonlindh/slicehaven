@@ -61,7 +61,8 @@ export function lakeDist(g: Ground3D, x: number, z: number): number {
 
 /** Distance outside a building pad (0 inside). */
 function padDist(p: Ground3D['pads'][number], x: number, z: number): number {
-  const c = Math.cos(-p.rot), s = Math.sin(-p.rot);
+  // Same turn as a three.js object rotated about y by p.rot (see `toWorld` in engine3d/world.ts).
+  const c = Math.cos(p.rot), s = Math.sin(p.rot);
   const lx = (x - p.x) * c - (z - p.z) * s, lz = (x - p.x) * s + (z - p.z) * c;
   const dx = Math.max(0, Math.abs(lx) - p.hw), dz = Math.max(0, Math.abs(lz) - p.hd);
   return Math.hypot(dx, dz);

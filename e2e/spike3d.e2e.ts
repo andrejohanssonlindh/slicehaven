@@ -75,3 +75,28 @@ describe('spike3d streaming', () => {
     expect(errors).toEqual([]);
   });
 });
+
+describe('spike3d walking', () => {
+  it('taps the ground and the hero walks round the house to it', async () => {
+    const { page, errors } = await openPage(env, '/spike3d/?nogov');
+    await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 30_000 });
+    await page.waitForTimeout(1000);
+    const hero = () => page.evaluate(() => { const h = (window as any).spike.world.hero; return { x: h.x as number, z: h.z as number }; });
+    const start = await hero();
+    // Ask for a spot across the house, behind it: the path has to bend round the walls.
+    const metres = await page.evaluate(() => (window as any).spike.world.walkTo(-1, -6) as number | null);
+    expect(metres).not.toBeNull();
+    expect(metres!).toBeGreaterThan(Math.hypot(-1 - start.x, -6 - start.z));
+    await page.waitForTimeout(1500);
+    expect(await page.evaluate(() => (window as any).spike.world.walking)).toBe(true);
+    await page.screenshot({ path: `${OUT}spike3d-walking.png` });
+    await page.waitForFunction(() => !(window as any).spike.world.walking, undefined, { timeout: 40_000 });
+    const end = await hero();
+    expect(Math.hypot(end.x + 1, end.z + 6)).toBeLessThan(0.6);
+    // A real tap on the canvas lands on the ground and starts a walk.
+    await page.mouse.click(200, 420);
+    await page.waitForTimeout(300);
+    expect(await page.evaluate(() => (window as any).spike.world.walking)).toBe(true);
+    expect(errors).toEqual([]);
+  });
+});
