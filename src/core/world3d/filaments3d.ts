@@ -1,6 +1,6 @@
 import type { Cell, Unit } from '../battle';
 import type { Environment } from '../environment';
-import { ASPECTS, BASE, type Context, type Emission, type HexFilaments, type Part, emissions } from '../filaments';
+import { ASPECTS, type AspectId, BASE, type Context, type Emission, type HexFilaments, type Part, emissions } from '../filaments';
 import { CHUNK } from './chunks';
 
 /**
@@ -157,12 +157,14 @@ export class FilamentField {
     const opts = { isUndead: (u: Unit) => u.kind === 'undead' };
     const inc = new Map<string, Map<string, Gathered>>();
     const spread = (i: number, j: number, ems: Emission[], scale: number): void => {
+      // Walls stop it: what burns indoors reaches only the room, what burns outside stays outside.
+      const roofed = this.indoorGrid[j * this.n + i] === 1;
       for (const em of ems) {
         for (let dj = -2; dj <= 2; dj++) {
           for (let di = -2; di <= 2; di++) {
             const d = Math.hypot(di, dj);
             const v = falloffAt(em.fall, d) * scale;
-            if (!v || !this.inside(i + di, j + dj)) continue;
+            if (!v || !this.inside(i + di, j + dj) || (this.indoorGrid[(j + dj) * this.n + i + di] === 1) !== roofed) continue;
             const k = `${i + di},${j + dj}`;
             let m = inc.get(k);
             if (!m) inc.set(k, (m = new Map()));
@@ -244,6 +246,14 @@ export class FilamentField {
     }
     this.cache.set(key, reading);
     return reading;
+  }
+
+  /** The aspect's raw strength at a point, blended smoothly between the four nearest cell centres (for drawing; rules use `readAt`). */
+  smoothAt(x: number, z: number, aspect: AspectId): number {
+    const fx = (x - this.x0) / FCELL - 0.5, fz = (z - this.x0) / FCELL - 0.5;
+    const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j;
+    const c = (a: number, b: number): number => Math.max(-3, Math.min(3, this.readCell(Math.max(0, Math.min(this.n - 1, a)), Math.max(0, Math.min(this.n - 1, b)))[aspect].raw));
+    return (c(i, j) * (1 - u) + c(i + 1, j) * u) * (1 - v) + (c(i, j + 1) * (1 - u) + c(i + 1, j + 1) * u) * v;
   }
 
   /** The reading at a point in metres. Outside the world patch it reads the nearest cell. */

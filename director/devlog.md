@@ -1,5 +1,11 @@
 # Devlog
 
+## 2026-10-28 — Session 24c: walking in, walls and smooth filaments
+
+- **Roof is no longer a tap.** Taps always walk (outside, tapping the house walks in through the door); **shift-click** on the house toggles the roof by hand (dev). The roof still follows the hero over the threshold.
+- **Walls stop filaments**: fire inside a room reaches only the room, fire outside stays outside (it used to leak through the wall, which is the "fire outside the house that I can't see"). The room has its own heat plane on the floor, so the hearth shows when the roof is up.
+- **Smooth heat map**: drawn from a blend of the four nearest cell centres at 4 texels per cell (`smoothAt`); rules still read whole cells and levels. "No open fire -2" next to "Heat of fire +2" is the hex rules' own sum (a base of -2 plus what the fire adds), not a bug; the panel just lists both.
+
 ## 2026-10-28 — Session 24b: entering the house
 
 - The house's collision is now four thin walls with a doorway, so the room can be walked. **Tap the house to walk in** through the door; the roof lifts when the hero crosses the threshold and drops when they leave (tapping the house while inside still toggles it by hand). The hero stands on the room's floor indoors.

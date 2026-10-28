@@ -139,6 +139,40 @@ describe('filaments in the free world', () => {
   });
 });
 
+describe('walls and smoothness', () => {
+  // A room from x 0..6 (indoors), a hearth inside at x 4.
+  const room = meadow([{ x: 4, z: 0, kind: 'fire' }], { indoors: (x) => x >= 0 && x <= 6 });
+
+  it('fire inside a room heats the room and not the ground outside its wall', () => {
+    const f = new FilamentField(room);
+    f.setConditions({ env: NIGHT });
+    expect(f.readAt(4, 0).pyro.raw).toBeGreaterThan(1);
+    expect(f.readAt(2.5, 0).pyro.raw).toBeGreaterThan(-2);
+    // Just outside the wall, 1.5 m from the hearth's cell: nothing of it.
+    expect(f.readAt(7.2, 0).pyro.raw).toBe(-2);
+    expect(f.readAt(-1, 0).pyro.raw).toBe(-2);
+  });
+
+  it('fire outside does not leak in either', () => {
+    const f = new FilamentField(meadow([{ x: 8, z: 0, kind: 'fire' }], { indoors: (x) => x >= 0 && x <= 6 }));
+    f.setConditions({ env: NIGHT });
+    expect(f.readAt(8, 0).pyro.raw).toBeGreaterThan(1);
+    expect(f.readAt(5.5, 0).pyro.raw).toBe(-2);
+  });
+
+  it('smoothAt blends between cell centres with no jumps', () => {
+    const f = new FilamentField(meadow([{ x: 0.8, z: 0.8, kind: 'fire' }]));
+    f.setConditions({ env: NIGHT });
+    let prev = f.smoothAt(0.8, 0.8, 'pyro');
+    for (let x = 0.8; x < 6; x += 0.05) {
+      const v = f.smoothAt(x, 0.8, 'pyro');
+      expect(Math.abs(v - prev)).toBeLessThan(0.35);
+      prev = v;
+    }
+    expect(f.smoothAt(0.8, 0.8, 'pyro')).toBeCloseTo(f.readAt(0.8, 0.8).pyro.raw, 6);
+  });
+});
+
 describe('filaments on the spike', () => {
   const m = buildHouse(SPIKE_HOUSE.spec);
   const f = new FilamentField(spikeFilamentWorld(SPIKE_GROUND, m.footprint));

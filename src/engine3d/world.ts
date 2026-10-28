@@ -29,7 +29,7 @@ import { Weather } from '../engine/weather';
 import { type LitOpts, WORLD, lit, pixTexture, shellOf } from './materials';
 import { Rain } from './rain';
 import { type SpriteCard, blobShadow, spriteCard } from './sprites';
-import { type Heat, makeHeat } from './heat';
+import { type Heat, makeFloorHeat, makeHeat } from './heat';
 import { type Water, makeWater } from './water';
 
 /**
@@ -110,6 +110,7 @@ export class SpikeWorld {
   /** Which aspect the heat map shows, if any. */
   private heatAspect: AspectId | null = null;
   private heatT = 0;
+  private floorHeat: Heat | null = null;
   private chunkBuilds = 0;
   readonly house = new THREE.Group();
   private model: HouseModel;
@@ -485,6 +486,15 @@ export class SpikeWorld {
   showFilaments(a: AspectId | null): void {
     this.heatAspect = a;
     for (const lc of this.chunks.values()) this.syncHeat(lc);
+    // The room inside the house shows it on its floor.
+    if (a && !this.floorHeat) {
+      this.floorHeat = makeFloorHeat(this.model.room, this.model.floorY + 0.03, (x, z) => this.toWorld(x, z));
+      this.house.add(this.floorHeat.mesh);
+    } else if (!a && this.floorHeat) {
+      this.house.remove(this.floorHeat.mesh);
+      this.floorHeat.dispose();
+      this.floorHeat = null;
+    }
     this.heatT = 0;
   }
 
@@ -795,7 +805,10 @@ export class SpikeWorld {
     if (this.heatT <= 0) {
       this.heatT = 0.5;
       this.feedField();
-      if (this.heatAspect) for (const lc of this.chunks.values()) lc.heat?.paint(this.field, this.heatAspect);
+      if (this.heatAspect) {
+        for (const lc of this.chunks.values()) lc.heat?.paint(this.field, this.heatAspect);
+        this.floorHeat?.paint(this.field, this.heatAspect);
+      }
     }
     const span = Math.max(this.camera.right, this.camera.top) * 1.1;
     this.rain.update(dt, w.rain, this.focus, span, { x: w.windX, z: w.windY }, env.ambient * 0.6 + env.sunIntensity * 0.15 + w.flash);
