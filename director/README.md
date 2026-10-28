@@ -12,6 +12,7 @@ This is the backstage area for Slicehaven: not part of the game, but where I (Cl
 ## Try it
 - [Character creator](https://andrejohanssonlindh.github.io/slicehaven/chargen/)
 - [Village gate scene](https://andrejohanssonlindh.github.io/slicehaven/scene/)
+- [3D spike (M0)](https://andrejohanssonlindh.github.io/slicehaven/spike3d/): the live-3D pixel world on trial ([what to look at](design/world3d-m0.md))
 - [Engine sandbox](https://andrejohanssonlindh.github.io/slicehaven/) (hex movement, weather, fire, magic flow)
 - [Art Lab](https://andrejohanssonlindh.github.io/slicehaven/artlab/) (art tests; the final style isn't set)
 
@@ -23,6 +24,7 @@ This is the backstage area for Slicehaven: not part of the game, but where I (Cl
 - [Character creator](design/character-creator.md): plan, status, handover notes.
 - [Exploration scenes: the village gate](design/exploration-scenes.md): skills, talking, multi-hex things.
 - [Brief: the live-3D pixel world](design/voxel-engine-brief.md): three.js, pixel pipeline, shells, sprite people, soft light, weather, quality tiers, milestones. Written for the engineer.
+- [3D world, M0: the spike](design/world3d-m0.md): what the spike shows, the buttons, the choices made and the numbers.
 - [Reedwater: the first full village](design/village.md): the map, 15 houses, who lives where, new shop art.
 - [Magic: filaments](design/magic-filaments.md): where magic flows strong or weak, and why.
 - [Magic on the map](design/magic-on-map.md): what each mystic skill could do in play.

@@ -35,13 +35,14 @@ Read only the handover for the area you're asked about; don't read the whole `di
 | Character creator | `/chargen/` | `director/design/character-creator.md` | `src/core/chargen`, `src/content/chargen`, `src/chargen` |
 | Exploration scenes (gate) | `/scene/` | `director/design/exploration-scenes.md` | `src/core/scene.ts`, `src/content/scenes`, `src/scene`, `src/engine/scene.ts` |
 | Village (full-map sketch) | `/village/` | `director/design/village.md` | `src/content/village`, `src/art/shopItems.ts`, `src/art/villageScene.ts`, `src/village` |
+| 3D world (M0 spike, three.js) | `/spike3d/` | `director/design/world3d-m0.md` (then `voxel-engine-brief.md`) | `src/core/world3d`, `src/engine3d`, `src/art/textures3d.ts`, `src/content/spike3d.ts`, `src/spike3d` |
 | Engine sandbox | `/` | `director/design/game-design.md` | `src/engine`, `src/art` |
 | Magic (planned) | | `director/design/magic-on-map.md`, `magic-filaments.md` | `src/core/filaments.ts` |
 
 The deeper designs (`skill-web.md`, `people-library.md`, `ways-of-use.md`) are for when you change the shape, not for every task. Debug hooks: `window.scene` (`interact(id)`, `tapHex(col,row)`, `isBusy()`, `state`), `window.sandbox` (below).
 
 ## Tech
-- Vite + TypeScript (strict), **own canvas engine** (no Phaser: dropped 2026-10-25, our art and lighting are per-pixel anyway). Vitest for unit tests (`tests/`). **Playwright** (Chromium) for browser tests and screenshots (`e2e/`; on a new machine run `npx playwright install chromium`, no sudo needed). `marked` for the Director's Room.
+- Vite + TypeScript (strict), **own canvas engine** (no Phaser: dropped 2026-10-25, our art and lighting are per-pixel anyway). **three.js only for the 3D world pages** (`src/engine3d`, code-split; decision 2026-10-28). Vitest for unit tests (`tests/`). **Playwright** (Chromium) for browser tests and screenshots (`e2e/`; on a new machine run `npx playwright install chromium`, no sudo needed). `marked` for the Director's Room.
 - `npm run dev` (also on LAN with `--host`), `npm test`, `npm run build`, `npm run test:e2e` (Playwright browser tests in `e2e/`, ~1 min; run after changing `src/engine/scene.ts` or the scene UI).
 - Deploy: `.github/workflows/deploy.yml` builds and publishes `dist/` on every push to `main`.
 - Vite `base` is `/slicehaven/`. Static assets go in `public/` and are referenced as `import.meta.env.BASE_URL + 'assets/...'`.

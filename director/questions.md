@@ -4,6 +4,22 @@ Newest on top. Answer in chat (just reference the number, e.g. "Q11: option B").
 
 ---
 
+### Q23 — The 3D spike (M0): does the look work, and is it fast enough on your phone?
+Open **[the spike](https://andrejohanssonlindh.github.io/slicehaven/spike3d/)** on the phone. What it shows and every button is in [the M0 page](design/world3d-m0.md). What I need:
+
+- **The look.** Does it feel like our game? Compare **Shells 0 and 2** close up (zoom +, the roof's eave and the tree), **Outline** on and off, **Palette** 0 / 30 / 100 %. Which do you keep?
+- **The numbers.** The box at top left: fps and ms at the default tier, by day, at night, in the storm, and after two or three minutes (does the phone get hot or slow down?). A screenshot is enough.
+- **Pixel size.** The default is one art pixel per CSS pixel (×3 on most phones). Try **Pixel** ×2 and ×6: crisper or chunkier?
+- **The camera.** Pitch 39° (like the old hex art) and turned 24° so you see the front and the right side. Right, or steeper/flatter?
+- **Go or fallback.** If it is right, I start M1 (the core: chunked terrain, tiers, the atlas). If not, say what is wrong; the fallback is baked voxel sprites.
+
+---
+
+### Q22 — Fights without hexes
+The 3D world has no hexes. How should fights and ranges work there? **A)** Distances in metres, moves and ranges as circles (shown only in a fight); **B)** zones (near / close / far) like a tabletop theatre of the mind; **C)** a hex or square grid that appears only when a fight starts, laid over the free world. The sandbox and the gate scene keep their hexes until you decide. Not urgent: it does not block the 3D work.
+
+---
+
 ### Q21 — Reedwater, the first full village: what next?
 Open **Village** in the top bar. Pan, zoom, try Dusk and Night, tap houses and people, and **Step inside** the shops. The [design page](design/village.md) has the map and who lives where. Things I need from you:
 

@@ -1,5 +1,13 @@
 # Devlog
 
+## 2026-10-28 — Session 23: the 3D spike (M0)
+
+- **New page `/spike3d/`**, the decision gate from [the brief](design/voxel-engine-brief.md): a code-built thatched, timber-framed house whose **roof and front wall fade away** when you tap it (the humble furniture inside, the hearth glowing), ground with grass, flowers, a dirt road and **stamped mud** (no hexes), a lake with depth, foam and duckweed, a swaying tree and grass, a villager walking the road, two torches, glowing windows, **day / dusk / night**, **clear / cloudy / rain / storm** with drifting cloud shadows and lightning.
+- The **pixel pipeline**: three.js renders to a small target (one art pixel per whole number of device pixels), the camera snaps to whole pixels, then an outline pass from depth (darkened local colour, never black) and a palette pull with a world-locked dither. **Shells** on the thatch and leaves. Buttons for shells, outline, palette, tier, pixel size, shadow size and light count; an fps / draw-call overlay.
+- Pure, tested core in `src/core/world3d/` (mesh, house, terrain, tree, sky, tiers); 21 new tests (371 in all) and a Playwright run that screenshots every look.
+- Choices and numbers in [the M0 page](design/world3d-m0.md). **Q23**: judge it on the phone. **Q22**: fights without hexes (not urgent).
+- Not yet: side and back views for people, bloom, smoke, puddles, walking the hero, streaming.
+
 ## 2026-10-28 — Session 22b: brief for the voxel world engine
 
 - After the village sketch the director found the whole-map redraw too slow and the shape wrong (wants round, ~50 × 50, walkable, ~10 hexes in view). We talked through pre-rendering from 3D, and settled on: **voxel models baked to sprites with a G-buffer, our own small baker, soft light computed live over the viewport, weather as a separate system driving it**.

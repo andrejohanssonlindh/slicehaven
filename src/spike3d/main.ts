@@ -1,0 +1,205 @@
+import type { Sky, TimeOfDay } from '../core/environment';
+import { TIERS, type Tier, type TierName, pickTier } from '../core/world3d/tiers';
+import { Pipeline } from '../engine3d/pipeline';
+import { SpikeWorld } from '../engine3d/world';
+import { t } from '../i18n';
+
+/**
+ * M0, the 3D spike: one house with a working cut-away, ground with stamped mud
+ * and a road, a tree, a lake, a walking villager, torches, weather and time of
+ * day, through the pixel pipeline. Every knob the director needs to judge the
+ * look and the frame rate on a phone is a button here.
+ */
+
+const stage = document.getElementById('stage')!;
+const canvas = document.getElementById('view') as HTMLCanvasElement;
+const statsEl = document.getElementById('stats')!;
+const loading = document.getElementById('loading')!;
+
+const params = new URLSearchParams(location.search);
+const device = {
+  width: stage.clientWidth,
+  height: stage.clientHeight,
+  dpr: window.devicePixelRatio || 1,
+  touch: navigator.maxTouchPoints > 0,
+};
+let tier: Tier = { ...TIERS[(params.get('tier') as TierName) in TIERS ? (params.get('tier') as TierName) : pickTier(device)] };
+let zoomIndex = tier.zoom;
+
+const pipeline = new Pipeline(canvas, { pixelCss: tier.pixelCss, outline: 0.85, palette: 0.3 });
+let world: SpikeWorld;
+
+function fit(): void {
+  pipeline.resize(stage.clientWidth, stage.clientHeight, window.devicePixelRatio || 1);
+  world.ppm = tier.zooms[Math.min(zoomIndex, tier.zooms.length - 1)];
+  world.frame(pipeline.rw, pipeline.rh);
+}
+
+// --- controls ---------------------------------------------------------------
+
+interface Btn {
+  el: HTMLButtonElement;
+  refresh(): void;
+}
+const buttons: Btn[] = [];
+
+function button(row: string, label: () => string, on: () => boolean, click: () => void): void {
+  const el = document.createElement('button');
+  el.type = 'button';
+  const b: Btn = {
+    el,
+    refresh() {
+      el.textContent = label();
+      el.classList.toggle('on', on());
+    },
+  };
+  el.addEventListener('click', () => {
+    click();
+    for (const x of buttons) x.refresh();
+  });
+  document.getElementById(row)!.appendChild(el);
+  buttons.push(b);
+}
+
+const cycle = <T>(list: readonly T[], v: T): T => list[(list.indexOf(v) + 1) % list.length];
+
+function buildControls(): void {
+  const w = world.weather;
+  const times: [TimeOfDay, string][] = [['day', t('spike.day', 'Day')], ['dusk', t('spike.dusk', 'Dusk')], ['night', t('spike.night', 'Night')]];
+  for (const [id, name] of times) button('row-time', () => name, () => w.time === id, () => w.setTime(id));
+  const skies: [Sky, string][] = [['clear', t('spike.clear', 'Clear')], ['cloudy', t('spike.cloudy', 'Cloudy')], ['rain', t('spike.rain', 'Rain')], ['storm', t('spike.storm', 'Storm')]];
+  for (const [id, name] of skies) button('row-sky', () => name, () => w.sky === id, () => w.set(id));
+
+  button('row-look', () => t('spike.inside', 'Inside'), () => world.inside, () => { world.inside = !world.inside; });
+  button('row-look', () => t('spike.shells', 'Shells {n}', { n: world.settings.shells }), () => world.settings.shells > 0, () => {
+    world.settings.shells = cycle([0, 1, 2], world.settings.shells);
+  });
+  button('row-look', () => t('spike.outline', 'Outline'), () => pipeline.settings.outline > 0, () => {
+    pipeline.settings.outline = pipeline.settings.outline > 0 ? 0 : 0.85;
+  });
+  button('row-look', () => t('spike.palette', 'Palette {n}%', { n: Math.round(pipeline.settings.palette * 100) }), () => pipeline.settings.palette > 0, () => {
+    pipeline.settings.palette = cycle([0, 0.3, 0.6, 1], pipeline.settings.palette);
+  });
+
+  button('row-perf', () => t('spike.tier', 'Tier: {n}', { n: tier.name }), () => false, () => {
+    setTier(cycle(['low', 'medium', 'high'] as TierName[], tier.name));
+  });
+  button('row-perf', () => t('spike.pixel', 'Pixel ×{n}', { n: pipeline.factor }), () => false, () => {
+    pipeline.settings.pixelCss = cycle([0.5, 1, 1.5, 2, 3], pipeline.settings.pixelCss);
+    fit();
+  });
+  button('row-perf', () => t('spike.shadow', 'Shadow {n}', { n: world.settings.shadowMap }), () => false, () => {
+    world.settings.shadowMap = cycle([512, 1024, 2048, 4096], world.settings.shadowMap);
+    world.setShadowMap(world.settings.shadowMap);
+  });
+  button('row-perf', () => t('spike.lights', 'Lights {n}', { n: world.settings.lights }), () => world.settings.lights > 0, () => {
+    world.settings.lights = cycle([0, 1, 2, 3], world.settings.lights);
+  });
+  for (const b of buttons) b.refresh();
+}
+
+function setTier(name: TierName): void {
+  tier = { ...TIERS[name] };
+  zoomIndex = tier.zoom;
+  pipeline.settings.pixelCss = tier.pixelCss;
+  world.settings.shells = Math.min(2, tier.shells);
+  world.settings.lights = Math.min(3, tier.lights);
+  world.settings.shadowMap = tier.shadowMap;
+  world.setShadowMap(tier.shadowMap);
+  world.setGrass(tier.grass);
+  fit();
+}
+
+// --- input: drag to pan, tap the house to step inside, zoom buttons and wheel ---
+
+function bindInput(): void {
+  let down: { x: number; y: number; id: number; moved: number } | null = null;
+  canvas.addEventListener('pointerdown', (e) => {
+    down = { x: e.clientX, y: e.clientY, id: e.pointerId, moved: 0 };
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!down || e.pointerId !== down.id) return;
+    const k = (window.devicePixelRatio || 1) / pipeline.factor; // CSS px to rendered px
+    const dx = (e.clientX - down.x) * k, dy = (e.clientY - down.y) * k;
+    down.moved += Math.abs(e.clientX - down.x) + Math.abs(e.clientY - down.y);
+    down.x = e.clientX;
+    down.y = e.clientY;
+    world.pan(dx, dy);
+  });
+  canvas.addEventListener('pointerup', (e) => {
+    if (!down || e.pointerId !== down.id) return;
+    if (down.moved < 8) {
+      const r = canvas.getBoundingClientRect();
+      const nx = ((e.clientX - r.left) / r.width) * 2 - 1, ny = -(((e.clientY - r.top) / r.height) * 2 - 1);
+      if (world.pick(nx, ny) === 'house') {
+        world.inside = !world.inside;
+        for (const b of buttons) b.refresh();
+      }
+    }
+    down = null;
+  });
+  const zoom = (d: number): void => {
+    zoomIndex = Math.max(0, Math.min(tier.zooms.length - 1, zoomIndex + d));
+    fit();
+  };
+  for (const b of document.querySelectorAll<HTMLButtonElement>('#zoom button')) {
+    b.addEventListener('click', () => zoom(Number(b.dataset.zoom)));
+  }
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    zoom(e.deltaY < 0 ? 1 : -1);
+  }, { passive: false });
+}
+
+// --- the loop and the numbers -------------------------------------------------
+
+const frameMs: number[] = [];
+let frames = 0, fpsT = performance.now(), fps = 0, last = performance.now();
+
+function loop(now: number): void {
+  const dt = now - last;
+  last = now;
+  const t0 = performance.now();
+  world.update(dt);
+  const info = pipeline.renderer.info;
+  info.reset();
+  pipeline.render(world.scene, world.camera, world.camPix, 1 / world.ppm);
+  frameMs.push(performance.now() - t0);
+  if (frameMs.length > 120) frameMs.shift();
+  frames++;
+  if (now - fpsT >= 1000) {
+    fps = (frames * 1000) / (now - fpsT);
+    frames = 0;
+    fpsT = now;
+    const sorted = [...frameMs].sort((a, b) => a - b);
+    const med = sorted[Math.floor(sorted.length / 2)] ?? 0;
+    statsEl.textContent = [
+      `${fps.toFixed(0)} fps  cpu ${med.toFixed(1)} ms`,
+      `calls ${info.render.calls}  tris ${(info.render.triangles / 1000).toFixed(1)}k`,
+      `${pipeline.rw}×${pipeline.rh} ×${pipeline.factor}  ${world.ppm} px/m`,
+      `tier ${tier.name}  shadow ${world.settings.shadowMap}`,
+    ].join('\n');
+  }
+  requestAnimationFrame(loop);
+}
+
+// Building the world takes a moment (ground painting); let the page paint first.
+setTimeout(() => {
+  const t0 = performance.now();
+  world = new SpikeWorld({ shells: Math.min(2, tier.shells), lights: Math.min(3, tier.lights), shadowMap: tier.shadowMap }, TIERS.high.grass);
+  world.setGrass(tier.grass);
+  pipeline.renderer.info.autoReset = false;
+  fit();
+  new ResizeObserver(fit).observe(stage);
+  buildControls();
+  bindInput();
+  loading.hidden = true;
+  const built = performance.now() - t0;
+  console.info(`spike3d: world built in ${built.toFixed(0)} ms`);
+  (window as unknown as { spike: unknown }).spike = { world, pipeline, setTier, built, get tier() { return tier; } };
+  requestAnimationFrame((n) => {
+    last = n;
+    loop(n);
+  });
+}, 30);

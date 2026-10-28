@@ -14,6 +14,7 @@ export default defineConfig({
         scene: 'scene/index.html',
         skills: 'skills/index.html',
         village: 'village/index.html',
+        spike3d: 'spike3d/index.html',
       },
     },
   },
