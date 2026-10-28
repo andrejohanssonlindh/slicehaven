@@ -20,7 +20,14 @@ export const WORLD = {
   uCamPix: { value: new THREE.Vector2(0, 0) },
   /** World size of one rendered pixel, metres. */
   uPixWorld: { value: 1 / 21 },
+  /** Holes through things in front of people (see `SEE_SLOTS`): xy the centre in view space, z how far from the camera, w 1 if used. */
+  uSee: { value: Array.from({ length: 4 }, () => new THREE.Vector4(0, 0, 0, 0)) },
 };
+
+/** How many people can have a see-through oval at once. */
+export const SEE_SLOTS = 4;
+/** The oval's half sizes in view-space metres (a person is about 1.4 m tall on screen, 0.6 wide), and how much nearer than the person a surface must be to be cut. */
+export const SEE_RADIUS = { x: 0.8, y: 1.15, margin: 0.4 };
 
 /** The core's value noise and fbm, bit for bit (see core/noise.ts), plus the cloud field. */
 export const NOISE_GLSL = /* glsl */ `
@@ -61,6 +68,8 @@ export interface LitOpts {
   sprite?: boolean;
   emissiveMap?: THREE.Texture | null;
   emissive?: THREE.ColorRepresentation;
+  /** Gets a dithered see-through oval where it stands between the camera and a person. */
+  seeThrough?: boolean;
 }
 
 export interface ShellOpts {
@@ -75,7 +84,7 @@ export interface ShellOpts {
 }
 
 function patch(mat: THREE.MeshLambertMaterial, o: LitOpts, shell?: ShellOpts): void {
-  const key = `lit:${o.sway ? `s${o.sway.from},${o.sway.amount}` : ''}:${o.wettable ? 'w' : ''}:${shell ? `sh${shell.layer},${shell.offset},${shell.density},${shell.tint}` : ''}`;
+  const key = `lit:${o.sway ? `s${o.sway.from},${o.sway.amount}` : ''}:${o.wettable ? 'w' : ''}:${shell ? `sh${shell.layer},${shell.offset},${shell.density},${shell.tint}` : ''}:${o.seeThrough ? 'v' : ''}`;
   mat.customProgramCacheKey = () => key;
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, WORLD);
@@ -84,7 +93,8 @@ function patch(mat: THREE.MeshLambertMaterial, o: LitOpts, shell?: ShellOpts): v
 uniform float uTime;
 uniform vec3 uWind;
 uniform float uPixWorld;
-varying vec3 vWPos;`)
+varying vec3 vWPos;
+varying vec3 vVPos;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
 ${shell ? `transformed += normalize(objectNormal) * ${shell.offset.toFixed(3)};` : ''}
 ${o.sway ? `{
@@ -106,6 +116,7 @@ ${o.sway ? `{
   wp = instanceMatrix * wp;
   #endif
   vWPos = (modelMatrix * wp).xyz;
+  vVPos = mvPosition.xyz;
 }`);
     const lights = THREE.ShaderChunk.lights_fragment_begin.replace(
       'getDirectionalLightInfo( directionalLight, directLight );',
@@ -116,8 +127,24 @@ ${o.sway ? `{
 uniform float uWet;
 uniform vec2 uCamPix;
 varying vec3 vWPos;
+varying vec3 vVPos;
+uniform vec4 uSee[${SEE_SLOTS}];
 ${NOISE_GLSL}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
+${o.seeThrough ? `for (int i = 0; i < ${SEE_SLOTS}; i++) {
+  vec4 s = uSee[i];
+  // Only what is nearer the camera than the person, and inside the oval around them.
+  if (s.w > 0.0 && -vVPos.z < s.z - ${SEE_RADIUS.margin.toFixed(2)}) {
+    vec2 d = (vVPos.xy - s.xy) / vec2(${SEE_RADIUS.x.toFixed(2)}, ${SEE_RADIUS.y.toFixed(2)});
+    float e = dot(d, d);
+    if (e < 1.0) {
+      // Dithered in whole pixels: mostly gone in the middle, thinning to nothing at the rim.
+      float a = 0.88 * (1.0 - smoothstep(0.35, 1.0, e));
+      float h = fract(52.9829189 * fract(dot(floor(gl_FragCoord.xy), vec2(0.06711056, 0.00583715))));
+      if (h < a) discard;
+    }
+  }
+}` : ''}
 ${o.wettable ? 'diffuseColor.rgb *= 1.0 - uWet * 0.28;' : ''}
 ${shell ? `{
   // Locked to the world's pixel grid; cells are 1 × 2 pixels, so the fringe reads as strands.

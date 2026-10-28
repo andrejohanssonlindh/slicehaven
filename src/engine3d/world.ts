@@ -28,7 +28,7 @@ import { TEXELS_PER_M } from '../core/world3d/tiers';
 import { type Clump, buildTree } from '../core/world3d/tree';
 import { fbm } from '../core/noise';
 import { Weather } from '../engine/weather';
-import { type LitOpts, WORLD, lit, pixTexture, shellOf } from './materials';
+import { type LitOpts, SEE_SLOTS, WORLD, lit, pixTexture, shellOf } from './materials';
 import { Rain } from './rain';
 import { type SpriteCard, type WalkCard, blobShadow, spriteCard, walkCard } from './sprites';
 import { type Heat, makeFloorHeat, makeHeat } from './heat';
@@ -90,10 +90,19 @@ interface Shell {
   cutOf: HouseInst | null;
 }
 
+export interface Person {
+  id: string;
+  card: WalkCard;
+  /** Cuts a see-through oval in whatever (trees) stands between them and the camera. False for the hidden. */
+  reveals: boolean;
+}
+
 /** One placed house on the GPU, with its own cut-away. */
 interface HouseInst {
   built: BuiltHouse;
   group: THREE.Group;
+  /** The room's furniture cards: only shown when the roof is lifted, or their tops show through the roof. */
+  furniture: THREE.Object3D[];
   cut: CutPart[];
   box: Shape;
   floorHeat: Heat | null;
@@ -134,6 +143,11 @@ export class SpikeWorld {
   private windowMats: THREE.MeshLambertMaterial[] = [];
   private water: Water | null;
   private rain = new Rain(1400);
+  /**
+   * The people in the world. Anyone with `reveals` gets a see-through oval cut in the trees
+   * between them and the camera; leave it off for someone who should stay hidden.
+   */
+  readonly people: Person[] = [];
   private walker: WalkCard;
   private walkerBlob: THREE.Mesh;
   private walkS = 0;
@@ -191,11 +205,13 @@ export class SpikeWorld {
     this.scene.add(this.rain.lines);
 
     this.walker = walkCard(makeWalkSet(PEOPLE.baker), PITCH);
+    this.people.push({ id: 'villager', card: this.walker, reveals: true });
     this.walkerBlob = blobShadow(0.32);
     this.scene.add(this.walker.mesh, this.walkerBlob);
     this.sprites.push(this.walker);
     // The hero: the farmer by the door. Tap the ground and they walk there.
     this.heroCard = walkCard(makeWalkSet(PEOPLE.farmer), PITCH);
+    this.people.push({ id: 'hero', card: this.heroCard, reveals: true });
     this.heroBlob = blobShadow(0.32);
     this.heroCard.mesh.rotation.y = YAW;
     this.placeHero();
@@ -238,7 +254,7 @@ export class SpikeWorld {
 
   private buildHouse(built: BuiltHouse): HouseInst {
     const h = built.place, model = built.model;
-    const inst: HouseInst = { built, group: new THREE.Group(), cut: [], box: houseBox(built), floorHeat: null, cutT: 0, open: false };
+    const inst: HouseInst = { built, group: new THREE.Group(), furniture: [], cut: [], box: houseBox(built), floorHeat: null, cutT: 0, open: false };
     const matFor = (m: HouseMaterial, cut: boolean): { mat: THREE.MeshLambertMaterial; opts: LitOpts } => {
       let s = this.houseMats.get(m);
       if (!s) {
@@ -301,6 +317,7 @@ export class SpikeWorld {
       card.mesh.rotation.y = aligned ? 0 : YAW - h.rot;
       if (it.wall) card.mesh.scale.x = 1 / Math.cos(YAW - h.rot);
       inst.group.add(card.mesh);
+      inst.furniture.push(card.mesh);
       this.sprites.push(card);
     }
     // The hearth's glow.
@@ -342,12 +359,12 @@ export class SpikeWorld {
     const t = buildTree(place.seed);
     const group = new THREE.Group();
     // Bark and leaf textures are painted once and shared by every tree.
-    this.barkMat ??= lit({ map: tex(barkTex(4)), ao: true, wettable: true });
+    this.barkMat ??= lit({ map: tex(barkTex(4)), ao: true, wettable: true, seeThrough: true });
     const wood = new THREE.Mesh(geometryOf(t.wood), this.barkMat);
     wood.castShadow = wood.receiveShadow = true;
     group.add(wood);
     const merged = lumpGeometry(t.clumps, t.height, 2);
-    this.leafOpts ??= { map: tex(leafTex(5)), ao: true, sway: { from: 2.5, amount: 0.018 } };
+    this.leafOpts ??= { map: tex(leafTex(5)), ao: true, sway: { from: 2.5, amount: 0.018 }, seeThrough: true };
     const leafOpts = this.leafOpts;
     this.leafMat ??= lit(leafOpts);
     const leaves = new THREE.Mesh(merged, this.leafMat);
@@ -360,6 +377,7 @@ export class SpikeWorld {
   }
 
   private stoneMat: THREE.MeshLambertMaterial | null = null;
+  private logMat: THREE.MeshLambertMaterial | null = null;
   private shrubMat: THREE.MeshLambertMaterial | null = null;
 
   /** A shrub, boulder or woodpile, standing on the ground where it is placed. */
@@ -367,8 +385,8 @@ export class SpikeWorld {
     const group = new THREE.Group();
     const s = p.size ?? 1;
     if (p.kind === 'woodpile') {
-      this.barkMat ??= lit({ map: tex(barkTex(4)), ao: true, wettable: true });
-      const m = new THREE.Mesh(geometryOf(buildWoodpile(p.seed)), this.barkMat);
+      this.logMat ??= lit({ map: tex(barkTex(4)), ao: true, wettable: true });
+      const m = new THREE.Mesh(geometryOf(buildWoodpile(p.seed)), this.logMat);
       m.castShadow = m.receiveShadow = true;
       group.add(m);
     } else if (p.kind === 'boulder') {
@@ -379,9 +397,8 @@ export class SpikeWorld {
       group.add(m);
     } else {
       const b = buildShrub(p.seed);
-      this.leafOpts ??= { map: tex(leafTex(5)), ao: true, sway: { from: 2.5, amount: 0.018 } };
-      // Shrubs are low, so they sway from the ground up; trees keep their trunks still.
-      this.shrubMat ??= lit({ ...this.leafOpts, sway: { from: 0, amount: 0.05 } });
+      // Shrubs are low, so they sway from the ground up (trees keep their trunks still), and nobody hides behind them.
+      this.shrubMat ??= lit({ map: tex(leafTex(5)), ao: true, sway: { from: 0, amount: 0.05 } });
       const m = new THREE.Mesh(lumpGeometry(b.clumps, b.height, 2), this.shrubMat);
       m.castShadow = m.receiveShadow = true;
       group.add(m);
@@ -835,6 +852,29 @@ export class SpikeWorld {
 
   private sunDir = new THREE.Vector3(0, 1, 0);
 
+  /** Tell the shaders where the people who reveal themselves are (view space), nearest the view first. */
+  private updateSee(): void {
+    const slots = WORLD.uSee.value;
+    const f = this.focus;
+    const near = this.people
+      .filter((p) => p.reveals)
+      .sort((a, b) => Math.hypot(a.card.mesh.position.x - f.x, a.card.mesh.position.z - f.z) - Math.hypot(b.card.mesh.position.x - f.x, b.card.mesh.position.z - f.z))
+      .slice(0, SEE_SLOTS);
+    const v = new THREE.Vector3();
+    slots.forEach((s, i) => {
+      const p = near[i];
+      if (!p) {
+        s.set(0, 0, 0, 0);
+        return;
+      }
+      // The oval is centred on the chest.
+      v.copy(p.card.mesh.position);
+      v.y += 0.9;
+      v.applyMatrix4(this.camera.matrixWorldInverse);
+      s.set(v.x, v.y, -v.z, 1);
+    });
+  }
+
   update(dtMs: number): void {
     const dt = Math.min(0.1, dtMs / 1000);
     this.time += dt;
@@ -885,6 +925,7 @@ export class SpikeWorld {
         c.mesh.material.opacity = 1 - hs.cutT;
         c.mesh.visible = hs.cutT < 0.98;
       }
+      for (const f of hs.furniture) f.visible = hs.cutT > 0.02;
     }
     for (const s of this.shells) s.mesh.visible = s.layer <= this.settings.shells && (!s.cutOf || s.cutOf.cutT < 0.3);
 
@@ -899,6 +940,7 @@ export class SpikeWorld {
     for (const s of this.sprites) s.tick(this.time);
 
     this.placeCamera();
+    this.updateSee();
     this.streamChunks();
     // The heat map and the reading follow the weather and the living, twice a second.
     this.heatT -= dt;

@@ -1,5 +1,12 @@
 # Devlog
 
+## 2026-10-28 — Session 25c: no furniture through roofs, see-through ovals
+
+- **Furniture through the roofs**: the specks on the ridges were the tops of the interior cards (hanging, shelf, pegs). A house's furniture is now shown only while its roof is lifted.
+- **See-through oval**: where a tree stands between the camera and a person, a dithered oval (mostly clear in the middle, thinning to the rim, in whole art pixels) is cut in the tree, bark, leaves and shells alike. It is in the material (`seeThrough` in `engine3d/materials.ts`, `SEE_RADIUS` for the size): a surface is cut only if it is nearer the camera than the person, so nothing else is touched. Up to four people at once, those nearest the view first. Shrubs, boulders, houses and woodpiles are not cut.
+- **Who gets one**: `SpikeWorld.people` lists everyone with a `reveals` flag (hero and villager, both true). Set `reveals = false` on a person who should stay hidden (secret people) and they disappear behind trees as before. A person standing in front of a revealing person is cut too (every person's card is see-through); a hidden person never makes an oval of their own.
+- e2e `spike3d-see.e2e.ts` (revealed and hidden screenshots, no furniture when closed).
+
 ## 2026-10-28 — Session 25b: roofs, props, and people who turn and walk
 
 - **Roofs**: shingle, clay tile and sod have their own textures (`art/textures3d.ts`) and materials; a house's `roof` spec picks one. Only thatch gets shells. The spike now has one of each.
