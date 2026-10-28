@@ -22,31 +22,55 @@ const SOOT = '#2a2018';
 const SHINGLE_OLD = ['#2e241d', '#4e3f31', '#73604a', '#98816a', '#b9a58a'];
 const THATCH_OLD = ['#2a2218', '#453a2a', '#675838', '#8a774a', '#ab9862', '#cdb87e'];
 
-type Shutter = 'rust' | 'green' | 'blue';
+export const SHUTTER_COLOURS = ['rust', 'green', 'blue', 'ochre', 'plum', 'grey', 'white'] as const;
+export type Shutter = (typeof SHUTTER_COLOURS)[number];
 const PAINT: Record<Shutter, readonly string[]> = {
   rust: ['#3a1a14', '#6a2c22', '#8e4030', '#b05a42'],
   green: ['#1c2e24', '#2e4a3a', '#46705a', '#6a9478'],
   blue: ['#1c2a3c', '#2e4866', '#46688c', '#6c90b0'],
+  ochre: ['#3a2a10', '#6e5018', '#a07c28', '#cca848'],
+  plum: ['#2a1426', '#4a2644', '#6e3c66', '#94608c'],
+  grey: ['#22252a', '#3c4148', '#5c636c', '#8a919a'],
+  white: ['#4a4640', '#7a766c', '#aaa69a', '#d4d0c4'],
 };
+
+export const WALL_STYLES = ['white', 'ochre', 'rose', 'sage', 'brick', 'tarred'] as const;
+export type WallStyle = (typeof WALL_STYLES)[number];
+export const ROOF_KINDS = ['thatch', 'shingle', 'tile', 'sod'] as const;
+export type RoofKind = (typeof ROOF_KINDS)[number];
+
+const LIMES: Record<'white' | 'ochre' | 'rose' | 'sage', readonly string[]> = {
+  white: LIME,
+  ochre: ['#4e3a1e', '#7c5e2e', '#a8843e', '#c8a456', '#e0c27c'],
+  rose: ['#4e3036', '#7c525a', '#a8767c', '#c8979a', '#e2b8b4'],
+  sage: ['#2e3a2c', '#506250', '#788c72', '#9bb092', '#bccab0'],
+};
+const BRICK = ['#3a1a16', '#6a2e26', '#94483a', '#bc6648', '#d98a62'];
+const TAR = ['#120e0d', '#201816', '#34282a', '#4c3c38', '#665048'];
+const TILE = ['#33170f', '#5e2a1e', '#86402a', '#aa5a38', '#c87a4c', '#dc9a68'];
+const TURF = ['#1c3322', '#2a4d2d', '#3d6a34', '#58883c', '#7fa94a', '#a8c866'];
+const SOIL = ['#1a110c', '#2d1e15', '#47301f', '#64462c'];
 
 export interface HouseSpec {
   seed: number;
   /** Width in hexes, 4 or 5. Depth is always 3 rows. */
   cols?: 4 | 5;
-  roof?: 'thatch' | 'shingle';
+  roof?: RoofKind;
+  /** What fills the panels between the timbers. */
+  walls?: WallStyle;
   shop?: 'tankard' | 'herb' | 'loaf';
   shutters?: Shutter;
   lit?: boolean;
 }
 
-function darken(p: Pix, x: number, y: number, k: number): void {
+export function darken(p: Pix, x: number, y: number, k: number): void {
   if (!p.alpha(x, y)) return;
   const i = (y * p.w + x) * 4;
   for (let c = 0; c < 3; c++) p.data[i + c] *= 1 - k;
 }
 
 /** A straight, pegged timber with grain, a lit edge and a shadow line on the plaster below. */
-function timber(p: Pix, x0: number, y0: number, x1: number, y1: number, w: number, seed: number): void {
+export function timber(p: Pix, x0: number, y0: number, x1: number, y1: number, w: number, seed: number): void {
   const dx = x1 - x0, dy = y1 - y0;
   const n = Math.max(Math.abs(dx), Math.abs(dy));
   const horiz = Math.abs(dy) <= Math.abs(dx) * 0.4;
@@ -72,33 +96,47 @@ function timber(p: Pix, x0: number, y0: number, x1: number, y1: number, w: numbe
   }
 }
 
-/** Limewash over daub: aged but whole, with soot under the eaves, splash at the foot, a few hairline cracks. */
-function limewash(p: Pix, x0: number, y0: number, x1: number, y1: number, seed: number, shade = 1): void {
+/**
+ * What fills the panels between the timbers. Limewash over daub (soot under the
+ * eaves, splash at the foot, hairline cracks), brick nogging, or tarred boards.
+ */
+export function infill(p: Pix, x0: number, y0: number, x1: number, y1: number, seed: number, style: WallStyle = 'white', shade = 1): void {
+  const pal = style === 'brick' ? BRICK : style === 'tarred' ? TAR : LIMES[style];
   for (let y = y0; y <= y1; y++) {
     for (let x = x0; x <= x1; x++) {
       const n = fbm(x / 7, y / 6, seed);
       let v = 0.74 - (x - x0) / (x1 - x0 + 1) * 0.16 + (n - 0.5) * 0.4 + (white(x, y, seed + 1) - 0.5) * 0.12;
+      if (style === 'brick') {
+        const row = Math.floor((y - y0) / 3), bx = x - x0 + (row % 2) * 3;
+        const id = Math.floor(bx / 6);
+        const mortar = (y - y0) % 3 === 2 || bx % 6 === 5;
+        v = mortar ? 0.12 : 0.66 + (white(id, row, seed + 6) - 0.5) * 0.5 + (n - 0.5) * 0.25 - (x - x0) / (x1 - x0 + 1) * 0.14;
+        if (mortar) { p.set(x, y, pick(['#5e5446', '#8a7e68', '#b0a48c'], 0.45 + (white(x, y, seed) - 0.5) * 0.4, x, y)); continue; }
+      } else if (style === 'tarred') {
+        v = 0.5 + (white(Math.floor((x - x0) / 5), 0, seed + 6) - 0.5) * 0.3 - (x - x0) / (x1 - x0 + 1) * 0.12 + (n - 0.5) * 0.2;
+        if ((x - x0) % 5 === 0) v = 0.08;
+      }
       // Soot dripping from the eaves, rain splash at the foot.
       v -= Math.max(0, 1 - (y - y0) / 12) * 0.22 * (0.4 + fbm(x / 4, 1, seed + 2));
       v -= Math.max(0, 1 - (y1 - y) / 9) * 0.3 * (0.4 + fbm(x / 3, 2, seed + 3));
       if (fbm(x / 1.4, y / 12, seed + 4) > 0.7) v -= 0.18; // rain streaks
-      p.set(x, y, pick(LIME, v * shade, x, y));
+      p.set(x, y, pick(pal, v * shade, x, y));
     }
   }
-  // A few hairline cracks.
+  if (style === 'brick' || style === 'tarred') return;
   const rng = Rng.fromSeed(seed + 5);
   for (let c = 0; c < Math.max(2, Math.round((x1 - x0) / 30)); c++) {
     let x = x0 + 6 + rng.int(Math.max(1, x1 - x0 - 12));
     let y = y0 + 4 + rng.int(Math.max(1, y1 - y0 - 14));
-    for (let s = 0; s < 6 + rng.int(8); s++) {
-      if (p.alpha(x, y)) p.set(x, y, LIME[1]);
+    for (let st = 0; st < 6 + rng.int(8); st++) {
+      if (p.alpha(x, y)) p.set(x, y, pal[1]);
       x += rng.int(3) - 1;
       y += rng.next() < 0.7 ? 1 : 0;
     }
   }
 }
 
-function glassWindow(p: Pix, cx: number, top: number, w: number, h: number, lit: boolean, shutters: Shutter | null, flowers: boolean, seed: number): void {
+export function glassWindow(p: Pix, cx: number, top: number, w: number, h: number, lit: boolean, shutters: Shutter | null, flowers: boolean, seed: number): void {
   const x0 = cx - Math.floor(w / 2);
   if (shutters) {
     for (const side of [-1, 1]) {
@@ -140,7 +178,7 @@ function glassWindow(p: Pix, cx: number, top: number, w: number, h: number, lit:
   }
 }
 
-function plankDoor(p: Pix, x0: number, top: number, w: number, bottom: number, seed: number): void {
+export function plankDoor(p: Pix, x0: number, top: number, w: number, bottom: number, seed: number): void {
   boards(p, x0, top, x0 + w - 1, bottom, seed, true);
   // Strap hinges and a ring handle.
   for (const y of [top + 7, bottom - 9]) {
@@ -179,7 +217,7 @@ function signBoard(p: Pix, x: number, y: number, kind: 'tankard' | 'herb' | 'loa
 
 interface Roof {
   ex0: number; ex1: number; rx0: number; rx1: number; eaveY: number; ridgeY: number;
-  kind: 'thatch' | 'shingle'; seed: number; moss: number;
+  kind: RoofKind; seed: number; moss: number;
 }
 
 /**
@@ -187,7 +225,7 @@ interface Roof {
  * lumps, the eave droops and rises, the thatch shows its bundles and its
  * thick layered edge, there is moss where it stays damp and a patch of new straw.
  */
-function paintRoof(p: Pix, r: Roof): { eaveAt: (x: number) => number; ridgeAt: (x: number) => number } {
+export function paintRoof(p: Pix, r: Roof): { eaveAt: (x: number) => number; ridgeAt: (x: number) => number } {
   const { ex0, ex1, rx0, rx1, eaveY, ridgeY, seed } = r;
   const depth = eaveY - ridgeY;
   const xl = (t: number): number => rx0 + (ex0 - rx0) * t + (fbm(t * 6, 1, seed) - 0.5) * 5;
@@ -216,7 +254,7 @@ function paintRoof(p: Pix, r: Roof): { eaveAt: (x: number) => number; ridgeAt: (
         // The thick underside of the eave: straw ends, shadowed and ragged.
         const k = y - ev;
         if (white(x, y, seed + 3) < 0.12 + k * 0.13) continue;
-        p.set(x, y, pick(r.kind === 'thatch' ? THATCH_OLD : SHINGLE_OLD, 0.28 - k * 0.04 + ((x >> 0) % 3 === 0 ? 0.12 : 0) + (white(x, y, seed + 4) - 0.5) * 0.16, x, y));
+        p.set(x, y, pick(r.kind === 'thatch' ? THATCH_OLD : r.kind === 'sod' ? SOIL : r.kind === 'tile' ? TILE : SHINGLE_OLD, 0.28 - k * 0.04 + ((x >> 0) % 3 === 0 ? 0.12 : 0) + (white(x, y, seed + 4) - 0.5) * 0.16, x, y));
         continue;
       }
       let v: number;
@@ -230,6 +268,26 @@ function paintRoof(p: Pix, r: Roof): { eaveAt: (x: number) => number; ridgeAt: (
         if (f > 0.84) v -= 0.22;
         if (white(x >> 1, y, seed + 8) < 0.05) v -= 0.25;
         if (Math.abs(s - patchS) < 0.09 && Math.abs(tt - patchT) < 0.14) v += 0.2 + (white(x, y, seed + 9) - 0.5) * 0.2;
+      } else if (r.kind === 'tile') {
+        pal = TILE;
+        const N = Math.max(5, Math.round(depth / 6));
+        const rowF = tt * N + Math.sin(x * 0.05 + seed) * 0.3 + (fbm(x / 10, 3, seed + 5) - 0.5) * 0.4;
+        const row = Math.floor(rowF), fr = rowF - row;
+        const off = (row % 2) * 3;
+        const id = Math.floor((x + off) / 6), u = ((x + off) % 6) / 6;
+        const base = white(id, row, seed + 6);
+        // Curved pantiles: lit on the left of each, dark in the trough, each its own firing.
+        v = 0.3 + base * 0.36 + Math.cos(u * Math.PI) * 0.22 - s * 0.2 + (white(x, y, seed + 8) - 0.5) * 0.1;
+        if (fr > 0.7) v -= 0.3 * ((fr - 0.7) / 0.3 + 0.4);
+        if (base > 0.95) v -= 0.3; // a cracked tile
+        if (base < 0.04 && fr > 0.3) v += 0.25; // a replacement
+      } else if (r.kind === 'sod') {
+        pal = TURF;
+        v = 0.45 + (fbm(x / 3.5, y / 3, seed + 5) - 0.5) * 0.8 - s * 0.2 + (white(x, y, seed + 7) - 0.5) * 0.2;
+        if (white(x, y, seed + 8) < 0.07) v += 0.4; // a bright blade
+        else if (white(x, y - 1, seed + 8) < 0.07) v -= 0.3;
+        if (fbm(x / 6, y / 5, seed + 9) > 0.75) { p.set(x, y, pick(SOIL, 0.5 + (white(x, y, seed) - 0.5) * 0.3, x, y)); continue; } // bare earth
+        if (white(x, y, seed + 10) < 0.012) { p.set(x, y, ['#f2d75c', '#f4f0e2', '#e889b0'][Math.floor(white(x, y, seed + 11) * 3)]); continue; }
       } else {
         pal = SHINGLE_OLD;
         const N = Math.max(5, Math.round(depth / 5.5));
@@ -248,7 +306,7 @@ function paintRoof(p: Pix, r: Roof): { eaveAt: (x: number) => number; ridgeAt: (
       let c: string = pick(pal, v, x, y);
       // Moss: in clumps, lower on the slope, mostly on the shady right.
       const mo = fbm(x / 5.5, y / 4.5, seed + 11) + tt * 0.12 + s * 0.08;
-      if (r.moss && mo > 1.02 - r.moss * 0.5 && white(x, y, seed + 12) < 0.9) {
+      if (r.moss && r.kind !== 'sod' && mo > 1.02 - r.moss * 0.5 && white(x, y, seed + 12) < 0.9) {
         c = pick(['#2a4024', '#3a5a2c', '#52743a', '#7a9648'], 0.2 + (mo - 0.7) * 1.3 + (white(x, y, seed + 13) - 0.5) * 0.4, x, y);
       }
       p.set(x, y, c);
@@ -262,7 +320,7 @@ function paintRoof(p: Pix, r: Roof): { eaveAt: (x: number) => number; ridgeAt: (
     for (let k = -3; k < th; k++) {
       const y = ry + k - 1;
       const v = 0.72 - k * 0.1 - (x - rx0) / (rx1 - rx0 + 1) * 0.25 + (white(x, y, seed + 15) - 0.5) * 0.2;
-      p.set(x, y, r.kind === 'thatch' ? pick(THATCH_OLD, v + 0.08, x, y) : pick(SHINGLE_OLD, v * 0.85, x, y));
+      p.set(x, y, r.kind === 'thatch' ? pick(THATCH_OLD, v + 0.08, x, y) : r.kind === 'tile' ? pick(TILE, v * 0.9 + 0.1, x, y) : r.kind === 'sod' ? pick(TURF, v * 0.8, x, y) : pick(SHINGLE_OLD, v * 0.85, x, y));
     }
     if (r.kind === 'thatch' && x % 6 === 0) { p.set(x, ry, '#6a5028'); p.set(x + 1, ry + 1, '#6a5028'); }
   }
@@ -270,10 +328,10 @@ function paintRoof(p: Pix, r: Roof): { eaveAt: (x: number) => number; ridgeAt: (
 }
 
 /** A dormer: a small gabled window poking out of the roof slope. */
-function dormer(p: Pix, cx: number, base: number, seed: number, lit: boolean): void {
+function dormer(p: Pix, cx: number, base: number, seed: number, lit: boolean, walls: WallStyle): void {
   const w = 22, h = 15;
   const x0 = cx - w / 2;
-  limewash(p, x0, base - h, x0 + w - 1, base, seed + 70, 0.9);
+  infill(p, x0, base - h, x0 + w - 1, base, seed + 70, walls, 0.9);
   timber(p, x0, base - h, x0, base, 3, seed + 71);
   timber(p, x0 + w - 3, base - h, x0 + w - 3, base, 3, seed + 72);
   timber(p, x0, base - h, x0 + w - 1, base - h, 3, seed + 73);
@@ -289,7 +347,7 @@ function dormer(p: Pix, cx: number, base: number, seed: number, lit: boolean): v
 }
 
 /** A stone chimney stack against the gable wall: tapered, soot-stained, capped. */
-function stack(p: Pix, x0: number, topY: number, groundY: number, seed: number): void {
+export function stack(p: Pix, x0: number, topY: number, groundY: number, seed: number): void {
   const w = 13;
   stoneWall(p, x0, topY + 6, x0 + w - 1, groundY, seed, STONE);
   // Taper: the lower part is wider, shoulders step in.
@@ -303,16 +361,24 @@ function stack(p: Pix, x0: number, topY: number, groundY: number, seed: number):
   for (let x = x0 + 4; x < x0 + w - 4; x++) p.set(x, topY + 1, SOOT);
 }
 
-export function makeHouse(spec: HouseSpec): Prop {
-  const { seed } = spec;
-  const cols = spec.cols ?? 4;
+/** The shared box every building of this scale is drawn in. Depth runs up and to the right. */
+export function houseGeom(cols: 4 | 5 = 4): {
+  Wf: number; Hw: number; DX: number; DY: number; RISE: number; FX0: number; FX1: number; FB: number; FE: number; W: number; H: number;
+} {
   const Wf = cols === 5 ? 132 : 104;
   const Hw = 58, DX = 40, DY = -44, RISE = 28;
   const FX0 = 16, FX1 = FX0 + Wf, FB = 128, FE = FB - Hw;
-  const W = FX1 + DX + 26, H = FB + 6;
+  return { Wf, Hw, DX, DY, RISE, FX0, FX1, FB, FE, W: FX1 + DX + 26, H: FB + 6 };
+}
+
+export function makeHouse(spec: HouseSpec): Prop {
+  const { seed } = spec;
+  const cols = spec.cols ?? 4;
+  const { Wf, Hw, DX, DY, RISE, FX0, FX1, FB, FE, W, H } = houseGeom(cols);
   const shut = spec.shutters ?? 'rust';
   const lit = spec.lit !== false;
   const kind = spec.roof ?? 'thatch';
+  const walls = spec.walls ?? 'white';
 
   const body = new Pix(W, H);
   const roofL = new Pix(W, H);
@@ -321,7 +387,7 @@ export function makeHouse(spec: HouseSpec): Prop {
   const sideX = (u: number): number => FX1 + u * DX;
   const sideY = (u: number, v: number): number => FB + u * DY - v * Hw;
   const sideShade = new Pix(W, H);
-  limewash(sideShade, FX1, FE + DY - 2, FX1 + DX, FB, seed + 20, 0.74);
+  infill(sideShade, FX1, FE + DY - 2, FX1 + DX, FB, seed + 20, walls, 0.74);
   polyFill(body, [[FX1, FE], [FX1 + DX, FE + DY], [FX1 + DX, FB + DY], [FX1, FB]], (x, y) => {
     const u = (x - FX1) / DX;
     const v = (FB + u * DY - y) / Hw;
@@ -341,7 +407,7 @@ export function makeHouse(spec: HouseSpec): Prop {
   // --- front wall ---
   const posts = cols === 5 ? [0, 28, 62, 92, 128] : [0, 30, 62, 84, 100];
   const FL = FB - 9; // top of the stone footing
-  limewash(body, FX0, FE, FX1 - 1, FL, seed + 30);
+  infill(body, FX0, FE, FX1 - 1, FL, seed + 30, walls);
   stoneWall(body, FX0 - 1, FL, FX1, FB, seed + 31, STONE, 3);
   for (let x = FX0 - 1; x <= FX1; x++) body.set(x, FL, STONE[4]); // footing cap
   // Frame: sill, mid rail, top rail, posts, knee braces in pairs.
@@ -381,9 +447,9 @@ export function makeHouse(spec: HouseSpec): Prop {
   const ex0 = FX0 - 7, ex1 = FX1 + 6;
   const rx0 = ex0 + DX / 2, rx1 = ex1 + DX / 2;
   const eaveY = FE + 1, ridgeY = FE + DY / 2 - RISE;
-  paintRoof(roofL, { ex0, ex1, rx0, rx1, eaveY, ridgeY, kind, seed: seed + 80, moss: kind === 'thatch' ? 0.42 : 0.3 });
+  paintRoof(roofL, { ex0, ex1, rx0, rx1, eaveY, ridgeY, kind, seed: seed + 80, moss: kind === 'thatch' ? 0.42 : kind === 'tile' ? 0.22 : 0.3 });
   const dcx = FX0 + Math.round(Wf * 0.46);
-  dormer(roofL, dcx, Math.round(ridgeY + (eaveY - ridgeY) * 0.62) + 8, seed + 90, lit);
+  dormer(roofL, dcx, Math.round(ridgeY + (eaveY - ridgeY) * 0.62) + 8, seed + 90, lit, walls);
   chew(roofL, seed + 91, 0.06);
 
   const bodyO = selOutline(body);

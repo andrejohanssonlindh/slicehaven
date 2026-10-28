@@ -56,3 +56,6 @@ img { max-width: 100%; image-rendering: pixelated; }
 #art .looks { display: flex; gap: 6px; flex-wrap: wrap; position: sticky; top: 52px; z-index: 2; padding: 6px 0; background: var(--bg); }
 #art .looks button { font: inherit; padding: 4px 12px; background: var(--panel); color: var(--ink); border: 2px solid #000; }
 #art .looks button.on { background: var(--accent); color: var(--bg); }
+#art .builder { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+#art .builder label { display: flex; flex-direction: column; font-size: 13px; color: var(--muted); }
+#art .builder select, #art .builder button { font: inherit; font-size: 15px; padding: 4px 6px; background: var(--panel); color: var(--ink); border: 2px solid #000; }

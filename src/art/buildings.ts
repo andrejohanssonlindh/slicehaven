@@ -92,24 +92,6 @@ export function plaster(p: Pix, x0: number, y0: number, x1: number, y1: number, 
   }
 }
 
-/** One crooked timber, drawn as a thick wobbly line. */
-function beam(p: Pix, x0: number, y0: number, x1: number, y1: number, w: number, seed: number): void {
-  const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const jx = (fbm(i / 7, seed, seed) - 0.5) * 2.2;
-    const jy = (fbm(i / 7, seed + 9, seed) - 0.5) * 2.2;
-    const cx = x0 + (x1 - x0) * t + (Math.abs(y1 - y0) > Math.abs(x1 - x0) ? jx : 0);
-    const cy = y0 + (y1 - y0) * t + (Math.abs(y1 - y0) > Math.abs(x1 - x0) ? 0 : jy);
-    for (let a = 0; a < w; a++) {
-      const horiz = Math.abs(y1 - y0) <= Math.abs(x1 - x0);
-      const x = Math.round(cx + (horiz ? 0 : a));
-      const y = Math.round(cy + (horiz ? a : 0));
-      p.set(x, y, pick(WOOD, 0.62 - a / w * 0.5 + (white(x, y, seed + 2) - 0.5) * 0.2 + (fbm(x / 3, y / 3, seed) - 0.5) * 0.2, x, y));
-    }
-  }
-}
-
 interface RoofSpec {
   /** y of the top edge, y of the eaves, x centre, half-width at top and at the eaves. */
   top: number;
@@ -372,70 +354,6 @@ export function makeStall(seed: number, goods: 'fruit' | 'cloth' | 'bread' = 'fr
   grime(p, seed + 8, 0.5, 52);
   chew(p, seed + 9, 0.05);
   return still(selOutline(p), 30, 52, 40);
-}
-
-/** A smithy: open-fronted shed, stone forge with live coals, anvil, quench barrel, tools on the wall. */
-export function makeSmithy(seed: number): Prop {
-  const W = 82, H = 70;
-  const p = new Pix(W, H);
-  const x0 = 6, x1 = W - 8, floor = 62;
-  // Back wall: soot-black planks, with the forge's stone mass on the right.
-  boards(p, x0, 28, x1, floor, seed, true);
-  for (let y = 28; y <= floor; y++) for (let x = x0; x <= x1; x++) {
-    const i = (y * W + x) * 4;
-    const f = 0.55 - (y - 28) * 0.003;
-    for (let c = 0; c < 3; c++) p.data[i + c] *= f;
-  }
-  const fx0 = x1 - 30;
-  stoneWall(p, fx0, 20, x1, floor, seed + 1, STONE);
-  // Hood and chimney above the forge, soot-stained.
-  stoneWall(p, fx0 + 8, 0, fx0 + 20, 22, seed + 2, STONE);
-  // Fire mouth.
-  for (let y = 40; y < 56; y++) for (let x = fx0 + 6; x < fx0 + 24; x++) {
-    const d = Math.hypot((x - (fx0 + 15)) / 9.5, (y - 55) / 14);
-    if (d > 1) continue;
-    const heat = 1 - d + (fbm(x / 2, y / 2, seed + 3) - 0.5) * 0.5;
-    p.set(x, y, pick(['#1a0e0c', '#4a1a10', '#8a2a14', '#d4521e', '#f29a38', '#ffe08a'], heat * 1.15, x, y));
-  }
-  for (let x = fx0 + 6; x < fx0 + 24; x++) { p.set(x, 39, STONE[1]); p.set(x, 40, STONE[2]); }
-  // Anvil on a stump.
-  const ax = 24;
-  capsule(p, ax, 54, ax, 61, 4.2, 4.8, WOOD, seed + 4, 0.25);
-  for (let x = ax - 6; x <= ax + 5; x++) { p.set(x, 51, IRON[4]); p.set(x, 52, IRON[3]); p.set(x, 53, IRON[2]); }
-  for (let x = ax - 3; x <= ax + 2; x++) { p.set(x, 54, IRON[1]); p.set(x, 55, IRON[2]); }
-  p.set(ax - 7, 52, IRON[3]); p.set(ax - 8, 52, IRON[2]); p.set(ax + 6, 51, IRON[2]);
-  // Quench barrel at the left.
-  paintBarrel(p, 11, 60, 6.5, 14, seed + 5, 'open');
-  // Tools hung on the back wall.
-  for (const [tx, kind] of [[30, 0], [35, 1], [40, 2]] as const) {
-    for (let y = 33; y < 33 + (kind === 1 ? 11 : 9); y++) p.set(tx, y, WOOD[3]);
-    for (let k = 0; k < 3; k++) p.set(tx + (kind === 2 ? -1 + k : k - 1), 33 + (kind === 0 ? 0 : 0), IRON[3]);
-    p.set(tx, 32, IRON[1]);
-  }
-  for (const hx of [46, 50]) { p.set(hx, 34, IRON[3]); p.set(hx + 1, 34, IRON[3]); p.set(hx, 35, IRON[3]); p.set(hx + 1, 36, IRON[3]); p.set(hx, 36, IRON[3]); }
-  // Roof: shingles, with a steep front slope on posts.
-  for (const x of [x0 - 1, 46]) capsule(p, x, 22, x, floor, 2.0, 2.2, WOOD, seed + 6 + x, 0.2);
-  beam(p, x0 - 4, 22, x1 + 4, 22, 3, seed + 8);
-  dropShadow(p, x0, x1, 26, 10, 0.7);
-  roof(p, { top: 4, eave: 25, cx: Math.round(W / 2) - 3, halfTop: 24, halfEave: 40, kind: 'shingle', seed: seed + 9, moss: 0.6 });
-  // Soot: the whole back, stains up from the hood.
-  for (let y = 0; y < 24; y++) for (let x = fx0 + 6; x < fx0 + 23; x++) {
-    const i = (y * W + x) * 4;
-    if (!p.data[i + 3]) continue;
-    const f = 0.7 + (y / 24) * 0.25;
-    for (let c = 0; c < 3; c++) p.data[i + c] *= f;
-  }
-  // Charcoal heap and floor dirt.
-  for (let x = 14; x < 70; x++) for (let k = 0; k < 2; k++) if (white(x, k, seed + 11) < 0.7) p.set(x, floor + 1 + k, '#2a1c14');
-  grime(p, seed + 12, 0.5, floor + 2);
-  chew(p, seed + 13, 0.06);
-  const o = selOutline(p);
-  return still(o, 41, floor + 4, 0, {
-    lights: [
-      { dx: fx0 + 15 - 41 + 1, dy: 52 - floor - 3, r: 36, color: [1, 0.55, 0.2], flicker: 1 },
-    ],
-    smoke: [{ dx: fx0 + 14 - 41 + 1, dy: 1 - floor - 4 }],
-  });
 }
 
 /** Hay, stacked in a rough cone with a pitchfork stuck in. */

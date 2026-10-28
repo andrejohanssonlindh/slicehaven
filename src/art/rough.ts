@@ -1,6 +1,6 @@
 import { Rng } from '../core/rng';
 import {
-  type Prop, type Pt, capsule, chew, column, fbm, grime, mossify, pick, polyFill, selOutline, still, white, wobble,
+  type Prop, type Pt, capsule, chew, column, fbm, grime, mossify, pick, polyFill, selOutline, still, white,
 } from './grit';
 import { Pix } from './pix';
 import { FRAMES } from './props';
@@ -282,24 +282,26 @@ export function makeOak(seed: number, wind = 0): Prop {
 }
 
 /**
- * What is left of one of the old oaks: the same bark, grooves and flared roots,
- * a torn splintered top with rings, a split down one side, moss and a bracket
- * fungus. Wider and lower than the tree it came from.
+ * What is left of one of the old oaks: snapped, not sawn. The same bark and
+ * flared roots, but lopsided: one side broken off low, the other a tall jag of
+ * splintered fibre, a rotten hollow, moss, chunks fallen at the foot.
  */
 export function makeStump(seed: number): Prop {
   const rng = Rng.fromSeed(seed);
-  const W = 36, H = 32;
+  const W = 40, H = 40;
   const p = new Pix(W, H);
-  const cx = 18, baseY = H - 4, topY = 15;
-  const lean = (rng.next() - 0.5) * 2;
-  const half = (y: number): number => 7.5 + Math.max(0, y - (baseY - 6)) * 0.55 + (fbm(y / 3, 4, seed) - 0.5) * 1.6;
-  column(p, topY, baseY, (y) => cx + lean * (baseY - y) / 16, half, BARK, seed + 2, 0.22);
-  // Roots, like the trees': flaring out and gripping the ground.
-  for (const [dx, k] of [[-1, 1], [1, 1], [-1, 0.5], [1, 0.6]] as const) {
-    capsule(p, cx + dx * 5, baseY - 5, cx + dx * (11 + rng.int(4)) * k, baseY + 1, 2.4, 0.8, BARK, seed + 5 + dx);
+  const cx = 19, baseY = H - 4;
+  const lean = (rng.next() - 0.5) * 3;
+  const half = (y: number): number => 7 + Math.max(0, y - (baseY - 8)) * 0.6 + (fbm(y / 2.5, 4, seed) - 0.5) * 3.2;
+  column(p, 6, baseY, (y) => cx + lean * (baseY - y) / 24, half, BARK, seed + 2, 0.24);
+  for (const [dx, k] of [[-1, 1], [1, 1], [-1, 0.5], [1, 0.7]] as const) {
+    capsule(p, cx + dx * 5, baseY - 5, cx + dx * (11 + rng.int(5)) * k, baseY + 1, 2.4, 0.7, BARK, seed + 5 + dx);
   }
-  // Bark grooves, as on the oaks.
-  for (let y = topY; y <= baseY + 1; y++) {
+  // Break line: high on the left, low on the right, ragged all along.
+  const cut = (x: number): number => 16 + (x - cx) * 0.55 + (fbm(x / 2, 9, seed) - 0.5) * 7 + (white(x, 0, seed + 1) < 0.18 ? -4 : 0);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (p.alpha(x, y) && y < cut(x)) p.data[(y * W + x) * 4 + 3] = 0;
+  // Bark grooves.
+  for (let y = 6; y <= baseY + 1; y++) {
     for (let x = 0; x < W; x++) {
       if (!p.alpha(x, y)) continue;
       const g = fbm(x * 1.7, y / 9, seed + 12);
@@ -307,33 +309,37 @@ export function makeStump(seed: number): Prop {
       else if (g < 0.32 && white(x, y, seed + 13) < 0.5) p.set(x, y, BARK[4]);
     }
   }
-  // Torn top: an uneven ellipse of cut wood, with splinters standing up on one side.
-  const tcx = cx + lean * 0.6, tcy = topY - 1;
-  polyFill(p, wobble([[tcx - 9, tcy + 1], [tcx - 5, tcy - 3], [tcx + 3, tcy - 4], [tcx + 9, tcy], [tcx + 6, tcy + 4], [tcx - 4, tcy + 4]], seed, 0.9, 2), (x, y) => {
-    const d = Math.hypot((x - tcx) / 9, (y - tcy) / 4);
-    const ring = Math.sin(d * 11 + fbm(x / 4, y / 4, seed) * 2) > 0.35 ? -0.14 : 0.06;
-    return pick(['#3e3022', '#5a4834', '#7a6448', '#96805f', '#b09a78'], 0.55 - d * 0.22 + ring - (x - tcx) * 0.012 + (white(x, y, seed + 3) - 0.5) * 0.22, x, y);
-  });
-  // Heart rot at the middle, and a radial split.
-  for (let y = -1; y <= 1; y++) for (let x = -2; x <= 2; x++) if (Math.abs(x) + Math.abs(y) < 3) p.set(Math.round(tcx + x), Math.round(tcy + y), white(x, y, seed) < 0.5 ? '#2a1c12' : '#3e2a1a');
-  for (let i = 0; i < 6; i++) p.set(Math.round(tcx + 2 + i), Math.round(tcy + 1 + i * 0.3), '#2a1c12');
-  // Splinters: tall jagged shards on the back edge.
-  for (const [dx, h] of [[-7, 2], [-5, 4], [-3, 3], [-1, 5], [1, 3], [4, 2]] as const) {
-    for (let k = 0; k < h; k++) {
-      const x = Math.round(tcx + dx + (k > h - 3 ? 0.5 : 0)), y = Math.round(tcy - 3 - k + Math.abs(dx) * 0.15);
-      p.set(x, y, pick(['#4a3626', '#6a5238', '#8a7050'], 0.7 - k * 0.06 - (dx > 0 ? 0.2 : 0) + (white(x, y, seed) - 0.5) * 0.2, x, y));
-      p.set(x + 1, y, BARK[1]);
+  // The fracture: pale torn fibre standing in streaks along the break, grey with age.
+  for (let x = 0; x < W; x++) {
+    if (!p.alpha(x, Math.ceil(cut(x)) + 1)) continue;
+    const y0 = Math.ceil(cut(x));
+    const len = 3 + Math.floor(white(x, 1, seed + 2) * 3);
+    for (let k = 0; k < len; k++) {
+      const y = y0 + k;
+      if (!p.alpha(x, y)) break;
+      p.set(x, y, pick(['#3a2e22', '#5e4e3a', '#857158', '#a89478', '#c4b296'], 0.8 - k * 0.2 + (x % 2 ? 0.12 : -0.1) + (white(x, y, seed + 3) - 0.5) * 0.2, x, y));
     }
+    if (white(x, 2, seed + 4) < 0.3) p.set(x, y0 - 1, '#7a6a52'); // a loose splinter
   }
-  mossify(p, seed + 14, 0.8, (x, y) => (y > baseY - 12 ? 1.3 : 0.4) * (x < cx ? 1.2 : 0.6));
-  // Bracket fungus climbing the side.
-  for (const [fx, fy] of [[cx + 7, baseY - 9], [cx + 8, baseY - 5]] as const) {
-    for (let k = 0; k < 4; k++) { p.set(fx + k, fy, pick(['#7a4a22', '#b07a3a', '#e0b868'], 0.9 - k * 0.2, k, 0)); p.set(fx + k, fy + 1, '#3a2414'); }
+  // Rotten hollow low on the front, black and wet, with a lip of crumbling wood.
+  for (let y = 20; y < 31; y++) for (let x = 12; x < 24; x++) {
+    const d = ((x - 17.5) / 5.5) ** 2 + ((y - 26) / 5) ** 2 + (fbm(x / 2, y / 2, seed + 6) - 0.5) * 0.5;
+    if (d < 1 && p.alpha(x, y)) p.set(x, y, pick(['#050404', '#120d0a', '#251a12', '#3a2a1c'], 0.16 + (30 - y) * 0.02 + (white(x, y, seed) - 0.5) * 0.2, x, y));
+    else if (d < 1.35 && d >= 1 && p.alpha(x, y) && white(x, y, seed + 7) < 0.7) p.set(x, y, BARK[0]);
   }
-  chew(p, seed + 15, 0.1);
+  mossify(p, seed + 14, 0.9, (x, y) => (y > baseY - 14 ? 1.4 : 0.5) * (x < cx ? 1.3 : 0.5));
+  // Fungus: a shelf of it, not pretty.
+  for (const [fx, fy] of [[cx + 7, baseY - 12], [cx + 8, baseY - 8], [cx + 6, baseY - 5]] as const) {
+    for (let k = 0; k < 5 - Math.round(white(fx, fy, seed) * 2); k++) { p.set(fx + k, fy, pick(['#4a3220', '#7a5a38', '#a8885a'], 0.8 - k * 0.2, k, 0)); p.set(fx + k, fy + 1, '#2a1a10'); }
+  }
+  // Chunks and fibres fallen around the foot.
+  for (const [dx, dy, w, h] of [[-12, 0, 4, 3], [13, -1, 3, 2], [-6, 3, 3, 2], [8, 3, 5, 2]] as const) {
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) p.set(cx + dx + x, baseY + dy + y, pick(BARK, 0.7 - y * 0.25 - x * 0.05 + (white(x, y, seed + dx) - 0.5) * 0.2, x, y));
+  }
+  chew(p, seed + 15, 0.14);
   const o = selOutline(p);
-  bedIn(o, 3, 33, H - 2, seed);
-  return still(o, 19, H - 2, 24);
+  bedIn(o, 3, 37, H - 2, seed);
+  return still(o, 20, H - 2, 26);
 }
 
 // --- water details ---------------------------------------------------------

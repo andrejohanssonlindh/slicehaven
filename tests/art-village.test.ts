@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
-  makeBarrels, makeCrates, makeFence, makeHaystack, makeLantern, makeSmithy, makeStall, makeWell, makeWoodpile,
+  makeBarrels, makeCrates, makeFence, makeHaystack, makeLantern, makeStall, makeWell, makeWoodpile,
 } from '../src/art/buildings';
 import { FOLK, makeFolk } from '../src/art/folk';
+import { FURNITURE } from '../src/art/furniture';
 import { makeHouse } from '../src/art/houses';
+import { makeRoom, makeSmithy } from '../src/art/interior';
 import { makeBoulder, makeLilies, makeOak, makeOutcrop, makePebbles, makeReeds, makeStump } from '../src/art/rough';
 import type { Prop } from '../src/art/grit';
 
@@ -31,7 +33,9 @@ describe('village art', () => {
     ['barrels', () => makeBarrels(4)],
     ['crates', () => makeCrates(3)],
     ['stall', () => makeStall(2, 'fruit')],
-    ['smithy', () => makeSmithy(7)],
+    ['smithy', () => makeSmithy({ seed: 7 })],
+    ['room', () => makeRoom({ seed: 5 })],
+    ...Object.entries(FURNITURE).map(([k, f]): [string, () => Prop] => [`furniture ${k}`, f]),
     ['haystack', () => makeHaystack(3)],
     ['woodpile', () => makeWoodpile(2)],
     ['fence', () => makeFence(2)],

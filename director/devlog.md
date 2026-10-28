@@ -1,5 +1,14 @@
 # Devlog
 
+## 2026-10-28 — Session 21c: smithy at scale, variation slots, interiors
+
+- **Stump** redone again: snapped, not sawn. Lopsided, one tall splintered jag, a rotten hollow, fungus, chunks at the foot. Same bark and roots as the oaks.
+- **Smithy** rebuilt at house scale (`art/interior.ts`, `makeSmithy`): open-fronted, 4×3 hexes, forge with live coals in the middle-right, anvil on an oak stump, quench trough, workbench, coal bin, tool rack. The forge's chimney goes up through the roof.
+- **Variation slots** on houses: **roof** (thatch, shingle, clay tile, turf), **walls** (white, ochre, rose, sage limewash, brick nogging, tarred boards), **shutters** (rust, green, blue, ochre, plum, grey, white), **size** (4 or 5 hexes), **sign** (tankard, herb, loaf), plus the seed. The studio has a **House builder** card: pick the slots and the house is redrawn.
+- **Interiors** (`art/furniture.ts`, `art/interior.ts`): table with a candle, bed, chest, cupboard, shelf, stool, bench, ladder, rug, a hearth with a live fire and a crane and pot; forge, anvil, trough, workbench, coal bin, tool rack. `makeRoom` builds the cut-away: floor, back and left walls from inside, right wall still outside, front cut to a footing wall, furnished. Same box and anchor as the house so the two swap in place. Lights come from the hearth, the candle and the forge.
+- Not done: walking and blocking rules, the roof fade-out itself, a door-to-door pairing (each house uses one furnished layout), more furniture. 273 tests.
+
+
 ## 2026-10-28 — Session 21b: village art, round 2 (houses at real size)
 
 - Your notes: houses far too small, a flat facade, frame looked sloppy, roofs too straight and clean, the stump belonged to the old trees.

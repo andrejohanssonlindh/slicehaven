@@ -1,8 +1,13 @@
 import {
-  makeBarrels, makeCrates, makeFence, makeHaystack, makeLantern, makeSmithy, makeStall, makeWell, makeWoodpile,
+  makeBarrels, makeCrates, makeFence, makeHaystack, makeLantern, makeStall, makeWell, makeWoodpile,
 } from '../art/buildings';
 import { FOLK, makeFolk } from '../art/folk';
+import {
+  makeAnvil, makeBed, makeBench, makeChest, makeCoalBin, makeCupboard, makeForge, makeHearth, makeLadder, makeRug, makeShelf, makeStool, makeTable,
+  makeToolRack, makeTrough, makeWorkbench,
+} from '../art/furniture';
 import { makeHouse } from '../art/houses';
+import { makeRoom, makeSmithy } from '../art/interior';
 import { makeBoulder, makeOak, makeOutcrop, makePebbles, makeStump } from '../art/rough';
 import type { Placed, VCell } from '../art/villageScene';
 
@@ -19,6 +24,73 @@ export interface Section {
 const folkRow = (names: string[]): Placed[] => names.map((n, i) => ({ col: i, row: 0, prop: makeFolk(FOLK[n]) }));
 
 export const SECTIONS: Section[] = [
+  {
+    title: 'Interior: furniture',
+    note: 'For inside the houses. Same scale as the people (they sit on a 14 px stool), same slanted view as the houses: front, top, right side. Wood grain, worn edges, a candle that lights the table at dusk.',
+    cols: 9,
+    padTop: 84,
+    maxWidth: 400,
+    items: [
+      { col: 1, row: 0, ox: 8, prop: makeTable() },
+      { col: 3, row: 0, ox: 12, prop: makeBed() },
+      { col: 6, row: 0, ox: 0, prop: makeChest() },
+      { col: 8, row: 0, ox: -4, prop: makeCupboard() },
+    ],
+  },
+  {
+    title: 'Interior: hearth and small things',
+    note: 'The hearth has a live fire, an iron crane and a pot, and lights the room. Stool, bench, shelf, rug, ladder.',
+    cols: 9,
+    padTop: 100,
+    maxWidth: 400,
+    items: [
+      { col: 1, row: 0, ox: 4, prop: makeHearth() },
+      { col: 3, row: 0, ox: 6, prop: makeStool() },
+      { col: 4, row: 0, ox: 10, prop: makeBench() },
+      { col: 6, row: 0, ox: 4, prop: makeLadder() },
+      { col: 7, row: 0, ox: 14, prop: makeRug() },
+      { col: 8, row: 0, ox: 10, oy: -22, prop: makeShelf() },
+    ],
+  },
+  {
+    title: 'Interior: smithy fittings',
+    note: 'Forge (live coals, a bar heating), anvil on an oak stump, quench trough, workbench, coal bin, tool rack.',
+    cols: 9,
+    padTop: 90,
+    maxWidth: 400,
+    items: [
+      { col: 1, row: 0, ox: 4, prop: makeForge() },
+      { col: 3, row: 0, ox: 4, prop: makeAnvil() },
+      { col: 4, row: 0, ox: 12, prop: makeTrough() },
+      { col: 6, row: 0, ox: 6, prop: makeWorkbench() },
+      { col: 8, row: 0, ox: 0, prop: makeCoalBin() },
+      { col: 7, row: 0, ox: 8, oy: -30, prop: makeToolRack() },
+    ],
+  },
+  {
+    title: 'Smithy, at house scale',
+    note: 'An open-fronted workshop, 4 hexes by 3 like the houses, with a person-sized interior: forge with live coals in the middle-right, anvil on an oak stump, quench trough, workbench, coal bin, tools. The roof is the same swappable layer (shingle here); the forge chimney goes up through it. Try Dusk.',
+    cols: 7,
+    rows: 3,
+    padTop: 104,
+    maxWidth: 400,
+    items: [
+      { col: 3, row: 2, ox: 16, prop: makeSmithy({ seed: 7 }) },
+      { col: 5, row: 2, ox: 12, oy: 4, prop: makeFolk(FOLK.smith) },
+    ],
+  },
+  {
+    title: 'Inside a cottage (the roof and front wall cut away)',
+    note: 'What you see when you step in: the same box as the house, so the two swap in place. Floor, back and left walls from inside, the right wall still showing outside. Bed, cupboard, shelf, hearth with a live fire, table with a candle, stool, bench, chest, rug. The villager is for scale.',
+    cols: 7,
+    rows: 3,
+    padTop: 104,
+    maxWidth: 400,
+    items: [
+      { col: 3, row: 2, ox: 0, prop: makeRoom({ seed: 5, cols: 5 }) },
+      { col: 3, row: 2, ox: -10, oy: -8, prop: makeFolk(FOLK.baker) },
+    ],
+  },
   {
     title: 'Houses at real size',
     note: 'A cottage, 4 hexes across and 3 deep: the door is 42 px for a 36 px person, the walls 48. Front wall, side wall, roof slope, a chimney on the gable end. Timber frame built the way a carpenter would, aged in the plaster, paint and roof. Roofs sag, droop and lump.',
@@ -65,15 +137,15 @@ export const SECTIONS: Section[] = [
     ],
   },
   {
-    title: 'Shops',
-    note: 'Market stalls (fruit, bread, cloth) and a smithy with a live forge. Forge and lantern light up at dusk.',
-    cols: 7,
+    title: 'Market stalls',
+    note: 'Fruit, bread, cloth.',
+    cols: 6,
     padTop: 64,
     maxWidth: 400,
     items: [
-      { col: 1, row: 0, ox: -6, prop: makeSmithy(7) },
-      { col: 4, row: 0, ox: 4, prop: makeStall(2, 'fruit') },
-      { col: 6, row: 0, ox: 4, prop: makeStall(6, 'bread') },
+      { col: 1, row: 0, ox: 4, prop: makeStall(2, 'fruit') },
+      { col: 3, row: 0, ox: 10, prop: makeStall(6, 'bread') },
+      { col: 5, row: 0, ox: 4, prop: makeStall(8, 'cloth') },
     ],
   },
   {
