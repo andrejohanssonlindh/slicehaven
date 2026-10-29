@@ -26,6 +26,7 @@ uniform sampler2D tDepth;
 uniform vec4 uDepthRect;
 uniform float uTime;
 uniform vec3 uWind;
+uniform float uGale;
 uniform vec3 uSun;
 uniform vec3 uSky;
 uniform vec3 uAmbient;
@@ -42,7 +43,10 @@ void main() {
   vec2 drift = uWind.xy * uTime * 0.6;
   float r1 = shValue(vec2(cell.x * 1.7 - drift.x, cell.y * 4.5 - drift.y), 5);
   float r2 = shValue(vec2(cell.x * 3.1 + uTime * 0.21, cell.y * 7.0 - uTime * 0.13), 6);
-  float rip = r1 * 0.6 + r2 * 0.4;
+  // Wind roughens it: from a stiff breeze the ripples shorten and sharpen, and in a gale the crests break white and the shore foam churns.
+  float chop = clamp((uGale - 0.45) / 1.6, 0.0, 1.0);
+  float r3 = shValue(vec2(cell.x * 6.0 - drift.x * 2.5, cell.y * 11.0 - drift.y * 2.5), 14);
+  float rip = mix(r1 * 0.6 + r2 * 0.4, r1 * 0.35 + r2 * 0.3 + r3 * 0.35, chop);
   vec3 shallow = vec3(0.13, 0.27, 0.3);
   vec3 deep = vec3(0.025, 0.07, 0.16);
   vec3 col = mix(shallow, deep, smoothstep(0.05, 1.3, depth));
@@ -53,8 +57,11 @@ void main() {
   col *= uAmbient + uSun * cs * 0.55;
   // Glints on ripple crests.
   col += uSun * cs * step(0.8, rip) * 0.15 * (1.0 - uNight * 0.7);
+  // Whitecaps on the crests in a gale.
+  float cap = step(0.74 - chop * 0.08, rip) * step(0.4, shValue(cell * 5.0 + drift, 15)) * chop;
+  col = mix(col, (uAmbient + uSun * cs * 0.5 + 0.25) * vec3(0.85, 0.9, 0.9), cap * 0.75);
   // Foam where it laps the bank.
-  float foam = step(depth, 0.09 + 0.05 * sin(uTime * 1.3 + cell.x * 3.0 + cell.y * 2.0)) * step(0.45, shValue(cell * 6.0, 9));
+  float foam = step(depth, 0.09 + 0.05 * sin(uTime * 1.3 + cell.x * 3.0 + cell.y * 2.0) + chop * 0.08) * step(0.45 - chop * 0.1, shValue(cell * 6.0, 9));
   col = mix(col, (uAmbient + uSun * cs * 0.5) * vec3(0.75, 0.8, 0.78), foam * 0.8);
   // Duckweed in the sheltered shallows.
   float weed = step(0.66, shFbm(cell * 0.7, 12)) * step(depth, 0.7);
@@ -107,6 +114,7 @@ export function makeWater(g: Ground3D): Water | null {
   // Share the live world uniforms (time, wind, clouds) by reference.
   mat.uniforms.uTime = WORLD.uTime;
   mat.uniforms.uWind = WORLD.uWind;
+  mat.uniforms.uGale = WORLD.uGale;
   mat.uniforms.uCloud = WORLD.uCloud;
   for (const k of VISION_UNIFORMS) mat.uniforms[k] = WORLD[k];
   mat.uniforms.tDepth.value = depth;

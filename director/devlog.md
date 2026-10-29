@@ -1,5 +1,14 @@
 # Devlog
 
+## 2026-10-30 — Gale, leaves from trees, wind on water, wind clears fog, bench off the well
+
+- **Gale:** the wind the world feels is as set up to force 3, then climbs fast (`gale` in `SpikeWorld.update`: force 6 is about 2.3 times what it was). It drives tree and cloth sway, rain slant, smoke lean, flames, leaves and the new `WORLD.uGale` (water). Tunable: the `2.8` in the `wk` line.
+- **Leaves** now come off the broadleaf crowns near the view (pines and dead trees shed none), start at a stiff breeze, come in gusts, are carried downwind, tumble, sink, and vanish when they land. No trees near, no leaves. Pool of 96. (They used to spawn anywhere upwind of the view.)
+- **Water in wind:** from a stiff breeze the ripples shorten; in a gale the crests break into whitecaps and the shore foam churns (`chop` in `water.ts`).
+- **Wind clears fog:** asked-for mist (`setMist`) thins as the wind rises and is gone by about force 4 (it eases out over a few seconds); the ask is kept, so it returns when the wind drops. Rain's own mist thins less. Verified: mist 0.8 reads 0 in force 6 and 0.72 again after calm.
+- **Well:** I could not make the hero walk into it (walked five routes round it). What I found is the bench I had put 1 m behind it: it left a pocket between bench and well that sent paths wide around the back. The bench moved to (-14.5, 9.2). Say if something is still off and from which side.
+- E2E timeout 60 s -> 120 s: with the panel folded the stage is taller and the software renderer slower.
+
 ## 2026-10-30 — Admin ring on "å", wind control, lingering smoke, water under sight, well
 
 - **Admin menu:** press **å** (or the ⚙ at the bottom right, for the phone) for a ring of groups: Time, Weather, Wind, Fog, Fire & light, Look, Magic, Sight, Quality, and Show/Hide panel. Tap a group for its settings round the hub; ‹ goes back, ✕ / å / Esc / tapping the dark closes. It holds every setting the bottom panel had (they are the same definitions, `button()` in `spike3d/main.ts`), plus new ones: ±3 h, wind, fog levels. **The bottom panel is now folded by default** (the choice is remembered); the ring's "Show panel" brings it back.

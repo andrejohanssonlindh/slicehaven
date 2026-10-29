@@ -356,7 +356,28 @@ export class SpikeWorld {
   private rain = new Rain(1400);
   private smoke = new Smoke(24);
   private smokeSeen = new Set<string>();
-  private leaves = new Leaves(48);
+  private leafSpots: { x: number; y: number; z: number; r: number }[] = [];
+  private leafSpotsAt = -9;
+
+  /** The crowns that can shed leaves near the view (worked out twice a second, from the chunks the view touches). */
+  private leafTrees(): { x: number; y: number; z: number; r: number }[] {
+    if (this.time - this.leafSpotsAt < 0.5) return this.leafSpots;
+    this.leafSpotsAt = this.time;
+    const reach = Math.max(this.camera.right, this.camera.top) * 1.2 + 6;
+    const out: { x: number; y: number; z: number; r: number }[] = [];
+    for (let j = Math.floor((this.focus.z - reach) / CHUNK); j <= Math.floor((this.focus.z + reach) / CHUNK); j++) {
+      for (let i = Math.floor((this.focus.x - reach) / CHUNK); i <= Math.floor((this.focus.x + reach) / CHUNK); i++) {
+        for (const t of this.placed.chunk(i, j).trees) {
+          // Broadleaves shed; pines and dead trees hold (or have) nothing to lose.
+          if (t.kind === 'pine' || t.kind === 'dead') continue;
+          const h = t.kind === 'young' ? 2.6 : 5.2;
+          out.push({ x: t.x, y: groundHeight(this.ground, t.x, t.z) + h, z: t.z, r: t.kind === 'young' ? 1 : 2 });
+        }
+      }
+    }
+    return (this.leafSpots = out);
+  }
+  private leaves = new Leaves(96);
   /**
    * The people in the world. Anyone with `reveals` gets a see-through oval cut in the trees
    * between them and the camera; leave it off for someone who should stay hidden.
@@ -1703,7 +1724,12 @@ export class SpikeWorld {
     this.fog.color.copy(fogC);
     // Mist: what is asked for (`setMist`, for magic and scenes) or what the weather gives by itself (rain), whichever is thicker,
     // eased so it rolls in and out. It thickens the distance fog and lies low on the ground.
-    const wantMist = Math.max(this.mist, 0.3 * Math.min(1, w.rain));
+    // The wind as the world feels it: as set up to a stiff breeze (force 3), then it climbs fast, so force 6 is a gale.
+    const wk = w.wind <= 0.6 ? 1 : (0.6 + (w.wind - 0.6) * 2.8) / w.wind;
+    const wx = w.windX * wk, wz = w.windY * wk, gale = w.wind * wk;
+    // Wind blows asked-for mist away: gone by about force 4 (the ask stays, so it comes back when the wind drops).
+    const clearing = 1 - Math.min(1, Math.max(0, (w.wind - 0.25) / 0.55));
+    const wantMist = Math.max(this.mist * clearing, 0.3 * Math.min(1, w.rain) * (0.4 + 0.6 * clearing));
     this.mistNow += (wantMist - this.mistNow) * (1 - Math.exp(-dt / 2.5));
     const m = this.mistNow;
     this.fog.near = CAM_DIST + THREE.MathUtils.lerp(env.fogNear - 30, -6, m);
@@ -1739,7 +1765,8 @@ export class SpikeWorld {
     WORLD.uCloud.value.set(cloudThreshold(env.cloudCover), 0.72 * (1 - env.night * 0.7), this.cloudOff.x, this.cloudOff.y);
     this.wet += (env.wetness - this.wet) * (1 - Math.exp(-dt / (env.wetness > 0.5 ? 6 : 25)));
     WORLD.uWet.value = this.wet;
-    WORLD.uWind.value.set(w.windX, w.windY, w.wind);
+    WORLD.uWind.value.set(wx, wz, gale);
+    WORLD.uGale.value = gale;
 
     // Torches flicker; real point lights only for the nearest few.
     // (Distances are measured once each, not inside the sort: a sort asks for them n log n times, and each ask made a vector.)
@@ -1753,7 +1780,7 @@ export class SpikeWorld {
       const f = 0.82 + 0.18 * Math.sin(this.time * 11 + t.seed) * Math.sin(this.time * 7.3 + t.seed * 2);
       t.light.intensity = t.base * f * (t.always ? 1 : 0.35 + 0.65 * env.night);
       t.flame.scale.set(1, 0.85 + f * 0.3, 1);
-      t.tick?.(this.time, { x: w.windX, z: w.windY });
+      t.tick?.(this.time, { x: wx, z: wz });
     });
     // The number of lights in the scene is part of every shader: when it changes, every material is compiled again (a
     // stall of a second on a phone). So it never changes: dark spares make up whatever the torches in view do not.
@@ -1803,8 +1830,8 @@ export class SpikeWorld {
     }
     const span = Math.max(this.camera.right, this.camera.top) * 1.1;
     const groundAt = (x: number, z: number): number => groundHeight(this.ground, x, z);
-    this.rain.update(dt, w.rain, this.focus, span, { x: w.windX, z: w.windY }, env.ambient * 0.6 + env.sunIntensity * 0.15 + w.flash, groundAt);
-    this.leaves.update(dt, this.time, Math.hypot(w.windX, w.windY), this.focus, span, { x: w.windX, z: w.windY }, 1 - env.night * 0.7, groundAt);
+    this.rain.update(dt, w.rain, this.focus, span, { x: wx, z: wz }, env.ambient * 0.6 + env.sunIntensity * 0.15 + w.flash, groundAt);
+    this.leaves.update(dt, this.time, gale, this.focus, span, { x: wx, z: wz }, 1 - env.night * 0.7, groundAt, this.leafTrees());
     // Chimney smoke: the nearest chimneys in sight (a smoking chimney is a long way to see, but not through the dark).
     const sm: { c: Chimney; d: number }[] = [];
     for (const hs of this.houses) {
@@ -1823,7 +1850,7 @@ export class SpikeWorld {
     // A campfire smokes too (the hero lit it, so it is in view); doused, its smoke thins away rather than cutting off.
     for (const k of this.camps) sm.push({ c: k.smoke, d: Math.hypot(k.x - this.focus.x, k.z - this.focus.z) });
     sm.sort((a, b) => a.d - b.d);
-    this.smoke.update(this.time, sm.map((s) => s.c), { x: w.windX, z: w.windY }, 1 - env.night * 0.8, 1 - Math.min(1, w.rain) * 0.5);
+    this.smoke.update(this.time, sm.map((s) => s.c), { x: wx, z: wz }, 1 - env.night * 0.8, 1 - Math.min(1, w.rain) * 0.5);
     if (this.water && this.ground.lake) {
       const lk = this.ground.lake;
       this.water.mesh.visible = this.vision.outer <= 0 || Math.hypot(this.focus.x - lk.x, this.focus.z - lk.z) < lk.r * 1.4 + this.vision.outer;

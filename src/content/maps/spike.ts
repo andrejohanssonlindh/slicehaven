@@ -73,7 +73,7 @@ export const SPIKE_MAP: MapSpec = {
     { kind: 'barrel', x: 3.4, z: 12.7, seed: 41 },
     { kind: 'hay', x: -5.5, z: 14.5, rot: 0.15, seed: 42 },
     { kind: 'signpost', x: 8, z: 7.6, rot: 0.2, seed: 43 },
-    { kind: 'bench', x: -9, z: 8.6, seed: 44 },
+    { kind: 'bench', x: -14.5, z: 9.2, seed: 44 },
     { kind: 'trough', x: 11, z: 12.8, seed: 45 },
     { kind: 'stump', x: -12, z: 13, seed: 46 },
   ],

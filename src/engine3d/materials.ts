@@ -20,6 +20,8 @@ export const WORLD = {
   /** Where the mist is thinnest (the view's focus, xz) and its tint, used when `uMist.w` > 0. */
   uMistAt: { value: new THREE.Vector2(0, 0) },
   uMistColor: { value: new THREE.Vector3(0.7, 0.72, 0.76) },
+  /** How hard the wind blows as the world feels it: 0 calm, about 0.6 a stiff breeze, over 2 a gale. */
+  uGale: { value: 0 },
   /** xy: wind direction × strength, z: gustiness. */
   uWind: { value: new THREE.Vector3(0.2, 0, 0.5) },
   /** The camera's offset in whole rendered pixels, so screen-space noise stays put on the world. */

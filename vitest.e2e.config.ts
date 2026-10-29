@@ -5,7 +5,8 @@ export default defineConfig({
   base: '/slicehaven/',
   test: {
     include: ['e2e/**/*.e2e.ts'],
-    testTimeout: 60_000,
+    // (The 3D pages render in software here, and the folded panel gives them a taller stage.)
+    testTimeout: 120_000,
     hookTimeout: 60_000,
     fileParallelism: false,
   },
