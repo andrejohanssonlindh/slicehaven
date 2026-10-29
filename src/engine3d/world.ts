@@ -80,6 +80,8 @@ interface CutPart {
   mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial>;
   /** Fades while the viewer's storey is at or below this. */
   level: number;
+  /** The back wall: also fades up to this storey when the house faces away from the camera (-1: not a back wall). */
+  away: number;
   /** 0 shown, 1 gone; eases. */
   t: number;
 }
@@ -671,7 +673,7 @@ export class SpikeWorld {
       mesh.castShadow = !p.cut;
       inst.group.add(mesh);
       if (p.cut) {
-        inst.cut.push({ mesh, level: p.level ?? 0, t: 0 });
+        inst.cut.push({ mesh, level: p.level ?? 0, away: p.away ?? -1, t: 0 });
         // The roof keeps shading the room when it is cut away: a shadow-only twin on layer 1.
         const proxy = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
         proxy.layers.set(1);
@@ -1986,8 +1988,11 @@ export class SpikeWorld {
     const cutK = 1 - Math.exp(-dt / 0.12);
     for (const hs of this.houses) {
       hs.cutT += ((hs.open ? 1 : 0) - hs.cutT) * cutK;
+      // Does the house's back face the camera? (The camera is toward (sin YAW, cos YAW); the house's local z is its front.)
+      const away = Math.sin(YAW) * Math.sin(hs.built.place.rot) + Math.cos(YAW) * Math.cos(hs.built.place.rot) < 0;
       for (const c of hs.cut) {
-        c.t += ((hs.open && hs.view <= c.level ? 1 : 0) - c.t) * cutK;
+        const gone = hs.open && (hs.view <= c.level || (away && hs.view <= c.away));
+        c.t += ((gone ? 1 : 0) - c.t) * cutK;
         c.mesh.material.opacity = 1 - c.t;
         c.mesh.visible = c.t < 0.98;
       }

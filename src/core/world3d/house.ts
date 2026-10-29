@@ -56,6 +56,8 @@ export interface HousePart {
   cut: boolean;
   /** Cut parts only: fades while the viewer's storey is at or below this. */
   level?: number;
+  /** The back wall only: fades too while the viewer is on this storey or below, if the house faces away from the camera. */
+  away?: number;
   mesh: MeshData;
 }
 
@@ -153,7 +155,7 @@ export function buildHouse(spec: House3DSpec): HouseModel {
   const partMap = new Map<string, HousePart>();
   /** The part for a material and fade level (`level` undefined: never cut). */
   const part = (material: HouseMaterial, level?: number, name: string = material): HousePart => {
-    const key = `${name}|${material}|${level ?? 'x'}`;
+    const key = `${name}|${material}|${level ?? 'x'}|${name === 'backWall' ? 'b' : ''}`;
     let p = partMap.get(key);
     if (!p) partMap.set(key, (p = { name, material, cut: level !== undefined, level, mesh: emptyMesh() }));
     return p;
@@ -170,7 +172,10 @@ export function buildHouse(spec: House3DSpec): HouseModel {
   const wallOpts = { aoBottom: 0.7, aoTop: 0.72 };
   for (let k = 0; k < nL; k++) {
     const w = part(wallMat, upperLevel(k), 'walls').mesh;
-    addBox(w, [-hw, wallBot[k], -hd], [hw, wallTop[k], -hd + WALL_T], wallOpts);
+    // The back wall is its own part: it also fades, when the house is turned so that it faces the camera.
+    const back = part(wallMat, k === 0 ? -1 : k - 1, 'backWall');
+    back.away = k;
+    addBox(back.mesh, [-hw, wallBot[k], -hd], [hw, wallTop[k], -hd + WALL_T], wallOpts);
     addBox(w, [-hw, wallBot[k], -hd + WALL_T], [-hw + WALL_T, wallTop[k], hd - WALL_T], wallOpts);
     addBox(w, [hw - WALL_T, wallBot[k], -hd + WALL_T], [hw, wallTop[k], hd - WALL_T], wallOpts);
     addBox(part(wallMat, k, 'frontWall').mesh, [-hw, wallBot[k], hd - WALL_T], [hw, wallTop[k], hd], wallOpts);
