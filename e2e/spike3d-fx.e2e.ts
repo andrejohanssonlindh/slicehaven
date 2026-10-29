@@ -44,6 +44,7 @@ describe('spike3d lightning and fires', () => {
     await page.waitForTimeout(2500);
     expect(await w('w.lightFire()')).toBe(true);
     expect(await w('w.campfires')).toBe(1);
+    for (let i = 0; i < 3; i++) await page.click('#zoom button[data-zoom="1"]');
     await page.waitForTimeout(800);
     await page.screenshot({ path: `${OUT}spike3d-fire.png` });
     await w('(w.douseFires(), 0)');

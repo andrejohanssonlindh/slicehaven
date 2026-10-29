@@ -27,6 +27,7 @@ import { TEXELS_PER_M } from '../core/world3d/tiers';
 import { type Clump, buildTree } from '../core/world3d/tree';
 import { fbm } from '../core/noise';
 import { Weather } from '../engine/weather';
+import { makeFlame } from './fire';
 import { type LitOpts, SEE_SLOTS, WORLD, lit, pixTexture, shellOf } from './materials';
 import { Rain } from './rain';
 import { type SpriteCard, type WalkCard, blobShadow, spriteCard, walkCard } from './sprites';
@@ -73,6 +74,8 @@ const BOLT_LIFE = 0.5;
 interface Torch {
   light: THREE.PointLight;
   flame: THREE.Object3D;
+  /** Moves the flame's bits (see fire.ts), if it has any. */
+  tick?: (t: number, wind: { x: number; z: number }) => void;
   base: number;
   seed: number;
 }
@@ -313,13 +316,12 @@ export class SpikeWorld {
       const prop = room.props.get(it.id);
       if (!prop) continue;
       const flat = it.kind === 'flat';
-      // Things on the back wall and rugs line up with the room (stretched sideways a little to keep
-      // one art pixel to one screen pixel). Free-standing things face the camera.
-      const wall = !flat && it.aligned;
+      // Everything follows the house's alignment cross (see roomplan.ts): the card is turned with the house,
+      // stretched sideways a little to keep one art pixel to one screen pixel.
       const card = spriteCard(prop, PITCH, { flat, shadow: false });
       card.mesh.position.set(it.x, model.floorY + 0.02 + it.lift, it.z);
-      card.mesh.rotation.y = flat || wall ? 0 : YAW - h.rot;
-      if (wall) card.mesh.scale.x = 1 / Math.cos(YAW - h.rot);
+      card.mesh.rotation.y = 0;
+      if (!flat) card.mesh.scale.x = 1 / Math.cos(YAW - h.rot);
       inst.group.add(card.mesh);
       inst.furniture.push(card.mesh);
       this.sprites.push(card);
@@ -626,7 +628,6 @@ export class SpikeWorld {
 
   private buildTorches(): void {
     const postMat = lit({ map: tex(timberTex(21)) });
-    const flameMat = new THREE.MeshBasicMaterial({ color: 0xffb040 });
     const place = (x: number, y: number, z: number, post: boolean): void => {
       if (post) {
         const p = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.9, 0.14), postMat);
@@ -634,13 +635,13 @@ export class SpikeWorld {
         p.castShadow = true;
         this.scene.add(p);
       }
-      const flame = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.22, 0.12), flameMat);
-      flame.position.set(x, y + 0.12, z);
-      this.scene.add(flame);
+      const fx = makeFlame(0.42, 10, this.torches.length * 11);
+      fx.object.position.set(x, y + 0.02, z);
+      this.scene.add(fx.object);
       const light = new THREE.PointLight(0xffa458, 9, 11, 2);
       light.position.set(x, y + 0.3, z);
       this.scene.add(light);
-      this.torches.push({ light, flame, base: 9, seed: this.torches.length * 7 + 1 });
+      this.torches.push({ light, flame: fx.object, tick: fx.tick, base: 9, seed: this.torches.length * 7 + 1 });
     };
     for (const [x, z] of this.layout.torches) place(x, this.store.heightAt(x, z) + 1.9, z, true);
     // On a bracket beside the first house's door.
@@ -965,21 +966,13 @@ export class SpikeWorld {
       log.rotation.y = rot;
       group.add(log);
     }
-    const flame = new THREE.Group();
-    const tongue = (w: number, h: number, c: number, oy: number): void => {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), new THREE.MeshBasicMaterial({ color: c }));
-      m.position.y = oy + h / 2;
-      flame.add(m);
-    };
-    tongue(0.34, 0.34, 0xe0501c, 0.1);
-    tongue(0.22, 0.34, 0xffa030, 0.28);
-    tongue(0.1, 0.28, 0xfff0a0, 0.48);
-    group.add(flame);
+    const fx = makeFlame(1, 20, this.camps.length * 13);
+    group.add(fx.object);
     const light = new THREE.PointLight(0xff9a48, 10, 12, 2);
     light.position.set(0, 0.7, 0);
     group.add(light);
     this.scene.add(group);
-    const torch: Torch = { light, flame, base: 10, seed: 17 + this.camps.length * 5 };
+    const torch: Torch = { light, flame: fx.object, tick: fx.tick, base: 10, seed: 17 + this.camps.length * 5 };
     this.torches.push(torch);
     this.camps.push({ x, z, group, torch });
     this.syncFires();
@@ -1048,7 +1041,8 @@ export class SpikeWorld {
       t.light.visible = i < this.settings.lights;
       const f = 0.82 + 0.18 * Math.sin(this.time * 11 + t.seed) * Math.sin(this.time * 7.3 + t.seed * 2);
       t.light.intensity = t.base * f * (0.35 + 0.65 * env.night);
-      t.flame.scale.set(1, 0.8 + f * 0.4, 1);
+      t.flame.scale.set(1, 0.85 + f * 0.3, 1);
+      t.tick?.(this.time, { x: w.windX, z: w.windY });
     });
     for (const m of this.windowMats) m.emissive.setScalar(env.night * 1.4);
 

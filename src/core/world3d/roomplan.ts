@@ -9,7 +9,10 @@ import { white } from '../noise';
  * each piece's footprint, so the same plan furnishes the room and blocks the feet.
  *
  * Frame: the house's own, metres. The room's back wall is z0, the door wall z1
- * (z grows toward the front), x runs along the front.
+ * (z grows toward the front), x runs along the front. This is the house's
+ * alignment cross: every piece, flat or standing, follows these two axes (the
+ * renderer turns a piece's card with the house, never toward the camera), so a
+ * piece's footprint is exactly its w by d and rugs lie square to the walls.
  */
 
 export interface RoomRect {
@@ -59,8 +62,6 @@ export interface PlacedPiece {
   kind: PieceIn['kind'];
   lift: number;
   fire: boolean;
-  /** Lines up with the room (back wall pieces, rugs) instead of facing the camera. */
-  aligned: boolean;
 }
 
 export interface RoomPlan {
@@ -121,9 +122,9 @@ export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn
   };
   let standing = true; // is the piece being placed a floor piece (which must keep the room connected)?
   const fits = (r: RoomRect): boolean => inside(r) && !overlap(r, doorZone) && !solid.some((s) => overlap(r, s.r, GAP)) && (!standing || connectedWith(r));
-  const take = (p: PieceIn, x: number, z: number, aligned: boolean): void => {
+  const take = (p: PieceIn, x: number, z: number): void => {
     const lift = p.lift ?? 0;
-    placed.push({ id: p.id, x, z, w: p.w, d: p.d, kind: p.kind, lift, fire: !!p.fire, aligned });
+    placed.push({ id: p.id, x, z, w: p.w, d: p.d, kind: p.kind, lift, fire: !!p.fire });
     if (p.kind === 'floor') solid.push({ id: p.id, r: rectAt(x, z, p.w, p.d) });
     if (p.kind === 'hung') hungSpans.push({ x0: x - p.w / 2, x1: x + p.w / 2, lift, top: lift + 0.5 });
   };
@@ -140,46 +141,42 @@ export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn
     return null;
   };
 
-  const find = (p: PieceIn): { x: number; z: number; aligned: boolean } | null => {
+  const find = (p: PieceIn): { x: number; z: number } | null => {
     const r = p.rule;
     const hw = p.w / 2, hd = p.d / 2;
     switch (r.at) {
       case 'fixed':
-        return { x: room.x0 + r.u * W, z: room.z1 - r.d * D, aligned: r.d >= 0.9 };
+        return { x: room.x0 + r.u * W, z: room.z1 - r.d * D };
       case 'back': {
         const from = room.x0 + hw + (r.x ?? 0) * Math.max(0, W - p.w);
-        const s = slide(p, from, (t) => ({ x: t, z: room.z0 + hd + WALL }), room.x0 + hw, room.x1 - hw);
-        return s && { ...s, aligned: true };
+        return slide(p, from, (t) => ({ x: t, z: room.z0 + hd + WALL }), room.x0 + hw, room.x1 - hw);
       }
       case 'front': {
         const from = room.x0 + hw + (r.x ?? 0) * Math.max(0, W - p.w);
-        const s = slide(p, from, (t) => ({ x: t, z: room.z1 - hd - WALL }), room.x0 + hw, room.x1 - hw);
-        return s && { ...s, aligned: false };
+        return slide(p, from, (t) => ({ x: t, z: room.z1 - hd - WALL }), room.x0 + hw, room.x1 - hw);
       }
       case 'side': {
         const x = r.wall === 'left' ? room.x0 + hw + WALL : room.x1 - hw - WALL;
         const from = room.z0 + hd + (r.z ?? 0.5) * Math.max(0, D - p.d);
-        const s = slide(p, from, (t) => ({ x, z: t }), room.z0 + hd, room.z1 - hd);
-        return s && { ...s, aligned: false };
+        return slide(p, from, (t) => ({ x, z: t }), room.z0 + hd, room.z1 - hd);
       }
       case 'corner': {
         const x = r.corner.endsWith('Left') ? room.x0 + hw + WALL : room.x1 - hw - WALL;
         const z = r.corner.startsWith('back') ? room.z0 + hd + WALL : room.z1 - hd - WALL;
-        if (fits(rectAt(x, z, p.w, p.d))) return { x, z, aligned: r.corner.startsWith('back') };
+        if (fits(rectAt(x, z, p.w, p.d))) return { x, z };
         // The corner is taken: next to it along the wall it is on.
-        const s = r.corner.startsWith('back')
+        return r.corner.startsWith('back')
           ? slide(p, x, (t) => ({ x: t, z }), room.x0 + hw, room.x1 - hw)
           : slide(p, z, (t) => ({ x, z: t }), room.z0 + hd, room.z1 - hd);
-        return s && { ...s, aligned: r.corner.startsWith('back') };
       }
       case 'center': {
         const cx = (room.x0 + room.x1) / 2 + (r.dx ?? 0), cz = room.z0 + D * 0.46 + (r.dz ?? 0);
-        if (p.kind === 'flat') return { x: cx, z: cz, aligned: true };
+        if (p.kind === 'flat') return { x: cx, z: cz };
         for (let ring = 0; ring < 12; ring++) {
           for (let k = 0; k < Math.max(1, ring * 6); k++) {
             const a = (k / Math.max(1, ring * 6)) * Math.PI * 2;
             const x = cx + Math.cos(a) * ring * 0.25, z = cz + Math.sin(a) * ring * 0.25;
-            if (fits(rectAt(x, z, p.w, p.d))) return { x, z, aligned: false };
+            if (fits(rectAt(x, z, p.w, p.d))) return { x, z };
           }
         }
         return null;
@@ -198,7 +195,7 @@ export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn
             const g = GAP + 0.02; // just clear of the piece it sits next to
             const x = side === 'front' || side === 'back' ? tcx + off : side === 'left' ? t.x0 - hw - g : t.x1 + hw + g;
             const z = side === 'left' || side === 'right' ? tcz + off : side === 'front' ? t.z1 + hd + g : t.z0 - hd - g;
-            if (fits(rectAt(x, z, p.w, p.d))) return { x, z, aligned: false };
+            if (fits(rectAt(x, z, p.w, p.d))) return { x, z };
           }
         }
         return null;
@@ -214,7 +211,7 @@ export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn
         }
         cand.sort((a, b) => a.h - b.h);
         const c = cand.find((q) => fits(rectAt(q.x, q.z, p.w, p.d)));
-        return c ? { x: c.x, z: c.z, aligned: false } : null;
+        return c ? { x: c.x, z: c.z } : null;
       }
     }
   };
@@ -232,7 +229,7 @@ export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn
         if (!hungSpans.some((h) => t - p.w / 2 < h.x1 + 0.05 && t + p.w / 2 > h.x0 - 0.05 && lift < h.top && lift + 0.5 > h.lift)) x = t;
       }
       if (x === null) unplaced.push(p.id);
-      else take(p, x, room.z0 + WALL, true);
+      else take(p, x, room.z0 + WALL);
       continue;
     }
     standing = p.kind === 'floor';
@@ -242,7 +239,7 @@ export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn
       unplaced.push(p.id);
       continue;
     }
-    take(p, spot.x, spot.z, spot.aligned || p.kind === 'flat');
+    take(p, spot.x, spot.z);
   }
   return { pieces: placed, unplaced };
 }

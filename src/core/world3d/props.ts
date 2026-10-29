@@ -130,8 +130,14 @@ export function buildCart(seed: number): MeshData {
   for (const z of [-0.45, 0.45]) addBox(m, [-0.7, bedY + 0.08, z - 0.04], [0.7, bedY + 0.42, z + 0.04]);
   addBox(m, [-0.74, bedY + 0.08, -0.45], [-0.66, bedY + 0.42, 0.45]);
   addBox(m, [0.66, bedY + 0.08, -0.45], [0.74, bedY + 0.42, 0.45]);
-  // Wheels: a disc of spokes as crossed beams, either side of the bed.
+  // Wheels: a rim of short beams round a hub, and three crossed spokes, either side of the bed.
+  const RIM = 10, WR = 0.5;
   for (const z of [-0.55, 0.55]) {
+    for (let k = 0; k < RIM; k++) {
+      const a0 = (k / RIM) * Math.PI * 2, a1 = ((k + 1) / RIM) * Math.PI * 2;
+      addBeam(m, [Math.cos(a0) * WR, 0.5 + Math.sin(a0) * WR, z], [Math.cos(a1) * WR, 0.5 + Math.sin(a1) * WR, z], 0.09, [0, 0, 1], { aoBottom: 0.8 });
+    }
+    addBox(m, [-0.07, 0.43, z - 0.08], [0.07, 0.57, z + 0.08]);
     for (let k = 0; k < 3; k++) {
       const a = (k / 3) * Math.PI + rng.next() * 0.02;
       addBeam(m, [-Math.cos(a) * 0.5, 0.5 - Math.sin(a) * 0.5, z], [Math.cos(a) * 0.5, 0.5 + Math.sin(a) * 0.5, z], 0.07, [0, 0, 1], { aoBottom: 0.8 });
