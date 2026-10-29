@@ -142,13 +142,13 @@ export function seenAt(eye: P2, facing: number, spec: VisionSpec, rays: Float32A
   return Math.max(cone, close) * far;
 }
 
-/** A clear sight line from the eye to a point: nothing solid between them (for "can she see him"). */
-export function lineOfSight(eye: P2, to: P2, blockers: readonly Shape[]): boolean {
+/** A clear sight line from the eye to a point: nothing solid between them (for "can she see him"). `slack` is how close to the end a thing may stand without counting (a torch on a wall). */
+export function lineOfSight(eye: P2, to: P2, blockers: readonly Shape[], slack = 0.05): boolean {
   const dx = to.x - eye.x, dz = to.z - eye.z, d = Math.hypot(dx, dz);
   if (d < 1e-6) return true;
   for (const s of blockers) {
     const h = rayThrough(s, eye.x, eye.z, dx / d, dz / d);
-    if (h && h[0] < d - 0.05) return false;
+    if (h && h[0] < d - slack) return false;
   }
   return true;
 }
@@ -157,4 +157,48 @@ export function lineOfSight(eye: P2, to: P2, blockers: readonly Shape[]): boolea
 export function turnToward(from: number, to: number, step: number): number {
   const gap = ((to - from + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
   return from + Math.max(-step, Math.min(step, gap));
+}
+
+/**
+ * Something that shines (a torch, a fire) and so can be seen from much farther than anything unlit: the patch it
+ * lights up to `radius` metres is seen when the flame itself is in the clear and in front of you, however far.
+ */
+export interface SightLight {
+  x: number;
+  z: number;
+  /** The patch it lights, metres. */
+  radius: number;
+  /** 1 close, fading to 0 at the farthest it can be made out. */
+  strength: number;
+}
+
+/** How far a light can be seen, from how far plain sight reaches: a little farther by day, much farther at night. */
+export const lightReach = (spec: VisionSpec, night: number): number => spec.range * (1.3 + 1.6 * Math.max(0, Math.min(1, night)));
+
+/**
+ * Which of the shining things can be seen: within `lightReach`, inside the cone ahead (not behind you: you would
+ * have to turn), and with nothing solid in the way. Nearest first, at most `max`.
+ */
+export function visibleLights(
+  eye: P2, facing: number, spec: VisionSpec, night: number,
+  candidates: readonly { x: number; z: number; radius: number }[], blockers: readonly Shape[], max = 6,
+): SightLight[] {
+  const reach = lightReach(spec, night);
+  const out: SightLight[] = [];
+  for (const c of candidates) {
+    const d = Math.hypot(c.x - eye.x, c.z - eye.z);
+    if (d > reach || d < 1e-6) continue;
+    if (angleGap(Math.atan2(c.z - eye.z, c.x - eye.x), facing) > spec.fov / 2) continue;
+    if (!lineOfSight(eye, c, blockers, 0.7)) continue;
+    out.push({ ...c, strength: 1 - smooth(reach * 0.85, reach, d) });
+  }
+  out.sort((a, b) => Math.hypot(a.x - eye.x, a.z - eye.z) - Math.hypot(b.x - eye.x, b.z - eye.z));
+  return out.slice(0, max);
+}
+
+/** How much of (x, z) is made out by the light of shining things that are in view, 0..1 (the cone is already checked for the lights). */
+export function litSeenAt(lights: readonly SightLight[], x: number, z: number): number {
+  let k = 0;
+  for (const l of lights) k = Math.max(k, l.strength * (1 - smooth(l.radius * 0.5, l.radius, Math.hypot(x - l.x, z - l.z))));
+  return k;
 }

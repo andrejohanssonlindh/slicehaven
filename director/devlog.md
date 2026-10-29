@@ -1,5 +1,13 @@
 # Devlog
 
+## 2026-10-30 — Session 27b: more filaments, torches seen from afar
+
+- **Eight more aspects** in `core/filaments.ts` (so the hex games get them too): **Thermotropy / Cryotropy** (the hour, night chill and frost, rain, wind; fire warms and takes cold away), **Heliotropy** (the sun: highest at midday, gone at night, clouds and shadows dim it), **Selenotropy** (the moon: its phase from −2 new to +2 full, hidden by cloud), **Astrotropy** (stars: clear nights, washed out by a bright moon, hidden by cloud), **Cosmotropy** (the open night sky), **Iconotropy / Semotropy** (normal; **books** add a little, roads add a little semotropy). Primal and soul aspects are not added (Q24).
+- **Clock feeds them:** `Environment.hour` and `.moon` (`Weather.day` counts days; the moon cycle is 29.5 days; the game starts a few days after new moon).
+- **Night flips cloud on darkness:** by day a cloud adds darkness, at night it takes some away (it hides the moon and stars). Hex tests changed: night rain no longer reads skoto 2.
+- **Books:** `ROOM_BOOKS` in `content/furnish.ts` (herbalist 2, general 1) → a `book` source in the room's back corner. No book art yet.
+- **Torches seen from afar** (`core/world3d/vision.ts`: `visibleLights`, `litSeenAt`, `lightReach`): a flame in front of you (inside the cone) with a clear line is seen out to 1.3× (day) to 2.9× (night) your sight range, with the ground round it (6.5 m torch, 9 m campfire, smaller by day). The shader draws that patch however far; it is remembered on the map; its chunk is built so the ground shows. Up to six lights at once.
+
 ## 2026-10-30 — Session 27: your notes, first pass (necrotropy, wind shelter, a 24 h clock, cone vision, lightning scars)
 
 - **Necrotropy base.** The book gives no ambient figure for death; its sources are corpses, the sick, refuse and rot. The old `Forest −1` was my invention and applied to *every* cell, with `+1.5` leaf litter in forest. Now: **normal (0) everywhere**, **−0.5 "Living wood"** on forest ground, no litter bonus. Corpses and undead read one step higher than before (3 / 2 / 1 where it was 2 / 1 / 0).

@@ -43,4 +43,33 @@ describe('spike3d vision and the explored map', () => {
     expect(await w('w.explored.count')).toBeLessThan(seen0 * 2);
     expect(errors).toEqual([]);
   });
+
+  it('a torch is seen from far beyond plain sight at night, with the ground it lights, but not from behind', async () => {
+    const { page, errors } = await openPage(env, '/spike3d/?world=224&vision=on&nogov');
+    await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 90_000 });
+    const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; return ${fn}; })()`);
+    await w('(w.weather.setHour(0), w.weather.set("clear"), w.dayMinutes = 0, 0)');
+    // Stand 50 m out in front of the door torch, facing it (the house is behind the torch, not in the way).
+    const torch = (await w('({ x: w.fires.find((f) => f.kind === "fire").x, z: w.fires.find((f) => f.kind === "fire").z })')) as { x: number; z: number };
+    const rot = (await w('w.houses[0].built.place.rot')) as number;
+    const fx = Math.sin(rot), fz = Math.cos(rot); // the way the door faces
+    const face = Math.atan2(-fz, -fx);
+    await w(`(w.hero.x = ${torch.x + fx * 50}, w.hero.z = ${torch.z + fz * 50}, w.heroDir = { x: ${-fx}, z: ${-fz} }, w.facing = ${face}, w.focus.x = w.hero.x, w.focus.z = w.hero.z, 0)`);
+    await page.waitForTimeout(2500);
+    const range = (await w('w.spec.range')) as number;
+    expect(range).toBeLessThan(45);
+    expect(await w('w.sightLights.length')).toBeGreaterThan(0);
+    expect(await w(`w.seen(${torch.x}, ${torch.z})`)).toBeGreaterThan(0.2);
+    expect(await w(`w.seen(${torch.x} + 15, ${torch.z})`)).toBe(0);
+    // Look across at the torch from where the hero stands (the camera is let go to the torch).
+    await w(`(w.follow = false, w.focus.x = ${torch.x}, w.focus.z = ${torch.z}, 0)`);
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: `${OUT}vision-torch-far.png` });
+    await w('(w.follow = true, 0)');
+    // Turned away, it is out of sight.
+    await w(`(w.heroDir = { x: ${fx}, z: ${fz} }, w.facing = ${face + Math.PI}, 0)`);
+    await page.waitForTimeout(800);
+    expect(await w(`w.seen(${torch.x}, ${torch.z})`)).toBe(0);
+    expect(errors).toEqual([]);
+  });
 });

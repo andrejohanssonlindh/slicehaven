@@ -32,7 +32,7 @@ import { Weather } from '../engine/weather';
 import { makeFlame, makeOrb } from './fire';
 import { EXPLORED_WINDOW, type LitOpts, SEE_SLOTS, WORLD, exploredTexture, lit, pixTexture, shellOf, sightTexture } from './materials';
 import { SCORCH_SIZE, scorchImage } from '../core/world3d/scorch';
-import { RAYS, type VisionSpec, angleGap, castSight, seenAt, turnToward, visionOf } from '../core/world3d/vision';
+import { RAYS, type SightLight, type VisionSpec, angleGap, castSight, lightReach, litSeenAt, seenAt, turnToward, visibleLights, visionOf } from '../core/world3d/vision';
 import { Rain } from './rain';
 import { type SpriteCard, type WalkCard, blobShadow, spriteCard, walkCard } from './sprites';
 import { type Heat, makeFloorHeat, makeHeat } from './heat';
@@ -182,6 +182,12 @@ export class SpikeWorld {
   readonly rays = new Float32Array(RAYS);
   /** The way the hero faces, radians (atan2(z, x)), eased toward the way they walk. */
   facing = Math.PI / 2;
+  /** Torches and fires that can be made out from far away (see `refreshLights`), and how far that is now. */
+  private sightLights: SightLight[] = [];
+  private lightCands: { x: number; z: number; radius: number }[] = [];
+  private lightsAt: { x: number; z: number; f: number; night: number; at: number } | null = null;
+  private lightsSeen = new Set<string>();
+  lightRange = 0;
   private castAt: { x: number; z: number; range: number; house: number } | null = null;
   private tmpV = new THREE.Vector3();
   /** Where the hero has been (seen within the vision radius): drawn grey where it is out of sight now. */
@@ -197,6 +203,7 @@ export class SpikeWorld {
   forgetMap(): void {
     this.explored.clear();
     this.markedAt = null;
+    this.lightsSeen.clear();
     this.exploredWin.dirty = true;
   }
 
@@ -205,7 +212,13 @@ export class SpikeWorld {
     if (this.vision.outer <= 0 || this.explored.chunkSeen(i, j)) return true;
     const h = this.hero;
     const dx = Math.max(i * CHUNK - h.x, 0, h.x - (i + 1) * CHUNK), dz = Math.max(j * CHUNK - h.z, 0, h.z - (j + 1) * CHUNK);
-    return Math.hypot(dx, dz) <= this.vision.outer + 6;
+    if (Math.hypot(dx, dz) <= this.vision.outer + 6) return true;
+    // The ground round a flame that is in view is drawn, so it must be built.
+    for (const l of this.sightLights) {
+      const lx = Math.max(i * CHUNK - l.x, 0, l.x - (i + 1) * CHUNK), lz = Math.max(j * CHUNK - l.z, 0, l.z - (j + 1) * CHUNK);
+      if (Math.hypot(lx, lz) <= l.radius + 2) return true;
+    }
+    return false;
   }
 
   /** What stops the eye near the hero: trunks and boulders, other houses whole, and the walls of the house they stand in. */
@@ -231,7 +244,49 @@ export class SpikeWorld {
 
   /** How clearly the hero sees a point on the ground, 0..1 (with vision off, fully). */
   seen(x: number, z: number): number {
-    return this.vision.outer <= 0 ? 1 : seenAt(this.hero, this.facing, this.spec, this.rays, x, z);
+    if (this.vision.outer <= 0) return 1;
+    return Math.max(seenAt(this.hero, this.facing, this.spec, this.rays, x, z), litSeenAt(this.sightLights, x, z));
+  }
+
+  /**
+   * The torches and fires in view: asked for from the chunks within reach (rarely: when the hero has gone a few
+   * metres or the light has changed), then checked against the cone and the solid things whenever the hero has
+   * moved or turned. The patches they light are drawn and remembered however far away they are.
+   */
+  private refreshLights(night: number): void {
+    const h = this.hero, c = this.lightsAt;
+    const moved = !c || Math.hypot(h.x - c.x, h.z - c.z) >= 0.4 || angleGap(this.facing, c.f) > 0.12 || Math.abs(night - c.night) > 0.05;
+    if (!moved && this.time - c.at < 1) return;
+    const reach = Math.min(lightReach(this.spec, night), 110);
+    this.lightRange = reach;
+    const dayK = 0.25 + 0.75 * night; // by day a flame lights little
+    const spots = this.lightCands;
+    if (!c || Math.hypot(h.x - c.x, h.z - c.z) >= 3 || this.time - c.at >= 1) {
+      spots.length = 0;
+      for (let j = Math.floor((h.z - reach) / CHUNK); j <= Math.floor((h.z + reach) / CHUNK); j++) {
+        for (let i = Math.floor((h.x - reach) / CHUNK); i <= Math.floor((h.x + reach) / CHUNK); i++) {
+          for (const [x, z] of this.placed.chunk(i, j).torches) spots.push({ x, z, radius: 6.5 * dayK });
+        }
+      }
+      for (const f of this.fires) if (f.kind === 'fire') spots.push({ x: f.x, z: f.z, radius: 6.5 * dayK });
+      for (const k of this.camps) spots.push({ x: k.x, z: k.z, radius: 9 * dayK });
+    }
+    const blockers = this.blockers(reach, this.heroHouse());
+    this.sightLights = visibleLights(h, this.facing, this.spec, night, spots, blockers, 6);
+    // What was seen by flame light is remembered like anything else seen.
+    for (const l of this.sightLights) {
+      const key = `${Math.round(l.x)},${Math.round(l.z)}`;
+      if (this.lightsSeen.has(key)) continue;
+      this.lightsSeen.add(key);
+      if (this.explored.markWhere(l.x, l.z, l.radius * 0.8, () => true) > 0) this.exploredWin.dirty = true;
+    }
+    const slots = WORLD.uLights.value;
+    slots.forEach((s, i) => {
+      const l = this.sightLights[i];
+      if (l) s.set(l.x, l.z, l.radius, l.strength);
+      else s.set(0, 0, 0, 0);
+    });
+    this.lightsAt = { x: h.x, z: h.z, f: this.facing, night, at: this.time };
   }
 
   /** Record what the hero can see, and keep the window the shader reads centred on the view. */
@@ -1390,6 +1445,7 @@ export class SpikeWorld {
       this.facing = turnToward(this.facing, Math.atan2(this.heroDir.z, this.heroDir.x), 7 * dt);
       this.spec = visionOf({ alertness: this.alertness, night: env.night, cap: this.vision.outer });
       this.castRays();
+      this.refreshLights(env.night);
       const sp = this.spec;
       WORLD.uVision.value.set(this.hero.x, this.hero.z, sp.range * 0.7, sp.range);
       WORLD.uSight.value.set(this.facing, sp.fov / 2, sp.edge, sp.near);
@@ -1413,7 +1469,7 @@ export class SpikeWorld {
 
     // Torches flicker; real point lights only for the nearest few.
     // (Distances are measured once each, not inside the sort: a sort asks for them n log n times, and each ask made a vector.)
-    const far = this.vision.outer > 0 ? this.vision.outer + 8 : Infinity;
+    const far = this.vision.outer > 0 ? Math.max(this.vision.outer, this.lightRange) + 8 : Infinity;
     const order = this.torches.map((t) => ({ t, d: t.light.getWorldPosition(this.tmpV).distanceTo(this.focus) })).sort((a, b) => a.d - b.d);
     order.forEach(({ t, d }, i) => {
       t.light.visible = i < this.settings.lights && d < far;

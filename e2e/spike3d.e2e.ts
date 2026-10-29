@@ -125,8 +125,8 @@ describe('spike3d filaments', () => {
     // The hero reads the same field the overlay draws.
     const r = await page.evaluate(() => { const w = (window as any).spike.world; return w.field.readAt(w.hero.x, w.hero.z).pyro.level as number; });
     expect(r).toBeGreaterThanOrEqual(-2);
-    // Off again after darkness: no overlay left.
-    for (let k = 0; k < 2; k++) await clickBtn(page, 'Filaments');
+    // Off again after the last aspect (there are sixteen now, pyro is the seventh): no overlay left.
+    for (let k = 0; k < 10; k++) await clickBtn(page, 'Filaments');
     expect(await page.evaluate(() => (window as any).spike.world.shownAspect)).toBeNull();
     expect(errors).toEqual([]);
   });

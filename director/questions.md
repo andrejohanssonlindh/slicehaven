@@ -4,7 +4,7 @@ Newest on top. Answer in chat (just reference the number, e.g. "Q11: option B").
 
 ---
 
-### Q24 — "Add all filaments": how far? *(open)*
+### Q24 — "Add all filaments": how far? *(answered: do the reasonable ones; see [decisions](decisions.md))*
 The book names 22 aspects; the field has the 8 that come from the ground, the weather and the living. The rest need a source in the world before a number means anything. My proposal, by group (say which, or "all"):
 
 - **Grundkrafter: heat and cold** (Termotropi, Kryotropi): from fire, sun, season, snow, water. Cheap, and they tie into the clock (warm noon, cold night). *I'd do these first.*

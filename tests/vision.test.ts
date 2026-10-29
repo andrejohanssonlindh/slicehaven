@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RAYS, angleGap, castSight, lineOfSight, rayThrough, seenAt, sightAlong, turnToward, visionOf } from '../src/core/world3d/vision';
+import { RAYS, angleGap, lightReach, litSeenAt, visibleLights, castSight, lineOfSight, rayThrough, seenAt, sightAlong, turnToward, visionOf } from '../src/core/world3d/vision';
 import type { Shape } from '../src/core/world3d/space';
 import { Explored } from '../src/core/world3d/explored';
 
@@ -77,5 +77,24 @@ describe('vision', () => {
     expect(n).toBeGreaterThan(0);
     expect(e.has(2.5, 0.5)).toBe(true);
     expect(e.has(-2.5, 0.5)).toBe(false);
+  });
+
+  it('a torch is seen from far beyond plain sight, at night most of all, when ahead of you and in the clear', () => {
+    const spec = visionOf({ alertness: 10 });
+    expect(lightReach(spec, 1)).toBeGreaterThan(lightReach(spec, 0));
+    expect(lightReach(spec, 0)).toBeGreaterThan(spec.range);
+    const far = spec.range * 2; // twice as far as the eye reaches
+    const torch = { x: far, z: 0, radius: 6 };
+    const seen = visibleLights(eye, 0, spec, 1, [torch], []);
+    expect(seen).toHaveLength(1);
+    expect(litSeenAt(seen, far, 0)).toBeGreaterThan(0.3);
+    expect(litSeenAt(seen, far + 3, 0)).toBeGreaterThan(0); // what is close to it too
+    expect(litSeenAt(seen, far + 20, 0)).toBe(0);
+    expect(seenAt(eye, 0, spec, castSight(eye, spec.range, []), far, 0)).toBe(0); // unlit, the same spot is not seen
+    expect(visibleLights(eye, Math.PI, spec, 1, [torch], [])).toHaveLength(0); // behind you
+    expect(visibleLights(eye, 0, spec, 1, [torch], [{ kind: 'box', x: far / 2, z: 0, hw: 0.2, hd: 3, rot: 0 }])).toHaveLength(0); // behind a wall
+    expect(visibleLights(eye, 0, spec, 1, [{ ...torch, x: lightReach(spec, 1) + 5 }], [])).toHaveLength(0); // too far even for a flame
+    // A torch on a wall of the house it is on is not hidden by that wall.
+    expect(visibleLights(eye, 0, spec, 1, [{ x: far, z: 0, radius: 6 }], [{ kind: 'box', x: far + 1, z: 0, hw: 1.2, hd: 3, rot: 0 }])).toHaveLength(1);
   });
 });
