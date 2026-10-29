@@ -10,7 +10,7 @@ import type { FSource } from './filaments3d';
  * The renderer turns clumps into lumpy balls, as it does for trees.
  */
 
-export type PropKind = 'shrub' | 'boulder' | 'woodpile' | 'crates' | 'well' | 'fence' | 'cart';
+export type PropKind = 'shrub' | 'boulder' | 'woodpile' | 'crates' | 'well' | 'fence' | 'cart' | 'laundry';
 
 export interface PlacedProp {
   kind: PropKind;
@@ -20,7 +20,7 @@ export interface PlacedProp {
   rot?: number;
   /** Scale, 1 = the base size. */
   size?: number;
-  /** Fences: the run's length in metres (default 4). */
+  /** Fences and washing lines: the run's length in metres (default 4). */
   len?: number;
   seed: number;
 }
@@ -152,6 +152,37 @@ export function buildCart(seed: number): MeshData {
   return m;
 }
 
+/** Cloth colours on a washing line (linen, rust, blue, ochre): each a mesh of its own so each gets its own material. */
+export const LAUNDRY_COLOURS = [0xe8e2d0, 0xb4603c, 0x4f6f94, 0xc9a24a];
+/** Where a washing line's cloth hangs from, and how far it drops (local metres). */
+export const LAUNDRY_HANG = { top: 1.55, drop: 0.7 };
+
+/** A washing line: two posts, a sagging rope, and cloths hanging from it. The cloths sway in the wind (hanging sway). */
+export function buildLaundry(len: number, seed: number): { wood: MeshData; cloths: { colour: number; mesh: MeshData }[] } {
+  const rng = Rng.fromSeed(seed);
+  const wood = emptyMesh();
+  const { top, drop } = LAUNDRY_HANG;
+  for (const x of [-len / 2, len / 2]) addBeam(wood, [x, 0, 0], [x, top + 0.1, 0], 0.1, [0, 0, 1], { aoBottom: 0.7 });
+  // The rope in short straight runs that sag in the middle.
+  const SEG = 8;
+  const sag = (x: number): number => 0.12 * (1 - (x / (len / 2)) ** 2);
+  for (let i = 0; i < SEG; i++) {
+    const x0 = -len / 2 + (i / SEG) * len, x1 = -len / 2 + ((i + 1) / SEG) * len;
+    addBeam(wood, [x0, top - sag(x0), 0], [x1, top - sag(x1), 0], 0.025, [0, 0, 1]);
+  }
+  const cloths = LAUNDRY_COLOURS.map((colour) => ({ colour, mesh: emptyMesh() }));
+  let x = -len / 2 + 0.3;
+  while (x < len / 2 - 0.5) {
+    const w = 0.35 + rng.next() * 0.3;
+    const h = drop * (0.6 + rng.next() * 0.4);
+    const c = cloths[Math.floor(rng.next() * cloths.length)];
+    const y1 = top - sag(x + w / 2);
+    addBox(c.mesh, [x, y1 - h, -0.015], [x + w, y1, 0.015], { aoBottom: 0.85 });
+    x += w + 0.12 + rng.next() * 0.2;
+  }
+  return { wood, cloths: cloths.filter((c) => c.mesh.positions.length > 0) };
+}
+
 /** What blocks feet. */
 export function propShape(p: PlacedProp): Shape {
   const s = sizeOf(p);
@@ -160,6 +191,7 @@ export function propShape(p: PlacedProp): Shape {
     case 'woodpile': return { kind: 'box', x: p.x, z: p.z, hw: 0.9 * s, hd: 0.55 * s, rot };
     case 'crates': return { kind: 'box', x: p.x, z: p.z, hw: 0.6 * s, hd: 0.35 * s, rot };
     case 'cart': return { kind: 'box', x: p.x, z: p.z, hw: 0.8 * s, hd: 0.55 * s, rot };
+    case 'laundry':
     case 'fence': return { kind: 'box', x: p.x, z: p.z, hw: ((p.len ?? 4) / 2) * s, hd: 0.1, rot };
     case 'well': return circle(p.x, p.z, 0.85 * s);
     default: return circle(p.x, p.z, (p.kind === 'boulder' ? 0.75 : 0.5) * s);

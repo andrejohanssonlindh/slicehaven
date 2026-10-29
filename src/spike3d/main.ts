@@ -173,6 +173,10 @@ function buildControls(): void {
   });
   // The hero's Alertness: how far and how wide they see.
   button('row-perf', () => t('spike.alertness', 'Alertness {n}', { n: world.alertness }), () => world.alertness !== 10, () => { world.alertness = cycle([4, 7, 10, 14, 18], world.alertness); });
+  // Mist on demand (what a spell will do): off leaves it to the weather.
+  button('row-perf', () => (world.mistAmount > 0 ? t('spike.mist', 'Fog {n}%', { n: Math.round(world.mistAmount * 100) }) : t('spike.mistoff', 'Fog: weather')), () => world.mistAmount > 0, () => {
+    world.setMist(cycle([0, 0.25, 0.5, 0.75, 1], world.mistAmount));
+  });
   button('row-perf', () => t('spike.forget', 'Forget map'), () => false, () => { world.forgetMap(); });
   button('row-perf', () => t('spike.tier', 'Tier: {n}', { n: tier.name }), () => false, () => {
     setTier(cycle(['low', 'medium', 'high'] as TierName[], tier.name));

@@ -22,7 +22,7 @@ import { PlacedIndex } from '../core/world3d/placed';
 import { footprints } from '../core/world3d/roomplan';
 import { type HouseEntry, HouseIndex } from '../core/world3d/houses';
 import type { MeshData } from '../core/world3d/mesh';
-import { type PlacedProp, buildBoulder, buildCart, buildCrates, buildFence, buildShrub, buildWell, buildWoodpile } from '../core/world3d/props';
+import { LAUNDRY_HANG, type PlacedProp, buildBoulder, buildCart, buildCrates, buildFence, buildLaundry, buildShrub, buildWell, buildWoodpile } from '../core/world3d/props';
 import { cloudDrift, cloudThreshold } from '../core/world3d/sky';
 import { NavGrid, type P2, type Shape, findPath, followPath, pathLength } from '../core/world3d/space';
 import { type Ground3D, groundHeight, lakeDist, splatAt } from '../core/world3d/terrain';
@@ -378,6 +378,25 @@ export class SpikeWorld {
   /** The camera follows the hero while it walks, until the player drags the view. */
   follow = false;
   private wet = 0;
+  /** Mist asked for, 0..1 (0 leaves it to the weather), and the eased value in use. */
+  private mist = 0;
+  private mistNow = 0;
+  private mistTint: THREE.Color | null = null;
+  private mistTintK = 1;
+
+  /**
+   * Call up mist over the whole view: 0 is only what the weather gives, 1 is a wall of it a few metres out.
+   * `tint` (sRGB hex) colours it instead of the sky's fog (a spell's haze); `tintK` how strongly. It eases in and out.
+   */
+  setMist(amount: number, tint?: number | null, tintK = 1): void {
+    this.mist = Math.min(1, Math.max(0, amount));
+    this.mistTint = tint == null ? null : new THREE.Color().setHex(tint, THREE.SRGBColorSpace);
+    this.mistTintK = tintK;
+  }
+
+  get mistAmount(): number {
+    return this.mist;
+  }
   private time = 0;
   /** Real minutes for a whole day; 0 stops the clock. */
   dayMinutes = 0;
@@ -720,6 +739,7 @@ export class SpikeWorld {
   private stoneMat: THREE.MeshLambertMaterial | null = null;
   private logMat: THREE.MeshLambertMaterial | null = null;
   private shrubMat: THREE.MeshLambertMaterial | null = null;
+  private clothMats = new Map<number, THREE.MeshLambertMaterial>();
   private wellWater: THREE.MeshLambertMaterial | null = null;
 
   /** A shrub, boulder or woodpile, standing on the ground where it is placed. */
@@ -737,6 +757,19 @@ export class SpikeWorld {
     else if (p.kind === 'crates') solid(buildCrates(p.seed), this.logMat);
     else if (p.kind === 'fence') solid(buildFence(p.len ?? 4, p.seed), this.logMat);
     else if (p.kind === 'cart') solid(buildCart(p.seed), this.logMat);
+    else if (p.kind === 'laundry') {
+      const l = buildLaundry(p.len ?? 3, p.seed);
+      solid(l.wood, this.logMat);
+      for (const c of l.cloths) {
+        // One material per colour, shared; the cloth swings from the line.
+        let mat = this.clothMats.get(c.colour);
+        if (!mat) {
+          mat = lit({ map: tex(plasterTex(5)), color: c.colour, ao: true, wettable: true, sway: { from: LAUNDRY_HANG.top, amount: 0.22, hang: true } });
+          this.clothMats.set(c.colour, mat);
+        }
+        solid(c.mesh, mat);
+      }
+    }
     else if (p.kind === 'well') {
       const w = buildWell();
       solid(w.stone, this.stoneMat);
@@ -1640,8 +1673,16 @@ export class SpikeWorld {
     this.hemi.intensity = env.ambient;
     const fogC = lin(env.fog);
     this.fog.color.copy(fogC);
-    this.fog.near = CAM_DIST + env.fogNear - 30;
-    this.fog.far = CAM_DIST + env.fogFar;
+    // Mist: what is asked for (`setMist`, for magic and scenes) or what the weather gives by itself (rain), whichever is thicker,
+    // eased so it rolls in and out. It thickens the distance fog and lies low on the ground.
+    const wantMist = Math.max(this.mist, 0.3 * Math.min(1, w.rain));
+    this.mistNow += (wantMist - this.mistNow) * (1 - Math.exp(-dt / 2.5));
+    const m = this.mistNow;
+    this.fog.near = CAM_DIST + THREE.MathUtils.lerp(env.fogNear - 30, -6, m);
+    this.fog.far = CAM_DIST + THREE.MathUtils.lerp(env.fogFar, 22, m);
+    WORLD.uMist.value.set(m, 2.2 + m * 1.6, groundHeight(this.ground, this.focus.x, this.focus.z), this.mistTint ? this.mistTintK : 0);
+    WORLD.uMistAt.value.set(this.focus.x, this.focus.z);
+    if (this.mistTint) WORLD.uMistColor.value.set(this.mistTint.r, this.mistTint.g, this.mistTint.b);
     // With vision on, what lies past it is black, not sky.
     this.scene.background = this.vision.outer > 0 ? fogC.clone().multiplyScalar(0.05) : fogC;
     // Sight is the hero's, not the camera's: a cone ahead, a circle round, the dark shortening it, solid things in the way.

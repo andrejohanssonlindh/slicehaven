@@ -1,5 +1,12 @@
 # Devlog
 
+## 2026-10-30 — Rest of M4: mist with an intensity, wet glints, a washing line
+
+- **Mist** (`SpikeWorld.setMist(amount, tint?, tintK?)`, 0..1): 0 leaves it to the weather (rain gives about 0.3 by itself), 1 is a wall a few metres out. It thickens the distance fog *and* lies low on the ground (shader: `uMist`, `uMistAt` in `engine3d/materials.ts`; thinnest at the view's focus so the hero stays readable, thicker with distance, thinning with height above the ground). `tint` (sRGB hex) colours it for a spell's haze. It eases in and out over a few seconds, and `world.mistAmount` reads the ask. The spike page has a **Fog** button (weather / 25 / 50 / 75 / 100%). For magic: call `setMist` from whatever casts.
+- **Wet glints:** sparse pixel sparkles on upward-facing wet surfaces, in the sun, more in pools; none at night or in cloud shade.
+- **Washing line** (`laundry` prop, `buildLaundry`, `LAUNDRY_COLOURS`): two posts, a sagging rope, cloths in four colours that swing from the line in the wind (new `hang` option on `sway`). One in the spike map south of the road (15.5, 9.5). It blocks feet like a fence.
+- e2e now shoots `spike3d-laundry.png` and `spike3d-mist.png`.
+
 ## 2026-10-30 — M4: rain splashes and wind-blown leaves
 
 - Most of M4 was already there (continuous clock, clouds, rain, wind sway, lightning, fog, wetness from `environment()`). What the brief still asked for and was missing is now in: **splashes** where rain lands (`Rain`: a ring of 140 tiny crosses that open and fade, on the real ground height via `groundAt`; 12% of drops splash) and **falling leaves** (`engine3d/leaves.ts`: up to 48 flat bits that come loose above wind force 0.3, tumble downwind and sink; none in still air, dimmer at night). Smoke already leans with the wind (M3).

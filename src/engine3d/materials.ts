@@ -15,6 +15,11 @@ export const WORLD = {
   /** x: cloud threshold, y: how much a cloud dims the sun, zw: drift offset (metres). */
   uCloud: { value: new THREE.Vector4(0.7, 0.7, 0, 0) },
   uWet: { value: 0 },
+  /** Ground mist: x how thick (0..1), y how high it stands above the ground (metres), z the ground level at the focus, w how much `uMistColor` tints it instead of the sky's fog colour (0..1; magic). */
+  uMist: { value: new THREE.Vector4(0, 2.2, 0, 0) },
+  /** Where the mist is thinnest (the view's focus, xz) and its tint, used when `uMist.w` > 0. */
+  uMistAt: { value: new THREE.Vector2(0, 0) },
+  uMistColor: { value: new THREE.Vector3(0.7, 0.72, 0.76) },
   /** xy: wind direction × strength, z: gustiness. */
   uWind: { value: new THREE.Vector3(0.2, 0, 0.5) },
   /** The camera's offset in whole rendered pixels, so screen-space noise stays put on the world. */
@@ -99,7 +104,7 @@ export interface LitOpts {
   /** Vertex AO in the colour attribute. */
   ao?: boolean;
   /** Sway with the wind above this height (local metres); undefined = rigid. */
-  sway?: { from: number; amount: number };
+  sway?: { from: number; amount: number; /** Hangs from `from` and swings below it (cloth on a line). */ hang?: boolean };
   /** Gets darker and glossier in the rain. */
   wettable?: boolean;
   /** Standing water collects in the flat low patches of this surface once it is wet (the ground). */
@@ -124,7 +129,7 @@ export interface ShellOpts {
 }
 
 function patch(mat: THREE.MeshLambertMaterial, o: LitOpts, shell?: ShellOpts): void {
-  const key = `lit:${o.sway ? `s${o.sway.from},${o.sway.amount}` : ''}:${o.wettable ? 'w' : ''}${o.puddles ? 'p' : ''}:${shell ? `sh${shell.layer},${shell.offset},${shell.density},${shell.tint}` : ''}:${o.seeThrough ? 'v' : ''}`;
+  const key = `lit:${o.sway ? `s${o.sway.from},${o.sway.amount}${o.sway.hang ? 'h' : ''}` : ''}:${o.wettable ? 'w' : ''}${o.puddles ? 'p' : ''}:${shell ? `sh${shell.layer},${shell.offset},${shell.density},${shell.tint}` : ''}:${o.seeThrough ? 'v' : ''}`;
   mat.customProgramCacheKey = () => key;
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, WORLD);
@@ -143,7 +148,7 @@ ${o.sway ? `{
   wb = instanceMatrix * wb;
   #endif
   wb = modelMatrix * wb;
-  float hgt = max(0.0, transformed.y - ${o.sway.from.toFixed(2)});
+  float hgt = ${o.sway.hang ? `max(0.0, ${o.sway.from.toFixed(2)} - transformed.y)` : `max(0.0, transformed.y - ${o.sway.from.toFixed(2)})`};
   float ph = uTime * 1.7 + wb.x * 0.31 + wb.z * 0.27 + transformed.x * 0.4;
   float s = (sin(ph) * 0.6 + sin(ph * 2.3 + 1.1) * 0.4 * uWind.z) * ${o.sway.amount.toFixed(3)} * hgt * (0.25 + length(uWind.xy));
   transformed.x += s + uWind.x * hgt * ${(o.sway.amount * 0.5).toFixed(3)};
@@ -165,6 +170,9 @@ ${o.sway ? `{
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
 uniform float uWet;
+uniform vec4 uMist;
+uniform vec2 uMistAt;
+uniform vec3 uMistColor;
 uniform float uTime;
 uniform float uPixWorld;
 uniform vec2 uCamPix;
@@ -181,6 +189,22 @@ uniform vec4 uSee[${SEE_SLOTS}];
 ${NOISE_GLSL}`)
       // What is in sight is as it is; what was seen before is remembered in grey; the rest is black.
       .replace('#include <fog_fragment>', `#include <fog_fragment>
+${o.wettable ? `if (uWet > 0.05) {
+  // Wet things glint: sparse pixel-sized sparkles on upward faces that shimmer and are brightest in the sun, strongest in pools.
+  vec3 gn = normalize(cross(dFdx(vWPos), dFdy(vWPos)));
+  vec2 gc = floor(vWPos.xz / uPixWorld);
+  float gr = shHash(int(gc.x), int(gc.y), 5 + int(floor(uTime * 2.0)));
+  float spark = step(0.993 - poolMask * 0.03, gr);
+  float day = clamp(uCloud.y / 0.72, 0.0, 1.0);
+  gl_FragColor.rgb += vec3(0.85, 0.92, 1.0) * spark * smoothstep(0.7, 0.95, gn.y) * uWet * cloudSun * day * (0.25 + poolMask * 0.5);
+}` : ''}
+{
+  // Mist: thick near the ground and thinning upward, thicker with distance from the focus, so the hero's own spot stays readable.
+  float md = length(vWPos.xz - uMistAt);
+  float mh = 1.0 - smoothstep(0.0, uMist.y, vWPos.y - uMist.z);
+  float mk = uMist.x * mix(0.25, 1.0, mh) * smoothstep(1.5, mix(34.0, 9.0, uMist.x), md);
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, mix(fogColor, uMistColor, uMist.w), clamp(mk, 0.0, 0.92));
+}
 if (uVision.w > 0.0) {
   // In sight: close by, or in the cone ahead; out to the range; and not behind something solid.
   vec2 dv = vWPos.xz - uVision.xy;
@@ -208,6 +232,7 @@ if (uVision.w > 0.0) {
   gl_FragColor.rgb = mix(remembered, gl_FragColor.rgb, seen);
 }`)
       .replace('#include <color_fragment>', `#include <color_fragment>
+float poolMask = 0.0;
 ${o.seeThrough ? `for (int i = 0; i < ${SEE_SLOTS}; i++) {
   vec4 s = uSee[i];
   // Only what is nearer the camera than the person, and inside the oval around them.
@@ -234,6 +259,7 @@ ${o.puddles ? `if (uWet > 0.3) {
   float ripple = uWet > 0.55 ? 0.5 + 0.5 * sin(length(pp - floor(pp * 0.9 + 0.5) / 0.9) * 40.0 - uTime * 6.0) : 0.0;
   vec3 water = vec3(0.13, 0.18, 0.25) + vec3(0.07, 0.09, 0.12) * smoothstep(edge, edge + 0.1, pool) + ripple * 0.03;
   diffuseColor.rgb = mix(diffuseColor.rgb, water, inPool * 0.8);
+  poolMask = inPool;
 }` : ''}
 ${shell ? `{
   // Locked to the world's pixel grid; cells are 1 × 2 pixels, so the fringe reads as strands.

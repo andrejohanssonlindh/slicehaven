@@ -41,6 +41,14 @@ describe('spike3d', () => {
     await page.waitForTimeout(4000);
     await page.screenshot({ path: `${OUT}spike3d-rain.png` });
     await clickBtn(page, 'Clear');
+    // Mist on demand, looking at the washing line.
+    await page.evaluate(() => { const w = (window as any).spike.world; w.follow = false; w.focus.x = 15.5; w.focus.z = 7; });
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: `${OUT}spike3d-laundry.png` });
+    await page.evaluate(() => (window as any).spike.world.setMist(0.6));
+    await page.waitForTimeout(5000);
+    await page.screenshot({ path: `${OUT}spike3d-mist.png` });
+    await page.evaluate(() => { const w = (window as any).spike.world; w.setMist(0); w.follow = true; });
     await clickBtn(page, 'Inside');
     await page.locator('#zoom button[data-zoom="1"]').click();
     await page.waitForTimeout(2500);

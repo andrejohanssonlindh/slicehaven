@@ -53,6 +53,7 @@ export const SPIKE_MAP: MapSpec = {
     { kind: 'fence', x: 0, z: -7.5, rot: 0, len: 6, seed: 2 },
     { kind: 'crates', x: -18.4, z: 0.6, rot: -0.05, seed: 5 },
     { kind: 'cart', x: 10, z: -1.6, rot: 0.3, seed: 6 },
+    { kind: 'laundry', x: 15.5, z: 9.5, rot: 0.1, len: 3.2, seed: 12 },
   ],
   hero: [2.4, 1.2],
   walk: [[-12, 5.6], [-3, 5.0], [6, 5.8], [12, 4.8]],
