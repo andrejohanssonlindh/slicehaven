@@ -1,7 +1,7 @@
 import { fbm } from '../noise';
 import { Rng } from '../rng';
 import { CHUNK } from './chunks';
-import type { House3DSpec, RoofKind, WallKind } from './house';
+import { type House3DSpec, type HousePlan, PLAN_SIZE, type RoofKind, type WallKind } from './house';
 import { type Layout, type PlacedHouse, type PlacedTree, buildHouses, houseOuterBox, houseToWorld, layoutObstacles, layoutPads, layoutShade } from './layout';
 import { type ChunkContent, type ChunkGenerator, PlacedIndex } from './placed';
 import { type PlacedProp } from './props';
@@ -51,6 +51,8 @@ export interface MapHouse {
   walls?: WallKind;
   wallH?: number;
   seed?: number;
+  /** A bigger building: the inn, the shop or the stable (they have their own size, and `size` is ignored). */
+  plan?: HousePlan;
   at: HouseAt;
 }
 
@@ -250,8 +252,8 @@ export function compileMap(spec: MapSpec): CompiledMap {
 
   // Houses.
   const houses: PlacedHouse[] = spec.houses.map((h) => {
-    const dims = typeof h.size === 'object' ? h.size : SIZES[h.size ?? 'medium'];
-    const hs: House3DSpec = { seed: h.seed ?? hashStr(h.id) % 1000, width: dims.width, depth: dims.depth, wallH: h.wallH ?? 2.5, roof: h.roof ?? 'thatch', walls: h.walls };
+    const dims = h.plan && h.plan !== 'cottage' ? PLAN_SIZE[h.plan] : typeof h.size === 'object' ? h.size : SIZES[h.size ?? 'medium'];
+    const hs: House3DSpec = { seed: h.seed ?? hashStr(h.id) % 1000, width: dims.width, depth: dims.depth, wallH: h.wallH ?? 2.5, roof: h.roof ?? 'thatch', walls: h.walls, plan: h.plan };
     if ('road' in h.at) {
       const road = spec.roads[h.at.road];
       if (!road) {

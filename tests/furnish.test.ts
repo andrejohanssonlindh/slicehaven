@@ -3,11 +3,13 @@ import { type RoomSet, RECIPES, furnish } from '../src/content/furnish';
 import { buildHouse } from '../src/core/world3d/house';
 import { DOOR_CLEAR, type PieceIn, type RoomRect, footprints, planRoom } from '../src/core/world3d/roomplan';
 
-const SETS = [...Object.keys(RECIPES), 'smithy'] as RoomSet[];
+/** Rooms of the bigger buildings are tested in their own buildings (`buildings.test.ts`), not in a cottage. */
+const BIG = ['guestroom', 'landing', 'attic', 'upstairs', 'stall', 'aisle'];
+const SETS = [...Object.keys(RECIPES).filter((k) => !BIG.includes(k)), 'smithy'] as RoomSet[];
 /** House sizes that houses actually come in (width × depth, metres). */
 const SIZES: [number, number][] = [[5, 4], [5.4, 4.2], [6.2, 4.6], [7.4, 5]];
 /** From what width a room takes the whole recipe (the inn wants room for its tables). */
-const COMFORT: Partial<Record<RoomSet, number>> = { inn: 7.4 };
+const COMFORT: Partial<Record<RoomSet, number>> = { inn: 9 };
 
 const overlaps = (a: { x: number; z: number; hw: number; hd: number }, b: { x: number; z: number; hw: number; hd: number }): boolean =>
   Math.abs(a.x - b.x) < a.hw + b.hw && Math.abs(a.z - b.z) < a.hd + b.hd;

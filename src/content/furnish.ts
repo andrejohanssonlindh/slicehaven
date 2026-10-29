@@ -2,14 +2,17 @@ import {
   makeBasket, makeBucketBroom, makeCloakPegs, makeClutter, makeCookhearth, makeFootlocker, makeHanging, makeKeg, makeKindling, makePallet,
   makeRagRug, makeRoughShelf, makeSacks, makeStool3, makeStrawBits, makeTrestleTable,
 } from '../art/humble';
+import { makeGuestBed } from '../art/guest';
 import { smithyItems } from '../art/interior';
+import { makeHayBale, makeHayRack, makeHorse } from '../art/stable';
 import type { Prop } from '../art/grit';
 import {
   makeAleKegs, makeBakeOven, makeCounter, makeCrateStack, makeFishRack, makeFishTubs, makeHerbRack, makeHooks, makeHungNet, makeInnBench,
   makeKneadTrough, makeLongTable, makeLoom, makeMortarBench, makeNetHeap, makeWallShelves,
 } from '../art/shopItems';
 import type { CounterKind, ShelfKind } from '../art/shopItems';
-import { type PieceIn, type RoomPlan, type RoomRect, type Rule, planRoom } from '../core/world3d/roomplan';
+import type { HouseModel, LevelRoom } from '../core/world3d/house';
+import { type PieceIn, type PlanOpts, type RoomPlan, type RoomRect, type Rule, planRoom } from '../core/world3d/roomplan';
 import type { SourceKind } from '../core/world3d/filaments3d';
 import { TEXELS_PER_M } from '../core/world3d/tiers';
 
@@ -20,7 +23,10 @@ import { TEXELS_PER_M } from '../core/world3d/tiers';
  * places. Sizes are measured from the sprites, so a new piece needs no numbers.
  */
 
-export type RoomSet = 'home' | 'fisher' | 'inn' | 'bakery' | 'herbalist' | 'fishmonger' | 'general' | 'weaver' | 'smithy';
+export type RoomSet =
+  | 'home' | 'fisher' | 'inn' | 'bakery' | 'herbalist' | 'fishmonger' | 'general' | 'weaver' | 'smithy'
+  // Rooms upstairs and in the stable (see `roleSet`).
+  | 'guestroom' | 'landing' | 'attic' | 'upstairs' | 'stall' | 'aisle';
 
 interface PieceDef {
   make: () => Prop;
@@ -68,6 +74,11 @@ export const PIECES = {
   rug: flat(() => makeRagRug()),
   straw: flat(() => makeStrawBits()),
   litter: flat(() => makeClutter()),
+  // A guest's bed is the old, handsome one (a frame, a tick, a blanket); the village's own is the pallet.
+  bed: floor(() => makeGuestBed(), 1.25, 2.0),
+  horse: floor(() => makeHorse(), 1.0, 1.4),
+  hay: floor(() => makeHayBale(), 0.7, 1.0),
+  hayRack: hung(() => makeHayRack(), 1.2),
 } satisfies Record<string, PieceDef>;
 
 export type PieceKey = keyof typeof PIECES;
@@ -97,6 +108,8 @@ interface Line {
   seed?: number;
   /** Tells two lines of the same piece apart (the stool at the table's front, the stool at its back). */
   tag?: string;
+  /** The art takes the room's own seed too, so each room (each stall's horse) looks different. */
+  vary?: boolean;
 }
 
 const back = (x?: number): Rule => ({ at: 'back', x });
@@ -141,6 +154,84 @@ export const RECIPES: Record<Exclude<RoomSet, 'smithy'>, Line[]> = {
     { piece: 'keg', rule: side('right', 0.5) },
     { piece: 'broom', rule: side('right', 0.15) },
     { piece: 'rug', rule: center(0.2, 0.1) },
+    // A big common room has a second long table, and more to sit at.
+    { piece: 'longTable', tag: 'b', seed: 5, rule: center(-2.6, 0.3) },
+    { piece: 'bench', tag: 'b1', seed: 2, rule: { at: 'around', of: 'longTable@b', side: 'front' } },
+    { piece: 'bench', tag: 'b2', seed: 3, rule: { at: 'around', of: 'longTable@b', side: 'back' } },
+    { piece: 'table', tag: 'c', rule: side('right', 0.2) },
+    { piece: 'stool', tag: 'c', rule: { at: 'around', of: 'table@c' } },
+    { piece: 'keg', tag: 'b', rule: corner('frontRight') },
+    { piece: 'crates', rule: side('left', 0.15) },
+    { piece: 'hanging', rule: back(0.75), lift: 30 },
+    { piece: 'basket', rule: free },
+  ],
+  // The inn's guest rooms: a bed or two, a chest at the foot, a place to hang a cloak.
+  guestroom: [
+    { piece: 'bed', vary: true, rule: back(0) },
+    { piece: 'bed', tag: 'second', vary: true, seed: 3, rule: { at: 'around', of: 'bed', side: 'front' } },
+    { piece: 'footlocker', rule: side('right', 0.6) },
+    { piece: 'stool', rule: side('left', 0.7) },
+    { piece: 'pegs', rule: back(0.8), lift: 4 },
+    { piece: 'shelf', rule: back(0.5), lift: 40 },
+    { piece: 'rug', rule: center(0, 0.2) },
+    { piece: 'basket', rule: free },
+  ],
+  // The corridor upstairs: not much, but not bare.
+  landing: [
+    { piece: 'bench', rule: back(0.75) },
+    { piece: 'footlocker', rule: back(0.95) },
+    { piece: 'hanging', rule: back(0.55), lift: 24 },
+    { piece: 'pegs', rule: back(0.3), lift: 6 },
+    { piece: 'broom', rule: back(0.45) },
+  ],
+  // Under the roof: a row of beds for those who pay least, and the inn's spare stores.
+  attic: [
+    { piece: 'bed', n: 4, vary: true, rule: back(0) },
+    { piece: 'pallet', n: 2, rule: side('right', 0.7) },
+    { piece: 'footlocker', n: 2, rule: side('left', 0.6) },
+    { piece: 'sacks', rule: corner('frontRight') },
+    { piece: 'keg', rule: corner('backLeft') },
+    { piece: 'crates', rule: free },
+    { piece: 'rug', rule: center(0, 0.1) },
+    { piece: 'pegs', rule: back(0.9), lift: 4 },
+    { piece: 'basket', rule: free },
+  ],
+  // The rooms over a shop: the shopkeeper's home (a bed behind the hearth, table, chest).
+  upstairs: [
+    { piece: 'hearth', rule: corner('backRight'), fire: true },
+    { piece: 'bed', vary: true, rule: corner('backLeft') },
+    { piece: 'shelf', rule: back(0.5), lift: 22, books: 1 },
+    { piece: 'pegs', rule: back(0.72), lift: 4 },
+    { piece: 'hanging', rule: back(0.3), lift: 30 },
+    { piece: 'rug', rule: center() },
+    { piece: 'table', rule: center() },
+    { piece: 'stool', tag: 'front', rule: { at: 'around', of: 'table', side: 'front' } },
+    { piece: 'stool', tag: 'back', rule: { at: 'around', of: 'table', side: 'back' } },
+    { piece: 'footlocker', rule: side('left', 0.55) },
+    { piece: 'bed', tag: 'second', vary: true, seed: 3, rule: side('left', 0.3) },
+    { piece: 'keg', rule: side('right', 0.55) },
+    { piece: 'broom', rule: side('left', 0.9) },
+    { piece: 'basket', rule: free },
+  ],
+  // One horse in its stall, on straw, with a hay rack on the wall and a bucket in the corner.
+  stall: [
+    { piece: 'horse', vary: true, rule: center(0, 0.1) },
+    { piece: 'straw', rule: center(0, 0.1) },
+    { piece: 'hayRack', rule: back(0.5), lift: 22 },
+    { piece: 'broom', rule: corner('backRight') },
+    { piece: 'hay', rule: corner('backLeft') },
+  ],
+  // The aisle: hay, tack, a water barrel, a chest of gear.
+  aisle: [
+    { piece: 'hay', n: 2, rule: side('right', 0.3) },
+    { piece: 'hooks', rule: back(0.25), lift: 30 },
+    { piece: 'pegs', rule: back(0.7), lift: 10 },
+    { piece: 'footlocker', rule: side('left', 0.5) },
+    { piece: 'keg', rule: side('left', 0.2) },
+    { piece: 'sacks', rule: corner('frontRight') },
+    { piece: 'broom', rule: side('right', 0.9) },
+    { piece: 'straw', rule: center() },
+    { piece: 'litter', rule: free },
   ],
   bakery: [
     { piece: 'oven', rule: corner('backRight'), fire: true },
@@ -240,6 +331,8 @@ const makePiece = (key: PieceKey, line: Line): Prop => {
   if (!p) {
     if (key === 'counter') p = makeCounter((line.variant as CounterKind) ?? 'general', line.seed ?? 20);
     else if (key === 'shelf' && line.variant) p = makeWallShelves(line.variant as ShelfKind, line.seed ?? 23);
+    else if (key === 'horse') p = makeHorse(line.seed ?? 1);
+    else if (key === 'bed') p = makeGuestBed(1 + (line.seed ?? 0) % 5);
     else p = PIECES[key].make();
     artCache.set(id, p);
   }
@@ -255,7 +348,7 @@ export interface Furnished {
 }
 
 /** Furnish a room: make the art, measure it, and let the solver place it. */
-export function furnish(set: RoomSet, room: RoomRect, doorX: number, seed = 0): Furnished {
+export function furnish(set: RoomSet, room: RoomRect, doorX: number, seed = 0, opts: PlanOpts & { art?: number } = {}): Furnished {
   const props = new Map<string, Prop>();
   const ins: PieceIn[] = [];
   const gives = new Map<string, { kind: SourceKind; weight: number }>();
@@ -289,15 +382,36 @@ export function furnish(set: RoomSet, room: RoomRect, doorX: number, seed = 0): 
         const id = (line.n ?? 1) > 1 ? `${line.piece}#${i}` : line.piece;
         const unique = `${id}${line.variant ? `:${line.variant}` : ''}${line.tag ? `@${line.tag}` : ''}`;
         const rule = line.rule.at === 'around' ? { ...line.rule, of: line.rule.of } : line.rule;
-        add(unique, makePiece(line.piece, { ...line, seed: (line.seed ?? 0) + i }), PIECES[line.piece], { rule, lift: line.lift, fire: line.fire },
+        add(unique, makePiece(line.piece, { ...line, seed: (line.seed ?? 0) + i + (line.vary ? opts.art ?? 0 : 0) }), PIECES[line.piece], { rule, lift: line.lift, fire: line.fire },
           line.books ? { kind: 'book', weight: line.books } : PIECE_SOURCES[line.piece]);
       }
     }
   }
-  const plan = planRoom(room, doorX, ins, seed);
+  const plan = planRoom(room, doorX, ins, seed, opts);
   const sources = plan.pieces.flatMap((p) => {
     const g = gives.get(p.id);
     return g ? [{ x: p.x, z: p.z, ...g }] : [];
   });
   return { plan, props, sources };
+}
+
+/** What a kind of room upstairs, or in the stable, holds; any other role is the building's own kind (`main`). */
+const ROLE_SETS: Record<string, RoomSet> = { guest: 'guestroom', landing: 'landing', attic: 'attic', upstairs: 'upstairs', stall: 'stall', aisle: 'aisle' };
+export const roleSet = (role: string, main: RoomSet): RoomSet => ROLE_SETS[role] ?? main;
+
+/** A furnished room of a building, with the storey it is on. */
+export interface FurnishedRoom extends Furnished {
+  level: number;
+  room: LevelRoom;
+}
+
+/** Every room of a building furnished: the ground floor's by the kind the place is, the others by what they are for. */
+export function furnishHouse(model: HouseModel, main: RoomSet, seed = 0): FurnishedRoom[] {
+  const out: FurnishedRoom[] = [];
+  model.levels.forEach((lv, level) => lv.rooms.forEach((room, i) => {
+    const art = seed + i + level * 3;
+    const f = furnish(roleSet(room.role, main), room.rect, room.doorX, seed + level * 7 + i, { reserved: room.reserved, zones: room.zones, clear: room.clear, entry: room.entry, art });
+    out.push({ ...f, level, room });
+  }));
+  return out;
 }

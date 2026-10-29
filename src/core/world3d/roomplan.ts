@@ -83,12 +83,25 @@ const overlap = (a: RoomRect, b: RoomRect, gap = 0): boolean =>
 
 const rectAt = (x: number, z: number, w: number, d: number): RoomRect => ({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2 });
 
-export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn[], seed = 0): RoomPlan {
+/** What else is known about a room: where its door really is and what is already in it. */
+export interface PlanOpts {
+  /** Floor already taken (stairs, an opening in the floor): nothing is put there or touches it. */
+  reserved?: RoomRect[];
+  /** Floor kept clear in place of the space in front of the door (empty: none). */
+  zones?: RoomRect[];
+  /** A smaller space kept clear in front of the door than the usual. */
+  clear?: { half: number; depth: number };
+  /** Where people come in, when it is not at the door (the head of a stair): the way in is measured from here. */
+  entry?: { x: number; z: number };
+}
+
+export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn[], seed = 0, opts: PlanOpts = {}): RoomPlan {
   const placed: PlacedPiece[] = [];
   const unplaced: string[] = [];
-  const solid: { id: string; r: RoomRect }[] = [];
+  const solid: { id: string; r: RoomRect }[] = (opts.reserved ?? []).map((r, i) => ({ id: `reserved#${i}`, r }));
   const hungSpans: { x0: number; x1: number; lift: number; top: number }[] = [];
-  const doorZone: RoomRect = { x0: doorX - DOOR_CLEAR.half, x1: doorX + DOOR_CLEAR.half, z0: room.z1 - DOOR_CLEAR.depth, z1: room.z1 + 1 };
+  const clearDoor = opts.clear ?? DOOR_CLEAR;
+  const zones: RoomRect[] = opts.zones ?? [{ x0: doorX - clearDoor.half, x1: doorX + clearDoor.half, z0: room.z1 - clearDoor.depth, z1: room.z1 + 1 }];
   const W = room.x1 - room.x0, D = room.z1 - room.z0;
 
   const inside = (r: RoomRect): boolean => r.x0 - pad >= room.x0 + WALL && r.x1 + pad <= room.x1 - WALL && r.z0 >= room.z0 + WALL && r.z1 <= room.z1 - WALL;
@@ -106,7 +119,8 @@ export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn
       const x = room.x0 + (i + 0.5) * cell, z = room.z0 + (j + 0.5) * cell;
       return !rects.some((r) => x > r.x0 - rad && x < r.x1 + rad && z > r.z0 - rad && z < r.z1 + rad);
     };
-    const si = Math.min(nx - 1, Math.max(0, Math.floor((doorX - room.x0) / cell))), sj = nz - 1;
+    const ex = opts.entry?.x ?? doorX, ez = opts.entry?.z ?? room.z1;
+    const si = Math.min(nx - 1, Math.max(0, Math.floor((ex - room.x0) / cell))), sj = Math.min(nz - 1, Math.max(0, Math.floor((ez - room.z0) / cell)));
     if (!free(si, sj)) return false;
     const seen = new Uint8Array(nx * nz);
     const stack = [si, sj];
@@ -124,7 +138,7 @@ export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn
   };
   let standing = true; // is the piece being placed a floor piece (which must keep the room connected)?
   let pad = 0; // how much further sideways than its footprint the piece being placed is drawn (kept inside the walls too)
-  const fits = (r: RoomRect): boolean => inside(r) && !overlap(r, doorZone) && !solid.some((s) => overlap(r, s.r, GAP)) && (!standing || connectedWith(r));
+  const fits = (r: RoomRect): boolean => inside(r) && !zones.some((z) => overlap(r, z)) && !solid.some((s) => overlap(r, s.r, GAP)) && (!standing || connectedWith(r));
   const take = (p: PieceIn, x: number, z: number): void => {
     const lift = p.lift ?? 0;
     placed.push({ id: p.id, x, z, w: p.w, d: p.d, kind: p.kind, lift, fire: !!p.fire });

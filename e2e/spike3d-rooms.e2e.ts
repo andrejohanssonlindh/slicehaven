@@ -21,7 +21,7 @@ describe('spike3d rooms', () => {
     for (const [i, id] of ids.entries()) {
       await w(`(w.inside = false, w.toggleRoof(${i}), w.focus.x = w.houses[${i}].built.place.x, w.focus.z = w.houses[${i}].built.place.z, 0)`);
       await page.waitForTimeout(1800);
-      expect(await w(`w.houses[${i}].furniture.every((f) => f.visible)`)).toBe(true);
+      expect(await w(`w.houses[${i}].furniture.every((f, k) => f.visible === (w.houses[${i}].furnLevel[k] === w.houses[${i}].view))`)).toBe(true);
       await page.screenshot({ path: `${OUT}spike3d-room-${id}.png` });
     }
     expect(errors).toEqual([]);

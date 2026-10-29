@@ -177,6 +177,12 @@ function buildControls(): void {
   button('row-fx', () => t('spike.speed', 'Walk ×{n}', { n: world.speedMul }), () => world.speedMul > 1, () => { world.speedMul = cycle([1, 2, 3], world.speedMul); });
 
   button('row-look', () => t('spike.inside', 'Inside'), () => world.inside, () => { world.inside = !world.inside; });
+  button('row-look', () => t('spike.up', 'Upstairs'), () => world.heroLevel > 0, () => {
+    if (world.climb(1) === null) notify(t('spike.nostairs', 'No stairs up from here.'));
+  });
+  button('row-look', () => t('spike.down', 'Downstairs'), () => false, () => {
+    if (world.climb(-1) === null) notify(t('spike.nostairsdown', 'No stairs down from here.'));
+  });
   button('row-look', () => t('spike.shells', 'Shells {n}', { n: world.settings.shells }), () => world.settings.shells > 0, () => {
     world.settings.shells = cycle([0, 1, 2], world.settings.shells);
   });
@@ -356,8 +362,9 @@ function bindInput(): void {
         if (world.walkIn(house) === null) notify(t('spike.noway', 'There is no way there.'));
       } else {
         // Otherwise tap the ground and the hero walks there, round whatever is in the way.
-        const at = world.groundAt(nx, ny);
-        if (at && world.walkTo(at.x, at.z) === null) notify(t('spike.noway', 'There is no way there.'));
+        // (On an upper floor the tap lands on that floor, and a tap on the stairs changes storey.)
+        const at = world.tapPoint(nx, ny);
+        if (at && world.walkTo(at.x, at.z, at.level) === null) notify(t('spike.noway', 'There is no way there.'));
       }
     }
     down = null;

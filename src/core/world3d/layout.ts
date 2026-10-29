@@ -45,7 +45,7 @@ export interface BuiltHouse {
 /** A house's model, made once for each look (the same spec always gives the same model, and nothing changes it). */
 const models = new Map<string, HouseModel>();
 const modelOf = (spec: House3DSpec): HouseModel => {
-  const k = `${spec.seed}|${spec.width}|${spec.depth}|${spec.wallH}|${spec.roof}|${spec.walls}`;
+  const k = `${spec.seed}|${spec.width}|${spec.depth}|${spec.wallH}|${spec.roof}|${spec.walls}|${spec.plan}`;
   let m = models.get(k);
   if (!m) models.set(k, (m = buildHouse(spec)));
   return m;
@@ -68,25 +68,31 @@ export function houseToLocal(h: PlacedHouse, x: number, z: number): { x: number;
 
 export const TRUNK = 0.5;
 export const POST = 0.12;
-/** Half-width of a doorway for feet, wider than the door so the walker fits. */
-const DOOR_GAP = 0.65;
-
 /**
- * A house's four thin walls, so the inside can be walked, with a gap at the door.
- * The footprint is the walls plus a little proud (0.1 at the sides, a 0.6 porch at the front).
+ * A house's four thin walls, so the inside can be walked, with a gap at the door (`withDoor` false: whole,
+ * for the storeys above the ground). The footprint is the walls plus a little proud (0.1 at the sides, a 0.6
+ * porch at the front).
  */
-export function houseWalls(b: BuiltHouse): Shape[] {
-  const fp = b.model.footprint, doorX = b.model.door[0], t = 0.12;
+export function houseWalls(b: BuiltHouse, withDoor = true): Shape[] {
+  const fp = b.model.footprint, doorX = b.model.door[0], gap = b.model.doorHalf, t = 0.12;
   const hw = (fp.x1 - fp.x0) / 2 - 0.1, hd = -fp.z0 - 0.1;
   const wall = (x0: number, x1: number, z0: number, z1: number): Shape => boxOfFootprint({ x0, x1, z0, z1 }, b.place.x, b.place.z, b.place.rot);
   return [
     wall(-hw - t, hw + t, -hd - t, -hd + t),
     wall(-hw - t, -hw + t, -hd, hd),
     wall(hw - t, hw + t, -hd, hd),
-    wall(-hw - t, doorX - DOOR_GAP, hd - t, hd + t),
-    wall(doorX + DOOR_GAP, hw + t, hd - t, hd + t),
+    ...(withDoor
+      ? [wall(-hw - t, doorX - gap, hd - t, hd + t), wall(doorX + gap, hw + t, hd - t, hd + t)]
+      : [wall(-hw - t, hw + t, hd - t, hd + t)]),
   ];
 }
+
+/** What blocks feet inside a storey besides the outer walls: partitions and the stairs' footprints (not the furniture). */
+export const levelBlocks = (b: BuiltHouse, level: number): Shape[] =>
+  b.model.levels[level].blocks.map((r) => boxOfFootprint(r, b.place.x, b.place.z, b.place.rot));
+
+/** A storey's walls and what is built into it: what the ground's walking is stopped by, for a storey above it. */
+export const levelWalls = (b: BuiltHouse, level: number): Shape[] => [...houseWalls(b, level === 0), ...levelBlocks(b, level)];
 
 /** The house's whole footprint as one box (is something inside it?). */
 export function houseBox(b: BuiltHouse): Shape {
@@ -100,7 +106,7 @@ export const houseOuterBox = (b: BuiltHouse): Shape => boxOfFootprint(b.model.fo
 /** What blocks feet: house walls, tree trunks, torch posts. */
 export function layoutObstacles(l: Layout, houses: BuiltHouse[]): Shape[] {
   return [
-    ...houses.flatMap(houseWalls),
+    ...houses.flatMap((b) => levelWalls(b, 0)),
     ...l.trees.map((t) => circle(t.x, t.z, TRUNK)),
     ...l.torches.map(([x, z]) => circle(x, z, POST)),
     ...l.props.flatMap(propShapes),

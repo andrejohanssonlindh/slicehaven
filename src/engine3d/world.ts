@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { makeWalkSet, viewFor } from '../art/folkWalk';
 import type { Pix } from '../art/pix';
-import { type Furnished, type RoomSet, furnish } from '../content/furnish';
+import { type FurnishedRoom, type RoomSet, furnishHouse } from '../content/furnish';
 import {
   barkTex, doorTex, floorTex, groundChunkPainter, leafTex, plasterTex, roofUnderTex, shingleTex, shutterTex, sodTex, stoneTex, thatchTex,
   tileTex, timberTex, windowGlowTex, windowTex,
@@ -16,7 +16,7 @@ import { CHUNK, type ChunkTerrain, TerrainStore, chunkKey, chunksNear } from '..
 import { type Environment3D, environment } from '../core/world3d/environment3d';
 import { Rng } from '../core/rng';
 import type { HouseMaterial } from '../core/world3d/house';
-import { type BuiltHouse, type Layout, type PlacedTree, furnitureObstacles, houseAt, houseOuterBox, houseToLocal, houseToWorld, houseWalls } from '../core/world3d/layout';
+import { type BuiltHouse, type Layout, type PlacedHouse, type PlacedTree, furnitureObstacles, houseAt, houseOuterBox, houseToLocal, houseToWorld, houseWalls, levelWalls } from '../core/world3d/layout';
 import { Explored } from '../core/world3d/explored';
 import { PlacedIndex } from '../core/world3d/placed';
 import { footprints } from '../core/world3d/roomplan';
@@ -24,7 +24,7 @@ import { type HouseEntry, HouseIndex } from '../core/world3d/houses';
 import type { MeshData } from '../core/world3d/mesh';
 import { LAUNDRY_HANG, type PlacedProp, buildBoulder, buildCart, buildCrates, buildFence, buildLaundry, buildShrub, buildWell, buildWoodpile } from '../core/world3d/props';
 import { cloudDrift, cloudThreshold } from '../core/world3d/sky';
-import { NavGrid, type P2, type Shape, findPath, followPath, pathLength } from '../core/world3d/space';
+import { NavGrid, type P2, type Shape, findPath, followPath, pathLength, shapeDist } from '../core/world3d/space';
 import { type Ground3D, groundHeight, lakeDist, splatAt } from '../core/world3d/terrain';
 import { TEXELS_PER_M } from '../core/world3d/tiers';
 import { type Clump, buildTree } from '../core/world3d/tree';
@@ -78,10 +78,35 @@ export function geometryOf(m: MeshData): THREE.BufferGeometry {
 
 interface CutPart {
   mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial>;
+  /** Fades while the viewer's storey is at or below this. */
+  level: number;
+  /** 0 shown, 1 gone; eases. */
+  t: number;
 }
 
 /** A stroll, metres a second. */
 const HERO_SPEED = 1.6;
+
+/** A stage of the hero's walk: along a floor, or up or down a flight of stairs (points in the world, each with the local height of the foot). */
+type Leg =
+  | { kind: 'walk'; path: P2[]; house: HouseInst | null; level: number }
+  | { kind: 'climb'; house: HouseInst; pts: { x: number; z: number; y: number }[]; to: number };
+
+/** Where a climber is after `s` metres along a flight's points, with the height of their foot there. */
+function followClimb(pts: readonly { x: number; z: number; y: number }[], s: number): { x: number; z: number; y: number; dx: number; dz: number; done: boolean } {
+  let left = Math.max(0, s);
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i], l = Math.hypot(b.x - a.x, b.z - a.z);
+    if (left <= l || i === pts.length - 1) {
+      const k = l > 0 ? Math.min(1, left / l) : 1;
+      const dir = l > 0 ? { dx: (b.x - a.x) / l, dz: (b.z - a.z) / l } : { dx: 0, dz: 1 };
+      return { x: a.x + (b.x - a.x) * k, z: a.z + (b.z - a.z) * k, y: a.y + (b.y - a.y) * k, ...dir, done: left >= l && i === pts.length - 1 };
+    }
+    left -= l;
+  }
+  const p = pts[0];
+  return { x: p.x, z: p.z, y: p.y, dx: 0, dz: 1, done: true };
+}
 /** How far the ray of light reaches, metres. */
 const RAY_LENGTH = 9;
 
@@ -150,14 +175,18 @@ interface HouseInst {
   chimney: Chimney | null;
   shells: Shell[];
   group: THREE.Group;
-  /** The room's furniture cards: only shown when the roof is lifted, or their tops show through the roof. */
+  /** The rooms' furniture cards: only shown when the roof is lifted (and only the storey being looked at), or their tops show through the roof. */
   furniture: THREE.Object3D[];
+  /** The storey each furniture card stands on. */
+  furnLevel: number[];
   cut: CutPart[];
   box: Shape;
   floorHeat: Heat | null;
   /** Cut-away: 0 closed, 1 open; eases toward `open`. */
   cutT: number;
   open: boolean;
+  /** The storey looked into while open (the hero's). */
+  view: number;
 }
 
 export class SpikeWorld {
@@ -189,7 +218,9 @@ export class SpikeWorld {
   /** Trees, props and torch posts by chunk (the layout's, and any the map makes as it goes). */
   readonly placed: PlacedIndex;
   /** Every house of the map, by chunk: made when something comes near (see `core/world3d/houses.ts`). */
-  readonly houseIndex: HouseIndex<Furnished>;
+  readonly houseIndex: HouseIndex<FurnishedRoom[]>;
+  /** Walking above the ground floor: one grid for each storey of a house that has them (made when first asked). */
+  private upperNavs = new Map<PlacedHouse, (NavGrid | undefined)[]>();
   /** The houses that are standing now (those in resident chunks); they come and go as chunks stream. */
   readonly houses: HouseInst[] = [];
   private shells: Shell[] = [];
@@ -399,8 +430,16 @@ export class SpikeWorld {
   private walkPts: [number, number][] = [];
   readonly heroCard!: WalkCard;
   private heroBlob!: THREE.Mesh;
-  private path: P2[] | null = null;
-  private pathS = 0;
+  /** The walk in hand: stages, the one being walked, and metres done along it. */
+  private legs: Leg[] = [];
+  private legI = 0;
+  private legS = 0;
+  /** The storey the hero is on in the house they are in. */
+  private level = 0;
+  /** While on stairs, the foot's height (local to the house); otherwise null. */
+  private heroFloor: number | null = null;
+  /** How far the view is lifted for an upper storey, metres. */
+  private focusLift = 0;
   private marker: THREE.Mesh;
   /** The camera follows the hero while it walks, until the player drags the view. */
   follow = false;
@@ -469,19 +508,23 @@ export class SpikeWorld {
     this.layout = layout;
     // Each room is furnished by rules (see `content/furnish.ts`) when something first comes near its house; what stands
     // on the floor blocks feet, and what is in it (the hearth, books, pictures) feeds the filament field.
-    this.houseIndex = new HouseIndex<Furnished>(layout.houses, (b) => {
-      const room = furnish((b.place.room ?? 'home') as RoomSet, b.model.room, b.model.door[0], b.place.spec.seed);
+    this.houseIndex = new HouseIndex<FurnishedRoom[]>(layout.houses, (b) => {
+      const rooms = furnishHouse(b.model, (b.place.room ?? 'home') as RoomSet, b.place.spec.seed);
       const sources: FSource[] = [];
-      const fire = room.plan.pieces.filter((p) => p.fire).pop();
-      if (fire) {
-        const w = houseToWorld(b.place, fire.x, fire.z + 0.2);
-        sources.push({ x: w.x, z: w.z, kind: 'fire', weight: HEARTH_FIRE });
+      for (const room of rooms) {
+        const fire = room.plan.pieces.filter((p) => p.fire).pop();
+        if (fire) {
+          const w = houseToWorld(b.place, fire.x, fire.z + 0.2);
+          sources.push({ x: w.x, z: w.z, kind: 'fire', weight: HEARTH_FIRE });
+        }
+        for (const s of room.sources) {
+          const w = houseToWorld(b.place, s.x, s.z);
+          sources.push({ x: w.x, z: w.z, kind: s.kind, weight: s.weight });
+        }
       }
-      for (const s of room.sources) {
-        const w = houseToWorld(b.place, s.x, s.z);
-        sources.push({ x: w.x, z: w.z, kind: s.kind, weight: s.weight });
-      }
-      return { room, shapes: [...houseWalls(b), ...furnitureObstacles(b, footprints(room.plan))], sources };
+      // The ground floor's walls, partitions and furniture block the ground's walking; the storeys above have grids of their own.
+      const ground = rooms.filter((r) => r.level === 0);
+      return { room: rooms, shapes: [...levelWalls(b, 0), ...furnitureObstacles(b, ground.flatMap((r) => footprints(r.plan)))], sources };
     });
     const houseIndex = this.houseIndex;
     // Feet: the houses' walls and furniture block (held whole, in an index), and so do the trunks, posts and props the
@@ -615,10 +658,10 @@ export class SpikeWorld {
   }
 
   /** Stand a house up in the world: its model, its furniture cards, its hearth's light. It belongs to the chunk `st`. */
-  private standHouse(entry: HouseEntry<Furnished>, st: Standing): void {
-    const { built, room } = entry;
+  private standHouse(entry: HouseEntry<FurnishedRoom[]>, st: Standing): void {
+    const { built, room: rooms } = entry;
     const h = built.place, model = built.model;
-    const inst: HouseInst = { built, mats: [], cards: [], hearth: null, hearthAt: null, chimney: null, shells: [], group: new THREE.Group(), furniture: [], cut: [], box: entry.box, floorHeat: null, cutT: 0, open: false };
+    const inst: HouseInst = { built, mats: [], cards: [], hearth: null, hearthAt: null, chimney: null, shells: [], group: new THREE.Group(), furniture: [], furnLevel: [], cut: [], box: entry.box, floorHeat: null, cutT: 0, open: false, view: 0 };
     const matFor = (m: HouseMaterial, cut: boolean): { mat: THREE.MeshLambertMaterial; opts: LitOpts } => this.houseMat(m, cut, inst.mats);
     for (const p of model.parts) {
       const geo = geometryOf(p.mesh);
@@ -628,7 +671,7 @@ export class SpikeWorld {
       mesh.castShadow = !p.cut;
       inst.group.add(mesh);
       if (p.cut) {
-        inst.cut.push({ mesh });
+        inst.cut.push({ mesh, level: p.level ?? 0, t: 0 });
         // The roof keeps shading the room when it is cut away: a shadow-only twin on layer 1.
         const proxy = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
         proxy.layers.set(1);
@@ -638,28 +681,32 @@ export class SpikeWorld {
       if (p.material === 'roof') this.addShells(mesh, opts, { density: 0.5, tint: 1.12, step: 0.06 }, p.cut ? inst : null, inst.shells);
     }
     // Furniture: the solver's plan (`content/furnish.ts`), as sprites on the floor.
-    let fire: { x: number; z: number } | null = null;
-    for (const it of room.plan.pieces) {
-      const prop = room.props.get(it.id);
-      if (!prop) continue;
-      const flat = it.kind === 'flat';
-      // Everything follows the house's alignment cross (see roomplan.ts): the card is turned with the house,
-      // stretched sideways a little to keep one art pixel to one screen pixel.
-      const card = spriteCard(prop, PITCH, { flat, shadow: false });
-      card.mesh.position.set(it.x, model.floorY + 0.02 + it.lift, it.z);
-      card.mesh.rotation.y = 0;
-      if (!flat) card.mesh.scale.x = 1 / Math.cos(YAW - h.rot);
-      inst.group.add(card.mesh);
-      inst.furniture.push(card.mesh);
-      inst.cards.push(card);
-      this.sprites.push(card);
-      if (it.fire) fire = { x: it.x, z: it.z };
+    let fire: { x: number; z: number; level: number } | null = null;
+    for (const room of rooms) {
+      const floorY = model.levels[room.level].floorY;
+      for (const it of room.plan.pieces) {
+        const prop = room.props.get(it.id);
+        if (!prop) continue;
+        const flat = it.kind === 'flat';
+        // Everything follows the house's alignment cross (see roomplan.ts): the card is turned with the house,
+        // stretched sideways a little to keep one art pixel to one screen pixel.
+        const card = spriteCard(prop, PITCH, { flat, shadow: false });
+        card.mesh.position.set(it.x, floorY + 0.02 + it.lift, it.z);
+        card.mesh.rotation.y = 0;
+        if (!flat) card.mesh.scale.x = 1 / Math.cos(YAW - h.rot);
+        inst.group.add(card.mesh);
+        inst.furniture.push(card.mesh);
+        inst.furnLevel.push(room.level);
+        inst.cards.push(card);
+        this.sprites.push(card);
+        if (it.fire) fire = { x: it.x, z: it.z, level: room.level };
+      }
     }
     // The hearth's (or oven's, or forge's) glow, if the room has one.
     if (fire) {
       const hearth = new THREE.PointLight(0xff9a48, 4, 6, 2);
       hearth.visible = false; // (a light that is switched on counts in every shader: the pool in `update` decides which shine)
-      hearth.position.set(fire.x, model.floorY + 0.55, fire.z + 0.2);
+      hearth.position.set(fire.x, model.levels[fire.level].floorY + 0.55, fire.z + 0.2);
       inst.group.add(hearth);
       inst.hearth = { light: hearth, flame: new THREE.Mesh(), base: 4, seed: 3 + Math.round(h.x * 0.37 + h.z * 0.11) % 40 };
       this.torches.push(inst.hearth);
@@ -1310,27 +1357,127 @@ export class SpikeWorld {
     return { x: hit.x, z: hit.z };
   }
 
-  /** Walk the hero to a point: path-find round the house, the tree and the lake. Returns the metres to walk, or null if there is no way. */
-  walkTo(x: number, z: number): number | null {
-    const path = findPath(this.nav, this.hero, { x, z });
-    if (!path) return null;
-    this.path = path;
-    this.pathS = 0;
+  /**
+   * Where a tap lands. Indoors on an upper floor that is the floor you stand on (the ground under it is a house away),
+   * and tapping the stairs there means the other storey; anywhere else it is the ground.
+   */
+  tapPoint(ndcX: number, ndcY: number): { x: number; z: number; level?: number } | null {
+    const hs = this.houses[this.heroHouse()] ?? null;
+    if (hs && this.heroLevel > 0) {
+      const ray = new THREE.Raycaster();
+      ray.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
+      const hit = new THREE.Vector3();
+      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -(hs.group.position.y + hs.built.model.levels[this.heroLevel].floorY));
+      if (ray.ray.intersectPlane(plane, hit) && shapeDist(hs.box, hit.x, hit.z) < 0) {
+        // Stairs: a tap on the flight that goes up from this storey climbs, one on the opening in the floor goes down.
+        const l = houseToLocal(hs.built.place, hit.x, hit.z);
+        const inRect = (r: { x0: number; x1: number; z0: number; z1: number }): boolean => l.x > r.x0 && l.x < r.x1 && l.z > r.z0 && l.z < r.z1;
+        for (const s of hs.built.model.stairs) {
+          if (s.from === this.heroLevel && inRect(s.rect)) return { x: hit.x, z: hit.z, level: this.heroLevel + 1 };
+          if (s.to === this.heroLevel && inRect(s.rect)) return { x: hit.x, z: hit.z, level: this.heroLevel - 1 };
+        }
+        return { x: hit.x, z: hit.z, level: this.heroLevel };
+      }
+    }
+    const g = this.groundAt(ndcX, ndcY);
+    return g ? { ...g } : null;
+  }
+
+  /** The upper floor's walking grid of a house (storey 1 and up); the ground floor is `nav`. */
+  private upperNav(h: HouseInst, level: number): NavGrid | null {
+    if (level === 0) return this.nav;
+    const place = h.built.place;
+    let list = this.upperNavs.get(place);
+    if (!list) this.upperNavs.set(place, (list = []));
+    if (!list[level]) {
+      const entry = this.houseIndex.entry(place);
+      const furniture = furnitureObstacles(h.built, entry.room.filter((r) => r.level === level).flatMap((r) => footprints(r.plan)));
+      list[level] = new NavGrid(this.ground.size, [...levelWalls(h.built, level), ...furniture], { radius: 0.2 });
+    }
+    return list[level] ?? null;
+  }
+
+  /** The house (standing) whose floor plan holds a world point, if any. */
+  private houseHolding(x: number, z: number): HouseInst | null {
+    for (const hs of this.houses) if (shapeDist(hs.box, x, z) < -0.1) return hs;
+    return null;
+  }
+
+  /**
+   * Walk the hero to a point: path-find round the house, the tree and the lake, up and down stairs if the point is
+   * on another storey (`level`; by default the one the hero is on if it is in the same house, else the ground
+   * floor). Returns the metres to walk, or null if there is no way.
+   */
+  walkTo(x: number, z: number, level?: number): number | null {
+    const from = this.houses[this.heroHouse()] ?? null;
+    const target = this.houseHolding(x, z);
+    const to = Math.max(0, Math.min(level ?? (target && target === from ? this.heroLevel : 0), target ? target.built.model.levels.length - 1 : 0));
+    const legs: Leg[] = [];
+    const cur = { x: this.hero.x, z: this.hero.z, level: from ? this.heroLevel : 0 };
+    const walkOn = (house: HouseInst | null, lv: number, px: number, pz: number): boolean => {
+      const nav = house ? this.upperNav(house, lv) : this.nav;
+      const path = nav ? findPath(nav, cur, { x: px, z: pz }) : null;
+      if (!path) return false;
+      legs.push({ kind: 'walk', path, house, level: lv });
+      cur.x = path[path.length - 1].x;
+      cur.z = path[path.length - 1].z;
+      return true;
+    };
+    const climb = (house: HouseInst, a: number, b: number): boolean => {
+      const up = b > a;
+      const s = house.built.model.stairs.find((q) => (up ? q.from === a && q.to === b : q.from === b && q.to === a));
+      if (!s) return false;
+      const pts = (up ? s.path : [...s.path].reverse()).map((p) => ({ ...houseToWorld(house.built.place, p.x, p.z), y: p.y }));
+      if (!walkOn(house, a, pts[0].x, pts[0].z)) return false;
+      legs.push({ kind: 'climb', house, pts, to: b });
+      cur.x = pts[pts.length - 1].x;
+      cur.z = pts[pts.length - 1].z;
+      cur.level = b;
+      return true;
+    };
+    let ok = true;
+    if (from && target !== from) while (ok && cur.level > 0) ok = climb(from, cur.level, cur.level - 1);
+    else if (from && target === from) while (ok && cur.level !== to) ok = climb(from, cur.level, cur.level + Math.sign(to - cur.level));
+    if (ok && target && target !== from) for (let l = 0; ok && l < to; l++) ok = climb(target, l, l + 1);
+    if (ok) ok = walkOn(target && to > 0 ? target : null, to, x, z);
+    if (!ok) return null;
+    this.legs = legs;
+    this.legI = 0;
+    this.legS = 0;
     this.follow = true;
-    const end = path[path.length - 1];
-    this.marker.position.set(end.x, this.store.heightAt(end.x, end.z) + 0.04, end.z);
+    const end = legs[legs.length - 1] as Extract<Leg, { kind: 'walk' }>;
+    const e = end.path[end.path.length - 1];
+    const gy = end.house ? end.house.group.position.y + end.house.built.model.levels[end.level].floorY : this.store.heightAt(e.x, e.z);
+    this.marker.position.set(e.x, gy + 0.04, e.z);
     this.marker.visible = true;
-    return pathLength(path);
+    return legs.reduce((n, l) => n + (l.kind === 'walk' ? pathLength(l.path) : l.pts.reduce((m, p, i) => (i ? m + Math.hypot(p.x - l.pts[i - 1].x, p.z - l.pts[i - 1].z) : m), 0)), 0);
+  }
+
+  /** Go up (+1) or down (-1) the stairs of the house the hero is in, to the next storey. Null if there is none that way. */
+  climb(dir: 1 | -1): number | null {
+    const hs = this.houses[this.heroHouse()];
+    if (!hs) return null;
+    const lv = this.heroLevel + dir;
+    if (lv < 0 || lv >= hs.built.model.levels.length) return null;
+    const room = hs.built.model.levels[lv].rooms[0].rect;
+    const p = houseToWorld(hs.built.place, (room.x0 + room.x1) / 2, (room.z0 + room.z1) / 2);
+    // (Any point on the storey: the walk finds the stairs, then the nearest floor to it.)
+    return this.walkTo(p.x, p.z, lv);
+  }
+
+  /** The storey the hero is on in the house they are in (0 outdoors and on the ground floor). */
+  get heroLevel(): number {
+    return this.level;
   }
 
   get walking(): boolean {
-    return this.path !== null;
+    return this.legs.length > 0;
   }
 
   private placeHero(lift = 0): void {
-    // Indoors the hero stands on the room's floor, not the ground.
+    // Indoors the hero stands on the room's floor (or the stair under their feet), not the ground.
     const hs = this.houses[this.heroHouse()];
-    const y = hs ? hs.group.position.y + hs.built.model.floorY : this.store.heightAt(this.hero.x, this.hero.z);
+    const y = hs ? hs.group.position.y + (this.heroFloor ?? hs.built.model.levels[Math.min(this.level, hs.built.model.levels.length - 1)].floorY) : this.store.heightAt(this.hero.x, this.hero.z);
     this.heroCard.mesh.position.set(this.hero.x, y + lift, this.hero.z);
     this.heroBlob.position.set(this.hero.x, y + 0.03, this.hero.z);
   }
@@ -1362,19 +1509,45 @@ export class SpikeWorld {
       if (this.wasIn) this.wasIn.open = false;
       if (now) now.open = true;
       this.wasIn = now;
+      this.level = 0; // (every door is on the ground floor)
+      this.heroFloor = null;
     }
-    if (!this.path) return;
+    if (now) now.view = this.level;
+    // The view follows the storey: up when the hero is upstairs, back down when not.
+    const lift = now ? (this.heroFloor ?? now.built.model.levels[Math.min(this.level, now.built.model.levels.length - 1)].floorY) - now.built.model.floorY : 0;
+    this.focusLift += (lift - this.focusLift) * (1 - Math.exp(-dt / 0.3));
+    if (!this.legs.length) return;
     const speed = HERO_SPEED * this.speedMul;
-    this.pathS += dt * speed;
-    const p = followPath(this.path, this.pathS);
+    this.legS += dt * speed;
+    const leg = this.legs[this.legI];
+    let p: { x: number; z: number; dx: number; dz: number; done: boolean };
+    if (leg.kind === 'walk') {
+      p = followPath(leg.path, this.legS);
+      this.heroFloor = null;
+    } else {
+      const c = followClimb(leg.pts, this.legS);
+      p = c;
+      this.heroFloor = c.y;
+    }
     this.hero.x = p.x;
     this.hero.z = p.z;
     if (p.dx || p.dz) this.heroDir = { x: p.dx, z: p.dz };
+    // A storey is changed at the end of a flight.
+    if (p.done && leg.kind === 'climb') {
+      this.level = leg.to;
+      this.heroFloor = null;
+    }
     this.placeHero();
-    this.faceWalker(this.heroCard, p.dx, p.dz, !p.done, speed);
+    const last = p.done && this.legI === this.legs.length - 1;
+    this.faceWalker(this.heroCard, p.dx, p.dz, !last, speed);
     if (p.done) {
-      this.path = null;
-      this.marker.visible = false;
+      if (last) {
+        this.legs = [];
+        this.marker.visible = false;
+      } else {
+        this.legI++;
+        this.legS = 0;
+      }
     }
   }
 
@@ -1809,19 +1982,23 @@ export class SpikeWorld {
     for (const m of this.windowMats) m.emissive.setScalar(env.night * 1.4);
 
     // The cut-away fades the roof and the front wall with a dither.
+    // (Each cut part has its own storey: it goes when the viewer is on that storey or below it.)
+    const cutK = 1 - Math.exp(-dt / 0.12);
     for (const hs of this.houses) {
-      hs.cutT += ((hs.open ? 1 : 0) - hs.cutT) * (1 - Math.exp(-dt / 0.12));
+      hs.cutT += ((hs.open ? 1 : 0) - hs.cutT) * cutK;
       for (const c of hs.cut) {
-        c.mesh.material.opacity = 1 - hs.cutT;
-        c.mesh.visible = hs.cutT < 0.98;
+        c.t += ((hs.open && hs.view <= c.level ? 1 : 0) - c.t) * cutK;
+        c.mesh.material.opacity = 1 - c.t;
+        c.mesh.visible = c.t < 0.98;
       }
-      for (const f of hs.furniture) f.visible = hs.cutT > 0.02;
+      hs.furniture.forEach((f, i) => { f.visible = hs.cutT > 0.02 && hs.furnLevel[i] === hs.view; });
     }
     for (const s of this.shells) s.mesh.visible = s.layer <= this.settings.shells && (!s.cutOf || s.cutOf.cutT < 0.3);
 
     // The villager walks the road, there and back.
     this.walkVillager(dt);
     this.stepHero(dt);
+    this.focus.y = 0.5 + this.focusLift;
     if (this.follow) {
       const k = 1 - Math.exp(-dt / 0.25);
       this.focus.x += (this.hero.x - this.focus.x) * k;

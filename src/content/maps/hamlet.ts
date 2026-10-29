@@ -18,10 +18,10 @@ export const HAMLET_MAP: MapSpec = {
   lake: { x: -38, z: 36, r: 15 },
   doorMud: true,
   houses: [
-    { id: 'inn', room: 'inn', size: 'large', roof: 'tile', at: { road: 0, t: 0.5, side: 'north' } },
+    { id: 'inn', room: 'inn', plan: 'inn', roof: 'tile', at: { road: 0, t: 0.5, side: 'north' } },
     { id: 'bakery', room: 'bakery', size: 'medium', roof: 'shingle', at: { road: 0, t: 0.38, side: 'north' } },
     { id: 'smithy', room: 'smithy', size: 'medium', roof: 'shingle', walls: 'stone', at: { road: 0, t: 0.63, side: 'north' } },
-    { id: 'store', room: 'general', size: 'medium', roof: 'thatch', at: { road: 0, t: 0.27, side: 'north' } },
+    { id: 'store', room: 'general', plan: 'shop', roof: 'shingle', at: { road: 0, t: 0.27, side: 'north' } },
     { id: 'weaver', room: 'weaver', size: 'small', roof: 'sod', at: { road: 0, t: 0.78, side: 'north' } },
     { id: 'herbs', room: 'herbalist', size: 'small', roof: 'thatch', at: { road: 0, t: 0.2, side: 'south' } },
     { id: 'fish', room: 'fishmonger', size: 'medium', roof: 'thatch', walls: 'plank', at: { road: 0, t: 0.32, side: 'south' } },
@@ -29,6 +29,7 @@ export const HAMLET_MAP: MapSpec = {
     { id: 'home2', size: 'small', roof: 'sod', walls: 'stone', at: { road: 0, t: 0.56, side: 'south' } },
     { id: 'home3', size: 'medium', roof: 'thatch', walls: 'plank', at: { road: 0, t: 0.68, side: 'south' } },
     { id: 'home4', room: 'fisher', size: 'small', roof: 'shingle', at: { road: 0, t: 0.8, side: 'south' } },
+    { id: 'stable', plan: 'stable', walls: 'plank', roof: 'thatch', at: { road: 0, t: 0.92, side: 'south' } },
   ],
   scatter: [
     { kind: 'tree', count: 70, area: { ring: [0, 0, 40, 64] }, mix: ['oak', 'oak', 'pine', 'pine', 'pine', 'dead', 'young'] },

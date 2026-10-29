@@ -16,7 +16,7 @@ describe('spike3d maps', () => {
     await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 90_000 });
     const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; return ${fn}; })()`);
     console.info(`hamlet built in ${((await page.evaluate('window.spike.built')) as number).toFixed(0)} ms (software WebGL)`);
-    expect(await w('w.layout.houses.length')).toBe(11); // (the ones near the view are standing; the rest stream in with their chunk)
+    expect(await w('w.layout.houses.length')).toBe(12); // (the ones near the view are standing; the rest stream in with their chunk)
     expect(await w('w.houses.length')).toBeGreaterThanOrEqual(5);
     expect(await w('w.layout.trees.length')).toBeGreaterThan(60);
     await page.waitForTimeout(2500);
