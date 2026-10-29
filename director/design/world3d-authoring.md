@@ -29,6 +29,9 @@ bakery: [
 - **The solver** (`planRoom`) keeps the door clear, never overlaps two pieces, and refuses any spot that would leave the door unable to reach 92 % of the free floor (with a wider walker than the real one, because the nav grid is coarse). Low-priority pieces drop out of a room that is too small; the first four lines and the fire never do (tested). The footprints go straight into the nav grid, so furniture blocks feet.
 - Tests (`tests/furnish.test.ts`) run every recipe in four house sizes. A new recipe is covered by adding its name to `RECIPES`.
 
+## Rooms upstairs and bigger buildings
+A map house can be `plan: 'inn' | 'shop' | 'stable'` (own size, storeys, stairs); `room` is still the ground floor's recipe. The upstairs rooms use their own recipes by role (`guestroom`, `landing`, `attic`, `upstairs`, `stall`, `aisle`) in `RECIPES`; add a role in `ROLE_SETS` and a line in `house.ts` where the rooms are made. A piece with `vary: true` takes a seed from its room (each stall's horse differs). See the handover, session 29.
+
 ## Adding a map
 Write a `MapSpec` (`content/maps/<name>.ts`) and add it to `MAPS` in `content/maps/index.ts`. Look at `hamlet.ts`: houses by intent, scatter by region, torches by line.
 
