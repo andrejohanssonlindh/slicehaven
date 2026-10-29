@@ -5,6 +5,7 @@
 - **`torchpost`** (`content/things/kinds/fire.ts`, a kind of `fire`, which the skill library already had): a post you walk round, a small fire to the field, and a flame with its light. The flame is a new property any kind can have (`flame: { y }`), so a campfire or a brazier is one more line later.
 - The separate `torches` lists are gone from the layout, the placed index and the map compiler: torch posts are props like the rest, and `torchLines` just places them. The spike map's two posts are now `torchpost` props.
 - Gotcha: a vitest run can miss a brand-new kind file (stale glob in `content/things/index.ts`); editing that file once clears it.
+- **The failing torch e2e is fixed** (`e2e/spike3d-vision.e2e.ts`): the test stood 42 m out in line with the door, which since the palisade went in lies behind it; the engine was right. It now looks from the line through the open gate.
 - **Next in step 2:** campfires (hand-lit ones in the renderer) as the same kind, furniture as kinds, then kinds of building.
 
 ## 2026-10-29 — Kinds of thing: everything in the world is an object in a tree

@@ -51,8 +51,10 @@ describe('spike3d vision and the explored map', () => {
     await w('(w.weather.setHour(0), w.weather.set("clear"), w.dayMinutes = 0, 0)');
     // Stand 42 m out in front of the door torch, facing it (the house is behind the torch, not in the way).
     const torch = (await w('({ x: w.fires.find((f) => f.kind === "fire").x, z: w.fires.find((f) => f.kind === "fire").z })')) as { x: number; z: number };
-    const rot = (await w('w.houses[0].built.place.rot')) as number;
-    const fx = Math.sin(rot), fz = Math.cos(rot); // the way the door faces
+    // (The palisade across the village at z = 18 has one opening, the open gate at x = 4: look through it.)
+    const gate = { x: 4, z: 18 };
+    const gl = Math.hypot(gate.x - torch.x, gate.z - torch.z);
+    const fx = (gate.x - torch.x) / gl, fz = (gate.z - torch.z) / gl; // from the torch, out through the gate
     const face = Math.atan2(-fz, -fx);
     await w(`(w.hero.x = ${torch.x + fx * 42}, w.hero.z = ${torch.z + fz * 42}, w.heroDir = { x: ${-fx}, z: ${-fz} }, w.facing = ${face}, w.focus.x = w.hero.x, w.focus.z = w.hero.z, 0)`);
     await page.waitForTimeout(2500);
