@@ -81,7 +81,37 @@ describe('filaments: sources radiate', () => {
   it('trees radiate life and darkness at night', () => {
     const b = world({}, [{ feature: 'tree' }, { feature: 'pine' }, { feature: 'tree' }]);
     expect(read(b).bio.level).toBe(1);
-    expect(read(b, { ...NIGHT, sky: 'rain' }).skoto.level).toBe(2);
+    expect(read(b, NIGHT).skoto.level).toBe(1);
+  });
+
+  it('cloud deepens the dark by day but works the other way at night (it hides the moon and stars)', () => {
+    const open = world();
+    expect(read(open, { ...DAY, sky: 'rain' }).skoto.raw).toBeGreaterThan(read(open, DAY).skoto.raw);
+    expect(read(open, { ...NIGHT, sky: 'rain' }).skoto.raw).toBeLessThan(read(open, NIGHT).skoto.raw);
+  });
+
+  it('heat and cold follow the hour and the weather, and a fire warms its surroundings', () => {
+    const open = world();
+    const noon = { ...DAY, hour: 12 };
+    expect(read(open, noon).termo.raw).toBeGreaterThan(read(open, NIGHT).termo.raw);
+    expect(read(open, NIGHT).kryo.raw).toBeGreaterThan(read(open, noon).kryo.raw);
+    const fire = world({}, [{ fire: 'burning' }]);
+    expect(read(fire, NIGHT).termo.raw).toBeGreaterThan(read(open, NIGHT).termo.raw);
+    expect(read(fire, NIGHT).kryo.raw).toBeLessThan(read(open, NIGHT).kryo.raw);
+  });
+
+  it('the sky aspects read the clock: sun by day, stars and moon by night, the moon by its phase, clouds hide them', () => {
+    const open = world();
+    expect(read(open, { ...DAY, hour: 12 }).helio.level).toBeGreaterThanOrEqual(1);
+    expect(read(open, { ...NIGHT, hour: 0 }).helio.level).toBe(-3);
+    const full = { ...NIGHT, hour: 0, moon: 0.5 }, newMoon = { ...NIGHT, hour: 0, moon: 0 };
+    expect(read(open, full).selene.raw).toBeGreaterThan(read(open, newMoon).selene.raw);
+    expect(read(open, newMoon).astro.raw).toBeGreaterThan(read(open, full).astro.raw); // a bright moon washes the stars out
+    expect(read(open, { ...DAY, hour: 12 }).astro.level).toBe(-3);
+    expect(read(open, { ...full, sky: 'cloudy' }).selene.raw).toBeLessThanOrEqual(read(open, full).selene.raw);
+    expect(read(open, { ...full, sky: 'rain' }).selene.raw).toBeLessThan(read(open, full).selene.raw);
+    expect(read(open, { ...newMoon, sky: 'rain' }).astro.raw).toBeLessThan(read(open, newMoon).astro.raw);
+    expect(read(world({ indoors: true }), full).astro.level).toBe(-3);
   });
 
   it('fire warms its neighbours, more so with more fire', () => {

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { makeWalkSet, viewFor } from '../art/folkWalk';
 import type { Pix } from '../art/pix';
-import { type Furnished, type RoomSet, furnish } from '../content/furnish';
+import { type Furnished, ROOM_BOOKS, type RoomSet, furnish } from '../content/furnish';
 import {
   barkTex, doorTex, floorTex, groundChunkTex, leafTex, plasterTex, roofUnderTex, shingleTex, shutterTex, sodTex, stoneTex, thatchTex,
   tileTex, timberTex, windowGlowTex, windowTex,
@@ -467,6 +467,13 @@ export class SpikeWorld {
       this.torches.push({ light: hearth, flame: new THREE.Mesh(), base: 4, seed: 3 + this.houses.length * 5 });
       const hf = houseToWorld(h, hearth.position.x, hearth.position.z);
       this.fires.push({ x: hf.x, z: hf.z, kind: 'fire', weight: 1 });
+    }
+
+    // Books (weight: how many) in the room's back corner.
+    const books = ROOM_BOOKS[(h.room ?? 'home') as RoomSet];
+    if (books) {
+      const bp = houseToWorld(h, model.room.x0 + 0.4, model.room.z0 + 0.4);
+      this.fires.push({ x: bp.x, z: bp.z, kind: 'book', weight: books });
     }
 
     const y = groundHeight(this.ground, h.x, h.z) - 0.05;

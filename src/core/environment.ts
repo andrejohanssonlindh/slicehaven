@@ -32,7 +32,23 @@ export interface Environment {
   windForce: number;
   /** Index into WIND_DIRS. */
   windDir: number;
+  /** The clock, hours 0..24, in worlds that have one (the 3D world). Without it, `time` stands for a typical hour. */
+  hour?: number;
+  /** The moon's phase, 0 new .. 0.5 full .. 1 new again, where there is a calendar. Unknown reads as full. */
+  moon?: number;
 }
+
+/** The hour the rules go by: the clock, or a typical hour of the time of day. */
+export const hourOf = (env: Pick<Environment, 'time' | 'hour'>): number => env.hour ?? (env.time === 'day' ? 12 : env.time === 'dusk' ? 18.5 : 0);
+
+/** How much of the moon is lit, 0 (new) .. 1 (full). */
+export const moonLit = (moon = 0.5): number => 1 - Math.abs(2 * (((moon % 1) + 1) % 1) - 1);
+
+const MOON_NAMES = ['New moon', 'Waxing crescent', 'First quarter', 'Waxing gibbous', 'Full moon', 'Waning gibbous', 'Last quarter', 'Waning crescent'];
+export const moonName = (moon = 0.5): string => MOON_NAMES[Math.round((((moon % 1) + 1) % 1) * 8) % 8];
+
+/** Days in the moon's cycle. */
+export const MOON_CYCLE = 29.5;
 
 export function windVector(env: Pick<Environment, 'windDir'>): { x: number; y: number } {
   const a = WIND_DIRS[env.windDir].angle;

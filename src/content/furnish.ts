@@ -113,6 +113,9 @@ const HOME: Line[] = [
   { piece: 'basket', rule: free },
 ];
 
+/** How many books a room holds (a few shelves of them add a little iconotropy and semotropy to the room). */
+export const ROOM_BOOKS: Partial<Record<RoomSet, number>> = { herbalist: 2, general: 1 };
+
 export const RECIPES: Record<Exclude<RoomSet, 'smithy'>, Line[]> = {
   home: HOME,
   fisher: [...HOME.filter((l) => l.piece !== 'sacks'), { piece: 'nets', rule: side('right', 0.2) }, { piece: 'hungNet', rule: back(0.5), lift: 18 }],

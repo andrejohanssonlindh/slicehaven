@@ -1,5 +1,5 @@
 import { type Battle, type Cell, type Unit, cellAt } from './battle';
-import type { Environment } from './environment';
+import { type Environment, hourOf, moonLit, moonName } from './environment';
 import { DIRECTIONS, type Hex, hexAdd, hexDistance, hexKey, hexesWithin } from './hex';
 
 /**
@@ -15,7 +15,9 @@ import { DIRECTIONS, type Hex, hexAdd, hexDistance, hexKey, hexesWithin } from '
  * and each kind of source is capped so stacking stays sane. The sum is
  * rounded and clamped. Every contribution is kept so the UI can explain it.
  */
-export type AspectId = 'bio' | 'foto' | 'geo' | 'hydro' | 'nekro' | 'pneumo' | 'pyro' | 'skoto';
+export type AspectId =
+  | 'bio' | 'foto' | 'geo' | 'hydro' | 'nekro' | 'pneumo' | 'pyro' | 'skoto'
+  | 'termo' | 'kryo' | 'helio' | 'astro' | 'selene' | 'kosmo' | 'ikono' | 'semo';
 
 export interface AspectInfo {
   id: AspectId;
@@ -33,6 +35,14 @@ export const ASPECTS: AspectInfo[] = [
   { id: 'pneumo', name: 'Pneumotropy', gloss: 'air & wind', color: '#c8f0f4' },
   { id: 'pyro', name: 'Pyrotropy', gloss: 'fire', color: '#f2803a' },
   { id: 'skoto', name: 'Skototropy', gloss: 'darkness', color: '#7a5ac8' },
+  { id: 'termo', name: 'Thermotropy', gloss: 'heat', color: '#e8503c' },
+  { id: 'kryo', name: 'Cryotropy', gloss: 'cold', color: '#9fdcff' },
+  { id: 'helio', name: 'Heliotropy', gloss: 'the sun', color: '#ffd23a' },
+  { id: 'astro', name: 'Astrotropy', gloss: 'the stars', color: '#6f7cff' },
+  { id: 'selene', name: 'Selenotropy', gloss: 'the moon', color: '#d6dcee' },
+  { id: 'kosmo', name: 'Cosmotropy', gloss: 'the void', color: '#4a3a78' },
+  { id: 'ikono', name: 'Iconotropy', gloss: 'symbols & patterns', color: '#e0a0e8' },
+  { id: 'semo', name: 'Semotropy', gloss: 'signs & meanings', color: '#e6c27a' },
 ];
 
 export const LEVEL_NAMES: Record<number, string> = {
@@ -106,6 +116,8 @@ export function emissions(c: Cell, units: Unit[], env: Environment, opts: Filame
     e('foto', 'Firelight', [2, 1.5, 0.75], 2.5);
     e('skoto', 'Firelight', [-2, -1.5, -0.75], -3);
     e('bio', 'Burning', [-1.5, -0.25, 0], -1.5);
+    e('termo', 'Heat of fire', [3, 2, 1], 3.5);
+    e('kryo', 'Warmth of fire', [-2, -1.5, -0.75], -2.5);
   }
   if (c.fire === 'burnt') {
     e('nekro', 'Ash', [2, 0.5, 0.2], 2);
@@ -171,8 +183,9 @@ export const BASE: Record<AspectId, Base> = {
     if (env.time === 'day') add('Daylight', -3);
     if (env.time === 'dusk') add('Dusk', -1);
     if (env.time === 'night') add('Night', 0);
-    const gloom = env.time === 'day' ? 2 : 1;
-    if (overcast(env)) add('Overcast', gloom);
+    // By day a cloud deepens the dark; at night it works the other way, hiding the moon and stars that thin it.
+    const gloom = env.time === 'day' ? 2 : env.time === 'dusk' ? 1 : -1;
+    if (overcast(env)) add(env.time === 'night' ? 'Cloud hides moon and stars' : 'Overcast', gloom);
     else if (clouded) add(env.time === 'night' ? 'Cloud over the moon' : 'Under a cloud', gloom);
     if (shadowedBy) add(`In the shadow of a ${shadowedBy}`, 1);
   },
@@ -211,6 +224,110 @@ export const BASE: Record<AspectId, Base> = {
     if (cell.ground === 'flowers' || cell.ground === 'tallgrass') add('Lush growth', 0.5);
     if (cell.ground === 'path') add('Trampled path', -0.5);
     if (!outdoors) add('Indoors', -0.5);
+  },
+
+  // --- heat and cold: the weather, the hour and what burns ---
+  termo: ({ cell, env, outdoors }, add) => {
+    if (isWater(cell)) add('Cool water', -1);
+    if (!outdoors) {
+      add('Walls hold warmth', 0.5);
+      return;
+    }
+    if (env.time === 'day') add('Daylight warmth', 0.5);
+    if (env.time === 'dusk') add('Evening', 0);
+    if (env.time === 'night') add('Night chill', -1);
+    const h = hourOf(env);
+    if (env.time === 'day' && env.sky === 'clear' && h >= 10 && h <= 16) add('Midday sun', 0.5);
+    if (overcast(env)) add('Damp air', env.sky === 'storm' ? -1 : -0.5);
+    if (env.windForce >= 4) add('Biting wind', -0.5);
+  },
+
+  kryo: ({ cell, env, outdoors }, add) => {
+    if (isWater(cell)) add('Cold water', 0.5);
+    if (!outdoors) {
+      add('Shelter from the cold', -1);
+      return;
+    }
+    if (env.time === 'night') add('Night frost', 1);
+    if (env.time === 'dusk') add('Cooling air', 0.5);
+    if (env.time === 'day' && env.sky === 'clear') add('Sun-warmed air', -0.5);
+    if (overcast(env)) add('Grey and raw', 0.5);
+    if (env.windForce >= 4) add('Biting wind', 0.5);
+  },
+
+  // --- the sky: sun, stars, moon, the void. All read the clock. ---
+  helio: ({ env, outdoors, clouded, shadowedBy }, add) => {
+    if (!outdoors) {
+      add('Indoors', -2);
+      return;
+    }
+    const h = hourOf(env);
+    if (env.time === 'night') {
+      add('Sun below the horizon', -3);
+      return;
+    }
+    if (env.time === 'dusk') add('Low sun', -1);
+    else add('Sun above', 0);
+    if (env.time === 'day' && h >= 10 && h <= 14) add('Sun at its height', 1);
+    if (env.time === 'day' && env.sky === 'clear') add('Clear sky', 0.5);
+    if (overcast(env)) add('Overcast', env.sky === 'storm' ? -1.5 : -1);
+    else if (clouded) add('Under a cloud', -1);
+    if (shadowedBy) add(`In the shadow of a ${shadowedBy}`, -1);
+  },
+
+  selene: ({ env, outdoors, clouded }, add) => {
+    if (!outdoors) {
+      add('Indoors', -2);
+      return;
+    }
+    if (env.time !== 'night') {
+      add(env.time === 'dusk' ? 'Moon not yet risen' : 'Moon below the horizon', env.time === 'dusk' ? -1 : -3);
+      return;
+    }
+    add(moonName(env.moon), -2 + 4 * moonLit(env.moon));
+    if (overcast(env)) add('Cloud hides the moon', env.sky === 'storm' ? -2 : -1.5);
+    else if (clouded) add('Cloud over the moon', -1);
+  },
+
+  astro: ({ env, outdoors, clouded }, add) => {
+    if (!outdoors) {
+      add('No sky', -3);
+      return;
+    }
+    if (env.time === 'day') {
+      add('Stars lost in daylight', -3);
+      return;
+    }
+    if (env.time === 'dusk') {
+      add('Stars not yet out', -1);
+      return;
+    }
+    add('Night sky', 0);
+    if (env.sky === 'clear') add('Clear night', 1);
+    const lit = moonLit(env.moon);
+    if (lit > 0.25) add('Moonlight washes out the stars', -1.5 * lit);
+    if (overcast(env)) add('Cloud hides the stars', env.sky === 'storm' ? -2.5 : -2);
+    else if (clouded) add('Cloud over the stars', -1.5);
+  },
+
+  kosmo: ({ env, outdoors }, add) => {
+    if (!outdoors) {
+      add('Walls shut out the void', -1);
+      return;
+    }
+    add('Under the sky', 0);
+    if (env.time === 'night' && env.sky === 'clear') add('Open night sky', 1);
+    if (overcast(env)) add('A lid of cloud', -1);
+  },
+
+  // --- meaning: nothing by itself; books, and the roads people walk by, add to it ---
+  ikono: (_x, add) => {
+    add('Normal', 0);
+  },
+
+  semo: ({ cell }, add) => {
+    add('Normal', 0);
+    if (cell.ground === 'path') add('A road: it says where to go', 0.5);
   },
 
   nekro: ({ cell }, add) => {

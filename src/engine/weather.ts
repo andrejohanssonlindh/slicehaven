@@ -1,4 +1,4 @@
-import { type Environment, SKY_CLOUD, lightAt, timeOfDayAt, SKY_WIND, type Sky, type TimeOfDay, WIND_DIRS } from '../core/environment';
+import { type Environment, MOON_CYCLE, SKY_CLOUD, lightAt, timeOfDayAt, SKY_WIND, type Sky, type TimeOfDay, WIND_DIRS } from '../core/environment';
 
 export type { Sky, TimeOfDay };
 export { WIND_DIRS };
@@ -52,6 +52,8 @@ export class Weather {
   hour: number | null = null;
   /** The hour as drawn: follows `hour` (the short way round midnight) so a jump sweeps the sun across. */
   hourShown = 12;
+  /** Whole days passed (the moon's phase follows): starts a few days after the new moon. */
+  day = 4;
   tod = 0; // 0 day, 1 dusk, 2 night (continuous)
   /** Lightning flash brightness, decays quickly. */
   flash = 0;
@@ -91,7 +93,10 @@ export class Weather {
 
   /** Let hours pass (the clock must have been started with `setHour`). */
   advance(hours: number): void {
-    if (this.hour !== null) this.setHour(this.hour + hours);
+    if (this.hour === null) return;
+    const next = this.hour + hours;
+    this.day += Math.floor(next / 24);
+    this.setHour(next);
   }
 
   setWind(force: number, dir = this.windDir): void {
@@ -101,7 +106,12 @@ export class Weather {
 
   /** The conditions the rules see (targets, not the eased visuals). */
   env(): Environment {
-    return { time: this.time, sky: this.sky, windForce: this.windForce, windDir: this.windDir };
+    const env: Environment = { time: this.time, sky: this.sky, windForce: this.windForce, windDir: this.windDir };
+    if (this.hour !== null) {
+      env.hour = this.hour;
+      env.moon = (((this.day + this.hour / 24) % MOON_CYCLE) + MOON_CYCLE) % MOON_CYCLE / MOON_CYCLE;
+    }
+    return env;
   }
 
   /** Where the clouds should be (from the world state); they glide there. */

@@ -44,6 +44,14 @@ describe('filaments in the free world', () => {
     expect(lee.pneumo.parts.some((p) => p.label.includes('lee of a house'))).toBe(true);
   });
 
+  it('books add a little iconotropy and semotropy to the room that holds them, and nothing far away', () => {
+    const f = new FilamentField(meadow([{ x: 0.8, z: 0.8, kind: 'book', weight: 2 }]));
+    f.setConditions({ env: DAY });
+    expect(f.readAt(0.8, 0.8).ikono.raw).toBeGreaterThan(0);
+    expect(f.readAt(0.8, 0.8).semo.raw).toBeGreaterThan(0);
+    expect(f.readAt(20, 20).ikono.raw).toBe(0);
+  });
+
   it('the falloff joins the hex numbers smoothly and ends at 2.5 cells', () => {
     const fall: [number, number, number] = [4, 2, 1];
     expect(falloffAt(fall, 0)).toBe(4);
