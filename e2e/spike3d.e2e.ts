@@ -11,7 +11,11 @@ afterAll(async () => {
   await stopEnv(env);
 });
 
-const clickBtn = (page: Page, label: string) => page.locator('#panel button', { hasText: new RegExp(`^${label}`) }).first().click();
+const clickBtn = async (page: Page, label: string) => {
+  // The panel starts folded (the admin menu has the same settings); open it to click.
+  await page.evaluate(() => document.getElementById('panel')!.classList.remove('folded'));
+  await page.locator('#panel button', { hasText: new RegExp(`^${label}`) }).first().click();
+};
 
 describe('spike3d', () => {
   it('builds, renders the looks with no errors, and opens the house', async () => {
@@ -55,6 +59,29 @@ describe('spike3d', () => {
     await page.screenshot({ path: `${OUT}spike3d-inside.png` });
     const stats = await page.textContent('#stats');
     console.info(stats);
+    expect(errors).toEqual([]);
+  });
+});
+
+describe('spike3d admin menu', () => {
+  it('opens on å, sets the wind, and the panel stays folded', async () => {
+    const { page, errors } = await openPage(env, '/spike3d/?nogov');
+    await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 30_000 });
+    await page.waitForTimeout(800);
+    expect(await page.locator('#panel').isVisible()).toBe(false);
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'å' })));
+    expect(await page.locator('#radial').isVisible()).toBe(true);
+    await page.screenshot({ path: `${OUT}spike3d-admin.png` });
+    await page.locator('#radial button', { hasText: /^Wind$/ }).click();
+    await page.locator('#radial button', { hasText: /^Wind: weather/ }).click(); // pins at 0
+    for (let k = 0; k < 4; k++) await page.locator('#radial button', { hasText: /^Wind \d/ }).click(); // up to force 4
+    await page.screenshot({ path: `${OUT}spike3d-admin-wind.png` });
+    expect(await page.evaluate(() => (window as any).spike.world.weather.windForce)).toBe(4);
+    // A sky change leaves the pinned wind alone.
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'å' })));
+    expect(await page.locator('#radial').isVisible()).toBe(false);
+    await page.evaluate(() => (window as any).spike.world.weather.set('clear'));
+    expect(await page.evaluate(() => (window as any).spike.world.weather.windForce)).toBe(4);
     expect(errors).toEqual([]);
   });
 });

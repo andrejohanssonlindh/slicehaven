@@ -350,11 +350,12 @@ export class SpikeWorld {
   /** Where lightning has struck: the burnt ground it left (kept to a few; the oldest is cleared). */
   private scorches: { x: number; z: number; mesh: THREE.Mesh }[] = [];
   private bolt: { group: THREE.Group; age: number; repeats: number[] } | null = null;
-  private camps: { x: number; z: number; group: THREE.Group; torch: Torch }[] = [];
+  private camps: { x: number; z: number; group: THREE.Group; torch: Torch; smoke: Chimney }[] = [];
   private windowMats: THREE.MeshLambertMaterial[] = [];
   private water: Water | null;
   private rain = new Rain(1400);
   private smoke = new Smoke(24);
+  private smokeSeen = new Set<string>();
   private leaves = new Leaves(48);
   /**
    * The people in the world. Anyone with `reveals` gets a see-through oval cut in the trees
@@ -1526,7 +1527,7 @@ export class SpikeWorld {
     this.scene.add(group);
     const torch: Torch = { light, flame: fx.object, tick: fx.tick, base: 10, seed: 17 + this.camps.length * 5 };
     this.torches.push(torch);
-    this.camps.push({ x, z, group, torch });
+    this.camps.push({ x, z, group, torch, smoke: { x, y: y + 0.9, z, seed: 40 + this.camps.length * 11 } });
     this.syncFires();
     return true;
   }
@@ -1810,8 +1811,17 @@ export class SpikeWorld {
       const c = hs.chimney;
       if (!c) continue;
       const d = Math.hypot(c.x - this.focus.x, c.z - this.focus.z);
-      if (d < 60 && (this.vision.outer <= 0 || this.seen(c.x, c.z) > 0.25)) sm.push({ c, d });
+      if (d >= 60) continue;
+      // Once a chimney has been seen its smoke stays (it is remembered, like the ground); one never seen shows nothing.
+      const key = `${c.x},${c.z}`;
+      if (this.vision.outer > 0 && !this.smokeSeen.has(key)) {
+        if (this.seen(c.x, c.z) <= 0.25) continue;
+        this.smokeSeen.add(key);
+      }
+      sm.push({ c, d });
     }
+    // A campfire smokes too (the hero lit it, so it is in view); doused, its smoke thins away rather than cutting off.
+    for (const k of this.camps) sm.push({ c: k.smoke, d: Math.hypot(k.x - this.focus.x, k.z - this.focus.z) });
     sm.sort((a, b) => a.d - b.d);
     this.smoke.update(this.time, sm.map((s) => s.c), { x: w.windX, z: w.windY }, 1 - env.night * 0.8, 1 - Math.min(1, w.rain) * 0.5);
     if (this.water && this.ground.lake) {

@@ -128,6 +128,43 @@ export interface ShellOpts {
   tint: number;
 }
 
+/** The uniforms the sight code reads (all in `WORLD`), for any fragment shader that wants to hide what is not seen. */
+export const VISION_UNIFORMS = ['uVision', 'uSight', 'uSightBack', 'uLights', 'uSightRays', 'uExploredBox', 'uExplored'] as const;
+export const VISION_DECLS = `uniform vec4 uVision;
+uniform vec4 uSight;
+uniform float uSightBack;
+uniform vec4 uLights[6];
+uniform sampler2D uSightRays;
+uniform vec4 uExploredBox;
+uniform sampler2D uExplored;`;
+/** Needs `vWPos` and `gl_FragColor.rgb`: what is in sight is as it is, what was seen before is remembered in grey, the rest is black. */
+export const VISION_BODY = `if (uVision.w > 0.0) {
+  // In sight: close by, or in the cone ahead; out to the range; and not behind something solid.
+  vec2 dv = vWPos.xz - uVision.xy;
+  float sd = length(dv);
+  float sa = atan(dv.y, dv.x);
+  float ray = texture2D(uSightRays, vec2(fract(sa / 6.2831853) + ${(0.5 / SIGHT_RAYS).toFixed(6)}, 0.5)).r * uVision.w;
+  // The cone's point is a little behind the hero, so it is already wide where they stand and meets the small circle.
+  vec2 dc = dv + vec2(cos(uSight.x), sin(uSight.x)) * uSightBack;
+  float turn = abs(mod(atan(dc.y, dc.x) - uSight.x + 3.1415927, 6.2831853) - 3.1415927);
+  float cone = 1.0 - smoothstep(uSight.y - uSight.z, uSight.y, turn);
+  float close = 1.0 - smoothstep(uSight.w * 0.8, uSight.w, sd);
+  float seen = max(cone, close) * (1.0 - smoothstep(uVision.z, uVision.w, sd)) * (1.0 - smoothstep(ray + 0.1, ray + 0.45, sd));
+  // The ground a flame in view lights up is seen however far it is (the flame was checked to be in the clear).
+  float litk = 0.0;
+  for (int i = 0; i < 6; i++) {
+    vec4 l = uLights[i];
+    if (l.w > 0.0) litk = max(litk, l.w * (1.0 - smoothstep(l.z * 0.5, l.z, length(vWPos.xz - l.xy))));
+  }
+  seen = max(seen, litk);
+  vec2 euv = (vWPos.xz - uExploredBox.xy) / uExploredBox.z;
+  float known = (euv.x > 0.0 && euv.x < 1.0 && euv.y > 0.0 && euv.y < 1.0) ? texture2D(uExplored, euv).r : 0.0;
+  float lum = dot(gl_FragColor.rgb, vec3(0.3, 0.59, 0.11));
+  // What was seen before keeps most of its colour, a little cooler and dimmer: the step to what is in sight is gentle.
+  vec3 remembered = mix(vec3(lum), gl_FragColor.rgb, 0.45) * 0.78 * vec3(0.94, 0.97, 1.0) * known;
+  gl_FragColor.rgb = mix(remembered, gl_FragColor.rgb, seen);
+}`;
+
 function patch(mat: THREE.MeshLambertMaterial, o: LitOpts, shell?: ShellOpts): void {
   const key = `lit:${o.sway ? `s${o.sway.from},${o.sway.amount}${o.sway.hang ? 'h' : ''}` : ''}:${o.wettable ? 'w' : ''}${o.puddles ? 'p' : ''}:${shell ? `sh${shell.layer},${shell.offset},${shell.density},${shell.tint}` : ''}:${o.seeThrough ? 'v' : ''}`;
   mat.customProgramCacheKey = () => key;
@@ -176,13 +213,7 @@ uniform vec3 uMistColor;
 uniform float uTime;
 uniform float uPixWorld;
 uniform vec2 uCamPix;
-uniform vec4 uVision;
-uniform vec4 uSight;
-uniform float uSightBack;
-uniform vec4 uLights[6];
-uniform sampler2D uSightRays;
-uniform vec4 uExploredBox;
-uniform sampler2D uExplored;
+${VISION_DECLS}
 varying vec3 vWPos;
 varying vec3 vVPos;
 uniform vec4 uSee[${SEE_SLOTS}];
@@ -205,32 +236,7 @@ ${o.wettable ? `if (uWet > 0.05) {
   float mk = uMist.x * mix(0.25, 1.0, mh) * smoothstep(1.5, mix(34.0, 9.0, uMist.x), md);
   gl_FragColor.rgb = mix(gl_FragColor.rgb, mix(fogColor, uMistColor, uMist.w), clamp(mk, 0.0, 0.92));
 }
-if (uVision.w > 0.0) {
-  // In sight: close by, or in the cone ahead; out to the range; and not behind something solid.
-  vec2 dv = vWPos.xz - uVision.xy;
-  float sd = length(dv);
-  float sa = atan(dv.y, dv.x);
-  float ray = texture2D(uSightRays, vec2(fract(sa / 6.2831853) + ${(0.5 / SIGHT_RAYS).toFixed(6)}, 0.5)).r * uVision.w;
-  // The cone's point is a little behind the hero, so it is already wide where they stand and meets the small circle.
-  vec2 dc = dv + vec2(cos(uSight.x), sin(uSight.x)) * uSightBack;
-  float turn = abs(mod(atan(dc.y, dc.x) - uSight.x + 3.1415927, 6.2831853) - 3.1415927);
-  float cone = 1.0 - smoothstep(uSight.y - uSight.z, uSight.y, turn);
-  float close = 1.0 - smoothstep(uSight.w * 0.8, uSight.w, sd);
-  float seen = max(cone, close) * (1.0 - smoothstep(uVision.z, uVision.w, sd)) * (1.0 - smoothstep(ray + 0.1, ray + 0.45, sd));
-  // The ground a flame in view lights up is seen however far it is (the flame was checked to be in the clear).
-  float litk = 0.0;
-  for (int i = 0; i < 6; i++) {
-    vec4 l = uLights[i];
-    if (l.w > 0.0) litk = max(litk, l.w * (1.0 - smoothstep(l.z * 0.5, l.z, length(vWPos.xz - l.xy))));
-  }
-  seen = max(seen, litk);
-  vec2 euv = (vWPos.xz - uExploredBox.xy) / uExploredBox.z;
-  float known = (euv.x > 0.0 && euv.x < 1.0 && euv.y > 0.0 && euv.y < 1.0) ? texture2D(uExplored, euv).r : 0.0;
-  float lum = dot(gl_FragColor.rgb, vec3(0.3, 0.59, 0.11));
-  // What was seen before keeps most of its colour, a little cooler and dimmer: the step to what is in sight is gentle.
-  vec3 remembered = mix(vec3(lum), gl_FragColor.rgb, 0.45) * 0.78 * vec3(0.94, 0.97, 1.0) * known;
-  gl_FragColor.rgb = mix(remembered, gl_FragColor.rgb, seen);
-}`)
+${VISION_BODY}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
 float poolMask = 0.0;
 ${o.seeThrough ? `for (int i = 0; i < ${SEE_SLOTS}; i++) {

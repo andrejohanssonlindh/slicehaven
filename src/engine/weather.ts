@@ -69,9 +69,22 @@ export class Weather {
 
   constructor(private w: number, private h: number) {}
 
+  /** True once the wind has been fixed by hand (`pinWind`): changing the sky then leaves it alone. `unpinWind` hands it back to the sky. */
+  windPinned = false;
+
+  pinWind(force: number, dir = this.windDir): void {
+    this.windPinned = true;
+    this.setWind(force, dir);
+  }
+
   set(sky: Sky): void {
     this.sky = sky;
-    this.windForce = SKY_WIND[sky];
+    if (!this.windPinned) this.windForce = SKY_WIND[sky];
+  }
+
+  unpinWind(): void {
+    this.windPinned = false;
+    this.windForce = SKY_WIND[this.sky];
   }
 
   setTime(t: TimeOfDay): void {

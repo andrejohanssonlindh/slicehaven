@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { type Ground3D, WATER_Y, groundHeight } from '../core/world3d/terrain';
 import { TEXELS_PER_M } from '../core/world3d/tiers';
-import { NOISE_GLSL, WORLD } from './materials';
+import { NOISE_GLSL, VISION_BODY, VISION_DECLS, VISION_UNIFORMS, WORLD } from './materials';
 
 /**
  * Still water: one plane at the water line. Depth comes from the terrain (a
@@ -30,6 +30,7 @@ uniform vec3 uSun;
 uniform vec3 uSky;
 uniform vec3 uAmbient;
 uniform float uNight;
+${VISION_DECLS}
 varying vec3 vWPos;
 ${NOISE_GLSL}
 #include <common>
@@ -61,6 +62,7 @@ void main() {
   float a = mix(0.55, 0.94, smoothstep(0.0, 0.8, depth));
   gl_FragColor = vec4(col, max(a, max(foam, weed) * 0.95));
   #include <fog_fragment>
+  ${VISION_BODY}
   #include <colorspace_fragment>
 }`;
 
@@ -106,6 +108,7 @@ export function makeWater(g: Ground3D): Water | null {
   mat.uniforms.uTime = WORLD.uTime;
   mat.uniforms.uWind = WORLD.uWind;
   mat.uniforms.uCloud = WORLD.uCloud;
+  for (const k of VISION_UNIFORMS) mat.uniforms[k] = WORLD[k];
   mat.uniforms.tDepth.value = depth;
   const geo = new THREE.PlaneGeometry(span, span);
   geo.rotateX(-Math.PI / 2);

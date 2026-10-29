@@ -206,7 +206,8 @@ export function propShape(p: PlacedProp): Shape {
     case 'cart': return { kind: 'box', x: p.x, z: p.z, hw: 0.8 * s, hd: 0.55 * s, rot };
     case 'laundry':
     case 'fence': return { kind: 'box', x: p.x, z: p.z, hw: ((p.len ?? 4) / 2) * s, hd: 0.1, rot };
-    case 'well': return circle(p.x, p.z, 0.85 * s);
+    // The ring's outer edge (0.72) and no more: the hero's own radius is added when walking, so they can stand right against the stones.
+    case 'well': return circle(p.x, p.z, 0.72 * s);
     default: return circle(p.x, p.z, (p.kind === 'boulder' ? 0.75 : 0.5) * s);
   }
 }

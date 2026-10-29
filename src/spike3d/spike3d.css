@@ -48,6 +48,16 @@
 }
 #loading[hidden] { display: none; }
 
+#admin-open { position: absolute; right: 6px; bottom: 6px; width: 40px; height: 40px; font-size: 20px; padding: 0; z-index: 3; opacity: 0.7; }
+
+/* The admin ring: the hub in the middle, the choices round it. */
+#radial { position: absolute; inset: 0; z-index: 6; background: #0e0a1488; }
+#radial[hidden] { display: none; }
+#radial button { position: absolute; left: 50%; top: 50%; min-width: 64px; max-width: 92px; min-height: 44px; font-size: 12px; padding: 2px 6px; }
+#radial button.on { border-color: var(--accent); color: var(--accent); }
+#radial button.hub { transform: translate(-50%, -50%); width: 52px; height: 52px; min-width: 0; border-radius: 50%; font-size: 22px; }
+
+#panel.folded { display: none; }
 #panel { display: flex; flex-direction: column; gap: 4px; padding: 6px; }
 #panel .row { display: flex; gap: 4px; }
 #panel .row button { flex: 1; min-height: 36px; font-size: 12px; padding: 2px 4px; }

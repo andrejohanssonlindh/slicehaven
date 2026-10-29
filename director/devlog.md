@@ -1,5 +1,14 @@
 # Devlog
 
+## 2026-10-30 — Admin ring on "å", wind control, lingering smoke, water under sight, well
+
+- **Admin menu:** press **å** (or the ⚙ at the bottom right, for the phone) for a ring of groups: Time, Weather, Wind, Fog, Fire & light, Look, Magic, Sight, Quality, and Show/Hide panel. Tap a group for its settings round the hub; ‹ goes back, ✕ / å / Esc / tapping the dark closes. It holds every setting the bottom panel had (they are the same definitions, `button()` in `spike3d/main.ts`), plus new ones: ±3 h, wind, fog levels. **The bottom panel is now folded by default** (the choice is remembered); the ring's "Show panel" brings it back.
+- **Wind:** Wind group: force 0–6 (cycle; after 6 it hands back to the weather), direction (8 ways), "Weather wind". A hand-set wind stays when the sky changes (`Weather.pinWind` / `unpinWind`; the 2D sandbox is unchanged). Leaves start at about force 2.
+- **Smoke stays:** a chimney's smoke no longer cuts off when the chimney leaves sight. It builds up and thins away over 2.5 s (`Smoke`'s `FADE`), and once a chimney has been seen its smoke is remembered. **Placed fireplaces:** the Fire button's campfires now smoke too (doused ones thin away). Post torches do not (small flames); say if they should.
+- **Water under sight:** the lake was drawn whole once you were near it. It now goes through the same sight shader as the ground (`VISION_DECLS` / `VISION_BODY` in `engine3d/materials.ts`), so unseen water is dark, remembered water is grey.
+- **Well:** the feet shape was 0.85 m for a 0.72 m ring, so the hero stopped short, and behind the well that read as a wall under the roof. It is now the ring's own 0.72.
+- Slip: I edited `e2e/spike3d.e2e.ts` once with a `sed` instead of Edit. Not repeating.
+
 ## 2026-10-30 — Trees are clusters, not balls; settlement props
 
 - **Why the trees were "fussy balls":** each crown was ~11 big, evenly lit, noise-lumped spheres at 320 faces with a streaky texture smeared across them: no clusters, no light/dark structure. The 2D trees read because every crown is many outlined leaf clusters, light on top, dark underneath, with the trunk showing.

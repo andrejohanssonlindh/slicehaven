@@ -1,4 +1,4 @@
-import { type Sky, clockText } from '../core/environment';
+import { type Sky, WIND_DIRS, clockText } from '../core/environment';
 import { ASPECTS, LEVEL_NAMES } from '../core/filaments';
 import { MAPS, mapNamed } from '../content/maps';
 import { Governor, TIERS, type DeviceInfo, type Tier, type TierName, atlasSize, pickTier, qualityAt } from '../core/world3d/tiers';
@@ -70,22 +70,55 @@ interface Btn {
 }
 const buttons: Btn[] = [];
 
-function button(row: string, label: () => string, on: () => boolean, click: () => void): void {
+/** One setting, as the bottom panel and the admin menu both show it. */
+interface Def {
+  label: () => string;
+  on: () => boolean;
+  click: () => void;
+}
+/** The admin menu's groups, in ring order; each holds the settings that belong to it. */
+const GROUPS: { id: string; name: string; defs: Def[] }[] = [
+  { id: 'time', name: t('spike.g.time', 'Time'), defs: [] },
+  { id: 'weather', name: t('spike.g.weather', 'Weather'), defs: [] },
+  { id: 'wind', name: t('spike.g.wind', 'Wind'), defs: [] },
+  { id: 'fog', name: t('spike.g.fog', 'Fog'), defs: [] },
+  { id: 'fire', name: t('spike.g.fire', 'Fire & light'), defs: [] },
+  { id: 'look', name: t('spike.g.look', 'Look'), defs: [] },
+  { id: 'magic', name: t('spike.g.magic', 'Magic'), defs: [] },
+  { id: 'view', name: t('spike.g.view', 'Sight'), defs: [] },
+  { id: 'perf', name: t('spike.g.perf', 'Quality'), defs: [] },
+];
+const ROW_GROUP: Record<string, string> = { 'row-time': 'time', 'row-sky': 'weather', 'row-fx': 'fire', 'row-look': 'look', 'row-magic': 'magic', 'row-perf': 'view' };
+
+function makeButton(def: Def, parent: HTMLElement): Btn {
   const el = document.createElement('button');
   el.type = 'button';
   const b: Btn = {
     el,
     refresh() {
-      el.textContent = label();
-      el.classList.toggle('on', on());
+      el.textContent = def.label();
+      el.classList.toggle('on', def.on());
     },
   };
   el.addEventListener('click', () => {
-    click();
+    def.click();
     for (const x of buttons) x.refresh();
   });
-  document.getElementById(row)!.appendChild(el);
+  parent.appendChild(el);
   buttons.push(b);
+  return b;
+}
+
+/** A setting in the bottom panel's row and in the admin menu (`group` overrides the row's own group). */
+function button(row: string, label: () => string, on: () => boolean, click: () => void, group = ROW_GROUP[row]): void {
+  const def = { label, on, click };
+  makeButton(def, document.getElementById(row)!);
+  adminButton(group, label, on, click);
+}
+
+/** A setting that lives in the admin menu only. */
+function adminButton(group: string, label: () => string, on: () => boolean, click: () => void): void {
+  GROUPS.find((g) => g.id === group)!.defs.push({ label, on, click });
 }
 
 // Dynamic scaling: the governor watches frame times and steps quality down (and back up), and says so.
@@ -176,23 +209,106 @@ function buildControls(): void {
   // Mist on demand (what a spell will do): off leaves it to the weather.
   button('row-perf', () => (world.mistAmount > 0 ? t('spike.mist', 'Fog {n}%', { n: Math.round(world.mistAmount * 100) }) : t('spike.mistoff', 'Fog: weather')), () => world.mistAmount > 0, () => {
     world.setMist(cycle([0, 0.25, 0.5, 0.75, 1], world.mistAmount));
-  });
+  }, 'fog');
   button('row-perf', () => t('spike.forget', 'Forget map'), () => false, () => { world.forgetMap(); });
   button('row-perf', () => t('spike.tier', 'Tier: {n}', { n: tier.name }), () => false, () => {
     setTier(cycle(['low', 'medium', 'high'] as TierName[], tier.name));
-  });
+  }, 'perf');
   button('row-perf', () => t('spike.pixel', 'Pixel ×{n}', { n: pipeline.factor }), () => false, () => {
     pipeline.settings.pixelCss = cycle([0.5, 1, 1.5, 2, 3], pipeline.settings.pixelCss);
     fit();
-  });
+  }, 'perf');
   button('row-perf', () => t('spike.shadow', 'Shadow {n}', { n: world.settings.shadowMap }), () => false, () => {
     world.settings.shadowMap = cycle([512, 1024, 2048, 4096], world.settings.shadowMap);
     world.setShadowMap(world.settings.shadowMap);
-  });
+  }, 'perf');
   button('row-perf', () => t('spike.lights', 'Lights {n}', { n: world.settings.lights }), () => world.settings.lights > 0, () => {
     world.settings.lights = cycle([0, 1, 2, 3], world.settings.lights);
+  }, 'perf');
+
+  // Admin only: time steps, wind (the weather's own unless set here) and fog at a chosen strength.
+  adminButton('time', () => t('spike.hourplus', '+3 h'), () => false, () => { w.setHour((w.hour ?? 12) + 3); });
+  adminButton('time', () => t('spike.hourminus', '−3 h'), () => false, () => { w.setHour((w.hour ?? 12) - 3); });
+  adminButton('wind', () => (w.windPinned ? t('spike.windforce', 'Wind {n}', { n: w.windForce }) : t('spike.windweather', 'Wind: weather')), () => w.windPinned, () => {
+    if (!w.windPinned) w.pinWind(0);
+    else if (w.windForce >= 6) w.unpinWind();
+    else w.pinWind(w.windForce + 1);
   });
+  adminButton('wind', () => t('spike.winddir', 'Blows {n}', { n: WIND_DIRS[w.windDir].name }), () => false, () => { w.pinWind(w.windForce, w.windDir + 1); });
+  adminButton('wind', () => t('spike.windweather2', 'Weather wind'), () => !w.windPinned, () => { w.unpinWind(); });
+  for (const v of [0, 0.25, 0.5, 0.75, 1]) {
+    adminButton('fog', () => (v === 0 ? t('spike.fogweather', 'Weather') : `${Math.round(v * 100)}%`), () => Math.abs(world.mistAmount - v) < 0.01, () => { world.setMist(v); });
+  }
+  buildAdmin();
   for (const b of buttons) b.refresh();
+}
+
+// --- the admin menu: a ring of groups on "å" (or the cog), a ring of their settings on tapping one ---
+
+function buildAdmin(): void {
+  const ring = document.getElementById('radial')!;
+  const panel = document.getElementById('panel')!;
+  const cog = document.getElementById('admin-open')!;
+  let level: string | null = null;
+  let mine: Btn[] = [];
+  const panelShown = (): boolean => !panel.classList.contains('folded');
+  const setPanel = (show: boolean): void => {
+    panel.classList.toggle('folded', !show);
+    try { localStorage.setItem('spike3d.panel', show ? '1' : '0'); } catch { /* private window */ }
+    window.dispatchEvent(new Event('resize')); // the stage changed size
+  };
+  const place = (el: HTMLElement, i: number, n: number, r: number): void => {
+    const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+    el.style.transform = `translate(-50%, -50%) translate(${Math.round(Math.cos(a) * r)}px, ${Math.round(Math.sin(a) * r)}px)`;
+  };
+  const draw = (): void => {
+    for (const b of mine) buttons.splice(buttons.indexOf(b), 1);
+    mine = [];
+    ring.replaceChildren();
+    const r = Math.min(150, Math.min(stage.clientWidth, stage.clientHeight) * 0.36);
+    const hub = document.createElement('button');
+    hub.type = 'button';
+    hub.className = 'hub';
+    hub.textContent = level === null ? '✕' : '‹';
+    hub.addEventListener('click', () => { if (level === null) close(); else { level = null; draw(); } });
+    ring.appendChild(hub);
+    if (level === null) {
+      GROUPS.forEach((g, i) => {
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.textContent = g.name;
+        el.addEventListener('click', () => { level = g.id; draw(); });
+        place(el, i, GROUPS.length + 1, r);
+        ring.appendChild(el);
+      });
+      const p = document.createElement('button');
+      p.type = 'button';
+      p.textContent = panelShown() ? t('spike.hidepanel', 'Hide panel') : t('spike.showpanel', 'Show panel');
+      p.addEventListener('click', () => { setPanel(!panelShown()); draw(); });
+      place(p, GROUPS.length, GROUPS.length + 1, r);
+      ring.appendChild(p);
+      return;
+    }
+    const defs = GROUPS.find((g) => g.id === level)!.defs;
+    defs.forEach((d, i) => {
+      const b = makeButton(d, ring);
+      place(b.el, i, defs.length, r);
+      b.refresh();
+      mine.push(b);
+    });
+  };
+  const open = (): void => { level = null; ring.hidden = false; draw(); };
+  const close = (): void => { ring.hidden = true; ring.replaceChildren(); for (const b of mine) buttons.splice(buttons.indexOf(b), 1); mine = []; };
+  const toggle = (): void => (ring.hidden ? open() : close());
+  cog.addEventListener('click', toggle);
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'å' || e.key === 'Å') { e.preventDefault(); toggle(); }
+    else if (e.key === 'Escape' && !ring.hidden) close();
+  });
+  ring.addEventListener('click', (e) => { if (e.target === ring) close(); });
+  let saved = '0';
+  try { saved = localStorage.getItem('spike3d.panel') ?? '0'; } catch { /* private window */ }
+  panel.classList.toggle('folded', saved !== '1');
 }
 
 /** How far each tier sees (grey from, black at), metres from the view's focus. */
