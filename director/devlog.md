@@ -1,5 +1,11 @@
 # Devlog
 
+## 2026-10-29 — Session 26: tidy rooms, lightning and fires on buttons, build stamp
+
+- **Build stamp** at the top of `/spike3d/` (`v<commit count>·<hash> <date> <time>Z`, set in `vite.config.ts`): if it is the newest number, the page you load is the newest build.
+- **Rooms tidier**: odds and ends (`free` pieces) now hug the walls instead of scattering across the floor; the home has the table on the room's axis, a rug under it, and one stool at each long side; straw, litter and loose rugs are gone from the shops. Judge in `e2e/out/spike3d-room-*.png` (the e2e now zooms in).
+- **Lightning and fires to test by hand** (new button row): *Lightning* strikes a jagged bolt near the view in any weather (sky flashes twice, hard white light where it lands, `world.strike()`); *Storm bolts* turns the storm's own bolts on/off; *Fire (n)* lights a campfire beside the hero (up to 6; a real light and a filament source); *Douse* puts them all out. `e2e/spike3d-fx.e2e.ts` takes the pictures.
+
 ## 2026-10-28 — Session 25e: authoring (rooms by rules, maps as intent), faces fixed
 
 - **Bug, transparent faces**: I had made every person's card see-through, so a person's own oval (centred on the chest) cut their own head, which is nearer the camera. People are plain sprites again; only trees get the oval (what was asked). My mistake: I added that without being asked.

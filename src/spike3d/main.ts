@@ -14,6 +14,10 @@ import { t } from '../i18n';
  * look and the frame rate on a phone is a button here.
  */
 
+/** Set at build time by vite.config.ts. */
+declare const __BUILD__: string;
+document.getElementById('build')!.textContent = typeof __BUILD__ === 'string' ? __BUILD__ : 'dev';
+
 const stage = document.getElementById('stage')!;
 const canvas = document.getElementById('view') as HTMLCanvasElement;
 const statsEl = document.getElementById('stats')!;
@@ -115,6 +119,14 @@ function buildControls(): void {
   for (const [id, name] of times) button('row-time', () => name, () => w.time === id, () => w.setTime(id));
   const skies: [Sky, string][] = [['clear', t('spike.clear', 'Clear')], ['cloudy', t('spike.cloudy', 'Cloudy')], ['rain', t('spike.rain', 'Rain')], ['storm', t('spike.storm', 'Storm')]];
   for (const [id, name] of skies) button('row-sky', () => name, () => w.sky === id, () => w.set(id));
+
+  // Lightning and fires, to test by hand: a bolt on demand in any weather, storms throwing their own, campfires beside the hero.
+  button('row-fx', () => t('spike.strike', 'Lightning'), () => false, () => { world.strike(); });
+  button('row-fx', () => t('spike.autobolts', 'Storm bolts'), () => world.autoBolts, () => { world.autoBolts = !world.autoBolts; });
+  button('row-fx', () => t('spike.fire', 'Fire ({n})', { n: world.campfires }), () => world.campfires > 0, () => {
+    if (!world.lightFire()) notify(t('spike.toomanyfires', 'That is enough fires.'));
+  });
+  button('row-fx', () => t('spike.douse', 'Douse'), () => false, () => { world.douseFires(); });
 
   button('row-look', () => t('spike.inside', 'Inside'), () => world.inside, () => { world.inside = !world.inside; });
   button('row-look', () => t('spike.shells', 'Shells {n}', { n: world.settings.shells }), () => world.settings.shells > 0, () => {

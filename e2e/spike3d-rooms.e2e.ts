@@ -15,7 +15,8 @@ describe('spike3d rooms', () => {
     const { page, errors } = await openPage(env, '/spike3d/?nogov');
     await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 30_000 });
     const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; return ${fn}; })()`);
-    await w('(w.zoom = 0, 0)').catch(() => undefined);
+    // Close in, to judge how each room is laid out.
+    for (let i = 0; i < 3; i++) await page.click('#zoom button[data-zoom="1"]');
     const ids = (await w('w.houses.map((h) => h.built.place.id)')) as string[];
     for (const [i, id] of ids.entries()) {
       await w(`(w.inside = false, w.toggleRoof(${i}), w.focus.x = w.houses[${i}].built.place.x, w.focus.z = w.houses[${i}].built.place.z, 0)`);

@@ -84,6 +84,8 @@ interface Line {
   fire?: boolean;
   /** A different seed for the art, so two of a kind differ. */
   seed?: number;
+  /** Tells two lines of the same piece apart (the stool at the table's front, the stool at its back). */
+  tag?: string;
 }
 
 const back = (x?: number): Rule => ({ at: 'back', x });
@@ -99,16 +101,16 @@ const HOME: Line[] = [
   { piece: 'shelf', rule: back(0.5), lift: 22 },
   { piece: 'pegs', rule: back(0.72), lift: 4 },
   { piece: 'hanging', rule: back(0.25), lift: 14 },
+  // The table sits on the room's axis with a rug under it and a stool at each long side; the rest lines the walls.
+  { piece: 'rug', rule: center() },
   { piece: 'table', rule: center() },
-  { piece: 'stool', n: 2, rule: { at: 'around', of: 'table' } },
+  { piece: 'stool', tag: 'front', rule: { at: 'around', of: 'table', side: 'front' } },
+  { piece: 'stool', tag: 'back', rule: { at: 'around', of: 'table', side: 'back' } },
   { piece: 'footlocker', rule: side('left', 0.55) },
   { piece: 'keg', rule: side('right', 0.55) },
   { piece: 'sacks', rule: corner('frontRight') },
   { piece: 'broom', rule: side('left', 0.9) },
   { piece: 'basket', rule: free },
-  { piece: 'rug', rule: center(0, 0.5) },
-  { piece: 'straw', rule: free },
-  { piece: 'litter', rule: free },
 ];
 
 export const RECIPES: Record<Exclude<RoomSet, 'smithy'>, Line[]> = {
@@ -139,7 +141,6 @@ export const RECIPES: Record<Exclude<RoomSet, 'smithy'>, Line[]> = {
     { piece: 'basket', rule: free },
     { piece: 'broom', rule: side('left', 0.9) },
     { piece: 'stool', rule: free },
-    { piece: 'straw', rule: free },
   ],
   herbalist: [
     { piece: 'hearth', rule: corner('backRight'), fire: true },
@@ -152,8 +153,6 @@ export const RECIPES: Record<Exclude<RoomSet, 'smithy'>, Line[]> = {
     { piece: 'basket', rule: side('left', 0.5) },
     { piece: 'stool', rule: side('right', 0.5) },
     { piece: 'broom', rule: side('right', 0.9) },
-    { piece: 'rug', rule: center(0, 0.2) },
-    { piece: 'litter', rule: free },
   ],
   fishmonger: [
     { piece: 'hearth', rule: corner('backRight'), fire: true },
@@ -165,7 +164,6 @@ export const RECIPES: Record<Exclude<RoomSet, 'smithy'>, Line[]> = {
     { piece: 'counter', variant: 'fish', seed: 29, rule: center(0, 0.6) },
     { piece: 'keg', rule: side('right', 0.5) },
     { piece: 'broom', rule: side('left', 0.9) },
-    { piece: 'straw', rule: free },
   ],
   general: [
     { piece: 'shelf', variant: 'wares', seed: 32, rule: back(0.3), lift: 22 },
@@ -177,7 +175,6 @@ export const RECIPES: Record<Exclude<RoomSet, 'smithy'>, Line[]> = {
     { piece: 'counter', variant: 'general', seed: 38, rule: center(0, 0.6) },
     { piece: 'basket', rule: free },
     { piece: 'broom', rule: side('left', 0.9) },
-    { piece: 'rug', rule: center(0, 0.2) },
   ],
   weaver: [
     { piece: 'hearth', rule: corner('backRight'), fire: true },
@@ -189,7 +186,6 @@ export const RECIPES: Record<Exclude<RoomSet, 'smithy'>, Line[]> = {
     { piece: 'counter', variant: 'cloth', seed: 46, rule: center(-0.3, 0.6) },
     { piece: 'stool', rule: { at: 'around', of: 'loom' } },
     { piece: 'basket', rule: free },
-    { piece: 'rug', rule: center(-0.3, 0.1) },
   ],
 };
 
@@ -241,14 +237,14 @@ export function furnish(set: RoomSet, room: RoomRect, doorX: number, seed = 0): 
     add('forge', forge, { kind: 'floor', d: 0.9, maxW: 1.4 }, { rule: corner('backRight'), fire: true });
     add('workbench', bench, { kind: 'floor', d: 0.6, maxW: 1.6 }, { rule: back(0.1) });
     add('toolrack', rack, { kind: 'hung', maxW: 1.4 }, { rule: back(0.55), lift: 22 });
-    add('anvil', anvil, { kind: 'floor', d: 0.5, maxW: 0.8 }, { rule: center(0.1, 0.1) });
+    add('anvil', anvil, { kind: 'floor', d: 0.5, maxW: 0.8 }, { rule: center() });
     add('trough', trough, { kind: 'floor', d: 0.5, maxW: 1.1 }, { rule: side('left', 0.5) });
     add('coalbin', coal, { kind: 'floor', d: 0.5, maxW: 0.9 }, { rule: corner('frontRight') });
   } else {
     for (const line of RECIPES[set]) {
       for (let i = 0; i < (line.n ?? 1); i++) {
         const id = (line.n ?? 1) > 1 ? `${line.piece}#${i}` : line.piece;
-        const unique = `${id}${line.variant ? `:${line.variant}` : ''}`;
+        const unique = `${id}${line.variant ? `:${line.variant}` : ''}${line.tag ? `@${line.tag}` : ''}`;
         const rule = line.rule.at === 'around' ? { ...line.rule, of: line.rule.of } : line.rule;
         add(unique, makePiece(line.piece, { ...line, seed: (line.seed ?? 0) + i }), PIECES[line.piece], { rule, lift: line.lift, fire: line.fire });
       }

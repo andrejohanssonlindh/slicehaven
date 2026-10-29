@@ -204,9 +204,13 @@ export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn
         return null;
       }
       case 'free': {
+        // Odds and ends hug the walls (the tidy places first), never scatter across the middle; the seed only breaks ties.
         const cand: { x: number; z: number; h: number }[] = [];
-        for (let x = room.x0 + hw + 0.3; x <= room.x1 - hw - 0.3; x += 0.25) {
-          for (let z = room.z0 + hd + 0.3; z <= room.z1 - hd - 0.3; z += 0.25) cand.push({ x, z, h: white(Math.round(x * 100), Math.round(z * 100), seed + p.id.length * 7) });
+        for (let x = room.x0 + hw + WALL; x <= room.x1 - hw - WALL + 1e-6; x += 0.25) {
+          for (let z = room.z0 + hd + WALL; z <= room.z1 - hd - WALL + 1e-6; z += 0.25) {
+            const wall = Math.min(x - hw - room.x0, room.x1 - hw - x, z - hd - room.z0, room.z1 - hd - z);
+            cand.push({ x, z, h: Math.round(wall / 0.3) + white(Math.round(x * 100), Math.round(z * 100), seed + p.id.length * 7) * 0.5 });
+          }
         }
         cand.sort((a, b) => a.h - b.h);
         const c = cand.find((q) => fits(rectAt(q.x, q.z, p.w, p.d)));

@@ -67,9 +67,12 @@ interface CutPart {
   mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial>;
 }
 
+/** How long a lightning bolt stays on screen, seconds. */
+const BOLT_LIFE = 0.5;
+
 interface Torch {
   light: THREE.PointLight;
-  flame: THREE.Mesh;
+  flame: THREE.Object3D;
   base: number;
   seed: number;
 }
@@ -139,6 +142,14 @@ export class SpikeWorld {
   readonly houses: HouseInst[] = [];
   private shells: Shell[] = [];
   private torches: Torch[] = [];
+
+  // --- test controls: lightning and campfires ---
+  /** Storm weather throws bolts by itself (off: only `strike()` does). */
+  autoBolts = true;
+  /** The flash of the current bolt: one light that is always in the scene (adding lights at run time would recompile every shader). */
+  private boltLight = new THREE.PointLight(0xcfe0ff, 0, 40, 1.5);
+  private bolt: { group: THREE.Group; age: number; repeats: number[] } | null = null;
+  private camps: { x: number; z: number; group: THREE.Group; torch: Torch }[] = [];
   private windowMats: THREE.MeshLambertMaterial[] = [];
   private water: Water | null;
   private rain = new Rain(1400);
@@ -191,7 +202,7 @@ export class SpikeWorld {
     this.sun.shadow.radius = 2;
     this.sun.shadow.camera.layers.enable(1);
     this.setShadowMap(settings.shadowMap);
-    this.scene.add(this.sun, this.sun.target);
+    this.scene.add(this.sun, this.sun.target, this.boltLight);
 
     // Ground chunks stream in once the view is sized (see `frame`); until then the exact height function stands in.
     this.layout = layout;
@@ -871,12 +882,129 @@ export class SpikeWorld {
     });
   }
 
+  /**
+   * A lightning bolt: a jagged streak from the sky to the ground (near the view unless a spot is given), the sky
+   * flashing twice, and a hard white light where it lands. Works in any weather, so it can be tested on a clear day.
+   */
+  strike(at?: { x: number; z: number }, rnd: () => number = Math.random): { x: number; z: number } {
+    this.clearBolt();
+    const a = rnd() * Math.PI * 2, r = 4 + rnd() * 9;
+    const x = at?.x ?? this.focus.x + Math.cos(a) * r, z = at?.z ?? this.focus.z + Math.sin(a) * r;
+    const y = this.store.heightAt(x, z);
+    const top = y + 48;
+    const group = new THREE.Group();
+    const mat = new THREE.MeshBasicMaterial({ color: 0xf2f6ff, fog: false });
+    // Walk down in steps, wandering sideways less and less, so the streak lands where it was aimed.
+    const pts: THREE.Vector3[] = [];
+    const N = 14;
+    for (let i = 0; i <= N; i++) {
+      const k = i / N, wander = (1 - k) * 9 * (i === 0 || i === N ? 0.4 : 1);
+      pts.push(new THREE.Vector3(x + (rnd() - 0.5) * wander, top + (y - top) * k, z + (rnd() - 0.5) * wander));
+    }
+    pts[N].set(x, y, z);
+    const up = new THREE.Vector3(0, 1, 0);
+    for (let i = 0; i < N; i++) {
+      const d = new THREE.Vector3().subVectors(pts[i + 1], pts[i]);
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1, 0.16), mat);
+      seg.scale.y = d.length();
+      seg.position.copy(pts[i]).addScaledVector(d, 0.5);
+      seg.quaternion.setFromUnitVectors(up, d.normalize());
+      group.add(seg);
+    }
+    this.scene.add(group);
+    this.bolt = { group, age: 0, repeats: [0.14, 0.3] };
+    this.boltLight.position.set(x, y + 3, z);
+    this.weather.flash = 1;
+    return { x, z };
+  }
+
+  private clearBolt(): void {
+    if (!this.bolt) return;
+    this.scene.remove(this.bolt.group);
+    this.bolt.group.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
+    this.bolt = null;
+    this.boltLight.intensity = 0;
+  }
+
+  /** The bolt lives a third of a second; the sky flashes again as it flickers. */
+  private stepBolt(dt: number): void {
+    const b = this.bolt;
+    if (!b) return;
+    b.age += dt;
+    if (b.repeats.length && b.age >= b.repeats[0]) {
+      b.repeats.shift();
+      this.weather.flash = Math.max(this.weather.flash, 0.7);
+    }
+    if (b.age > BOLT_LIFE) return this.clearBolt();
+    // Flicker: the streak blinks while the light dies away.
+    b.group.visible = b.age < 0.15 || Math.floor(b.age * 40) % 3 !== 0;
+    this.boltLight.intensity = 120 * Math.max(0, 1 - b.age / BOLT_LIFE);
+  }
+
+  /** Light a campfire beside the hero (it is a fire for the filament field too). Returns false when there are too many. */
+  lightFire(): boolean {
+    if (this.camps.length >= 6) return false;
+    const x = this.hero.x + 0.9, z = this.hero.z + 0.2;
+    const y = this.heroCard.mesh.position.y;
+    const group = new THREE.Group();
+    group.position.set(x, y, z);
+    const wood = new THREE.MeshBasicMaterial({ color: 0x4a2e1a });
+    for (const rot of [0.5, 2.1, 3.6]) {
+      const log = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.1, 0.1), wood);
+      log.position.y = 0.06;
+      log.rotation.y = rot;
+      group.add(log);
+    }
+    const flame = new THREE.Group();
+    const tongue = (w: number, h: number, c: number, oy: number): void => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), new THREE.MeshBasicMaterial({ color: c }));
+      m.position.y = oy + h / 2;
+      flame.add(m);
+    };
+    tongue(0.34, 0.34, 0xe0501c, 0.1);
+    tongue(0.22, 0.34, 0xffa030, 0.28);
+    tongue(0.1, 0.28, 0xfff0a0, 0.48);
+    group.add(flame);
+    const light = new THREE.PointLight(0xff9a48, 10, 12, 2);
+    light.position.set(0, 0.7, 0);
+    group.add(light);
+    this.scene.add(group);
+    const torch: Torch = { light, flame, base: 10, seed: 17 + this.camps.length * 5 };
+    this.torches.push(torch);
+    this.camps.push({ x, z, group, torch });
+    this.syncFires();
+    return true;
+  }
+
+  /** Put out every campfire that was lit by hand. */
+  douseFires(): void {
+    for (const c of this.camps) {
+      this.scene.remove(c.group);
+      this.torches.splice(this.torches.indexOf(c.torch), 1);
+      c.group.traverse((o) => {
+        const m = o as THREE.Mesh;
+        m.geometry?.dispose();
+      });
+    }
+    this.camps = [];
+    this.syncFires();
+  }
+
+  get campfires(): number {
+    return this.camps.length;
+  }
+
+  private syncFires(): void {
+    this.field.setSources([...this.fires, ...this.camps.map((c): FSource => ({ x: c.x, z: c.z, kind: 'fire', weight: 1 }))]);
+  }
+
   update(dtMs: number): void {
     const dt = Math.min(0.1, dtMs / 1000);
     this.time += dt;
     const w = this.weather;
     w.update(dtMs);
-    if (w.sky === 'storm' && Math.random() < dt / 5) w.flash = 1;
+    if (this.autoBolts && w.sky === 'storm' && Math.random() < dt / 5) this.strike();
+    this.stepBolt(dt);
     // The clouds drift downwind; the offset is part of the environment so the rules can ask the same field.
     const drift = cloudDrift(w.windForce);
     this.cloudOff.x += w.wx * drift * dt;
