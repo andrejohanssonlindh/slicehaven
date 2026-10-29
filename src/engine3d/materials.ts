@@ -102,6 +102,8 @@ export interface LitOpts {
   sway?: { from: number; amount: number };
   /** Gets darker and glossier in the rain. */
   wettable?: boolean;
+  /** Standing water collects in the flat low patches of this surface once it is wet (the ground). */
+  puddles?: boolean;
   /** Billboard sprite: alpha-tested, double-sided. */
   sprite?: boolean;
   emissiveMap?: THREE.Texture | null;
@@ -122,7 +124,7 @@ export interface ShellOpts {
 }
 
 function patch(mat: THREE.MeshLambertMaterial, o: LitOpts, shell?: ShellOpts): void {
-  const key = `lit:${o.sway ? `s${o.sway.from},${o.sway.amount}` : ''}:${o.wettable ? 'w' : ''}:${shell ? `sh${shell.layer},${shell.offset},${shell.density},${shell.tint}` : ''}:${o.seeThrough ? 'v' : ''}`;
+  const key = `lit:${o.sway ? `s${o.sway.from},${o.sway.amount}` : ''}:${o.wettable ? 'w' : ''}${o.puddles ? 'p' : ''}:${shell ? `sh${shell.layer},${shell.offset},${shell.density},${shell.tint}` : ''}:${o.seeThrough ? 'v' : ''}`;
   mat.customProgramCacheKey = () => key;
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, WORLD);
@@ -163,6 +165,8 @@ ${o.sway ? `{
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
 uniform float uWet;
+uniform float uTime;
+uniform float uPixWorld;
 uniform vec2 uCamPix;
 uniform vec4 uVision;
 uniform vec4 uSight;
@@ -219,6 +223,18 @@ ${o.seeThrough ? `for (int i = 0; i < ${SEE_SLOTS}; i++) {
   }
 }` : ''}
 ${o.wettable ? 'diffuseColor.rgb *= 1.0 - uWet * 0.28;' : ''}
+${o.puddles ? `if (uWet > 0.3) {
+  // Pools sit in the flat parts; the noise is sampled per art pixel so the rim is a hard pixel edge, and it grows as the rain goes on.
+  vec3 fn = normalize(cross(dFdx(vWPos), dFdy(vWPos)));
+  vec2 pp = floor(vWPos.xz / uPixWorld) * uPixWorld;
+  float pool = shFbm(pp / 2.6, 913);
+  float edge = 0.71 - (uWet - 0.3) * 0.2;
+  float inPool = step(edge, pool) * smoothstep(0.93, 0.99, abs(fn.y));
+  // Dark water with a pale sky in it, a ring of ripples while it falls.
+  float ripple = uWet > 0.55 ? 0.5 + 0.5 * sin(length(pp - floor(pp * 0.9 + 0.5) / 0.9) * 40.0 - uTime * 6.0) : 0.0;
+  vec3 water = vec3(0.13, 0.18, 0.25) + vec3(0.07, 0.09, 0.12) * smoothstep(edge, edge + 0.1, pool) + ripple * 0.03;
+  diffuseColor.rgb = mix(diffuseColor.rgb, water, inPool * 0.8);
+}` : ''}
 ${shell ? `{
   // Locked to the world's pixel grid; cells are 1 × 2 pixels, so the fringe reads as strands.
   vec2 cell = floor(gl_FragCoord.xy) + uCamPix;

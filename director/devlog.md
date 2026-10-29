@@ -1,5 +1,12 @@
 # Devlog
 
+## 2026-10-30 — M3: chimney smoke and puddles
+
+- **Smoke** (`engine3d/smoke.ts`): every standing house with a fire gets seven chunky grey cubes rising from its chimney (`model.smoke`), swelling then shrinking away, leaning with the wind, dark grey at night, thinner in rain. One instanced draw for the nearest 24 chimneys within 60 m that are in sight. Tunables: `PUFFS`, `LIFE` and the rise/lean numbers in `Smoke.update`.
+- **Puddles:** the ground material (`puddles: true` in `lit`) gathers dark sky-tinted water in flat patches once wetness passes 0.3; the pools are sampled per art pixel (hard rims), grow as the rain goes on, and ripple above 0.55. They dry with the existing slow wetness ease. Tunables: the `edge` line and colours in `engine3d/materials.ts`.
+- Found by the spike e2e: the fragment shader had no `uTime` / `uPixWorld` declared (they were vertex-only), so the ground failed to compile. Both are declared now.
+- Left in M3: judge the Day / Dusk / Night / Storm shots on the phone and tune; rain putting out the torch.
+
 ## 2026-10-30 — Less jolting while walking; far ground is forgotten; a gentler vision cone
 
 - **Why it jolted** (measured in the browser, JS time per piece): (1) every light that is *switched on* counts in every shader, and a house's hearth light (or a chunk's torch) was created switched on, for one frame, then switched off by the pool: two shader rebuilds per house (200+ ms each, 3 s on software GL). Lights are now created off, and dark spare lights make up the count so it never changes (`SpikeWorld.spares`). Render max went from 214 ms to 23 ms. (2) Painting a chunk's ground texture took ~110 ms in one go: now `groundChunkPainter` does it in slices (4 ms a frame) with a flat green standing in until it is done. (3) The first time a new kind of house streams in, its shaders were built then: `warmHouses` builds them all before the first frame.

@@ -35,6 +35,7 @@ import { EXPLORED_WINDOW, type LitOpts, SEE_SLOTS, WORLD, exploredTexture, lit, 
 import { SCORCH_SIZE, scorchImage } from '../core/world3d/scorch';
 import { RAYS, type SightLight, type VisionSpec, angleGap, castSight, lightReach, litSeenAt, seenAt, turnToward, visibleLights, visionOf } from '../core/world3d/vision';
 import { Rain } from './rain';
+import { type Chimney, Smoke } from './smoke';
 import { type SpriteCard, type WalkCard, blobShadow, spriteCard, walkCard } from './sprites';
 import { type Heat, makeFloorHeat, makeHeat } from './heat';
 import { type Water, makeWater } from './water';
@@ -139,6 +140,8 @@ interface HouseInst {
   hearth: Torch | null;
   /** Where its hearth burns, in the world (a light seen from far). */
   hearthAt: P2 | null;
+  /** Where its smoke leaves, if it has a fire to make it. */
+  chimney: Chimney | null;
   shells: Shell[];
   group: THREE.Group;
   /** The room's furniture cards: only shown when the roof is lifted, or their tops show through the roof. */
@@ -349,6 +352,7 @@ export class SpikeWorld {
   private windowMats: THREE.MeshLambertMaterial[] = [];
   private water: Water | null;
   private rain = new Rain(1400);
+  private smoke = new Smoke(24);
   /**
    * The people in the world. Anyone with `reveals` gets a see-through oval cut in the trees
    * between them and the camera; leave it off for someone who should stay hidden.
@@ -439,6 +443,7 @@ export class SpikeWorld {
     if (this.water) this.scene.add(this.water.mesh);
     this.buildTorches();
     this.scene.add(this.rain.lines);
+    this.scene.add(this.smoke.mesh);
 
     this.walker = walkCard(makeWalkSet(PEOPLE.baker), PITCH);
     this.people.push({ id: 'villager', card: this.walker, reveals: true });
@@ -558,7 +563,7 @@ export class SpikeWorld {
   private standHouse(entry: HouseEntry<Furnished>, st: Standing): void {
     const { built, room } = entry;
     const h = built.place, model = built.model;
-    const inst: HouseInst = { built, mats: [], cards: [], hearth: null, hearthAt: null, shells: [], group: new THREE.Group(), furniture: [], cut: [], box: entry.box, floorHeat: null, cutT: 0, open: false };
+    const inst: HouseInst = { built, mats: [], cards: [], hearth: null, hearthAt: null, chimney: null, shells: [], group: new THREE.Group(), furniture: [], cut: [], box: entry.box, floorHeat: null, cutT: 0, open: false };
     const matFor = (m: HouseMaterial, cut: boolean): { mat: THREE.MeshLambertMaterial; opts: LitOpts } => this.houseMat(m, cut, inst.mats);
     for (const p of model.parts) {
       const geo = geometryOf(p.mesh);
@@ -608,6 +613,10 @@ export class SpikeWorld {
     // (What the room gives off to the filaments is the index's: it feeds the field whether or not the house is standing.)
 
     const y = groundHeight(this.ground, h.x, h.z) - 0.05;
+    if (fire) {
+      const c = houseToWorld(h, model.smoke[0], model.smoke[2]);
+      inst.chimney = { x: c.x, y: y + model.smoke[1], z: c.z, seed: Math.round(h.x * 0.91 + h.z * 0.53) % 97 };
+    }
     inst.group.position.set(h.x, y, h.z);
     inst.group.rotation.y = h.rot;
     this.scene.add(inst.group);
@@ -826,7 +835,7 @@ export class SpikeWorld {
     const c = this.store.ensure(i, j);
     // The painting is the slow part (about 100 ms), so it is done a few ms a frame: a flat green stands in until it is finished.
     this.groundHold ??= pixTexture(new Uint8ClampedArray([62, 92, 42, 255]), 1, 1, { flip: false });
-    const mesh = new THREE.Mesh(geometryOf(c.mesh), lit({ map: this.groundHold, ao: true, wettable: true }));
+    const mesh = new THREE.Mesh(geometryOf(c.mesh), lit({ map: this.groundHold, ao: true, wettable: true, puddles: true }));
     mesh.receiveShadow = true;
     this.scene.add(mesh);
     const grass = this.buildGrass(c);
@@ -1721,6 +1730,16 @@ export class SpikeWorld {
     }
     const span = Math.max(this.camera.right, this.camera.top) * 1.1;
     this.rain.update(dt, w.rain, this.focus, span, { x: w.windX, z: w.windY }, env.ambient * 0.6 + env.sunIntensity * 0.15 + w.flash);
+    // Chimney smoke: the nearest chimneys in sight (a smoking chimney is a long way to see, but not through the dark).
+    const sm: { c: Chimney; d: number }[] = [];
+    for (const hs of this.houses) {
+      const c = hs.chimney;
+      if (!c) continue;
+      const d = Math.hypot(c.x - this.focus.x, c.z - this.focus.z);
+      if (d < 60 && (this.vision.outer <= 0 || this.seen(c.x, c.z) > 0.25)) sm.push({ c, d });
+    }
+    sm.sort((a, b) => a.d - b.d);
+    this.smoke.update(this.time, sm.map((s) => s.c), { x: w.windX, z: w.windY }, 1 - env.night * 0.8, 1 - Math.min(1, w.rain) * 0.5);
     if (this.water && this.ground.lake) {
       const lk = this.ground.lake;
       this.water.mesh.visible = this.vision.outer <= 0 || Math.hypot(this.focus.x - lk.x, this.focus.z - lk.z) < lk.r * 1.4 + this.vision.outer;
