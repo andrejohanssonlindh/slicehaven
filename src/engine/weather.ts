@@ -1,4 +1,4 @@
-import { type Environment, SKY_CLOUD, SKY_WIND, type Sky, type TimeOfDay, WIND_DIRS } from '../core/environment';
+import { type Environment, SKY_CLOUD, lightAt, timeOfDayAt, SKY_WIND, type Sky, type TimeOfDay, WIND_DIRS } from '../core/environment';
 
 export type { Sky, TimeOfDay };
 export { WIND_DIRS };
@@ -48,6 +48,10 @@ export class Weather {
   /** Smoothed wind direction vector. */
   wx = 1;
   wy = 0;
+  /** The clock in hours 0..24 (3D world); null in the hex games, which only know day, dusk and night. */
+  hour: number | null = null;
+  /** The hour as drawn: follows `hour` (the short way round midnight) so a jump sweeps the sun across. */
+  hourShown = 12;
   tod = 0; // 0 day, 1 dusk, 2 night (continuous)
   /** Lightning flash brightness, decays quickly. */
   flash = 0;
@@ -70,6 +74,24 @@ export class Weather {
 
   setTime(t: TimeOfDay): void {
     this.time = t;
+    if (this.hour !== null) this.hour = t === 'day' ? 12 : t === 'dusk' ? 18.5 : 0;
+  }
+
+  /** What the sky is drawn from: the hour as shown, or null without a clock. */
+  get lightHour(): number | null {
+    return this.hour === null ? null : this.hourShown;
+  }
+
+  /** Give the world a clock and set it. */
+  setHour(h: number): void {
+    if (this.hour === null) this.hourShown = h; // first start: no sweep
+    this.hour = ((h % 24) + 24) % 24;
+    this.time = timeOfDayAt(this.hour);
+  }
+
+  /** Let hours pass (the clock must have been started with `setHour`). */
+  advance(hours: number): void {
+    if (this.hour !== null) this.setHour(this.hour + hours);
   }
 
   setWind(force: number, dir = this.windDir): void {
@@ -105,7 +127,12 @@ export class Weather {
     const a = WIND_DIRS[this.windDir].angle;
     this.wx = lerp(this.wx, Math.cos(a), k);
     this.wy = lerp(this.wy, Math.sin(a), k);
-    this.tod = lerp(this.tod, TIME[this.time], 1 - Math.exp(-dt / 2000));
+    if (this.hour !== null) {
+      // The light follows the clock; a jump of hours sweeps across in about a second instead of cutting.
+      const gap = ((this.hour - this.hourShown + 36) % 24) - 12;
+      this.hourShown = (this.hourShown + gap * (1 - Math.exp(-dt / 350)) + 24) % 24;
+      this.tod = lightAt(this.hourShown);
+    } else this.tod = lerp(this.tod, TIME[this.time], 1 - Math.exp(-dt / 2000));
     this.flash *= Math.exp(-dt / 90);
     const kc = 1 - Math.exp(-dt / 500); // clouds glide into place in about a second
     this.cloudX = lerp(this.cloudX, this.cloudTargetX, kc);

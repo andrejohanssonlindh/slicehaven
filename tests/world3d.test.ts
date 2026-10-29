@@ -211,3 +211,21 @@ describe('tree', () => {
     expect(dead.clumps).toHaveLength(0);
   });
 });
+
+describe('the 24-hour clock', () => {
+  it('maps hours to day, dusk and night, and the sun crosses the sky', async () => {
+    const { timeOfDayAt, lightAt, clockText } = await import('../src/core/environment');
+    const { bodyDir } = await import('../src/core/world3d/sky');
+    expect([3, 6, 12, 18, 21].map(timeOfDayAt)).toEqual(['night', 'dusk', 'day', 'dusk', 'night']);
+    expect(lightAt(12)).toBe(0);
+    expect(lightAt(23)).toBe(2);
+    expect(lightAt(6)).toBe(1);
+    expect(clockText(7.5)).toBe('07:30');
+    const morning = bodyDir(8), noon = bodyDir(12), evening = bodyDir(16);
+    expect(morning[0]).toBeGreaterThan(0.3); // east
+    expect(evening[0]).toBeLessThan(-0.3); // west
+    expect(noon[1]).toBeGreaterThan(morning[1]); // highest at noon
+    expect(noon[2]).toBeGreaterThan(0); // over the south
+    expect(bodyDir(0)[1]).toBeGreaterThan(0.5); // the moon is high at midnight
+  });
+});

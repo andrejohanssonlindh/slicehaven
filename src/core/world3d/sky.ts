@@ -59,10 +59,23 @@ const grey = (c: RGB, k: number): RGB => {
 };
 
 /**
+ * Where the sun (6h to 18h) or the moon (18h to 6h) is: up in the east, over the south at its height, down in the west.
+ * z grows southward, so the noon sun lies toward +z.
+ */
+export function bodyDir(hour: number): V3 {
+  const h = ((hour % 24) + 24) % 24;
+  const u = (((h - 6) % 12) + 12) % 12 / 12; // 0..1 across the arc, same for both bodies
+  const th = Math.PI * u;
+  const y = 0.2 + 0.6 * Math.sin(th);
+  return unit([Math.cos(th) * 0.9, y, Math.sin(th) * 0.55 + 0.1]);
+}
+
+/**
  * @param tod continuous time of day, 0 day, 1 dusk, 2 night
  * @param cloud cloud cover 0..1, rain 0..1, flash 0..1 (lightning)
+ * @param hour the clock, if there is one: the sun (by day) or the moon (by night) then crosses the sky
  */
-export function skyLight(tod: number, cloud: number, rain: number, flash = 0): SkyLight {
+export function skyLight(tod: number, cloud: number, rain: number, flash = 0, hour?: number): SkyLight {
   const t = Math.max(0, Math.min(2, tod));
   const i = Math.min(1, Math.floor(t));
   const k = t - i;
@@ -81,6 +94,7 @@ export function skyLight(tod: number, cloud: number, rain: number, flash = 0): S
     fogFar: lerp(140, 45, rain),
     night: lerp(a.night, b.night, k),
   };
+  if (hour !== undefined) s.sunDir = bodyDir(hour);
   if (flash > 0) {
     s.sunIntensity += flash * 4;
     s.sunColor = lerpV(s.sunColor, [0.85, 0.9, 1.0], flash);

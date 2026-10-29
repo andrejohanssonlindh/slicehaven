@@ -1,4 +1,4 @@
-import type { Sky, TimeOfDay } from '../core/environment';
+import { type Sky, clockText } from '../core/environment';
 import { ASPECTS, LEVEL_NAMES } from '../core/filaments';
 import { MAPS, mapNamed } from '../content/maps';
 import { Governor, TIERS, type DeviceInfo, type Tier, type TierName, atlasSize, pickTier, qualityAt } from '../core/world3d/tiers';
@@ -115,8 +115,18 @@ const cycle = <T>(list: readonly T[], v: T): T => list[(list.indexOf(v) + 1) % l
 
 function buildControls(): void {
   const w = world.weather;
-  const times: [TimeOfDay, string][] = [['day', t('spike.day', 'Day')], ['dusk', t('spike.dusk', 'Dusk')], ['night', t('spike.night', 'Night')]];
-  for (const [id, name] of times) button('row-time', () => name, () => w.time === id, () => w.setTime(id));
+  const times: [number, string][] = [[6, t('spike.dawn', 'Dawn')], [12, t('spike.day', 'Day')], [18.5, t('spike.dusk', 'Dusk')], [0, t('spike.night', 'Night')]];
+  const nearHour = (h: number): boolean => w.hour !== null && Math.abs(((w.hour - h + 36) % 24) - 12) < 1.5 && world.dayMinutes === 0;
+  for (const [h, name] of times) button('row-time', () => name, () => nearHour(h), () => { world.dayMinutes = 0; w.setHour(h); });
+  // The clock: a whole day in 0 (stopped), 6, 2 or 0.5 real minutes.
+  button('row-time', () => (world.dayMinutes ? t('spike.dayminutes', 'Day: {n} min', { n: world.dayMinutes }) : t('spike.clockstopped', 'Clock stopped')), () => world.dayMinutes > 0, () => { world.dayMinutes = cycle([0, 6, 2, 0.5], world.dayMinutes); });
+  const hourEl = document.getElementById('hour') as HTMLInputElement, hourText = document.getElementById('hour-text')!;
+  hourEl.addEventListener('input', () => { world.dayMinutes = 0; w.setHour(Number(hourEl.value)); for (const b of buttons) b.refresh(); });
+  setInterval(() => {
+    if (w.hour === null) return;
+    hourText.textContent = clockText(w.hour);
+    if (document.activeElement !== hourEl) hourEl.value = String(w.hour);
+  }, 250);
   const skies: [Sky, string][] = [['clear', t('spike.clear', 'Clear')], ['cloudy', t('spike.cloudy', 'Cloudy')], ['rain', t('spike.rain', 'Rain')], ['storm', t('spike.storm', 'Storm')]];
   for (const [id, name] of skies) button('row-sky', () => name, () => w.sky === id, () => w.set(id));
 

@@ -258,6 +258,8 @@ export class SpikeWorld {
   follow = false;
   private wet = 0;
   private time = 0;
+  /** Real minutes for a whole day; 0 stops the clock. */
+  dayMinutes = 0;
   private cloudOff = new THREE.Vector2();
   settings: WorldSettings;
 
@@ -327,6 +329,7 @@ export class SpikeWorld {
     this.scene.add(this.marker);
 
     this.weather.setWind(2, 1);
+    this.weather.setHour(12);
     this.field = new FilamentField(streamingFilamentWorld(g, placed, built, () => this.fieldExtras()));
   }
 
@@ -1277,6 +1280,7 @@ export class SpikeWorld {
     const dt = Math.min(0.1, dtMs / 1000);
     this.time += dt;
     const w = this.weather;
+    if (this.dayMinutes > 0) w.advance((dt * 24) / (this.dayMinutes * 60));
     w.update(dtMs);
     if (this.autoBolts && w.sky === 'storm' && Math.random() < dt / 5) this.strike();
     this.stepBolt(dt);

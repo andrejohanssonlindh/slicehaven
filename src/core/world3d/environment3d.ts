@@ -10,6 +10,8 @@ import { cloudDensity, skyLight, type RGB } from './sky';
 /** The slice of the weather model this needs (what `Weather` exposes). */
 export interface WeatherState {
   tod: number;
+  /** The clock as drawn, hours 0..24, when the world has one. */
+  lightHour?: number | null;
   cloud: number;
   rain: number;
   flash: number;
@@ -47,7 +49,7 @@ export interface Environment3D {
 
 /** Build the environment from the weather and the clouds' accumulated drift (metres). */
 export function environment(w: WeatherState, cloudOffset = { x: 0, z: 0 }): Environment3D {
-  const sky = skyLight(w.tod, w.cloud, w.rain, w.flash);
+  const sky = skyLight(w.tod, w.cloud, w.rain, w.flash, w.lightHour ?? undefined);
   return {
     sunDir: sky.sunDir,
     sunColor: sky.sunColor,
