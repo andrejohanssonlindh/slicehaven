@@ -1,5 +1,12 @@
 # Devlog
 
+## 2026-10-29 — Walking moved out of the renderer (review item 4)
+
+- **`core/world3d/actors.ts`:** the hero and the innkeeper are `Actor`s (plain data, can be saved), moved by `Walking` (paths, stairs, key steering, doors) and, for the keeper, a `Rounds` routine. Houses are held by id, not by what the renderer stood up. `world.ts` lost 250 lines of rules.
+- **Fixes review bugs 1 and 2:** the hero stays upstairs when the view is dragged away and the inn streams out and back (`e2e/spike3d-storeys.e2e.ts`; it fails on the old code). The keeper is safe the same way.
+- First unit tests for walking (`tests/actors.test.ts`): up to the attic and out, house to house, stopping half way up a flight, steering on to stairs, the keeper's round, a walk surviving a trip through JSON. Maps now report two houses with the same id.
+- The rest of the review is a standing work order for Sonnet (CLAUDE.md).
+
 ## 2026-10-29 — The 2D engine removed; code review of the 3D world
 
 - **Review** of everything since M2: [review-2026-10-29](design/review-2026-10-29.md). The core is sound. The weak spot is `engine3d/world.ts`, which holds the walking and stairs rules. Bugs found: the hero drops to the ground floor if the view is dragged far from them, and some materials leak as houses and torches stream. Nothing fixed yet; the order of work is at the end of the review.

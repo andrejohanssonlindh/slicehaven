@@ -37,11 +37,13 @@ const REACH = 12;
 
 export class HouseIndex<R> {
   private readonly byChunk = new Map<string, PlacedHouse[]>();
+  private readonly ids = new Map<string, PlacedHouse>();
   private readonly entries = new Map<PlacedHouse, HouseEntry<R>>();
   private readonly lites = new Map<PlacedHouse, HouseLite>();
 
   constructor(readonly places: readonly PlacedHouse[], private readonly make: (b: BuiltHouse) => HouseMade<R>) {
     for (const h of places) {
+      this.ids.set(h.id, h);
       const k = chunkKey(Math.floor(h.x / CHUNK), Math.floor(h.z / CHUNK));
       const list = this.byChunk.get(k);
       if (list) list.push(h);
@@ -52,6 +54,11 @@ export class HouseIndex<R> {
   /** The houses whose centre is in chunk (i, j). */
   inChunk(i: number, j: number): readonly PlacedHouse[] {
     return this.byChunk.get(chunkKey(i, j)) ?? [];
+  }
+
+  /** The place of the house with this id (ids are unique in a map: `compileMap` reports it if not). */
+  byId(id: string): PlacedHouse | undefined {
+    return this.ids.get(id);
   }
 
   /** A house's model and boxes (cheap: nothing is furnished). */

@@ -399,6 +399,12 @@ function validate(spec: MapSpec, c: CompiledMap, houses: { id: string; box: Shap
   const problem = (s: string): void => {
     if (!out.includes(s)) out.push(s);
   };
+  // Walking and the people in the world hold a house by its id.
+  const ids = new Set<string>();
+  for (const h of c.layout.houses) {
+    if (ids.has(h.id)) problem(`two houses are called ${h.id}`);
+    ids.add(h.id);
+  }
   built.forEach((b, i) => {
     const id = b.place.id;
     const fp = b.model.footprint;

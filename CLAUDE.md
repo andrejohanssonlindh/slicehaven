@@ -41,6 +41,14 @@ The deeper designs (`skill-web.md`, `people-library.md`, `ways-of-use.md`) are f
 
 **The 2D hex engine was removed on 2026-10-29** (sandbox, gate scene page, Reedwater, Art Lab). Its code is in the git tag `2d-archive`, its art as pictures in `director/archive/2d-art.md`. Don't bring hex code back; take a painter from the tag only to give it a 3D use.
 
+## Standing work order: 3D review fixes (remove this section when every item in the review is fixed)
+Sessions fixing `director/design/review-2026-10-29.md` (Sonnet does the rest; Opus did item 4, the actors refactor, which also fixed bugs 1 and 2):
+- Order: bug 3 (leaks), the failing torch e2e, item 5, item 6, item 7, items 10–13. Items 8 and 9 are design work: only if asked.
+- One commit per item; skip items marked ✅; don't take on items you weren't asked for. Walking lives in `core/world3d/actors.ts`: keep it there.
+- Edit files only with Edit/Write, never `sed` or other shell edits.
+- Before every push: `npm test`, `npm run build` **and** `npm run test:e2e` (about 8 minutes; wait for it). All must pass.
+- Add a test for each bug fixed; mark the item ✅ in the review and add a devlog line.
+
 ## Tech
 - Vite + TypeScript (strict). **three.js for the 3D world** (`src/engine3d`, code-split; decision 2026-10-28); art is still painted per pixel by code (`src/art`) and put on textures and sprite cards. Vitest for unit tests (`tests/`). **Playwright** (Chromium) for browser tests and screenshots (`e2e/`; on a new machine run `npx playwright install chromium`, no sudo needed). `marked` for the Director's Room.
 - `npm run dev` (also on LAN with `--host`), `npm test`, `npm run build`, `npm run test:e2e` (Playwright browser tests in `e2e/`, a few minutes; run after changing `src/engine3d` or the 3D page).
@@ -63,7 +71,7 @@ tests/       Vitest tests for core/ and content/.
 public/      Static assets.
 ```
 Rules of thumb:
-- Keep rules in `core/` and data in `content/`; the engine renders and animates, it doesn't decide rules. (`engine3d/world.ts` still breaks this for walking and the innkeeper; see the review.)
+- Keep rules in `core/` and data in `content/`; the engine renders and animates, it doesn't decide rules. People who walk are `Actor`s (`core/world3d/actors.ts`); the renderer only places their cards.
 - Check visual work in a real browser (dev server + Chrome tools) before pushing.
 - Game state must be plain JSON-serialisable (it goes into the save).
 - Save formats carry a version (`CHAR_VERSION` in `core/chargen/state.ts`); data from another version is dropped, no migrations.
