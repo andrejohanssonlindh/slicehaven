@@ -29,7 +29,7 @@ export const HAMLET_MAP: MapSpec = {
     { id: 'home2', size: 'small', roof: 'sod', walls: 'stone', at: { road: 0, t: 0.56, side: 'south' } },
     { id: 'home3', size: 'medium', roof: 'thatch', walls: 'plank', at: { road: 0, t: 0.68, side: 'south' } },
     { id: 'home4', room: 'fisher', size: 'small', roof: 'shingle', at: { road: 0, t: 0.8, side: 'south' } },
-    { id: 'stable', plan: 'stable', walls: 'plank', roof: 'thatch', at: { road: 0, t: 0.92, side: 'south' } },
+    { id: 'stable', plan: 'stable', walls: 'plank', roof: 'thatch', at: { road: 0, t: 0.92, side: 'north' } },
   ],
   scatter: [
     { kind: 'tree', count: 70, area: { ring: [0, 0, 40, 64] }, mix: ['oak', 'oak', 'pine', 'pine', 'pine', 'dead', 'young'] },

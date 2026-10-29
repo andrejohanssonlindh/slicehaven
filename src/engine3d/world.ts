@@ -1385,7 +1385,7 @@ export class SpikeWorld {
    */
   tapPoint(ndcX: number, ndcY: number): { x: number; z: number; level?: number } | null {
     const hs = this.houses[this.heroHouse()] ?? null;
-    if (hs && this.heroLevel > 0) {
+    if (hs) {
       const ray = new THREE.Raycaster();
       ray.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
       const hit = new THREE.Vector3();
@@ -2104,7 +2104,7 @@ export class SpikeWorld {
       const m = this.houseIndex.lite(place).built.model;
       const mid = (r: { x0: number; x1: number; z0: number; z1: number }): { x: number; z: number } => ({ x: (r.x0 + r.x1) / 2, z: (r.z0 + r.z1) / 2 });
       const stops = m.levels.map((lv, level) => ({ ...mid(lv.rooms[lv.rooms.length - 1].rect), level }));
-      const out = { x: m.door[0], z: m.door[2] + 1.6, level: 0 };
+      const out = { x: m.door[0] + 1.5, z: m.door[2] + 1.8, level: 0 };
       const card = walkCard(makeWalkSet(PEOPLE.wife), PITCH);
       const blob = blobShadow(0.32);
       this.scene.add(card.mesh, blob);
@@ -2133,7 +2133,7 @@ export class SpikeWorld {
           k.legI = 0;
           k.legS = 0;
         }
-        k.wait = 2.5;
+        k.wait = s.level === 0 && s.z > 0 ? 14 : 2.5; // (a long pause outside the door, where the hero can find them)
       }
     }
     let dx = 0, dz = 1, moving = false;

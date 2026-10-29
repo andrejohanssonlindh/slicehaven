@@ -368,7 +368,7 @@ export function buildHouse(spec: House3DSpec): HouseModel {
   };
 
   // Stairs: a flight from storey k to k+1 along the front wall, starting at x = xs.
-  const flight = (k: number, xs: number): Stair => {
+  const flight = (k: number, xs: number, last: boolean): Stair => {
     const y0 = floorY[k], y1 = floorY[k + 1];
     const n = Math.ceil((y1 - y0) / 0.2), runL = n * TREAD, xe = xs + runL;
     const rect = rectOf(xs, xe, iz1 - STAIR_W, iz1);
@@ -394,7 +394,9 @@ export function buildHouse(spec: House3DSpec): HouseModel {
       from: k,
       to: k + 1,
       rect,
-      path: [{ x: xs + 0.45, z: zw, y: y0 }, { x: xs + 0.05, z: zc, y: y0 }, { x: xe - 0.05, z: zc, y: y1 }, { x: xe + 0.3, z: zw, y: y1 }],
+      // The ground flight is approached along its own line from the open floor before its foot; the next flight (carrying on from
+      // the first) from the walkway behind. The last flight steps off straight ahead; the first of two, to the walkway.
+      path: [k === 0 ? { x: xs - 0.5, z: zc, y: y0 } : { x: xs + 0.45, z: zw, y: y0 }, { x: xs + 0.05, z: zc, y: y0 }, { x: xe - 0.05, z: zc, y: y1 }, last ? { x: xe + 0.5, z: zc, y: y1 } : { x: xe + 0.3, z: zw, y: y1 }],
     };
     stairs.push(s);
     levels[k].blocks.push(rect);
@@ -422,7 +424,7 @@ export function buildHouse(spec: House3DSpec): HouseModel {
     levels[0].rooms.push({ rect: fullRect, doorX: dx, role: doorRoomKey, reserved: [] });
   } else if (plan === 'stable') {
     // Stalls along the back, each with its own low partitions; the aisle in front.
-    const nStall = 4, stallD = 2.6;
+    const nStall = 5, stallD = 3.0;
     const stallZ1 = iz0 + stallD;
     const sw = (ix1 - ix0 - PART_T * (nStall - 1)) / nStall;
     for (let i = 0; i < nStall; i++) {
@@ -438,10 +440,10 @@ export function buildHouse(spec: House3DSpec): HouseModel {
     levels[0].rooms.push({ rect: rectOf(ix0, ix1, stallZ1 + 0.05, iz1), doorX: dx, role: 'aisle', reserved: [] });
   } else {
     // Inn and shop: the main stair rises from the front-left to the first floor.
-    const xs1 = ix0 + 0.25;
-    const f1 = flight(0, xs1);
+    const xs1 = ix0 + 1.0;
+    const f1 = flight(0, xs1, plan === 'shop');
     const f1x1 = f1.rect.x1;
-    levels[0].rooms.push({ rect: fullRect, doorX: dx, role: doorRoomKey, reserved: [rectOf(xs1 - 0.1, f1x1 + 0.1, iz1 - STAIR_W - 1.1, iz1)] });
+    levels[0].rooms.push({ rect: fullRect, doorX: dx, role: doorRoomKey, reserved: [rectOf(ix0, f1x1 + 0.1, iz1 - STAIR_W - 0.4, iz1)] });
     const head1 = f1.path[3];
     if (plan === 'shop') {
       slab(1, f1.rect);
@@ -450,12 +452,12 @@ export function buildHouse(spec: House3DSpec): HouseModel {
         doorX: head1.x,
         role: 'upstairs',
         reserved: [f1.rect],
-        zones: [rectOf(f1x1 - 0.3, f1x1 + 1.3, iz1 - STAIR_W - 1.3, iz1 - STAIR_W)],
+        zones: [rectOf(f1x1, f1x1 + 1.5, iz1 - STAIR_W - 0.3, iz1)],
         entry: { x: head1.x, z: head1.z },
       });
     } else {
       // Inn: the second flight carries on from the first to the attic, and a corridor with guest rooms behind it fills the first floor.
-      const f2 = flight(1, f1x1);
+      const f2 = flight(1, f1x1, true);
       const f2x1 = f2.rect.x1;
       slab(1, f1.rect);
       slab(2, f2.rect);
@@ -491,7 +493,7 @@ export function buildHouse(spec: House3DSpec): HouseModel {
         doorX: head2.x,
         role: 'attic',
         reserved: [f2.rect],
-        zones: [rectOf(f2x1 - 0.3, f2x1 + 1.3, iz1 - STAIR_W - 1.3, iz1 - STAIR_W)],
+        zones: [rectOf(f2x1, f2x1 + 1.5, iz1 - STAIR_W - 0.3, iz1)],
         entry: { x: head2.x, z: head2.z },
       });
     }

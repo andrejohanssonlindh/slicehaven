@@ -18,40 +18,31 @@ const COATS: string[][] = [
 ];
 const MANE = ['#0e0a08', '#1e1610', '#33261a'];
 
-/** A work horse standing, seen from the side, facing right. About 2.1 m nose to tail. The coat follows the seed. */
+/**
+ * A work horse standing in its stall with its head toward the back wall, seen from behind and above: the broad
+ * quarters, the tail hanging, the barrel and neck going away, ears at the top. About 0.9 m across. The coat follows the seed.
+ */
 export function makeHorse(seed = 1): Prop {
   const coat = COATS[((seed % COATS.length) + COATS.length) % COATS.length];
-  const p = new Pix(58, 48);
-  const g = 44; // ground
+  const p = new Pix(36, 54);
+  const g = 50; // ground
   const fur = (x: number, y: number, light: number): string => pick(coat, light + (fbm(x / 3, y / 2, seed) - 0.5) * 0.3 + (white(x, y, seed + 2) - 0.5) * 0.1, x, y);
-  // Far legs first (darker), then the body over them.
-  for (const [x0, x1] of [[37, 38], [19, 19]]) capsule(p, x0, 28, x1, g - 3, 2.1, 1.3, coat.slice(0, 3), seed + 1, 0.2);
-  // Hind leg bends at the hock.
-  capsule(p, 14, 26, 11, 36, 3.2, 2, coat, seed + 2, 0.2);
-  capsule(p, 11, 36, 13, g - 3, 1.8, 1.3, coat, seed + 3, 0.2);
-  capsule(p, 34, 28, 34, g - 3, 2.4, 1.4, coat, seed + 4, 0.2);
-  // Hooves.
-  for (const x of [13, 19, 34, 38]) for (let dx = -1; dx <= 1; dx++) for (let dy = 0; dy < 3; dy++) p.set(x + dx, g - 2 + dy, '#1c1612');
-  // Tail: a few strands hanging from the croup.
-  capsule(p, 9, 18, 5, 36, 2.2, 1.2, MANE, seed + 5, 0.4);
-  // Body and the swell of the quarters and chest.
-  ellipse(p, 24, 23, 15.5, 8, (x, y) => fur(x, y, 0.9 - (y - 15) * 0.045));
-  ellipse(p, 13, 22, 6.5, 7.5, (x, y) => fur(x, y, 0.82 - (y - 15) * 0.04));
-  ellipse(p, 35, 22, 6, 7.5, (x, y) => fur(x, y, 0.85 - (y - 15) * 0.04));
-  // Neck and head.
-  capsule(p, 36, 19, 45, 9, 5.4, 3.6, coat, seed + 6, 0.2);
-  polyFill(p, wobble([[43, 5], [52, 9], [56, 16], [54, 19], [49, 15], [44, 13]], seed, 0.4, 2), (x, y) => fur(x, y, 0.8 - (y - 5) * 0.03));
-  polyFill(p, [[43, 6], [44, 1.5], [46, 6]], () => coat[1]);
-  p.set(48, 9, '#0c0a0a'); // eye
-  p.set(55, 17, '#1a1210'); p.set(54, 18, '#1a1210'); // nostril and muzzle
-  // Mane along the crest.
-  for (let i = 0; i < 9; i++) {
-    const t = i / 8, x = 36 + t * 9, y = 14 - t * 7;
-    capsule(p, x, y, x - 2.6, y + 3, 1.1, 0.7, MANE, seed + 7 + i, 0.4);
-  }
-  // A forelock and a pale blaze on some.
-  if (seed % 3 === 0) for (let y = 7; y < 15; y++) p.set(49 + Math.round((y - 7) * 0.5), y, '#d8d4cc');
-  return finish(p, 28, g, seed, 20);
+  // Far (front) legs peek out either side of the barrel; hind legs under the quarters.
+  for (const x of [11, 25]) capsule(p, x, 22, x, g - 22, 2.2, 1.5, coat.slice(0, 3), seed + 1, 0.2);
+  for (const x of [11, 25]) capsule(p, x, 34, x + (x < 18 ? -1 : 1), g - 3, 3, 1.6, coat, seed + 3, 0.2);
+  for (const x of [10, 26]) for (let dx = -2; dx <= 2; dx++) for (let dy = 0; dy < 3; dy++) p.set(x + dx, g - 2 + dy, '#1c1612');
+  // Neck and head, going away up the picture, with the mane along the crest and the ears.
+  ellipse(p, 18, 9, 4.6, 6.5, (x, y) => fur(x, y, 0.7 - (y - 3) * 0.02));
+  capsule(p, 18, 2, 18, 12, 1.7, 2.4, MANE, seed + 6, 0.4);
+  polyFill(p, [[13, 4], [14, 0], [16.5, 4]], () => coat[1]);
+  polyFill(p, [[20, 4], [22, 0], [23.5, 4]], () => coat[1]);
+  // The barrel, then the quarters, broad and rounded, lit from the top.
+  ellipse(p, 18, 19, 9, 9, (x, y) => fur(x, y, 0.85 - (y - 10) * 0.025));
+  ellipse(p, 18, 30, 11.5, 10, (x, y) => fur(x, y, 0.9 - (y - 20) * 0.03 - Math.abs(x - 15) * 0.012));
+  // The tail hangs down the middle of the rump.
+  capsule(p, 18, 24, 18, 44, 2.6, 1.5, MANE, seed + 5, 0.4);
+  if (seed % 3 === 0) for (let y = 4; y < 12; y++) p.set(18, y, '#d8d4cc');
+  return finish(p, 18, g, seed, 18);
 }
 
 /** A bale of hay, bound with twine, and loose hay beside it. */

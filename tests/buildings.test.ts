@@ -69,7 +69,7 @@ describe('the bigger buildings', () => {
     for (const r of inn.rooms.filter((q) => q.room.role === 'guest')) expect(r.plan.pieces.some((q) => q.id.startsWith('bed'))).toBe(true);
     const stable = make('stable');
     const stalls = stable.rooms.filter((r) => r.room.role === 'stall');
-    expect(stalls.length).toBeGreaterThanOrEqual(4);
+    expect(stalls.length).toBeGreaterThanOrEqual(5);
     for (const s of stalls) expect(s.plan.pieces.some((q) => q.id === 'horse')).toBe(true);
     // And the horses are not all the same colour.
     const coats = new Set(stalls.map((s) => JSON.stringify(Array.from(s.props.get('horse')!.frames[0].data.slice(0, 4000)))));
