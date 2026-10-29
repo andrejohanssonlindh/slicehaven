@@ -12,8 +12,10 @@ import { CHUNK } from './chunks';
  * chunk), and a source's strength at "here, 1 away, 2 away" becomes a smooth
  * falloff in cell widths. Shadows come from the real sun direction.
  *
- * Static things (ground, indoors) are sampled once; sources and the weather
- * can change, and every change just marks the field dirty.
+ * The field is sparse and lazy: a cell is worked out when somebody reads it,
+ * from the ground and the sources round it, and remembered until the weather,
+ * the living or the sources change. Nothing here is sized by the world, so a
+ * map of any size costs what is looked at.
  */
 
 /** Cell width, metres. 32 / 20: whole cells tile a chunk. */
@@ -41,6 +43,11 @@ export interface FilamentWorld {
   indoors(x: number, z: number): boolean;
   /** Fixed things: trees, rocks, fires, the dead. */
   sources: readonly FSource[];
+  /**
+   * Instead of `sources`, a way to ask which fixed things lie in a rectangle of the ground (a streaming map's
+   * index). It must return the same things each time until `setSources` is called.
+   */
+  sourcesIn?(x0: number, z0: number, x1: number, z1: number): readonly FSource[];
 }
 
 export interface Conditions {
@@ -66,33 +73,37 @@ const GROUND_CODES: Ground[] = ['grass', 'forest', 'path', 'tallgrass', 'flowers
 /** Tree height (m) for shadow length; rocks only cast at dusk, as in the hex rules. */
 const HEIGHT: Partial<Record<SourceKind, number>> = { tree: 6, pine: 8, thicket: 2, rock: 1.5 };
 
+/** A cell's key: i and j may be negative, and a world can be tens of thousands of cells across. */
+const OFF = 1 << 19, WIDE = 1 << 20;
+const keyOf = (i: number, j: number): number => (j + OFF) * WIDE + (i + OFF);
+
+/** The reach of a source's influence in cells, and the longest shadow in cells (10 m). */
+const R = Math.ceil(2.5 * REACH);
+const SHADOW_R = Math.ceil(10 / FCELL);
+
 export class FilamentField {
   readonly cell = FCELL;
   readonly n: number;
   private readonly x0: number;
-  private groundGrid: Uint8Array;
-  private indoorGrid: Uint8Array;
-  private statics: FSource[];
+  private readonly world: FilamentWorld;
+  private readonly groundCache = new Map<number, number>();
+  private readonly indoorCache = new Map<number, boolean>();
+  /** Fixed sources by the cell they stand in (filled as cells are asked about, or all at once from a list). */
+  private staticCells = new Map<number, FSource[]>();
+  private staticAsked = new Set<number>();
+  private moverCells = new Map<number, FSource[]>();
   private movers: FSource[] = [];
   private cond: Conditions = { env: { time: 'day', sky: 'clear', windForce: 1, windDir: 0 } };
-  private incoming: Map<string, Map<string, Gathered>> | null = null;
-  private cache = new Map<string, HexFilaments>();
+  private cache = new Map<number, HexFilaments>();
+  private emCache = new Map<FSource, Emission[]>();
 
   constructor(world: FilamentWorld) {
     // The grid starts on a chunk corner, so heat-map cells line up with chunk edges.
     const lo = Math.floor(-world.size / 2 / CHUNK), hi = Math.ceil(world.size / 2 / CHUNK) - 1;
     this.n = (hi - lo + 1) * (CHUNK / FCELL);
     this.x0 = lo * CHUNK;
-    this.statics = [...world.sources];
-    this.groundGrid = new Uint8Array(this.n * this.n);
-    this.indoorGrid = new Uint8Array(this.n * this.n);
-    for (let j = 0; j < this.n; j++) {
-      for (let i = 0; i < this.n; i++) {
-        const c = this.centre(i, j);
-        this.groundGrid[j * this.n + i] = GROUND_CODES.indexOf(world.ground(c.x, c.z));
-        this.indoorGrid[j * this.n + i] = world.indoors(c.x, c.z) ? 1 : 0;
-      }
-    }
+    this.world = world;
+    this.setSources(world.sources);
   }
 
   cellOf(x: number, z: number): { i: number; j: number } {
@@ -107,30 +118,78 @@ export class FilamentField {
     return i >= 0 && j >= 0 && i < this.n && j < this.n;
   }
 
+  private groundOf(i: number, j: number): Ground {
+    const k = keyOf(i, j);
+    let g = this.groundCache.get(k);
+    if (g === undefined) {
+      const c = this.centre(i, j);
+      g = GROUND_CODES.indexOf(this.world.ground(c.x, c.z));
+      this.groundCache.set(k, g);
+    }
+    return GROUND_CODES[g];
+  }
+
+  private indoorsOf(i: number, j: number): boolean {
+    const k = keyOf(i, j);
+    let v = this.indoorCache.get(k);
+    if (v === undefined) {
+      const c = this.centre(i, j);
+      v = this.world.indoors(c.x, c.z);
+      this.indoorCache.set(k, v);
+    }
+    return v;
+  }
+
   /** New weather or time: everything is re-read on demand. */
   setConditions(c: Conditions): void {
     this.cond = c;
-    this.incoming = null;
     this.cache.clear();
+    this.emCache.clear();
   }
 
   /** The things that move (the living): replaced as a whole. */
   setMovers(m: readonly FSource[]): void {
     this.movers = [...m];
-    this.incoming = null;
+    this.moverCells.clear();
+    for (const s of this.movers) this.put(this.moverCells, s);
     this.cache.clear();
+    this.emCache.clear();
   }
 
-  /** Fixed sources changed (a fire lit, a tree felled). */
+  /** Fixed sources changed (a fire lit, a tree felled, a chunk streamed in or out). */
   setSources(s: readonly FSource[]): void {
-    this.statics = [...s];
-    this.incoming = null;
+    this.staticCells.clear();
+    this.staticAsked.clear();
+    if (!this.world.sourcesIn) for (const src of s) this.put(this.staticCells, src);
     this.cache.clear();
+    this.emCache.clear();
+  }
+
+  private put(into: Map<number, FSource[]>, s: FSource): void {
+    const { i, j } = this.cellOf(s.x, s.z);
+    const k = keyOf(i, j);
+    const list = into.get(k);
+    if (list) list.push(s);
+    else into.set(k, [s]);
+  }
+
+  /** The fixed sources standing in cell (i, j). */
+  private staticsAt(i: number, j: number): readonly FSource[] {
+    const k = keyOf(i, j);
+    if (this.world.sourcesIn && !this.staticAsked.has(k)) {
+      this.staticAsked.add(k);
+      const c = this.centre(i, j), h = FCELL / 2;
+      const found = this.world.sourcesIn(c.x - h, c.z - h, c.x + h, c.z + h).filter((s) => {
+        const o = this.cellOf(s.x, s.z);
+        return o.i === i && o.j === j;
+      });
+      if (found.length) this.staticCells.set(k, [...found]);
+    }
+    return this.staticCells.get(k) ?? [];
   }
 
   private pseudoCell(i: number, j: number, src?: FSource): { cell: Cell; units: Unit[] } {
-    const code = this.inside(i, j) ? this.groundGrid[j * this.n + i] : 0;
-    const ground = GROUND_CODES[code];
+    const ground = this.inside(i, j) ? this.groundOf(i, j) : GROUND_CODES[0];
     const cell: Cell = {
       at: { q: i, r: j },
       obstacle: false,
@@ -138,7 +197,7 @@ export class FilamentField {
       water: ground === 'river' || ground === 'pond' || ground === 'ford',
       fire: 'none',
       ground,
-      indoors: this.inside(i, j) && this.indoorGrid[j * this.n + i] === 1,
+      indoors: this.inside(i, j) && this.indoorsOf(i, j),
     };
     const units: Unit[] = [];
     if (src) {
@@ -156,51 +215,65 @@ export class FilamentField {
     return { cell, units };
   }
 
-  private build(): Map<string, Map<string, Gathered>> {
+  /** What one source (or the water of one ground cell) gives off, with its strength scale. */
+  private emissionsOf(s: FSource, i: number, j: number): Emission[] {
+    let ems = this.emCache.get(s);
+    if (!ems) {
+      const { env } = this.cond;
+      const opts = { isUndead: (u: Unit) => u.kind === 'undead' };
+      const { cell, units } = this.pseudoCell(i, j, s);
+      // Emissions of the ground under it are counted from the ground itself; take only what the source adds.
+      // (A water source is the one thing that adds its own water.)
+      ems = emissions(cell, units, env, opts).filter((e) => s.kind === 'water' || !(e.label === 'Water' || e.label === 'Still water' || e.label === 'Sun glare off water'));
+      this.emCache.set(s, ems);
+    }
+    return ems;
+  }
+
+  private waterEmissions(i: number, j: number): Emission[] {
     const { env } = this.cond;
-    const opts = { isUndead: (u: Unit) => u.kind === 'undead' };
-    const inc = new Map<string, Map<string, Gathered>>();
-    const R = Math.ceil(2.5 * REACH);
-    const spread = (i: number, j: number, ems: Emission[], scale: number): void => {
-      // Walls stop it: what burns indoors reaches only the room, what burns outside stays outside.
-      const roofed = this.indoorGrid[j * this.n + i] === 1;
+    return emissions(this.pseudoCell(i, j).cell, [], env, { isUndead: (u: Unit) => u.kind === 'undead' });
+  }
+
+  /**
+   * Everything that reaches cell (ti, tj): the water of the ground round it and every source round it, each with
+   * the strength it has at that distance. Walls stop it: what burns indoors reaches only the room, what burns
+   * outside stays outside.
+   */
+  private gather(ti: number, tj: number): Map<string, Gathered> {
+    const got = new Map<string, Gathered>();
+    const roofed = this.indoorsOf(ti, tj);
+    const waterRing = new Map<number, Emission[]>();
+    const add = (ems: readonly Emission[], scale: number, d: number): void => {
       for (const em of ems) {
-        for (let dj = -R; dj <= R; dj++) {
-          for (let di = -R; di <= R; di++) {
-            const d = Math.hypot(di, dj) / REACH;
-            const v = falloffAt(em.fall, d) * scale;
-            if (!v || !this.inside(i + di, j + dj) || (this.indoorGrid[(j + dj) * this.n + i + di] === 1) !== roofed) continue;
-            const k = `${i + di},${j + dj}`;
-            let m = inc.get(k);
-            if (!m) inc.set(k, (m = new Map()));
-            const id = `${em.aspect}|${em.label}`;
-            const g = m.get(id) ?? { total: 0, here: false, near: 0, cap: em.cap };
-            g.total += v;
-            if (d === 0) g.here = true;
-            else g.near += 1;
-            m.set(id, g);
-          }
-        }
+        const v = falloffAt(em.fall, d) * scale;
+        if (!v) continue;
+        const id = `${em.aspect}|${em.label}`;
+        const g = got.get(id) ?? { total: 0, here: false, near: 0, cap: em.cap };
+        g.total += v;
+        if (d === 0) g.here = true;
+        else g.near += 1;
+        got.set(id, g);
       }
     };
-    // The ground itself: water and the like radiate from every cell it fills.
-    for (let j = 0; j < this.n; j++) {
-      for (let i = 0; i < this.n; i++) {
-        const g = GROUND_CODES[this.groundGrid[j * this.n + i]];
-        if (g !== 'river' && g !== 'pond' && g !== 'ford') continue;
-        spread(i, j, emissions(this.pseudoCell(i, j).cell, [], env, opts), 1);
+    for (let dj = -R; dj <= R; dj++) {
+      for (let di = -R; di <= R; di++) {
+        const d = Math.hypot(di, dj) / REACH;
+        if (d > 2.5) continue;
+        const si = ti + di, sj = tj + dj;
+        if (!this.inside(si, sj) || this.indoorsOf(si, sj) !== roofed) continue;
+        const g = this.groundOf(si, sj);
+        if (g === 'river' || g === 'pond' || g === 'ford') {
+          const k = keyOf(si, sj);
+          let ems = waterRing.get(k);
+          if (!ems) waterRing.set(k, (ems = this.waterEmissions(si, sj)));
+          add(ems, 1, d);
+        }
+        for (const s of this.staticsAt(si, sj)) add(this.emissionsOf(s, si, sj), s.kind === 'corpse' ? 1 : s.weight ?? 1, d);
+        for (const s of this.moverCells.get(keyOf(si, sj)) ?? []) add(this.emissionsOf(s, si, sj), s.kind === 'corpse' ? 1 : s.weight ?? 1, d);
       }
     }
-    for (const s of [...this.statics, ...this.movers]) {
-      const { i, j } = this.cellOf(s.x, s.z);
-      if (!this.inside(i, j)) continue;
-      const { cell, units } = this.pseudoCell(i, j, s);
-      // Emissions of the ground under it are already counted above; take only what the source adds.
-      // (A water source is the one thing that adds its own water.)
-      const ems = emissions(cell, units, env, opts).filter((e) => s.kind === 'water' || !(e.label === 'Water' || e.label === 'Still water' || e.label === 'Sun glare off water'));
-      spread(i, j, ems, s.kind === 'corpse' ? 1 : (s.weight ?? 1));
-    }
-    return inc;
+    return got;
   }
 
   /** Who casts a shadow onto (x, z): a tree or rock toward the sun's far side, by the real sun direction. */
@@ -210,24 +283,29 @@ export class FilamentField {
     const hl = Math.hypot(sunDir[0], sunDir[2]) || 1;
     const sx = sunDir[0] / hl, sz = sunDir[2] / hl;
     const tan = Math.max(0.12, sunDir[1] / hl);
-    for (const s of this.statics) {
-      const h = HEIGHT[s.kind];
-      if (!h || (s.kind === 'rock' && env.time !== 'dusk')) continue;
-      const len = Math.min(10, h / tan);
-      // Along the shadow (away from the sun) and across it.
-      const dx = x - s.x, dz = z - s.z;
-      const along = -(dx * sx + dz * sz), across = Math.abs(dx * sz - dz * sx);
-      if (along > 0.4 && along < len && across < (s.kind === 'rock' ? 0.9 : 1.3)) return s.kind === 'thicket' ? 'thicket' : s.kind === 'rock' ? 'rock' : 'tree';
+    const here = this.cellOf(x, z);
+    for (let dj = -SHADOW_R; dj <= SHADOW_R; dj++) {
+      for (let di = -SHADOW_R; di <= SHADOW_R; di++) {
+        for (const s of this.staticsAt(here.i + di, here.j + dj)) {
+          const h = HEIGHT[s.kind];
+          if (!h || (s.kind === 'rock' && env.time !== 'dusk')) continue;
+          const len = Math.min(10, h / tan);
+          // Along the shadow (away from the sun) and across it.
+          const dx = x - s.x, dz = z - s.z;
+          const along = -(dx * sx + dz * sz), across = Math.abs(dx * sz - dz * sx);
+          if (along > 0.4 && along < len && across < (s.kind === 'rock' ? 0.9 : 1.3)) return s.kind === 'thicket' ? 'thicket' : s.kind === 'rock' ? 'rock' : 'tree';
+        }
+      }
     }
     return null;
   }
 
   /** The reading of cell (i, j): all eight aspects, with every contribution. */
   readCell(i: number, j: number): HexFilaments {
-    const key = `${i},${j}`;
+    const key = keyOf(i, j);
     const have = this.cache.get(key);
     if (have) return have;
-    this.incoming ??= this.build();
+    const incoming = this.gather(i, j);
     const { env, isClouded } = this.cond;
     const c = this.centre(i, j);
     const { cell } = this.pseudoCell(i, j);
@@ -239,7 +317,7 @@ export class FilamentField {
       const parts: Part[] = [];
       const skip = BASE[a.id](ctx, (label, value) => parts.push({ label, value }));
       if (skip !== 'skipSources') {
-        for (const [id, g] of this.incoming.get(key) ?? []) {
+        for (const [id, g] of incoming) {
           const [aspect, label] = id.split('|');
           if (aspect !== a.id) continue;
           const value = g.cap >= 0 ? Math.min(g.total, g.cap) : Math.max(g.total, g.cap);
