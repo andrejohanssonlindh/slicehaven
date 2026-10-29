@@ -48,6 +48,11 @@ export const SPIKE_MAP: MapSpec = {
     // Wood stacked against the sides of houses.
     { kind: 'woodpile', x: 4.1, z: -3.6, rot: 0.08 + Math.PI / 2, seed: 3 },
     { kind: 'woodpile', x: 20.1, z: -2.4, rot: -0.1 + Math.PI / 2, seed: 8 },
+    // The village's small things: a well off the road, a fence behind the home, crates by the herbalist, a cart by the weaver.
+    { kind: 'well', x: -8.5, z: 10, seed: 1 },
+    { kind: 'fence', x: 0, z: -7.5, rot: 0, len: 6, seed: 2 },
+    { kind: 'crates', x: -18.4, z: 0.6, rot: -0.05, seed: 5 },
+    { kind: 'cart', x: 10, z: -1.6, rot: 0.3, seed: 6 },
   ],
   hero: [2.4, 1.2],
   walk: [[-12, 5.6], [-3, 5.0], [6, 5.8], [12, 4.8]],

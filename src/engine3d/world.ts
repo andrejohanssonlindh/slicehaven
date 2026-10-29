@@ -19,7 +19,7 @@ import type { HouseMaterial } from '../core/world3d/house';
 import { type BuiltHouse, type Layout, type PlacedTree, buildHouses, furnitureObstacles, houseAt, houseBox, houseToLocal, houseToWorld, layoutObstacles } from '../core/world3d/layout';
 import { footprints } from '../core/world3d/roomplan';
 import type { MeshData } from '../core/world3d/mesh';
-import { type PlacedProp, buildBoulder, buildShrub, buildWoodpile } from '../core/world3d/props';
+import { type PlacedProp, buildBoulder, buildCart, buildCrates, buildFence, buildShrub, buildWell, buildWoodpile } from '../core/world3d/props';
 import { cloudDrift, cloudThreshold } from '../core/world3d/sky';
 import { NavGrid, type P2, type Shape, findPath, followPath, pathLength } from '../core/world3d/space';
 import { type Ground3D, groundHeight, lakeDist, splatAt } from '../core/world3d/terrain';
@@ -391,14 +391,23 @@ export class SpikeWorld {
   private buildProp(p: PlacedProp): void {
     const group = new THREE.Group();
     const s = p.size ?? 1;
-    if (p.kind === 'woodpile') {
-      this.logMat ??= lit({ map: tex(barkTex(4)), ao: true, wettable: true });
-      const m = new THREE.Mesh(geometryOf(buildWoodpile(p.seed)), this.logMat);
+    const solid = (data: MeshData, mat: THREE.MeshLambertMaterial): void => {
+      const m = new THREE.Mesh(geometryOf(data), mat);
       m.castShadow = m.receiveShadow = true;
       group.add(m);
+    };
+    this.logMat ??= lit({ map: tex(barkTex(4)), ao: true, wettable: true });
+    this.stoneMat ??= lit({ map: tex(stoneTex(3)), ao: true, wettable: true });
+    if (p.kind === 'woodpile') solid(buildWoodpile(p.seed), this.logMat);
+    else if (p.kind === 'crates') solid(buildCrates(p.seed), this.logMat);
+    else if (p.kind === 'fence') solid(buildFence(p.len ?? 4, p.seed), this.logMat);
+    else if (p.kind === 'cart') solid(buildCart(p.seed), this.logMat);
+    else if (p.kind === 'well') {
+      const w = buildWell();
+      solid(w.stone, this.stoneMat);
+      solid(w.wood, this.logMat);
     } else if (p.kind === 'boulder') {
       const b = buildBoulder(p.seed);
-      this.stoneMat ??= lit({ map: tex(stoneTex(3)), ao: true, wettable: true });
       const m = new THREE.Mesh(lumpGeometry(b.clumps, b.height, 1), this.stoneMat);
       m.castShadow = m.receiveShadow = true;
       group.add(m);

@@ -10,6 +10,21 @@ afterAll(async () => {
   await stopEnv(env);
 });
 
+describe('spike3d village props', () => {
+  it('shows the well, fence, crates and cart', async () => {
+    const { page, errors } = await openPage(env, '/spike3d/?nogov');
+    await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 30_000 });
+    const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; return ${fn}; })()`);
+    for (let i = 0; i < 2; i++) await page.click('#zoom button[data-zoom="1"]');
+    for (const [name, x, z] of [['well', -8.5, 10], ['fence', 0, -7.5], ['crates', -18.4, 0.6], ['cart', 10, -1.6]] as const) {
+      await w(`(w.follow = false, w.focus.x = ${x}, w.focus.z = ${z}, 0)`);
+      await page.waitForTimeout(1200);
+      await page.screenshot({ path: `${OUT}spike3d-prop-${name}.png` });
+    }
+    expect(errors).toEqual([]);
+  });
+});
+
 describe('spike3d lightning and fires', () => {
   it('strikes a bolt, lights and douses campfires, and shows the build stamp', async () => {
     const { page, errors } = await openPage(env, '/spike3d/?nogov');

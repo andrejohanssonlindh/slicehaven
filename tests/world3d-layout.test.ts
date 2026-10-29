@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SPIKE_GROUND, SPIKE_HERO, SPIKE_LAYOUT, SPIKE_TORCHES } from '../src/content/spike3d';
 import { buildHouses, houseAt, houseBox, houseOuterBox, houseToLocal, houseToWorld, houseWalls, layoutObstacles } from '../src/core/world3d/layout';
-import { buildBoulder, buildShrub, buildWoodpile, propSource } from '../src/core/world3d/props';
+import { buildBoulder, buildCart, buildCrates, buildFence, buildShrub, buildWell, buildWoodpile, propShape, propSource } from '../src/core/world3d/props';
 import { NavGrid, findPath, shapeDist } from '../src/core/world3d/space';
 import { WATER_Y, groundHeight, lakeDist, roadDist } from '../src/core/world3d/terrain';
 
@@ -78,6 +78,21 @@ describe('layout', () => {
     expect(propSource({ kind: 'boulder', x: 1, z: 2, seed: 1 })?.kind).toBe('rock');
     expect(propSource({ kind: 'shrub', x: 1, z: 2, seed: 1 })?.kind).toBe('thicket');
     expect(propSource({ kind: 'woodpile', x: 1, z: 2, seed: 1 })).toBeNull();
+  });
+
+  it('crates, wells, fences and carts build, are deterministic, block feet, and are no filament sources', () => {
+    expect(JSON.stringify(buildCrates(5))).toBe(JSON.stringify(buildCrates(5)));
+    expect(buildCrates(5).indices.length).toBeGreaterThan(0);
+    const w = buildWell();
+    expect(w.stone.indices.length).toBeGreaterThan(0);
+    expect(w.wood.indices.length).toBeGreaterThan(0);
+    expect(buildFence(6, 2).indices.length).toBeGreaterThan(buildFence(2, 2).indices.length);
+    expect(buildCart(6).indices.length).toBeGreaterThan(0);
+    for (const kind of ['crates', 'well', 'fence', 'cart'] as const) {
+      const p = { kind, x: 3, z: 4, seed: 1 };
+      expect(propSource(p)).toBeNull();
+      expect(shapeDist(propShape(p), 3, 4)).toBeLessThan(0);
+    }
   });
 
   it('each house keeps a doorway gap in its walls', () => {
