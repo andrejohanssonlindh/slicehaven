@@ -16,7 +16,7 @@ import { CHUNK, type ChunkTerrain, TerrainStore, chunkKey, chunksNear } from '..
 import { type Environment3D, environment } from '../core/world3d/environment3d';
 import { Rng } from '../core/rng';
 import type { HouseMaterial } from '../core/world3d/house';
-import { type BuiltHouse, type Layout, type PlacedHouse, type PlacedTree, furnitureObstacles, houseAt, houseOuterBox, houseToLocal, houseToWorld, houseWalls, levelWalls } from '../core/world3d/layout';
+import { type BuiltHouse, type Layout, type PlacedHouse, type PlacedTree, furnitureObstacles, houseAt, houseOuterBox, houseToLocal, houseToWorld, houseWalls, levelWalls, sightWalls } from '../core/world3d/layout';
 import { Explored } from '../core/world3d/explored';
 import { PlacedIndex } from '../core/world3d/placed';
 import { footprints } from '../core/world3d/roomplan';
@@ -248,7 +248,7 @@ export class SpikeWorld {
   private lightsAt: { x: number; z: number; f: number; night: number; at: number } | null = null;
   private lightsSeen = new Set<string>();
   lightRange = 0;
-  private castAt: { x: number; z: number; range: number; house: HouseInst | null } | null = null;
+  private castAt: { x: number; z: number; range: number; house: HouseInst | null; level: number } | null = null;
   private tmpV = new THREE.Vector3();
   /** Where the hero has been (seen within the vision radius): drawn grey where it is out of sight now. */
   readonly explored = new Explored();
@@ -286,7 +286,7 @@ export class SpikeWorld {
     const h = this.hero;
     const out: Shape[] = [...this.placed.sightNear(h.x - range, h.z - range, h.x + range, h.z + range)];
     // (Asked of the index, not of the standing houses: sight reaches past what has been stood up.)
-    for (const l of this.houseIndex.liteNear(h.x - range, h.z - range, h.x + range, h.z + range)) out.push(...(inHouse && l.built === inHouse.built ? houseWalls(l.built) : [l.box]));
+    for (const l of this.houseIndex.liteNear(h.x - range, h.z - range, h.x + range, h.z + range)) out.push(...(inHouse && l.built === inHouse.built ? [...houseWalls(l.built, this.level === 0), ...sightWalls(l.built, this.level)] : [l.box]));
     return out;
   }
 
@@ -294,9 +294,9 @@ export class SpikeWorld {
   private castRays(): void {
     const h = this.hero, range = this.spec.range, house = this.houses[this.heroHouse()] ?? null;
     const c = this.castAt;
-    if (c && c.range === range && c.house === house && Math.hypot(h.x - c.x, h.z - c.z) < 0.02) return;
+    if (c && c.range === range && c.house === house && c.level === this.level && Math.hypot(h.x - c.x, h.z - c.z) < 0.02) return;
     castSight({ x: h.x, z: h.z }, range, this.blockers(range, house), this.rays, 0.7);
-    this.castAt = { x: h.x, z: h.z, range, house };
+    this.castAt = { x: h.x, z: h.z, range, house, level: this.level };
     const data = sightTexture.image.data as Uint16Array;
     for (let i = 0; i < RAYS; i++) data[i] = THREE.DataUtils.toHalfFloat(Math.min(1, this.rays[i] / range));
     sightTexture.needsUpdate = true;

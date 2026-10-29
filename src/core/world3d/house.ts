@@ -89,6 +89,8 @@ export interface Level {
   rooms: LevelRoom[];
   /** What blocks feet on this storey besides walls and furniture: partitions, and the stairs' footprints. */
   blocks: Rect[];
+  /** The tall walls among them: what stops the eye (low stall boards do not). */
+  sight: Rect[];
 }
 
 /** A straight flight along the front wall from storey `from` up to `to`. `path` is the walk up, local, with the height of each point. */
@@ -334,7 +336,7 @@ export function buildHouse(spec: House3DSpec): HouseModel {
   addBox(part('stone', undefined, 'footing').mesh, [dx - doorW / 2 - 0.2, 0, hd + 0.08], [dx + doorW / 2 + 0.2, FOOT * 0.5, hd + 0.55], { aoBottom: 0.6, skip: ['ny'] });
 
   // --- inside: stairs, floors, partitions, rooms ---------------------------------------------------------------------
-  const levels: Level[] = floorY.map((y) => ({ floorY: y, rooms: [], blocks: [] }));
+  const levels: Level[] = floorY.map((y) => ({ floorY: y, rooms: [], blocks: [], sight: [] }));
   const stairs: Stair[] = [];
   const rectOf = (x0: number, x1: number, z0: number, z1: number): Rect => ({ x0, x1, z0, z1 });
   const fullRect = rectOf(ix0, ix1, iz0, iz1);
@@ -345,6 +347,7 @@ export function buildHouse(spec: House3DSpec): HouseModel {
     addBox(part('timber', upperLevel(k), 'timber').mesh, [r.x0, y0, r.z0], [r.x1, lowTop, r.z1], { aoBottom: 0.7, aoTop: 0.9 });
     if (!lowOnly) addBox(part('plaster', k, 'partition').mesh, [r.x0, lowTop, r.z0], [r.x1, wallTop[k], r.z1], { aoBottom: 0.8, aoTop: 0.72 });
     levels[k].blocks.push(r);
+    if (!lowOnly) levels[k].sight.push(r);
   };
   /** A wall along x at z = zc, with doorways at the given x centres. */
   const wallWithDoors = (k: number, x0: number, x1: number, zc: number, doors: number[]): void => {
@@ -356,6 +359,9 @@ export function buildHouse(spec: House3DSpec): HouseModel {
       // The lintel over the doorway.
       addBox(part('plaster', k, 'partition').mesh, [d - DOOR_OPEN, floorY[k] + 2.05, z0], [d + DOOR_OPEN, wallTop[k], z1], { aoBottom: 0.8 });
       addBeam(part('timber', k, 'frontTimber').mesh, [d - DOOR_OPEN - 0.05, floorY[k] + 2.0, z1 + 0.04], [d + DOOR_OPEN + 0.05, floorY[k] + 2.0, z1 + 0.04], 0.1, frontFace);
+      // Jambs, and the room door standing open against the wall inside.
+      for (const s of [-1, 1]) addBeam(part('timber', k, 'frontTimber').mesh, [d + s * (DOOR_OPEN + 0.03), floorY[k], z1 + 0.04], [d + s * (DOOR_OPEN + 0.03), floorY[k] + 2.05, z1 + 0.04], 0.1, frontFace);
+      addBox(part('door', k).mesh, [d - DOOR_OPEN - 0.01, floorY[k], z0 - 0.85], [d - DOOR_OPEN + 0.05, floorY[k] + 1.95, z0], { aoBottom: 0.7, unitUV: true });
       x = d + DOOR_OPEN;
     }
     if (x1 > x + 0.02) partition(k, rectOf(x, x1, z0, z1));
@@ -422,6 +428,11 @@ export function buildHouse(spec: House3DSpec): HouseModel {
     for (let i = 0; i < nStall; i++) {
       const xa = ix0 + i * (sw + PART_T), xb = xa + sw;
       if (i > 0) partition(0, rectOf(xa - PART_T, xa, iz0, stallZ1), true, 1.15);
+      // A rail gate across the stall's front (a horse is seen over it); it blocks feet.
+      const gm = part('timber', undefined, 'timber').mesh;
+      for (const y of [FOOT + 0.4, FOOT + 0.85]) addBeam(gm, [xa, y, stallZ1], [xb, y, stallZ1], 0.09, frontFace);
+      for (const x of [xa + 0.05, xb - 0.05]) addBeam(gm, [x, FOOT, stallZ1], [x, FOOT + 1.05, stallZ1], 0.12, frontFace);
+      levels[0].blocks.push(rectOf(xa, xb, stallZ1 - 0.06, stallZ1 + 0.06));
       levels[0].rooms.push({ rect: rectOf(xa, xb, iz0, stallZ1), doorX: (xa + xb) / 2, role: 'stall', reserved: [], clear: { half: 0.6, depth: 0.5 } });
     }
     levels[0].rooms.push({ rect: rectOf(ix0, ix1, stallZ1 + 0.05, iz1), doorX: dx, role: 'aisle', reserved: [] });

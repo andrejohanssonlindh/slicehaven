@@ -91,6 +91,10 @@ export function houseWalls(b: BuiltHouse, withDoor = true): Shape[] {
 export const levelBlocks = (b: BuiltHouse, level: number): Shape[] =>
   b.model.levels[level].blocks.map((r) => boxOfFootprint(r, b.place.x, b.place.z, b.place.rot));
 
+/** The tall inner walls of a storey, which stop the eye. */
+export const sightWalls = (b: BuiltHouse, level: number): Shape[] =>
+  b.model.levels[level].sight.map((r) => boxOfFootprint(r, b.place.x, b.place.z, b.place.rot));
+
 /** A storey's walls and what is built into it: what the ground's walking is stopped by, for a storey above it. */
 export const levelWalls = (b: BuiltHouse, level: number): Shape[] => [...houseWalls(b, level === 0), ...levelBlocks(b, level)];
 

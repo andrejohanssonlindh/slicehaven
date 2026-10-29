@@ -114,7 +114,7 @@ describe('the bigger buildings', () => {
       // Ground floor: the door reaches the middle of every room (the stalls' fronts too) and the first flight's foot.
       for (const r of house.rooms.filter((q) => q.level === 0)) {
         const c = r.room.rect;
-        goes(ground, doorOut, { x: r.room.role === 'stall' ? r.room.doorX : (c.x0 + c.x1) / 2, z: r.room.role === 'stall' ? c.z1 - 0.2 : (c.z0 + c.z1) / 2 + 0.3 }, `door to ${r.room.role}`);
+        goes(ground, doorOut, { x: r.room.role === 'stall' ? r.room.doorX : (c.x0 + c.x1) / 2, z: r.room.role === 'stall' ? c.z1 + 0.8 : (c.z0 + c.z1) / 2 + 0.3 }, `door to ${r.room.role}`);
       }
       for (const s of model.stairs) {
         const nav = navOf(house, s.from);

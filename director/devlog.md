@@ -8,7 +8,7 @@
 - **Rooms furnished per room** (`furnishHouse`, `LevelRoom.role` -> recipe): inn hall (two long tables, benches, more to sit at), `guestroom` (bed or two, chest, stool), `landing`, `attic` (a row of beds, pallets), `upstairs`, `stall` (a horse on straw, hay rack, bucket), `aisle` (hay, tack, chest). `planRoom` takes `reserved` floor (stairs, doorways), `zones` and an `entry` for rooms entered from a stair. New art: `art/guest.ts` (guest bed, blanket by seed), `art/stable.ts` (horse in five coats, hay bale, hay rack). Horses are rough; art is not polished on purpose.
 - **Hamlet** (`/spike3d/?map=hamlet`) now has the new inn, a shop (`store`) and a stable on the south side.
 - Tests: `tests/buildings.test.ts` (storeys, stairs, furnishing, walkability from the door to every room on every floor). Furnish test no longer runs the upstairs recipes in cottages.
-- Not done / next: the house's back wall hides things when the house faces away from the camera (as before); stall fronts have no gate; no doors in the interior (only gaps); people do not use the stairs; sight is not blocked by partitions; windows are not lit from inside upstairs.
+- Fixed after: back wall fades when a house faces away; stall rail gates; guest-room door frames and open doors; inner tall walls stop sight on the storey you are on (`Level.sight`). Still open: people other than the hero do not use stairs (nobody but the road villager walks yet).
 - Slip: used `sed -i` and a python edit a few times for small edits; Edit from here.
 
 
