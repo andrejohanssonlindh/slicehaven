@@ -138,6 +138,7 @@ function buildControls(): void {
   });
   button('row-fx', () => t('spike.douse', 'Douse'), () => false, () => { world.douseFires(); });
 
+  button('row-fx', () => t('spike.torch', 'Torch'), () => world.torchOn, () => { world.toggleTorch(); });
   button('row-fx', () => t('spike.orb', 'Light orb'), () => world.orbOn, () => { world.toggleOrb(); });
   button('row-fx', () => t('spike.ray', 'Light ray'), () => world.rayOn, () => { world.toggleRay(); });
   button('row-fx', () => t('spike.speed', 'Walk ×{n}', { n: world.speedMul }), () => world.speedMul > 1, () => { world.speedMul = cycle([1, 2, 3], world.speedMul); });

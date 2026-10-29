@@ -25,6 +25,9 @@ export const SPIKE_WALK = SPIKE.walk;
 /** Where the hero starts: by the first door, on the mud. */
 export const SPIKE_HERO = SPIKE.hero;
 
+/** How near a house a place is still among homes, metres. */
+const SETTLED = 8;
+
 export function filamentWorld(g: Ground3D, layout: Layout, houses: BuiltHouse[], extra: FSource[] = []): FilamentWorld {
   const boxes = houses.map(houseOuterBox);
   return {
@@ -39,6 +42,7 @@ export function filamentWorld(g: Ground3D, layout: Layout, houses: BuiltHouse[],
       return 'grass';
     },
     indoors: (x, z) => boxes.some((b) => shapeDist(b, x, z) < 0),
+    settled: (x, z) => boxes.some((b) => shapeDist(b, x, z) < SETTLED),
     windBreak: (x, z, dx, dz, reach) => {
       const l = Math.hypot(dx, dz) || 1;
       for (let d = 0.75; d <= reach; d += 0.75) {

@@ -24,7 +24,7 @@ export const FCELL = CHUNK / 20;
 /** How far a source's reach is stretched, against the hex table (which was tuned for 1.5 m hexes). */
 export const REACH = 1.7;
 
-export type SourceKind = 'tree' | 'pine' | 'thicket' | 'rock' | 'fire' | 'burnt' | 'corpse' | 'undead' | 'friend' | 'beast' | 'water' | 'light' | 'book';
+export type SourceKind = 'tree' | 'pine' | 'thicket' | 'rock' | 'fire' | 'burnt' | 'corpse' | 'undead' | 'friend' | 'beast' | 'water' | 'light' | 'book' | 'art';
 
 export interface FSource {
   x: number;
@@ -52,6 +52,8 @@ export interface FilamentWorld {
    * What stands in the way of the wind: the name of a solid thing (a house) crossed by the line from (x, z)
    * `reach` metres toward (dx, dz), the direction the wind comes from; null when the air is free.
    */
+  /** Is this spot among people's homes (close to a house)? */
+  settled?(x: number, z: number): boolean;
   windBreak?(x: number, z: number, dx: number, dz: number, reach: number): string | null;
   /** Called when `setSources` says the fixed sources changed, before they are asked for again. */
   refresh?(): void;
@@ -234,6 +236,8 @@ export class FilamentField {
       { aspect: 'ikono', label: 'Books', fall: [1, 0.5, 0.2], cap: 1.5 },
       { aspect: 'semo', label: 'Books', fall: [0.75, 0.4, 0.15], cap: 1.25 },
     ]));
+    // Art: pictures, hangings, rugs and weaving, the patterns that iconotropy lives in.
+    if (!ems && s.kind === 'art') this.emCache.set(s, (ems = [{ aspect: 'ikono', label: 'Patterns and pictures', fall: [1, 0.6, 0.25], cap: 1.5 }]));
     if (!ems && s.kind === 'light') this.emCache.set(s, (ems = [{ aspect: 'foto', label: 'Magic light', fall: [1.6, 0.9, 0.3], cap: 3 }]));
     if (!ems) {
       const { env } = this.cond;
@@ -330,7 +334,7 @@ export class FilamentField {
     const clouded = outdoors && !!isClouded?.(c.x, c.z);
     const wind = windVector(env);
     const shelteredBy = outdoors && env.windForce > 0 ? this.world.windBreak?.(c.x, c.z, -wind.x, -wind.y, WIND_SHELTER) ?? null : null;
-    const ctx: Context = { cell, env, outdoors, clouded, shadowedBy: outdoors && !clouded && env.sky !== 'rain' && env.sky !== 'storm' ? this.shadowedBy(c.x, c.z) : null, shelteredBy };
+    const ctx: Context = { cell, env, outdoors, clouded, settled: outdoors && !!this.world.settled?.(c.x, c.z), shadowedBy: outdoors && !clouded && env.sky !== 'rain' && env.sky !== 'storm' ? this.shadowedBy(c.x, c.z) : null, shelteredBy };
     const reading = {} as HexFilaments;
     for (const a of ASPECTS) {
       const parts: Part[] = [];

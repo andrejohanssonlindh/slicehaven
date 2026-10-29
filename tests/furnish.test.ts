@@ -111,3 +111,21 @@ describe('furnishing by rules', () => {
     expect(Math.hypot(s0.x - s1.x, s0.z - s1.z)).toBeGreaterThan(0.5);
   });
 });
+
+describe('what furniture gives off to the filaments', () => {
+  const m = buildHouse({ width: 5.4, depth: 4.2, seed: 12, wallH: 2.4, roof: 'shingle' } as never);
+  it('shelves with books, hangings and rugs become sources, standing where the pieces stand', () => {
+    const { plan, sources } = furnish('herbalist', m.room, m.door[0]);
+    expect(sources.filter((s) => s.kind === 'book').length).toBeGreaterThan(0);
+    for (const s of sources) {
+      expect(s.x).toBeGreaterThanOrEqual(m.room.x0 - 0.01);
+      expect(s.x).toBeLessThanOrEqual(m.room.x1 + 0.01);
+    }
+    expect(plan.pieces.length).toBeGreaterThan(0);
+  });
+  it('a plain home has pictures (a hanging and a rug) but no books', () => {
+    const { sources } = furnish('home', m.room, m.door[0]);
+    expect(sources.some((s) => s.kind === 'art')).toBe(true);
+    expect(sources.some((s) => s.kind === 'book')).toBe(false);
+  });
+});

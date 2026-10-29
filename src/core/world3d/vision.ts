@@ -27,18 +27,22 @@ export interface VisionInput {
   night?: number;
   /** Farthest the renderer is willing to draw, metres. */
   cap?: number;
+  /** 0..1: a flame carried in the hand (a torch, a lantern, a magic light) lights the dark close by. */
+  light?: number;
 }
 
 const deg = (d: number): number => (d * Math.PI) / 180;
 
 /** Alertness (and the light) to the shape of sight. */
-export function visionOf({ alertness, night = 0, cap = Infinity }: VisionInput): VisionSpec {
+export function visionOf({ alertness, night = 0, cap = Infinity, light = 0 }: VisionInput): VisionSpec {
   const a = Math.max(0, alertness);
-  const dark = 1 - 0.4 * Math.max(0, Math.min(1, night));
+  const n = Math.max(0, Math.min(1, night)), l = Math.max(0, Math.min(1, light));
+  // A carried flame wins back most of what the dark takes from the range, and lights a wider circle all round.
+  const dark = 1 - 0.4 * n * (1 - 0.65 * l);
   return {
     range: Math.min(cap, Math.max(10, 6 + 2.4 * a) * dark),
     fov: deg(Math.max(70, Math.min(150, 110 + 4 * (a - 10)))),
-    near: Math.max(2.5, Math.min(7, 2 + 0.25 * a)),
+    near: Math.max(2.5, Math.min(7, 2 + 0.25 * a)) + 3.5 * n * l,
     edge: deg(18),
   };
 }

@@ -10,6 +10,7 @@ import {
 } from '../art/shopItems';
 import type { CounterKind, ShelfKind } from '../art/shopItems';
 import { type PieceIn, type RoomPlan, type RoomRect, type Rule, planRoom } from '../core/world3d/roomplan';
+import type { SourceKind } from '../core/world3d/filaments3d';
 import { TEXELS_PER_M } from '../core/world3d/tiers';
 
 /**
@@ -71,6 +72,14 @@ export const PIECES = {
 
 export type PieceKey = keyof typeof PIECES;
 
+/** What a kind of piece gives off to the filament field, when it stands in a room (a fire is the line's own `fire` flag). */
+export const PIECE_SOURCES: Partial<Record<PieceKey, { kind: SourceKind; weight: number }>> = {
+  hanging: { kind: 'art', weight: 0.7 },
+  rug: { kind: 'art', weight: 0.5 },
+  loom: { kind: 'art', weight: 1 },
+  fishTubs: { kind: 'water', weight: 0.5 },
+};
+
 /** What a recipe line can say about a piece. */
 interface Line {
   piece: PieceKey;
@@ -82,6 +91,8 @@ interface Line {
   /** Hung pieces: how high up the wall, in sprite pixels. */
   lift?: number;
   fire?: boolean;
+  /** Books on it (a few shelves of them add a little iconotropy and semotropy to the room). */
+  books?: number;
   /** A different seed for the art, so two of a kind differ. */
   seed?: number;
   /** Tells two lines of the same piece apart (the stool at the table's front, the stool at its back). */
@@ -112,9 +123,6 @@ const HOME: Line[] = [
   { piece: 'broom', rule: side('left', 0.9) },
   { piece: 'basket', rule: free },
 ];
-
-/** How many books a room holds (a few shelves of them add a little iconotropy and semotropy to the room). */
-export const ROOM_BOOKS: Partial<Record<RoomSet, number>> = { herbalist: 2, general: 1 };
 
 export const RECIPES: Record<Exclude<RoomSet, 'smithy'>, Line[]> = {
   home: HOME,
@@ -148,8 +156,8 @@ export const RECIPES: Record<Exclude<RoomSet, 'smithy'>, Line[]> = {
   herbalist: [
     { piece: 'hearth', rule: corner('backRight'), fire: true },
     { piece: 'pallet', rule: corner('backLeft') },
-    { piece: 'shelf', variant: 'bottles', seed: 12, rule: back(0.22), lift: 24 },
-    { piece: 'shelf', variant: 'jars', seed: 13, rule: back(0.7), lift: 24 },
+    { piece: 'shelf', variant: 'bottles', seed: 12, rule: back(0.22), lift: 24, books: 1 },
+    { piece: 'shelf', variant: 'jars', seed: 13, rule: back(0.7), lift: 24, books: 1 },
     { piece: 'herbs', rule: back(0.46), lift: 48 },
     { piece: 'mortarBench', rule: back(0.55) },
     { piece: 'counter', variant: 'herbs', seed: 18, rule: center(0, 0.6) },
@@ -169,7 +177,7 @@ export const RECIPES: Record<Exclude<RoomSet, 'smithy'>, Line[]> = {
     { piece: 'broom', rule: side('left', 0.9) },
   ],
   general: [
-    { piece: 'shelf', variant: 'wares', seed: 32, rule: back(0.3), lift: 22 },
+    { piece: 'shelf', variant: 'wares', seed: 32, rule: back(0.3), lift: 22, books: 1 },
     { piece: 'hooks', rule: back(0.72), lift: 8 },
     { piece: 'crates', rule: corner('backLeft') },
     { piece: 'sacks', rule: side('right', 0.6) },
@@ -232,13 +240,17 @@ export interface Furnished {
   plan: RoomPlan;
   /** The art of each placed piece, by id. */
   props: Map<string, Prop>;
+  /** What the placed pieces give off to the filament field, in the house's frame. */
+  sources: { x: number; z: number; kind: SourceKind; weight: number }[];
 }
 
 /** Furnish a room: make the art, measure it, and let the solver place it. */
 export function furnish(set: RoomSet, room: RoomRect, doorX: number, seed = 0): Furnished {
   const props = new Map<string, Prop>();
   const ins: PieceIn[] = [];
-  const add = (id: string, prop: Prop, def: { kind: PieceIn['kind']; d?: number; maxW?: number }, line: { rule: Rule; lift?: number; fire?: boolean }): void => {
+  const gives = new Map<string, { kind: SourceKind; weight: number }>();
+  const add = (id: string, prop: Prop, def: { kind: PieceIn['kind']; d?: number; maxW?: number }, line: { rule: Rule; lift?: number; fire?: boolean }, source?: { kind: SourceKind; weight: number }): void => {
+    if (source) gives.set(id, source);
     const px = opaqueSize(prop);
     const m = px.w / TEXELS_PER_M;
     // The sprites are drawn obliquely, so their width is part depth: a floor piece's real width (its footprint, what
@@ -266,9 +278,15 @@ export function furnish(set: RoomSet, room: RoomRect, doorX: number, seed = 0): 
         const id = (line.n ?? 1) > 1 ? `${line.piece}#${i}` : line.piece;
         const unique = `${id}${line.variant ? `:${line.variant}` : ''}${line.tag ? `@${line.tag}` : ''}`;
         const rule = line.rule.at === 'around' ? { ...line.rule, of: line.rule.of } : line.rule;
-        add(unique, makePiece(line.piece, { ...line, seed: (line.seed ?? 0) + i }), PIECES[line.piece], { rule, lift: line.lift, fire: line.fire });
+        add(unique, makePiece(line.piece, { ...line, seed: (line.seed ?? 0) + i }), PIECES[line.piece], { rule, lift: line.lift, fire: line.fire },
+          line.books ? { kind: 'book', weight: line.books } : PIECE_SOURCES[line.piece]);
       }
     }
   }
-  return { plan: planRoom(room, doorX, ins, seed), props };
+  const plan = planRoom(room, doorX, ins, seed);
+  const sources = plan.pieces.flatMap((p) => {
+    const g = gives.get(p.id);
+    return g ? [{ x: p.x, z: p.z, ...g }] : [];
+  });
+  return { plan, props, sources };
 }

@@ -49,7 +49,21 @@ describe('filaments in the free world', () => {
     f.setConditions({ env: DAY });
     expect(f.readAt(0.8, 0.8).ikono.raw).toBeGreaterThan(0);
     expect(f.readAt(0.8, 0.8).semo.raw).toBeGreaterThan(0);
-    expect(f.readAt(20, 20).ikono.raw).toBe(0);
+    expect(f.readAt(20, 20).ikono.raw).toBe(-1); // out in the open, nothing marks the place
+  });
+
+  it('symbols and meanings: weak in open country, normal among homes, indoors normal and lifted by pictures', () => {
+    const wild = new FilamentField(meadow());
+    wild.setConditions({ env: DAY });
+    expect(wild.readAt(10, 10).ikono.raw).toBe(-1);
+    expect(wild.readAt(10, 10).semo.raw).toBe(-1);
+    const town = new FilamentField(meadow([], { settled: () => true }));
+    town.setConditions({ env: DAY });
+    expect(town.readAt(10, 10).ikono.raw).toBe(0);
+    const room = new FilamentField(meadow([{ x: 0.8, z: 0.8, kind: 'art', weight: 1 }], { indoors: () => true }));
+    room.setConditions({ env: DAY });
+    expect(room.readAt(0.8, 0.8).ikono.raw).toBeGreaterThan(0);
+    expect(room.readAt(8, 8).ikono.raw).toBe(0);
   });
 
   it('the falloff joins the hex numbers smoothly and ends at 2.5 cells', () => {

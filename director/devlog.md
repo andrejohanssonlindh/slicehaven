@@ -1,5 +1,11 @@
 # Devlog
 
+## 2026-10-30 — Symbols and meanings by the book's description, furniture feeds the field, a torch in the hand
+
+- **Iconotropy / semotropy:** the book gives no ambient strength for these two (its tables cover eight aspects), only where they live. So now: **weak (−1) in open country, normal (0) among homes** (within 8 m of a house, or on a road/building on a hex) **and indoors**; roads add a little semotropy. `Context.settled`, `FilamentWorld.settled`.
+- **Furniture feeds the field** (`PIECE_SOURCES` and `Line.books` in `content/furnish.ts`, `Furnished.sources`): books on herbalist/general shelves, `art` (new source kind: hangings, rugs, the loom → iconotropy), tubs of water, hearths as before. Each stands where its piece was placed; `ROOM_BOOKS` is gone. Furniture already blocked feet (house shapes).
+- **Torch in the hand** (`SpikeWorld.toggleTorch`, button "Torch"): a flame and a light that go with the hero; at night it wins back most of the range the dark takes and lights a circle 3.5 m wider all round (`visionOf({ light })`); it burns in the filament field as a small fire. The light orb counts the same for sight.
+
 ## 2026-10-30 — Lighting polish: sight edge no longer jumps, roofs no longer ringed dark
 
 - The sight rays were recast only after the hero moved 0.3 m, so the edge of what is seen hopped in steps. Now they are recast on every move (0.02 m) and there are 512 rays, not 256.

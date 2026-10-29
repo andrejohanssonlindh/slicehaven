@@ -48,6 +48,14 @@ describe('vision', () => {
     expect(sightAlong(rays, 0)).toBeCloseTo(13, 1);
   });
 
+  it('a flame in the hand wins back most of what the dark takes, and lights a wider circle round you at night', () => {
+    const dark = visionOf({ alertness: 10, night: 1 }), lit = visionOf({ alertness: 10, night: 1, light: 1 }), day = visionOf({ alertness: 10 });
+    expect(lit.range).toBeGreaterThan(dark.range);
+    expect(lit.range).toBeLessThan(day.range);
+    expect(lit.near).toBeGreaterThan(dark.near + 3);
+    expect(visionOf({ alertness: 10, light: 1 }).near).toBe(day.near); // by day it adds nothing
+  });
+
   it('a roofed house keeps its eaves in sight: the ray ends past the wall by the overhang, a thin wall does not', () => {
     const house: Shape = { kind: 'box', x: 10, z: 0, hw: 3, hd: 3, rot: 0 };
     expect(sightAlong(castSight(eye, 40, [house], undefined, 0.7), 0)).toBeCloseTo(13.7, 1);

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { makeWalkSet, viewFor } from '../art/folkWalk';
 import type { Pix } from '../art/pix';
-import { type Furnished, ROOM_BOOKS, type RoomSet, furnish } from '../content/furnish';
+import { type Furnished, type RoomSet, furnish } from '../content/furnish';
 import {
   barkTex, doorTex, floorTex, groundChunkTex, leafTex, plasterTex, roofUnderTex, shingleTex, shutterTex, sodTex, stoneTex, thatchTex,
   tileTex, timberTex, windowGlowTex, windowTex,
@@ -524,11 +524,10 @@ export class SpikeWorld {
       this.fires.push({ x: hf.x, z: hf.z, kind: 'fire', weight: 1 });
     }
 
-    // Books (weight: how many) in the room's back corner.
-    const books = ROOM_BOOKS[(h.room ?? 'home') as RoomSet];
-    if (books) {
-      const bp = houseToWorld(h, model.room.x0 + 0.4, model.room.z0 + 0.4);
-      this.fires.push({ x: bp.x, z: bp.z, kind: 'book', weight: books });
+    // What the other pieces give off (books, hangings, rugs, tubs of water) feeds the field from where they stand.
+    for (const s of room.sources) {
+      const sp = houseToWorld(h, s.x, s.z);
+      this.fires.push({ x: sp.x, z: sp.z, kind: s.kind, weight: s.weight });
     }
 
     const y = groundHeight(this.ground, h.x, h.z) - 0.05;
@@ -1321,6 +1320,28 @@ export class SpikeWorld {
   // ray's spot light is always in the scene, dark until it is raised.
   private orb: { group: THREE.Group; torch: Torch; fx: { object: THREE.Object3D; tick(t: number): void } } | null = null;
   private ray: { group: THREE.Group; beam: THREE.Mesh } | null = null;
+  /** The torch in the hero's hand, if they carry one: a flame and a light that go where they go, and sight is the better for it. */
+  private hand: { fx: { object: THREE.Object3D; tick(t: number): void }; torch: Torch } | null = null;
+
+  get torchOn(): boolean {
+    return this.hand !== null;
+  }
+
+  /** Take up (or put out) a torch in the hand. */
+  toggleTorch(): void {
+    if (this.hand) {
+      this.scene.remove(this.hand.fx.object, this.hand.torch.light);
+      this.torches.splice(this.torches.indexOf(this.hand.torch), 1);
+      this.hand = null;
+      return;
+    }
+    const fx = makeFlame(0.34, 10, 77);
+    const light = new THREE.PointLight(0xffa458, 9, 11, 2);
+    this.scene.add(fx.object, light);
+    const torch: Torch = { light, flame: fx.object, tick: fx.tick, base: 9, seed: 31 };
+    this.torches.push(torch);
+    this.hand = { fx, torch };
+  }
   private rayLight = new THREE.SpotLight(0xfff1cc, 0, 24, 0.42, 0.55, 1.1);
 
   get orbOn(): boolean {
@@ -1376,6 +1397,7 @@ export class SpikeWorld {
   magicLightSources(): FSource[] {
     const out: FSource[] = [];
     if (this.orb) out.push({ x: this.orb.group.position.x, z: this.orb.group.position.z, kind: 'light', weight: 1 });
+    if (this.hand) out.push({ x: this.hand.fx.object.position.x, z: this.hand.fx.object.position.z, kind: 'fire', weight: 0.5 });
     if (this.ray) {
       const hp = this.heroCard.mesh.position, dl = Math.hypot(this.heroDir.x, this.heroDir.z) || 1;
       for (const s of [1.5, 3.5, 5.5, 7.5]) out.push({ x: hp.x + (this.heroDir.x / dl) * s, z: hp.z + (this.heroDir.z / dl) * s, kind: 'light', weight: 0.6 });
@@ -1385,6 +1407,13 @@ export class SpikeWorld {
 
   private stepMagicLights(): void {
     const hp = this.heroCard.mesh.position;
+    if (this.hand) {
+      // Held out a little in front, at about the height of a hand.
+      const dl = Math.hypot(this.heroDir.x, this.heroDir.z) || 1;
+      const x = hp.x + (this.heroDir.x / dl) * 0.4, z = hp.z + (this.heroDir.z / dl) * 0.4;
+      this.hand.fx.object.position.set(x, hp.y + 1.05, z);
+      this.hand.torch.light.position.set(x, hp.y + 1.35, z);
+    }
     if (this.orb) {
       // Floats at the hero's shoulder, bobbing, a little behind the way they are going.
       const bob = Math.sin(this.time * 2.1) * 0.12;
@@ -1443,7 +1472,7 @@ export class SpikeWorld {
     // Sight is the hero's, not the camera's: a cone ahead, a circle round, the dark shortening it, solid things in the way.
     if (this.vision.outer > 0) {
       this.facing = turnToward(this.facing, Math.atan2(this.heroDir.z, this.heroDir.x), 7 * dt);
-      this.spec = visionOf({ alertness: this.alertness, night: env.night, cap: this.vision.outer });
+      this.spec = visionOf({ alertness: this.alertness, night: env.night, cap: this.vision.outer, light: this.orb || this.hand ? 1 : 0 });
       this.castRays();
       this.refreshLights(env.night);
       const sp = this.spec;

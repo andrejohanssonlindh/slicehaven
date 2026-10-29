@@ -72,4 +72,23 @@ describe('spike3d vision and the explored map', () => {
     expect(await w(`w.seen(${torch.x}, ${torch.z})`)).toBe(0);
     expect(errors).toEqual([]);
   });
+
+  it('a torch in the hand widens the lit circle round the hero at night and burns in the field', async () => {
+    const { page, errors } = await openPage(env, '/spike3d/?map=wilds&vision=on&nogov');
+    await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 90_000 });
+    const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; return ${fn}; })()`);
+    await w("(w.weather.setTime('night'), w.weather.set('clear'), 0)");
+    await page.waitForTimeout(1500);
+    const near0 = (await w('w.spec.near')) as number, range0 = (await w('w.spec.range')) as number;
+    await w('(w.toggleTorch(), 0)');
+    await page.waitForTimeout(1500);
+    expect(await w('w.torchOn')).toBe(true);
+    expect((await w('w.spec.near')) as number).toBeGreaterThan(near0 + 3);
+    expect((await w('w.spec.range')) as number).toBeGreaterThan(range0);
+    await page.screenshot({ path: `${OUT}vision-hand-torch.png` });
+    await w('(w.toggleTorch(), 0)');
+    await page.waitForTimeout(500);
+    expect((await w('w.spec.near')) as number).toBeCloseTo(near0, 1);
+    expect(errors).toEqual([]);
+  });
 });

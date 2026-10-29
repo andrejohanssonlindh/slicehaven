@@ -144,9 +144,15 @@ export interface Context {
   shadowedBy: string | null;
   /** What breaks the wind here (a house upwind), if anything. Free-world fields only. */
   shelteredBy?: string | null;
+  /** Close to people's homes (free-world fields only; the hex games read roads and buildings off the hex). */
+  settled?: boolean;
 }
 
 export type Base = (x: Context, add: (label: string, value: number) => void) => 'skipSources' | void;
+
+/** Where people live: told by the free world, or on a hex by a road or a building. */
+const isHomely = (cell: Cell, settled?: boolean): boolean =>
+  !!settled || cell.ground === 'path' || cell.feature === 'house' || cell.feature === 'wall' || cell.feature === 'gate' || cell.feature === 'cart' || cell.feature === 'campfire';
 
 export const overcast = (env: Environment): boolean => env.sky === 'rain' || env.sky === 'storm';
 
@@ -320,14 +326,19 @@ export const BASE: Record<AspectId, Base> = {
     if (overcast(env)) add('A lid of cloud', -1);
   },
 
-  // --- meaning: nothing by itself; books, and the roads people walk by, add to it ---
-  ikono: (_x, add) => {
-    add('Normal', 0);
+  // --- meaning: the book gives no ambient strength for these two, only where they live (music, pictures, symbols,
+  //     colours; writing and signs). So: weak in open country, normal where people live, and made things add to it ---
+  ikono: ({ cell, outdoors, settled }, add) => {
+    if (!outdoors) add('Indoors, among made things', 0);
+    else if (isHomely(cell, settled)) add('Near homes: colours, signs, songs', 0);
+    else add('Open country: no marks, no song', -1);
   },
 
-  semo: ({ cell }, add) => {
-    add('Normal', 0);
-    if (cell.ground === 'path') add('A road: it says where to go', 0.5);
+  semo: ({ cell, outdoors, settled }, add) => {
+    if (!outdoors) add('Indoors, among made things', 0);
+    else if (isHomely(cell, settled)) add('Near homes: signs to read', 0);
+    else add('Open country: nothing to read', -1);
+    if (outdoors && cell.ground === 'path') add('A road: it says where to go', 0.5);
   },
 
   nekro: ({ cell }, add) => {
