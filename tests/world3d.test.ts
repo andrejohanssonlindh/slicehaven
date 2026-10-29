@@ -31,6 +31,17 @@ describe('house generator', () => {
     expect(JSON.stringify(buildHouse(SPIKE_HOUSE.spec))).toBe(JSON.stringify(h));
   });
 
+  it('wall kinds: planks and stone use their own material and carry less frame than the framed default', () => {
+    const kinds = (['framed', 'plank', 'stone'] as const).map((walls) => buildHouse({ ...SPIKE_HOUSE.spec, walls }));
+    const mat = (m: typeof h) => m.parts.find((p) => p.name === 'walls')!.material;
+    expect(kinds.map(mat)).toEqual(['plaster', 'timber', 'stone']);
+    const timberTris = (m: typeof h) => m.parts.filter((p) => p.name.toLowerCase().includes('timber')).reduce((n, p) => n + p.mesh.indices.length, 0);
+    expect(timberTris(kinds[1])).toBeLessThan(timberTris(kinds[0]));
+    expect(JSON.stringify(kinds[0])).toBe(JSON.stringify(h)); // no walls given = framed, as before
+    // Every kind keeps its door and room.
+    for (const k of kinds) expect(k.door[2]).toBeCloseTo(h.door[2]);
+  });
+
   it('stays inside its footprint plus the eaves, and below a sane height', () => {
     const all = emptyMesh();
     for (const p of h.parts) {

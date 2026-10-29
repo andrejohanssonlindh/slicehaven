@@ -1,5 +1,5 @@
 import { Rng } from '../rng';
-import type { House3DSpec, RoofKind } from './house';
+import type { House3DSpec, RoofKind, WallKind } from './house';
 import { type Layout, type PlacedHouse, type PlacedTree, buildHouses, houseOuterBox, houseToWorld, layoutObstacles, layoutPads, layoutShade } from './layout';
 import { type PlacedProp } from './props';
 import type { TreeKind } from './tree';
@@ -43,6 +43,8 @@ export interface MapHouse {
   room?: string;
   size?: HouseSize;
   roof?: RoofKind;
+  /** Walls: plaster in a timber frame (default), planks, or fieldstone. */
+  walls?: WallKind;
   wallH?: number;
   seed?: number;
   at: HouseAt;
@@ -155,7 +157,7 @@ export function compileMap(spec: MapSpec): CompiledMap {
   // Houses.
   const houses: PlacedHouse[] = spec.houses.map((h) => {
     const dims = typeof h.size === 'object' ? h.size : SIZES[h.size ?? 'medium'];
-    const hs: House3DSpec = { seed: h.seed ?? hashStr(h.id) % 1000, width: dims.width, depth: dims.depth, wallH: h.wallH ?? 2.5, roof: h.roof ?? 'thatch' };
+    const hs: House3DSpec = { seed: h.seed ?? hashStr(h.id) % 1000, width: dims.width, depth: dims.depth, wallH: h.wallH ?? 2.5, roof: h.roof ?? 'thatch', walls: h.walls };
     if ('road' in h.at) {
       const road = spec.roads[h.at.road];
       if (!road) {

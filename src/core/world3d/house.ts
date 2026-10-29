@@ -14,7 +14,11 @@ import { type MeshData, type Vec3, addBeam, addBox, addFace, addOrientedBox, emp
 
 export type RoofKind = 'thatch' | 'shingle' | 'tile' | 'sod';
 
+/** How the walls are made: plaster in a timber frame (the default), bare planks, or fieldstone. */
+export type WallKind = 'framed' | 'plank' | 'stone';
+
 export interface House3DSpec {
+  walls?: WallKind;
   seed: number;
   /** Outside width along the front and depth, in metres. */
   width: number;
@@ -63,10 +67,13 @@ export function buildHouse(spec: House3DSpec): HouseModel {
   const top = FOOT + wallH;
 
   const part = (name: string, material: HouseMaterial, cut = false): HousePart => ({ name, material, cut, mesh: emptyMesh() });
+  const wallKind = spec.walls ?? 'framed';
+  const framed = wallKind === 'framed';
+  const wallMat: HouseMaterial = wallKind === 'plank' ? 'timber' : wallKind === 'stone' ? 'stone' : 'plaster';
   const stone = part('footing', 'stone');
-  const walls = part('walls', 'plaster');
-  const front = part('frontWall', 'plaster', true);
-  const gables = part('gables', 'plaster', true);
+  const walls = part('walls', wallMat);
+  const front = part('frontWall', wallMat, true);
+  const gables = part('gables', wallMat, true);
   const timber = part('timber', 'timber');
   const frontTimber = part('frontTimber', 'timber', true);
   const roof = part('roof', roofKind === 'thatch' ? 'roof' : roofKind, true);
@@ -144,7 +151,9 @@ export function buildHouse(spec: House3DSpec): HouseModel {
   const frontFace: Vec3 = [0, 0, 1], sideFace: Vec3 = [1, 0, 0];
   const beam = (m: MeshData, a: Vec3, b: Vec3, face: Vec3): void => addBeam(m, a, b, BEAM, face, { aoBottom: 0.85 });
   // Posts and rails on the front.
+  // (Planked and stone walls carry no frame: only the door's own frame and the corner posts are timber.)
   for (let i = 0; i <= bays; i++) {
+    if (!framed && i > 0 && i < bays) continue;
     const x = -hw + BEAM / 2 + (W - BEAM) * (i / bays);
     beam(frontTimber.mesh, [x, FOOT, zf], [x, top, zf], frontFace);
   }
@@ -156,28 +165,34 @@ export function buildHouse(spec: House3DSpec): HouseModel {
   const winY = FOOT + wallH * 0.55;
   // Sill rail just under the windows; the low rails stop at the door frame.
   const midY = winY - 0.45;
-  for (const y of [FOOT + BEAM / 2, midY]) {
-    beam(frontTimber.mesh, [-hw, y, zf], [dx - doorW / 2 - BEAM / 2, y, zf], frontFace);
-    beam(frontTimber.mesh, [dx + doorW / 2 + BEAM / 2, y, zf], [hw, y, zf], frontFace);
+  if (framed) {
+    for (const y of [FOOT + BEAM / 2, midY]) {
+      beam(frontTimber.mesh, [-hw, y, zf], [dx - doorW / 2 - BEAM / 2, y, zf], frontFace);
+      beam(frontTimber.mesh, [dx + doorW / 2 + BEAM / 2, y, zf], [hw, y, zf], frontFace);
+    }
+    beam(frontTimber.mesh, [-hw, top - BEAM / 2, zf], [hw, top - BEAM / 2, zf], frontFace);
   }
-  beam(frontTimber.mesh, [-hw, top - BEAM / 2, zf], [hw, top - BEAM / 2, zf], frontFace);
   // Door frame: jambs and a heavy lintel.
   for (const s of [-1, 1]) beam(frontTimber.mesh, [dx + s * (doorW / 2 + BEAM / 2), FOOT, zf], [dx + s * (doorW / 2 + BEAM / 2), FOOT + doorH + 0.1, zf], frontFace);
   addBeam(frontTimber.mesh, [dx - doorW / 2 - BEAM - 0.1, FOOT + doorH + 0.12, zf + 0.02], [dx + doorW / 2 + BEAM + 0.1, FOOT + doorH + 0.12, zf + 0.02], BEAM * 1.3, frontFace);
   // The right side wall (the one the camera sees).
   const sideBays = Math.max(1, Math.round(D / 2));
   for (let i = 0; i <= sideBays; i++) {
+    if (!framed && i > 0 && i < sideBays) continue;
     const z = hd - BEAM / 2 - (D - BEAM) * (i / sideBays);
     beam(timber.mesh, [xr, FOOT, z], [xr, top, z], sideFace);
   }
-  for (const y of [FOOT + BEAM / 2, midY, top - BEAM / 2]) beam(timber.mesh, [xr, y, hd], [xr, y, -hd], sideFace);
-  beam(timber.mesh, [xr, midY, -hd + 0.1], [xr, top - 0.1, -hd + D * 0.35], sideFace);
+  if (framed) {
+    for (const y of [FOOT + BEAM / 2, midY, top - BEAM / 2]) beam(timber.mesh, [xr, y, hd], [xr, y, -hd], sideFace);
+    beam(timber.mesh, [xr, midY, -hd + 0.1], [xr, top - 0.1, -hd + D * 0.35], sideFace);
+  }
   // The left side wall gets the same frame (seen when the camera turns, and from inside).
   for (let i = 0; i <= sideBays; i++) {
+    if (!framed && i > 0 && i < sideBays) continue;
     const z = hd - BEAM / 2 - (D - BEAM) * (i / sideBays);
     beam(timber.mesh, [-xr, FOOT, z], [-xr, top, z], [-1, 0, 0]);
   }
-  for (const y of [FOOT + BEAM / 2, midY, top - BEAM / 2]) beam(timber.mesh, [-xr, y, hd], [-xr, y, -hd], [-1, 0, 0]);
+  if (framed) for (const y of [FOOT + BEAM / 2, midY, top - BEAM / 2]) beam(timber.mesh, [-xr, y, hd], [-xr, y, -hd], [-1, 0, 0]);
 
   // Door: a plank door in its frame.
   addBox(door.mesh, [dx - doorW / 2, FOOT, hd], [dx + doorW / 2, FOOT + doorH, hd + 0.07], { aoBottom: 0.7, unitUV: true });

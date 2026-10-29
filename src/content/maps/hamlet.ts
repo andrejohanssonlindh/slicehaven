@@ -20,14 +20,14 @@ export const HAMLET_MAP: MapSpec = {
   houses: [
     { id: 'inn', room: 'inn', size: 'large', roof: 'tile', at: { road: 0, t: 0.5, side: 'north' } },
     { id: 'bakery', room: 'bakery', size: 'medium', roof: 'shingle', at: { road: 0, t: 0.38, side: 'north' } },
-    { id: 'smithy', room: 'smithy', size: 'medium', roof: 'shingle', at: { road: 0, t: 0.63, side: 'north' } },
+    { id: 'smithy', room: 'smithy', size: 'medium', roof: 'shingle', walls: 'stone', at: { road: 0, t: 0.63, side: 'north' } },
     { id: 'store', room: 'general', size: 'medium', roof: 'thatch', at: { road: 0, t: 0.27, side: 'north' } },
     { id: 'weaver', room: 'weaver', size: 'small', roof: 'sod', at: { road: 0, t: 0.78, side: 'north' } },
     { id: 'herbs', room: 'herbalist', size: 'small', roof: 'thatch', at: { road: 0, t: 0.2, side: 'south' } },
-    { id: 'fish', room: 'fishmonger', size: 'medium', roof: 'thatch', at: { road: 0, t: 0.32, side: 'south' } },
+    { id: 'fish', room: 'fishmonger', size: 'medium', roof: 'thatch', walls: 'plank', at: { road: 0, t: 0.32, side: 'south' } },
     { id: 'home1', room: 'fisher', size: 'small', roof: 'thatch', at: { road: 0, t: 0.45, side: 'south' } },
-    { id: 'home2', size: 'small', roof: 'sod', at: { road: 0, t: 0.56, side: 'south' } },
-    { id: 'home3', size: 'medium', roof: 'thatch', at: { road: 0, t: 0.68, side: 'south' } },
+    { id: 'home2', size: 'small', roof: 'sod', walls: 'stone', at: { road: 0, t: 0.56, side: 'south' } },
+    { id: 'home3', size: 'medium', roof: 'thatch', walls: 'plank', at: { road: 0, t: 0.68, side: 'south' } },
     { id: 'home4', room: 'fisher', size: 'small', roof: 'shingle', at: { road: 0, t: 0.8, side: 'south' } },
   ],
   scatter: [
