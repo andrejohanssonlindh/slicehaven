@@ -39,6 +39,14 @@ export function filamentWorld(g: Ground3D, layout: Layout, houses: BuiltHouse[],
       return 'grass';
     },
     indoors: (x, z) => boxes.some((b) => shapeDist(b, x, z) < 0),
+    windBreak: (x, z, dx, dz, reach) => {
+      const l = Math.hypot(dx, dz) || 1;
+      for (let d = 0.75; d <= reach; d += 0.75) {
+        const px = x + (dx / l) * d, pz = z + (dz / l) * d;
+        if (boxes.some((b) => shapeDist(b, px, pz) < 0)) return 'house';
+      }
+      return null;
+    },
     sources: [
       ...layout.trees.map((t): FSource => ({ x: t.x, z: t.z, kind: 'tree' })),
       ...layout.torches.map(([x, z]): FSource => ({ x, z, kind: 'fire', weight: 1 })),

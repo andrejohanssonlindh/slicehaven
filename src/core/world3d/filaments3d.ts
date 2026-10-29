@@ -1,5 +1,5 @@
 import type { Cell, Unit } from '../battle';
-import type { Environment } from '../environment';
+import { type Environment, windVector } from '../environment';
 import { ASPECTS, type AspectId, BASE, type Context, type Emission, type HexFilaments, type Part, emissions } from '../filaments';
 import { CHUNK } from './chunks';
 
@@ -48,6 +48,11 @@ export interface FilamentWorld {
    * index). It must return the same things each time until `setSources` is called.
    */
   sourcesIn?(x0: number, z0: number, x1: number, z1: number): readonly FSource[];
+  /**
+   * What stands in the way of the wind: the name of a solid thing (a house) crossed by the line from (x, z)
+   * `reach` metres toward (dx, dz), the direction the wind comes from; null when the air is free.
+   */
+  windBreak?(x: number, z: number, dx: number, dz: number, reach: number): string | null;
   /** Called when `setSources` says the fixed sources changed, before they are asked for again. */
   refresh?(): void;
 }
@@ -81,6 +86,8 @@ const keyOf = (i: number, j: number): number => (j + OFF) * WIDE + (i + OFF);
 
 /** The reach of a source's influence in cells, and the longest shadow in cells (10 m). */
 const R = Math.ceil(2.5 * REACH);
+/** How far behind a house the air is still, metres. */
+const WIND_SHELTER = 7;
 const SHADOW_R = Math.ceil(10 / FCELL);
 
 export class FilamentField {
@@ -316,7 +323,9 @@ export class FilamentField {
     const { cell } = this.pseudoCell(i, j);
     const outdoors = !cell.indoors;
     const clouded = outdoors && !!isClouded?.(c.x, c.z);
-    const ctx: Context = { cell, env, outdoors, clouded, shadowedBy: outdoors && !clouded && env.sky !== 'rain' && env.sky !== 'storm' ? this.shadowedBy(c.x, c.z) : null };
+    const wind = windVector(env);
+    const shelteredBy = outdoors && env.windForce > 0 ? this.world.windBreak?.(c.x, c.z, -wind.x, -wind.y, WIND_SHELTER) ?? null : null;
+    const ctx: Context = { cell, env, outdoors, clouded, shadowedBy: outdoors && !clouded && env.sky !== 'rain' && env.sky !== 'storm' ? this.shadowedBy(c.x, c.z) : null, shelteredBy };
     const reading = {} as HexFilaments;
     for (const a of ASPECTS) {
       const parts: Part[] = [];

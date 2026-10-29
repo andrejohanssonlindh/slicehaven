@@ -108,12 +108,17 @@ describe('filaments: sources radiate', () => {
   });
 
   it('the dead and the undead radiate necrotropy', () => {
-    expect(read(world({ corpses: 2 })).nekro.level).toBe(2);
-    expect(read(world({}, [{ corpses: 2 }])).nekro.level).toBe(1);
+    expect(read(world({ corpses: 2 })).nekro.level).toBe(3);
+    expect(read(world({}, [{ corpses: 2 }])).nekro.level).toBe(2);
     const b = world();
     const skel: Unit = { id: 's', kind: 'skeleton', name: 's', team: 'foe', at: hex(1, 0), hp: 5, maxHp: 5 };
     b.units.push(skel);
-    expect(read(b, DAY, { isUndead: () => true }).nekro.level).toBe(0); // from -1
+    expect(read(b, DAY, { isUndead: () => true }).nekro.level).toBe(1);
+  });
+
+  it('death is normal in the open and a little weaker under living trees, never stronger', () => {
+    expect(read(world()).nekro.raw).toBe(0);
+    expect(read(world({ ground: 'forest' })).nekro.raw).toBeLessThan(0);
   });
 
   it('friends radiate life to the hexes around them', () => {

@@ -130,6 +130,8 @@ export interface Context {
   clouded: boolean;
   /** Who casts a shadow onto this hex (tree/rock), if anyone. */
   shadowedBy: string | null;
+  /** What breaks the wind here (a house upwind), if anything. Free-world fields only. */
+  shelteredBy?: string | null;
 }
 
 export type Base = (x: Context, add: (label: string, value: number) => void) => 'skipSources' | void;
@@ -175,12 +177,13 @@ export const BASE: Record<AspectId, Base> = {
     if (shadowedBy) add(`In the shadow of a ${shadowedBy}`, 1);
   },
 
-  pneumo: ({ env, outdoors }, add) => {
+  pneumo: ({ env, outdoors, shelteredBy }, add) => {
     if (!outdoors) {
       add('Indoors', -2);
       return 'skipSources';
     }
     add(`Wind force ${env.windForce}`, [-2, -1, 0, 0, 1, 2, 2][Math.max(0, Math.min(6, env.windForce))]);
+    if (shelteredBy && env.windForce > 0) add(`In the lee of a ${shelteredBy}`, -1);
   },
 
   pyro: ({ cell, env }, add) => {
@@ -211,8 +214,10 @@ export const BASE: Record<AspectId, Base> = {
   },
 
   nekro: ({ cell }, add) => {
-    add('Forest', -1);
-    if (cell.ground === 'forest') add('Rotting leaf litter', 1.5);
+    // The book gives no ambient figure for death: it is normal everywhere, and comes from corpses, the sick,
+    // refuse and rot (the sources below). Living wood holds it back a little; fallen leaves don't add to it.
+    add('Normal', 0);
+    if (cell.ground === 'forest') add('Living wood', -0.5);
   },
 };
 

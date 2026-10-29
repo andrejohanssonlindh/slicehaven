@@ -31,6 +31,19 @@ describe('filaments in the free world', () => {
     expect(r.pneumo.level).toBe(-1);
   });
 
+  it('air is stiller in the lee of a house (wind from the west, house at x 0..4)', () => {
+    const wall = (x: number, z: number, dx: number, dz: number, reach: number): string | null => {
+      const l = Math.hypot(dx, dz);
+      for (let d = 0.75; d <= reach; d += 0.75) { const px = x + (dx / l) * d; if (px >= 0 && px <= 4 && Math.abs(z) < 3) return 'house'; }
+      return null;
+    };
+    const f = new FilamentField(meadow([], { windBreak: wall }));
+    f.setConditions({ env: { ...DAY, windForce: 3, windDir: 0 } }); // blows toward the east
+    const lee = f.readAt(6.4, 0.8), windward = f.readAt(-6.4, 0.8);
+    expect(lee.pneumo.raw).toBe(windward.pneumo.raw - 1);
+    expect(lee.pneumo.parts.some((p) => p.label.includes('lee of a house'))).toBe(true);
+  });
+
   it('the falloff joins the hex numbers smoothly and ends at 2.5 cells', () => {
     const fall: [number, number, number] = [4, 2, 1];
     expect(falloffAt(fall, 0)).toBe(4);
