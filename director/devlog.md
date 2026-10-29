@@ -1,5 +1,10 @@
 # Devlog
 
+## 2026-10-30 — Lighting polish: sight edge no longer jumps, roofs no longer ringed dark
+
+- The sight rays were recast only after the hero moved 0.3 m, so the edge of what is seen hopped in steps. Now they are recast on every move (0.02 m) and there are 512 rays, not 256.
+- The ray stopped at a house's wall, so the roof overhang on the far side fell outside sight and showed as a dark border. Roofed boxes (more than 2 m through) now count `eave` (0.7 m) past the wall (`castSight(..., eave)`).
+
 ## 2026-10-30 — Session 27b: more filaments, torches seen from afar
 
 - **Eight more aspects** in `core/filaments.ts` (so the hex games get them too): **Thermotropy / Cryotropy** (the hour, night chill and frost, rain, wind; fire warms and takes cold away), **Heliotropy** (the sun: highest at midday, gone at night, clouds and shadows dim it), **Selenotropy** (the moon: its phase from −2 new to +2 full, hidden by cloud), **Astrotropy** (stars: clear nights, washed out by a bright moon, hidden by cloud), **Cosmotropy** (the open night sky), **Iconotropy / Semotropy** (normal; **books** add a little, roads add a little semotropy). Primal and soul aspects are not added (Q24).

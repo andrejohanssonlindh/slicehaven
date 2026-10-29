@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CLOUD_SCALE, CLOUD_SEED } from '../core/world3d/sky';
+import { RAYS } from '../core/world3d/vision';
 
 /**
  * Lit materials for the 3D world: three's Lambert (cheap, per-pixel) with our
@@ -48,7 +49,7 @@ export const exploredTexture = ((): THREE.DataTexture => {
 WORLD.uExplored.value = exploredTexture;
 
 /** The sight rays (`core/world3d/vision.ts`), one texel each round the circle, 0..255 for 0..range; wraps round. */
-export const SIGHT_RAYS = 256;
+export const SIGHT_RAYS = RAYS;
 export const sightTexture = ((): THREE.DataTexture => {
   const t = new THREE.DataTexture(new Uint8Array(SIGHT_RAYS).fill(255), SIGHT_RAYS, 1, THREE.RedFormat);
   t.magFilter = t.minFilter = THREE.LinearFilter;
@@ -178,7 +179,7 @@ if (uVision.w > 0.0) {
   vec2 dv = vWPos.xz - uVision.xy;
   float sd = length(dv);
   float sa = atan(dv.y, dv.x);
-  float ray = texture2D(uSightRays, vec2(fract(sa / 6.2831853) + ${(0.5 / 256).toFixed(6)}, 0.5)).r * uVision.w;
+  float ray = texture2D(uSightRays, vec2(fract(sa / 6.2831853) + ${(0.5 / SIGHT_RAYS).toFixed(6)}, 0.5)).r * uVision.w;
   float turn = abs(mod(sa - uSight.x + 3.1415927, 6.2831853) - 3.1415927);
   float cone = 1.0 - smoothstep(uSight.y - uSight.z, uSight.y, turn);
   float close = 1.0 - smoothstep(uSight.w * 0.8, uSight.w, sd);

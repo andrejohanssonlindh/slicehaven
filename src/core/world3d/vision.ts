@@ -44,7 +44,7 @@ export function visionOf({ alertness, night = 0, cap = Infinity }: VisionInput):
 }
 
 /** How many rays are cast round the eye. */
-export const RAYS = 256;
+export const RAYS = 512;
 
 /** Where the ray from (ox, oz) along (dx, dz) enters and leaves a shape; null if it misses or starts inside. */
 export function rayThrough(s: Shape, ox: number, oz: number, dx: number, dz: number): [number, number] | null {
@@ -82,21 +82,23 @@ export function rayThrough(s: Shape, ox: number, oz: number, dx: number, dz: num
 /**
  * How far the eye sees along each of `RAYS` directions round it (ray i points at angle i / RAYS · 2π). A ray stops
  * where it leaves the first solid thing it meets, so a wall is seen and what is behind it is not, and a house seen
- * from outside shows its whole roof. `blockers` are the solid things near enough to matter.
+ * from outside shows its whole roof (`eave` metres past the wall, for the overhang). `blockers` are the solid things near enough to matter.
  */
-export function castSight(eye: P2, range: number, blockers: readonly Shape[], out = new Float32Array(RAYS)): Float32Array {
+export function castSight(eye: P2, range: number, blockers: readonly Shape[], out = new Float32Array(RAYS), eave = 0): Float32Array {
   // Keep only what can reach the eye's circle.
   const near = blockers.filter((s) => {
     const reach = s.kind === 'circle' ? s.r : Math.hypot(s.hw, s.hd);
     return Math.hypot(s.x - eye.x, s.z - eye.z) - reach < range;
   });
+  // A roofed building (a box more than two metres through) shows its eaves: its wall of sight is `eave` farther out.
+  const roofed = (s: Shape): number => (s.kind === 'box' && Math.min(s.hw, s.hd) > 1 ? eave : 0);
   const hits: [number, number][] = [];
   for (let i = 0; i < RAYS; i++) {
     const a = (i / RAYS) * Math.PI * 2, dx = Math.cos(a), dz = Math.sin(a);
     hits.length = 0;
     for (const s of near) {
       const h = rayThrough(s, eye.x, eye.z, dx, dz);
-      if (h && h[0] < range) hits.push(h);
+      if (h && h[0] < range) hits.push([h[0], h[1] + roofed(s)]);
     }
     let end = range;
     if (hits.length) {

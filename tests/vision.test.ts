@@ -48,6 +48,13 @@ describe('vision', () => {
     expect(sightAlong(rays, 0)).toBeCloseTo(13, 1);
   });
 
+  it('a roofed house keeps its eaves in sight: the ray ends past the wall by the overhang, a thin wall does not', () => {
+    const house: Shape = { kind: 'box', x: 10, z: 0, hw: 3, hd: 3, rot: 0 };
+    expect(sightAlong(castSight(eye, 40, [house], undefined, 0.7), 0)).toBeCloseTo(13.7, 1);
+    const wall: Shape = { kind: 'box', x: 5, z: 0, hw: 0.1, hd: 3, rot: 0 };
+    expect(sightAlong(castSight(eye, 30, [wall], undefined, 0.7), 0)).toBeCloseTo(5.1, 1);
+  });
+
   it('seen: in the cone, close by behind you, not far behind you, not behind a wall', () => {
     const spec = visionOf({ alertness: 10 });
     const rays = castSight(eye, spec.range, [{ kind: 'box', x: 8, z: 0, hw: 0.1, hd: 2, rot: 0 }]);
