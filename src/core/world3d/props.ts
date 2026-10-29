@@ -3,6 +3,7 @@ import type { Clump } from './tree';
 import { type MeshData, type Vec3, addBeam, addBox, addFace, addOrientedBox, emptyMesh } from './mesh';
 import { type Shape, circle } from './space';
 import type { FSource } from './filaments3d';
+import { type MoreKind, SIGHT_BLOCKING, isMore, moreShapes } from './propsMore';
 
 /**
  * Small things placed in the world: shrubs, boulders, woodpiles. Each has a
@@ -10,7 +11,7 @@ import type { FSource } from './filaments3d';
  * The renderer turns clumps into lumpy balls, as it does for trees.
  */
 
-export type PropKind = 'shrub' | 'boulder' | 'woodpile' | 'crates' | 'well' | 'fence' | 'cart' | 'laundry';
+export type PropKind = 'shrub' | 'boulder' | 'woodpile' | 'crates' | 'well' | 'fence' | 'cart' | 'laundry' | MoreKind;
 
 export interface PlacedProp {
   kind: PropKind;
@@ -20,8 +21,10 @@ export interface PlacedProp {
   rot?: number;
   /** Scale, 1 = the base size. */
   size?: number;
-  /** Fences and washing lines: the run's length in metres (default 4). */
+  /** Fences, walls, palisades and washing lines: the run's length in metres (default 4); a gate's opening. */
   len?: number;
+  /** Gates: the leaves are swung back. */
+  open?: boolean;
   seed: number;
 }
 
@@ -36,12 +39,13 @@ const sizeOf = (p: PlacedProp): number => p.size ?? 1;
 export function buildShrub(seed: number): Lumps {
   const rng = Rng.fromSeed(seed);
   const clumps: Clump[] = [];
-  const n = 3 + rng.int(3);
+  // A low mound of several small clusters, lighter on top and toward the edge.
+  const n = 5 + rng.int(3);
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2 + rng.next();
-    const d = i === 0 ? 0 : 0.35 + rng.next() * 0.3;
-    const r = 0.4 + rng.next() * 0.25;
-    clumps.push({ at: [Math.cos(a) * d, r * 0.75, Math.sin(a) * d], r: [r, r * 0.8, r] });
+    const d = i === 0 ? 0 : 0.4 + rng.next() * 0.3;
+    const r = (i === 0 ? 0.4 : 0.26) + rng.next() * 0.16;
+    clumps.push({ at: [Math.cos(a) * d, r * 0.75 + (i === 0 ? 0.2 : 0), Math.sin(a) * d], r: [r, r * 0.8, r], tone: i === 0 ? 0.9 : 0.3 + rng.next() * 0.4 });
   }
   return { clumps, height: Math.max(...clumps.map((c) => c.at[1] + c.r[1])) };
 }
@@ -183,8 +187,17 @@ export function buildLaundry(len: number, seed: number): { wood: MeshData; cloth
   return { wood, cloths: cloths.filter((c) => c.mesh.positions.length > 0) };
 }
 
-/** What blocks feet. */
+/** Everything that blocks feet for a prop (a gate is two posts and, shut, a leaf between them). */
+export function propShapes(p: PlacedProp): Shape[] {
+  return isMore(p.kind) ? moreShapes(p) : [propShape(p)];
+}
+
+/** Whether the eye is stopped by it: boulders, palisades, walls, towers. */
+export const blocksSight = (p: PlacedProp): boolean => p.kind === 'boulder' || SIGHT_BLOCKING.includes(p.kind);
+
+/** What blocks feet (the first of `propShapes`). */
 export function propShape(p: PlacedProp): Shape {
+  if (isMore(p.kind)) return moreShapes(p)[0];
   const s = sizeOf(p);
   const rot = p.rot ?? 0;
   switch (p.kind) {

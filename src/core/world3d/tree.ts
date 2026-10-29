@@ -10,6 +10,8 @@ export interface Clump {
   at: Vec3;
   /** Radii of the ellipsoid. */
   r: Vec3;
+  /** 0..1, how much sky it sees: tops and outer clusters are light, the inside and underside dark (default 0.5). */
+  tone?: number;
 }
 
 export interface TreeModel {
@@ -41,12 +43,23 @@ function buildPine(seed: number, height: number): TreeModel {
   addBeam(wood, [0, -0.2, 0], [lean, height * 0.5, lean], footR * 2, [0, 0, 1], { aoBottom: 0.55 });
   addBeam(wood, [lean, height * 0.5, lean], [lean * 1.4, height * 0.92, lean * 1.4], footR * 1.1, [0, 0, 1]);
   const clumps: Clump[] = [];
-  const tiers = 5 + rng.int(2);
+  // Tiers of drooping skirts, each a ring of flat clusters whose outer edge hangs lowest; the tiers narrow upward.
+  const tiers = 6 + rng.int(2);
   for (let i = 0; i < tiers; i++) {
     const k = i / (tiers - 1);
-    const y = height * (0.3 + k * 0.62);
-    const r = (1.45 - k * 1.1) * (0.9 + rng.next() * 0.2);
-    clumps.push({ at: [lean * (0.4 + k), y, lean * (0.4 + k)], r: [r, 0.55, r] });
+    const y = height * (0.26 + k * 0.66);
+    const reach = (1.15 - k * 0.85) * (0.9 + rng.next() * 0.2);
+    const n = k > 0.85 ? 1 : 5;
+    for (let j = 0; j < n; j++) {
+      const a = (j / n) * Math.PI * 2 + i * 0.9 + rng.next() * 0.5;
+      const d = n === 1 ? 0 : reach * 0.6;
+      const r = n === 1 ? 0.35 : reach * 0.62;
+      clumps.push({
+        at: [lean * (0.4 + k) + Math.cos(a) * d, y, lean * (0.4 + k) + Math.sin(a) * d],
+        r: [r, n === 1 ? 0.5 : 0.4, r],
+        tone: Math.min(1, 0.25 + k * 0.6 + rng.next() * 0.2),
+      });
+    }
   }
   return { wood, clumps, height: Math.max(...clumps.map((c) => c.at[1] + c.r[1])), footR };
 }
@@ -86,25 +99,37 @@ function buildBroadleaf(seed: number, height: number, young: boolean): TreeModel
   const knee: Vec3 = [lean[0] * 0.4, height * 0.24, lean[2] * 0.4];
   addBeam(wood, [0, -0.2, 0], knee, footR * 2, [0, 0, 1], { aoBottom: 0.55 });
   addBeam(wood, knee, trunkTop, footR * 1.6, [0, 0, 1]);
-  // Limbs fanning out, each ending in a clump; a crown clump on top.
+  // Limbs fanning out under the crown, so the trunk is seen to hold it up.
   const limbs = 4 + rng.int(3);
   for (let i = 0; i < limbs; i++) {
     const a = (i / limbs) * Math.PI * 2 + rng.next() * 0.8;
-    const reach = (1.4 + rng.next() * 1.4) * s;
-    const up = height * (0.6 + rng.next() * 0.22);
-    const end: Vec3 = [trunkTop[0] + Math.cos(a) * reach, up, trunkTop[2] + Math.sin(a) * reach];
+    const reach = (1.3 + rng.next() * 1.2) * s;
+    const end: Vec3 = [trunkTop[0] + Math.cos(a) * reach, height * (0.58 + rng.next() * 0.14), trunkTop[2] + Math.sin(a) * reach];
     addBeam(wood, trunkTop, end, footR * 0.7, [0, 1, 0]);
-    const r = (1.2 + rng.next() * 0.7) * s;
-    clumps.push({ at: end, r: [r, r * (0.7 + rng.next() * 0.2), r] });
   }
-  const cr = (1.7 + rng.next() * 0.5) * s;
-  clumps.push({ at: [trunkTop[0], height * 0.82, trunkTop[2]], r: [cr, cr * 0.8, cr] });
-  // A few small clumps filling the gaps.
-  for (let i = 0; i < 4; i++) {
-    const a = rng.next() * Math.PI * 2;
-    const r = (0.8 + rng.next() * 0.5) * s;
-    clumps.push({ at: [trunkTop[0] + Math.cos(a) * 1.3 * s, height * (0.55 + rng.next() * 0.3), trunkTop[2] + Math.sin(a) * 1.3 * s], r: [r, r * 0.8, r] });
-  }
+  // The crown is many small clusters in three tiers (a wide skirt, a fuller middle, a cap), the way the 2D trees read:
+  // each cluster lit on top and dark beneath, with gaps between them showing the next one behind.
+  const cx = trunkTop[0], cz = trunkTop[2];
+  const tiers: { y: number; ring: number; n: number; r: number }[] = [
+    { y: 0.6, ring: 1.9, n: 6, r: 1.05 },
+    { y: 0.72, ring: 1.55, n: 6, r: 1.15 },
+    { y: 0.85, ring: 0.8, n: 4, r: 1.0 },
+  ];
+  const yMin = height * 0.5, yMax = height * 0.97;
+  tiers.forEach((t, ti) => {
+    for (let i = 0; i < t.n; i++) {
+      const a = (i / t.n) * Math.PI * 2 + ti * 0.5 + (rng.next() - 0.5) * 0.7;
+      const d = t.ring * s * (0.85 + rng.next() * 0.3);
+      const r = t.r * s * (0.85 + rng.next() * 0.35);
+      const at: Vec3 = [cx + Math.cos(a) * d, height * t.y + (rng.next() - 0.5) * 0.5 * s, cz + Math.sin(a) * d];
+      // Light where it is high and on the outside; the skirt's edge catches sky too, its middle does not.
+      const tone = Math.min(1, Math.max(0, ((at[1] - yMin) / (yMax - yMin)) * 0.7 + (d / (2.2 * s)) * 0.25 + rng.next() * 0.1));
+      clumps.push({ at, r: [r, r * (0.72 + rng.next() * 0.15), r], tone });
+    }
+  });
+  clumps.push({ at: [cx, height * 0.95 - 0.5 * s, cz], r: [0.95 * s, 0.8 * s, 0.95 * s], tone: 1 });
+  // One dark clump in the middle, so the inside is shade, not a see-through gap.
+  clumps.push({ at: [cx, height * 0.68, cz], r: [1.2 * s, 1.0 * s, 1.2 * s], tone: 0.1 });
   const top = Math.max(...clumps.map((c) => c.at[1] + c.r[1]));
   return { wood, clumps, height: top, footR };
 }

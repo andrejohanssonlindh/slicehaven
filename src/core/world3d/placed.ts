@@ -1,7 +1,7 @@
 import { CHUNK, chunkKey } from './chunks';
 import type { FSource } from './filaments3d';
 import { POST, TRUNK, type Layout, type PlacedTree } from './layout';
-import { type PlacedProp, propShape, propSource } from './props';
+import { type PlacedProp, blocksSight, propShapes, propSource } from './props';
 import { type Shape, type ShapeSource, circle } from './space';
 
 /**
@@ -76,7 +76,7 @@ export class PlacedIndex implements ShapeSource {
     let s = this.shapes.get(k);
     if (!s) {
       const c = this.chunk(i, j);
-      s = [...c.trees.map((t) => circle(t.x, t.z, TRUNK)), ...c.torches.map(([x, z]) => circle(x, z, POST)), ...c.props.map(propShape)];
+      s = [...c.trees.map((t) => circle(t.x, t.z, TRUNK)), ...c.torches.map(([x, z]) => circle(x, z, POST)), ...c.props.flatMap(propShapes)];
       this.shapes.set(k, s);
     }
     return s;
@@ -98,7 +98,7 @@ export class PlacedIndex implements ShapeSource {
       let s = this.sights.get(k);
       if (!s) {
         const c = this.chunk(i, j);
-        s = [...c.trees.map((t) => circle(t.x, t.z, TRUNK)), ...c.props.filter((p) => p.kind === 'boulder').map(propShape)];
+        s = [...c.trees.map((t) => circle(t.x, t.z, TRUNK)), ...c.props.filter(blocksSight).flatMap(propShapes)];
         this.sights.set(k, s);
       }
       out.push(...s);

@@ -67,7 +67,8 @@ describe('layout', () => {
       expect(lakeDist(g, p.x, p.z), id).toBeGreaterThan(1);
       for (const r of g.roads) expect(roadDist(r, p.x, p.z), id).toBeGreaterThan(r.width / 2 + 0.3);
       for (const b of boxes) expect(shapeDist(b, p.x, p.z), id).toBeGreaterThan(0.4);
-      expect(grid.walkable(p.x, p.z), id).toBe(false);
+      // (A way through, an open gate or an archway, is walkable in the middle; its posts are what block.)
+      expect(grid.walkable(p.x, p.z), id).toBe(p.kind === 'archway' || (p.kind === 'gate' && !!p.open));
     }
   });
 
@@ -101,5 +102,35 @@ describe('layout', () => {
       const door = houseToWorld(h.place, h.model.door[0], h.model.door[2] - 0.1);
       for (const w of houseWalls(h)) expect(shapeDist(w, door.x, door.z)).toBeGreaterThan(0.3);
     }
+  });
+});
+
+describe('settlement props', () => {
+  const at = (kind: string, extra: object = {}) => ({ kind, x: 5, z: 5, seed: 3, ...extra }) as import('../src/core/world3d/props').PlacedProp;
+
+  it('every kind builds the same twice, has geometry in some material, and blocks feet', async () => {
+    const { MORE_KINDS, buildMore } = await import('../src/core/world3d/propsMore');
+    const { propShapes } = await import('../src/core/world3d/props');
+    for (const k of MORE_KINDS) {
+      const a = buildMore(at(k)), b = buildMore(at(k));
+      expect(JSON.stringify(a), k).toBe(JSON.stringify(b));
+      const meshes = [a.wood, a.stone, a.hay, ...(a.cloth ?? []).map((c) => c.mesh)].filter(Boolean);
+      expect(meshes.length, k).toBeGreaterThan(0);
+      for (const m of meshes) expect(m!.indices.length, k).toBeGreaterThan(0);
+      expect(propShapes(at(k)).length, k).toBeGreaterThan(0);
+    }
+  });
+
+  it('a shut gate bars the way, an open one leaves only its posts; an archway is two piers', async () => {
+    const { propShapes } = await import('../src/core/world3d/props');
+    expect(propShapes(at('gate', { open: true, len: 3 }))).toHaveLength(2);
+    expect(propShapes(at('gate', { len: 3 }))).toHaveLength(3);
+    expect(propShapes(at('archway'))).toHaveLength(2);
+  });
+
+  it('palisades, walls and towers stop the eye; stalls and barrels do not', async () => {
+    const { blocksSight } = await import('../src/core/world3d/props');
+    for (const k of ['palisade', 'stonewall', 'tower', 'boulder']) expect(blocksSight(at(k)), k).toBe(true);
+    for (const k of ['stall', 'barrel', 'gate', 'fence']) expect(blocksSight(at(k)), k).toBe(false);
   });
 });

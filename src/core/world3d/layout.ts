@@ -1,5 +1,5 @@
 import { type House3DSpec, type HouseModel, buildHouse } from './house';
-import { type PlacedProp, propShape } from './props';
+import { type PlacedProp, propShapes } from './props';
 import { type Shape, boxOfFootprint, circle, shapeDist } from './space';
 import type { TreeKind } from './tree';
 
@@ -103,7 +103,7 @@ export function layoutObstacles(l: Layout, houses: BuiltHouse[]): Shape[] {
     ...houses.flatMap(houseWalls),
     ...l.trees.map((t) => circle(t.x, t.z, TRUNK)),
     ...l.torches.map(([x, z]) => circle(x, z, POST)),
-    ...l.props.map(propShape),
+    ...l.props.flatMap(propShapes),
   ];
 }
 

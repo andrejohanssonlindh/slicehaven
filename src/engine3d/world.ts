@@ -34,6 +34,7 @@ import { makeFlame, makeOrb } from './fire';
 import { EXPLORED_WINDOW, type LitOpts, SEE_SLOTS, WORLD, exploredTexture, lit, pixTexture, shellOf, sightTexture } from './materials';
 import { SCORCH_SIZE, scorchImage } from '../core/world3d/scorch';
 import { RAYS, type SightLight, type VisionSpec, angleGap, castSight, lightReach, litSeenAt, seenAt, turnToward, visibleLights, visionOf } from '../core/world3d/vision';
+import { buildMore, isMore } from '../core/world3d/propsMore';
 import { Leaves } from './leaves';
 import { Rain } from './rain';
 import { type Chimney, Smoke } from './smoke';
@@ -706,13 +707,15 @@ export class SpikeWorld {
   private barkMat: THREE.MeshLambertMaterial | null = null;
   private leafMat: THREE.MeshLambertMaterial | null = null;
   private leafOpts: LitOpts | null = null;
+  private pineMat: THREE.MeshLambertMaterial | null = null;
+  private pineOpts: LitOpts | null = null;
 
   private buildTree(place: PlacedTree, st: Standing): void {
     const key = `${place.kind ?? 'oak'}:${place.seed}`;
     let geo = this.treeGeos.get(key);
     if (!geo) {
       const t = buildTree(place.seed, 7, place.kind);
-      geo = { wood: geometryOf(t.wood), leaves: t.clumps.length ? lumpGeometry(t.clumps, t.height, 2) : null }; // a dead tree has no leaves
+      geo = { wood: geometryOf(t.wood), leaves: t.clumps.length ? lumpGeometry(t.clumps, t.height, 1) : null }; // a dead tree has no leaves
       geo.wood.userData.shared = true;
       if (geo.leaves) geo.leaves.userData.shared = true;
       this.treeGeos.set(key, geo);
@@ -727,10 +730,14 @@ export class SpikeWorld {
     this.scene.add(group);
     st.objects.push(group);
     if (!geo.leaves) return;
+    // Pines are darker and bluer than broadleaves.
+    const pine = place.kind === 'pine';
     this.leafOpts ??= { map: tex(leafTex(5)), ao: true, sway: { from: 2.5, amount: 0.018 }, seeThrough: true };
-    const leafOpts = this.leafOpts;
-    this.leafMat ??= lit(leafOpts);
-    const leaves = new THREE.Mesh(geo.leaves, this.leafMat);
+    this.pineOpts ??= { ...this.leafOpts, color: 0x7fa596 };
+    const leafOpts = pine ? this.pineOpts : this.leafOpts;
+    this.leafMat ??= lit(this.leafOpts);
+    this.pineMat ??= lit(this.pineOpts);
+    const leaves = new THREE.Mesh(geo.leaves, pine ? this.pineMat : this.leafMat);
     leaves.castShadow = leaves.receiveShadow = true;
     group.add(leaves);
     this.addShells(leaves, leafOpts, { density: 0.55, tint: 1.18, step: 0.12 }, null, st.shells);
@@ -739,7 +746,29 @@ export class SpikeWorld {
   private stoneMat: THREE.MeshLambertMaterial | null = null;
   private logMat: THREE.MeshLambertMaterial | null = null;
   private shrubMat: THREE.MeshLambertMaterial | null = null;
-  private clothMats = new Map<number, THREE.MeshLambertMaterial>();
+  private clothMats = new Map<string, THREE.MeshLambertMaterial>();
+  private plank: THREE.MeshLambertMaterial | null = null;
+  private hayM: THREE.MeshLambertMaterial | null = null;
+
+  /** Sawn timber for gates, palisades and stalls. */
+  private plankMat(): THREE.MeshLambertMaterial {
+    return (this.plank ??= lit({ map: tex(timberTex(6)), ao: true, wettable: true, seeThrough: true }));
+  }
+
+  private hayMat(): THREE.MeshLambertMaterial {
+    return (this.hayM ??= lit({ map: tex(thatchTex(8)), ao: true, wettable: true, seeThrough: true }));
+  }
+
+  /** Cloth in a flat colour, shared by colour; `hang` swings from the top (a line of washing). */
+  private clothMat(colour: number, hang: boolean): THREE.MeshLambertMaterial {
+    const key = `${colour}:${hang}`;
+    let mat = this.clothMats.get(key);
+    if (!mat) {
+      mat = lit({ map: tex(plasterTex(5)), color: colour, ao: true, wettable: true, ...(hang ? { sway: { from: LAUNDRY_HANG.top, amount: 0.22, hang: true } } : {}) });
+      this.clothMats.set(key, mat);
+    }
+    return mat;
+  }
   private wellWater: THREE.MeshLambertMaterial | null = null;
 
   /** A shrub, boulder or woodpile, standing on the ground where it is placed. */
@@ -757,18 +786,16 @@ export class SpikeWorld {
     else if (p.kind === 'crates') solid(buildCrates(p.seed), this.logMat);
     else if (p.kind === 'fence') solid(buildFence(p.len ?? 4, p.seed), this.logMat);
     else if (p.kind === 'cart') solid(buildCart(p.seed), this.logMat);
-    else if (p.kind === 'laundry') {
+    else if (isMore(p.kind)) {
+      const parts = buildMore(p);
+      if (parts.wood) solid(parts.wood, p.kind === 'stump' ? this.logMat : this.plankMat());
+      if (parts.stone) solid(parts.stone, this.stoneMat);
+      if (parts.hay) solid(parts.hay, this.hayMat());
+      for (const c of parts.cloth ?? []) solid(c.mesh, this.clothMat(c.colour, false));
+    } else if (p.kind === 'laundry') {
       const l = buildLaundry(p.len ?? 3, p.seed);
       solid(l.wood, this.logMat);
-      for (const c of l.cloths) {
-        // One material per colour, shared; the cloth swings from the line.
-        let mat = this.clothMats.get(c.colour);
-        if (!mat) {
-          mat = lit({ map: tex(plasterTex(5)), color: c.colour, ao: true, wettable: true, sway: { from: LAUNDRY_HANG.top, amount: 0.22, hang: true } });
-          this.clothMats.set(c.colour, mat);
-        }
-        solid(c.mesh, mat);
-      }
+      for (const c of l.cloths) solid(c.mesh, this.clothMat(c.colour, true)); // the cloth swings from the line
     }
     else if (p.kind === 'well') {
       const w = buildWell();
@@ -787,7 +814,7 @@ export class SpikeWorld {
       const b = buildShrub(p.seed);
       // Shrubs are low, so they sway from the ground up (trees keep their trunks still), and nobody hides behind them.
       this.shrubMat ??= lit({ map: tex(leafTex(5)), ao: true, sway: { from: 0, amount: 0.05 }, seeThrough: true });
-      const m = new THREE.Mesh(lumpGeometry(b.clumps, b.height, 2), this.shrubMat);
+      const m = new THREE.Mesh(lumpGeometry(b.clumps, b.height, 1), this.shrubMat);
       m.castShadow = m.receiveShadow = true;
       group.add(m);
     }
@@ -1816,22 +1843,36 @@ export class SpikeWorld {
 }
 
 /** Lumpy balls for leaf clumps and boulders: a noisy icosphere per clump, merged. `detail` is the subdivision. */
-function lumpGeometry(clumps: Clump[], height: number, detail: number): THREE.BufferGeometry {
+function lumpGeometry(clumps: Clump[], _height: number, detail: number): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [];
   clumps.forEach((c, i) => {
     const geo = new THREE.IcosahedronGeometry(1, detail);
     const pos = geo.attributes.position as THREE.BufferAttribute;
     const nrm = new Float32Array(pos.count * 3), uv = new Float32Array(pos.count * 2), col = new Float32Array(pos.count * 3);
+    const tone = c.tone ?? 0.5;
     for (let k = 0; k < pos.count; k++) {
       const x = pos.getX(k), y = pos.getY(k), z = pos.getZ(k);
-      const lump = 1 + (fbm(x * 1.7 + i * 3, z * 1.7 + y, 41 + i) - 0.5) * 0.45;
+      const lump = 1 + (fbm(x * 1.7 + i * 3, z * 1.7 + y, 41 + i) - 0.5) * 0.3;
       const px = x * c.r[0] * lump, py = y * c.r[1] * lump, pz = z * c.r[2] * lump;
       pos.setXYZ(k, px + c.at[0], py + c.at[1], pz + c.at[2]);
-      const n = new THREE.Vector3(x / c.r[0], y / c.r[1], z / c.r[2]).normalize();
-      nrm.set([n.x, n.y, n.z], k * 3);
-      uv.set([px + pz * 0.6 + i * 1.3, py], k * 2);
-      const ao = 0.5 + 0.5 * Math.max(0, n.y * 0.5 + 0.5) * Math.min(1, (py + c.at[1]) / height + 0.35);
-      col.set([ao, ao, ao], k * 3);
+      // Pixels in the leaf texture are the cluster's own: mapped round it, not smeared down it.
+      uv.set([px * 1.0 + pz * 0.55 + i * 1.3, py * 0.8 - pz * 0.35], k * 2);
+    }
+    // Flat faces: each facet of a cluster is one tone, so a cluster reads as a chunky clump with hard-lit sides.
+    // The shade is the cluster's tone (light on top and out, dark under and in) times how much the facet faces up.
+    for (let f = 0; f < pos.count; f += 3) {
+      const a = new THREE.Vector3(pos.getX(f), pos.getY(f), pos.getZ(f));
+      const b = new THREE.Vector3(pos.getX(f + 1), pos.getY(f + 1), pos.getZ(f + 1));
+      const d = new THREE.Vector3(pos.getX(f + 2), pos.getY(f + 2), pos.getZ(f + 2));
+      const n = b.clone().sub(a).cross(d.clone().sub(a)).normalize();
+      const mid = a.clone().add(b).add(d).multiplyScalar(1 / 3).sub(new THREE.Vector3(c.at[0], c.at[1], c.at[2]));
+      if (n.dot(mid) < 0) n.negate(); // outward
+      const up = n.y * 0.5 + 0.5;
+      const ao = (0.42 + 0.7 * tone) * (0.55 + 0.6 * up);
+      for (let v = 0; v < 3; v++) {
+        nrm.set([n.x, n.y, n.z], (f + v) * 3);
+        col.set([ao, ao, ao], (f + v) * 3);
+      }
     }
     geo.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
