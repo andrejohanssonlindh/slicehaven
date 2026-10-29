@@ -30,7 +30,8 @@ import { type Clump, buildTree } from '../core/world3d/tree';
 import { fbm } from '../core/noise';
 import { Weather } from '../engine/weather';
 import { makeFlame, makeOrb } from './fire';
-import { EXPLORED_WINDOW, type LitOpts, SEE_SLOTS, WORLD, exploredTexture, lit, pixTexture, shellOf } from './materials';
+import { EXPLORED_WINDOW, type LitOpts, SEE_SLOTS, WORLD, exploredTexture, lit, pixTexture, shellOf, sightTexture } from './materials';
+import { RAYS, type VisionSpec, angleGap, castSight, seenAt, turnToward, visionOf } from '../core/world3d/vision';
 import { Rain } from './rain';
 import { type SpriteCard, type WalkCard, blobShadow, spriteCard, walkCard } from './sprites';
 import { type Heat, makeFloorHeat, makeHeat } from './heat';
@@ -173,10 +174,18 @@ export class SpikeWorld {
    * built or animated. `outer` 0 turns it off. Set by tier from the page.
    */
   vision = { inner: 0, outer: 0 };
+  /** The hero's Alertness attribute: how far and how wide they see (see `core/world3d/vision.ts`). */
+  alertness = 10;
+  /** The shape of the hero's sight now, and the rays cast from their eye over the ground. */
+  spec: VisionSpec = visionOf({ alertness: 10 });
+  readonly rays = new Float32Array(RAYS);
+  /** The way the hero faces, radians (atan2(z, x)), eased toward the way they walk. */
+  facing = Math.PI / 2;
+  private castAt: { x: number; z: number; range: number; house: number } | null = null;
   private tmpV = new THREE.Vector3();
   /** Where the hero has been (seen within the vision radius): drawn grey where it is out of sight now. */
   readonly explored = new Explored();
-  private markedAt: { x: number; z: number; r: number } | null = null;
+  private markedAt: { x: number; z: number; f: number; t: number } | null = null;
   private exploredWin = { ox: 0, oz: 0, dirty: true };
 
   setVision(inner: number, outer: number): void {
@@ -198,14 +207,42 @@ export class SpikeWorld {
     return Math.hypot(dx, dz) <= this.vision.outer + 6;
   }
 
+  /** What stops the eye near the hero: trunks and boulders, other houses whole, and the walls of the house they stand in. */
+  private blockers(range: number, inHouse: number): Shape[] {
+    const h = this.hero;
+    const out: Shape[] = [...this.placed.sightNear(h.x - range, h.z - range, h.x + range, h.z + range)];
+    this.houses.forEach((hs, i) => out.push(...(i === inHouse ? houseWalls(hs.built) : [hs.box])));
+    return out;
+  }
+
+  /** Cast the rays again if the eye moved, the range changed or the hero stepped through a door. */
+  private castRays(): void {
+    const h = this.hero, range = this.spec.range, house = this.heroHouse();
+    const c = this.castAt;
+    if (c && c.range === range && c.house === house && Math.hypot(h.x - c.x, h.z - c.z) < 0.3) return;
+    castSight({ x: h.x, z: h.z }, range, this.blockers(range, house), this.rays);
+    this.castAt = { x: h.x, z: h.z, range, house };
+    const data = sightTexture.image.data as Uint8Array;
+    for (let i = 0; i < RAYS; i++) data[i] = Math.min(255, Math.ceil((this.rays[i] / range) * 255));
+    sightTexture.needsUpdate = true;
+    this.markedAt = null; // what is seen has changed
+  }
+
+  /** How clearly the hero sees a point on the ground, 0..1 (with vision off, fully). */
+  seen(x: number, z: number): number {
+    return this.vision.outer <= 0 ? 1 : seenAt(this.hero, this.facing, this.spec, this.rays, x, z);
+  }
+
   /** Record what the hero can see, and keep the window the shader reads centred on the view. */
   private stepExplored(): void {
     const v = this.vision;
     if (v.outer <= 0) return;
     const h = this.hero, m = this.markedAt;
-    if (!m || m.r !== v.inner || Math.hypot(h.x - m.x, h.z - m.z) >= 2) {
-      if (this.explored.mark(h.x, h.z, v.inner * 0.95) > 0) this.exploredWin.dirty = true;
-      this.markedAt = { x: h.x, z: h.z, r: v.inner };
+    const turned = m ? angleGap(this.facing, m.f) : 1;
+    if (!m || Math.hypot(h.x - m.x, h.z - m.z) >= 2 || (turned > 0.25 && this.time - m.t > 0.15)) {
+      // The cells the eye reaches (their centres in the cone or close by, and in the clear) are remembered.
+      if (this.explored.markWhere(h.x, h.z, this.spec.range * 0.95, (x, z) => this.seen(x, z) > 0.5) > 0) this.exploredWin.dirty = true;
+      this.markedAt = { x: h.x, z: h.z, f: this.facing, t: this.time };
     }
     const half = EXPLORED_WINDOW / 2, w = this.exploredWin;
     const cx = Math.floor(this.focus.x), cz = Math.floor(this.focus.z);
@@ -507,8 +544,8 @@ export class SpikeWorld {
       m.castShadow = m.receiveShadow = true;
       group.add(m);
     };
-    this.logMat ??= lit({ map: tex(barkTex(4)), ao: true, wettable: true });
-    this.stoneMat ??= lit({ map: tex(stoneTex(3)), ao: true, wettable: true });
+    this.logMat ??= lit({ map: tex(barkTex(4)), ao: true, wettable: true, seeThrough: true });
+    this.stoneMat ??= lit({ map: tex(stoneTex(3)), ao: true, wettable: true, seeThrough: true });
     if (p.kind === 'woodpile') solid(buildWoodpile(p.seed), this.logMat);
     else if (p.kind === 'crates') solid(buildCrates(p.seed), this.logMat);
     else if (p.kind === 'fence') solid(buildFence(p.len ?? 4, p.seed), this.logMat);
@@ -529,7 +566,7 @@ export class SpikeWorld {
     } else {
       const b = buildShrub(p.seed);
       // Shrubs are low, so they sway from the ground up (trees keep their trunks still), and nobody hides behind them.
-      this.shrubMat ??= lit({ map: tex(leafTex(5)), ao: true, sway: { from: 0, amount: 0.05 } });
+      this.shrubMat ??= lit({ map: tex(leafTex(5)), ao: true, sway: { from: 0, amount: 0.05 }, seeThrough: true });
       const m = new THREE.Mesh(lumpGeometry(b.clumps, b.height, 2), this.shrubMat);
       m.castShadow = m.receiveShadow = true;
       group.add(m);
@@ -796,7 +833,7 @@ export class SpikeWorld {
 
   /** A flame on a post (or on a bracket, with no post), with its light; into `st` when it belongs to a chunk. */
   private placeTorch(x: number, y: number, z: number, post: boolean, st: Standing | null): void {
-    this.postMat ??= lit({ map: tex(timberTex(21)) });
+    this.postMat ??= lit({ map: tex(timberTex(21)), seeThrough: true });
     if (post) {
       const p = new THREE.Mesh(this.postGeo, this.postMat);
       p.position.set(x, y - 0.95, z);
@@ -1305,9 +1342,24 @@ export class SpikeWorld {
     this.fog.far = CAM_DIST + env.fogFar;
     // With vision on, what lies past it is black, not sky.
     this.scene.background = this.vision.outer > 0 ? fogC.clone().multiplyScalar(0.05) : fogC;
-    // Sight is the hero's, not the camera's.
-    WORLD.uVision.value.set(this.hero.x, this.hero.z, this.vision.inner, this.vision.outer);
-    this.stepExplored();
+    // Sight is the hero's, not the camera's: a cone ahead, a circle round, the dark shortening it, solid things in the way.
+    if (this.vision.outer > 0) {
+      this.facing = turnToward(this.facing, Math.atan2(this.heroDir.z, this.heroDir.x), 7 * dt);
+      this.spec = visionOf({ alertness: this.alertness, night: env.night, cap: this.vision.outer });
+      this.castRays();
+      const sp = this.spec;
+      WORLD.uVision.value.set(this.hero.x, this.hero.z, sp.range * 0.7, sp.range);
+      WORLD.uSight.value.set(this.facing, sp.fov / 2, sp.edge, sp.near);
+      this.stepExplored();
+      // People out of sight are not drawn.
+      const out = this.seen(this.walker.mesh.position.x, this.walker.mesh.position.z) < 0.25;
+      this.walker.mesh.visible = !out;
+      this.walkerBlob.visible = !out;
+    } else {
+      WORLD.uVision.value.set(0, 0, 0, 0);
+      this.walker.mesh.visible = true;
+      this.walkerBlob.visible = true;
+    }
 
     // World uniforms: time, clouds, wetness, wind.
     WORLD.uTime.value = this.time;

@@ -35,6 +35,7 @@ export class PlacedIndex implements ShapeSource {
   private readonly authored = new Map<string, ChunkContent>();
   private readonly made = new Map<string, ChunkContent>();
   private readonly shapes = new Map<string, Shape[]>();
+  private readonly sights = new Map<string, Shape[]>();
 
   constructor(layout: Pick<Layout, 'trees' | 'props' | 'torches'>, private readonly generator?: ChunkGenerator) {
     const at = (x: number, z: number): ChunkContent => {
@@ -87,6 +88,22 @@ export class PlacedIndex implements ShapeSource {
     const out = new Set<Shape>();
     for (const [i, j] of this.chunksIn(x0 - 1.5, z0 - 1.5, x1 + 1.5, z1 + 1.5)) for (const s of this.shapesOf(i, j)) out.add(s);
     return [...out];
+  }
+
+  /** What stops the eye: trunks and boulders (not posts, crates, fences or bushes) that may touch a rectangle. */
+  sightNear(x0: number, z0: number, x1: number, z1: number): readonly Shape[] {
+    const out: Shape[] = [];
+    for (const [i, j] of this.chunksIn(x0 - 1.5, z0 - 1.5, x1 + 1.5, z1 + 1.5)) {
+      const k = chunkKey(i, j);
+      let s = this.sights.get(k);
+      if (!s) {
+        const c = this.chunk(i, j);
+        s = [...c.trees.map((t) => circle(t.x, t.z, TRUNK)), ...c.props.filter((p) => p.kind === 'boulder').map(propShape)];
+        this.sights.set(k, s);
+      }
+      out.push(...s);
+    }
+    return out;
   }
 
   /** The filament sources (trees, rocks, bushes, torches, wells) that stand in a rectangle. */

@@ -28,10 +28,15 @@ export class Explored {
 
   /** Mark every cell whose centre is within `r` metres of (x, z). Returns how many were new. */
   mark(x: number, z: number, r: number): number {
+    return this.markWhere(x, z, r, () => true);
+  }
+
+  /** As `mark`, but only the cells (given by their centres) the test accepts: what the eye actually saw. */
+  markWhere(x: number, z: number, r: number, seen: (cx: number, cz: number) => boolean): number {
     let added = 0;
     for (let cz = Math.floor(z - r); cz <= Math.floor(z + r); cz++) {
       for (let cx = Math.floor(x - r); cx <= Math.floor(x + r); cx++) {
-        if (Math.hypot(cx + 0.5 - x, cz + 0.5 - z) > r) continue;
+        if (Math.hypot(cx + 0.5 - x, cz + 0.5 - z) > r || !seen(cx + 0.5, cz + 0.5)) continue;
         const ci = Math.floor(cx / CHUNK), cj = Math.floor(cz / CHUNK);
         const k = chunkKey(ci, cj);
         let m = this.chunks.get(k);

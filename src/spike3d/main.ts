@@ -170,6 +170,8 @@ function buildControls(): void {
     const next = steps[(at + 1) % steps.length];
     world.setVision(next * 0.7, next);
   });
+  // The hero's Alertness: how far and how wide they see.
+  button('row-perf', () => t('spike.alertness', 'Alertness {n}', { n: world.alertness }), () => world.alertness !== 10, () => { world.alertness = cycle([4, 7, 10, 14, 18], world.alertness); });
   button('row-perf', () => t('spike.forget', 'Forget map'), () => false, () => { world.forgetMap(); });
   button('row-perf', () => t('spike.tier', 'Tier: {n}', { n: tier.name }), () => false, () => {
     setTier(cycle(['low', 'medium', 'high'] as TierName[], tier.name));
