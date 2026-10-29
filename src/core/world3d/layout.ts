@@ -57,8 +57,8 @@ export function houseToLocal(h: PlacedHouse, x: number, z: number): { x: number;
   return { x: dx * c - dz * s, z: dx * s + dz * c };
 }
 
-const TRUNK = 0.5;
-const POST = 0.12;
+export const TRUNK = 0.5;
+export const POST = 0.12;
 /** Half-width of a doorway for feet, wider than the door so the walker fits. */
 const DOOR_GAP = 0.65;
 

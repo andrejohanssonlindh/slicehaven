@@ -26,6 +26,8 @@ export interface Ground3D {
   pads: { x: number; z: number; hw: number; hd: number; rot: number }[];
   /** Darker, leafy ground under trees. */
   shade: { x: number; z: number; r: number }[];
+  /** More shade (0..1) from things that are not in `shade` (trees a streaming map makes as it goes). */
+  extraShade?: (x: number, z: number) => number;
 }
 
 /** Water surface height. */
@@ -162,6 +164,7 @@ export function splatAt(g: Ground3D, x: number, z: number): Splat {
   for (const [r, segs] of ix.roads.get(k) ?? []) road = Math.max(road, 1 - smooth(r.width * 0.35, r.width * 0.6, nearRoadDist(segs, x, z)));
   for (const m of ix.mud.get(k) ?? []) mud = Math.max(mud, 1 - smooth(m.r * 0.55, m.r, Math.hypot(x - m.x, z - m.z)));
   for (const s of ix.shade.get(k) ?? []) shade = Math.max(shade, 1 - smooth(s.r * 0.5, s.r, Math.hypot(x - s.x, z - s.z)));
+  if (g.extraShade) shade = Math.max(shade, g.extraShade(x, z));
   const ld = lakeDist(g, x, z);
   const shore = 1 - smooth(0.2, 1.6, ld);
   // Wild grass grows where nobody walks: far from roads, pads and mud.

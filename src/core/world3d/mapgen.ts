@@ -1,9 +1,12 @@
+import { fbm } from '../noise';
 import { Rng } from '../rng';
+import { CHUNK } from './chunks';
 import type { House3DSpec, RoofKind, WallKind } from './house';
 import { type Layout, type PlacedHouse, type PlacedTree, buildHouses, houseOuterBox, houseToWorld, layoutObstacles, layoutPads, layoutShade } from './layout';
+import { type ChunkContent, type ChunkGenerator, PlacedIndex } from './placed';
 import { type PlacedProp } from './props';
 import type { TreeKind } from './tree';
-import { NavGrid, type Shape, findPath, shapeDist } from './space';
+import { NavGrid, type Shape, ShapeIndex, type ShapeSource, findPath, shapeDist } from './space';
 import { type Ground3D, type Road, type XZ, lakeDist, roadDist } from './terrain';
 
 /**
@@ -68,6 +71,23 @@ export interface Scatter {
   mix?: TreeKind[];
 }
 
+/**
+ * Wilderness made as it is looked at, chunk by chunk, so it costs nothing until someone goes there and the map can be
+ * as large as you like. Woods and clearings come from slow noise; within a wood, trees sit one to a jittered cell.
+ */
+export interface WildSpec {
+  /** Trees per 1000 m² in the thick of a wood (about 15 is a wood, 40 a thicket). */
+  trees: number;
+  mix?: TreeKind[];
+  /** Bushes and boulders per 1000 m² (anywhere, thicker in woods for bushes). */
+  shrubs?: number;
+  boulders?: number;
+  /** About how big the woods and clearings are, metres (default 90). */
+  grain?: number;
+  /** Only where (x, z) says so (a district, a margin); default everywhere. */
+  where?: (x: number, z: number) => boolean;
+}
+
 export interface MapSpec {
   name: string;
   seed: number;
@@ -81,6 +101,8 @@ export interface MapSpec {
   houses: MapHouse[];
   /** Things dropped wherever there is room. */
   scatter?: Scatter[];
+  /** Trees, bushes and rocks made chunk by chunk as the map is explored (for large outdoor areas). */
+  wild?: WildSpec;
   /** Things at exact spots. */
   trees?: PlacedTree[];
   props?: PlacedProp[];
@@ -97,6 +119,8 @@ export interface CompiledMap {
   name: string;
   ground: Ground3D;
   layout: Layout;
+  /** Trees, props and torch posts by chunk: the authored ones in `layout` plus whatever the map's `wild` makes. */
+  placed: PlacedIndex;
   hero: [number, number];
   walk: XZ[];
   /** Everything that did not work out: a thing that would not fit, a house in the lake, an unreachable door. Empty for a good map. */
@@ -140,6 +164,73 @@ const hashStr = (s: string): number => {
   for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
   return h >>> 0;
 };
+
+// --- the wilderness --------------------------------------------------------
+
+interface WildContext {
+  seed: number;
+  half: number;
+  edge: number;
+  lakeD(x: number, z: number): number;
+  roadD(x: number, z: number): number;
+  houses: ShapeSource;
+  clear: { x: number; z: number; r: number }[];
+}
+
+const smoothstep = (e0: number, e1: number, v: number): number => {
+  const t = Math.max(0, Math.min(1, (v - e0) / (e1 - e0)));
+  return t * t * (3 - 2 * t);
+};
+
+/**
+ * The generator for a `WildSpec`: for chunk (i, j) it lays a jittered grid over the chunk (cells about as wide as the
+ * density asks for), and in each cell keeps a thing if the woods are thick there and the spot is free. Everything is
+ * drawn from an Rng seeded by the chunk's address, so a chunk is the same whenever and in whatever order it is made.
+ */
+export function wildGenerator(w: WildSpec, ctx: WildContext): ChunkGenerator {
+  const grain = w.grain ?? 90;
+  const free = (x: number, z: number, lake: number, road: number, house: number): boolean => {
+    if (Math.abs(x) > ctx.half - ctx.edge || Math.abs(z) > ctx.half - ctx.edge) return false;
+    if (w.where && !w.where(x, z)) return false;
+    if (ctx.lakeD(x, z) < lake || ctx.roadD(x, z) < road) return false;
+    if (ctx.clear.some((c) => Math.hypot(x - c.x, z - c.z) < c.r)) return false;
+    return !ctx.houses.near(x - house, z - house, x + house, z + house).some((b) => shapeDist(b, x, z) < house);
+  };
+  /** Thickness of the woods at a spot, 0 (open meadow) .. 1 (the thick of it). */
+  const wood = (x: number, z: number): number => smoothstep(0.38, 0.62, fbm(x / grain, z / grain, ctx.seed + 41));
+  return (i, j): Partial<ChunkContent> => {
+    const out: ChunkContent = { trees: [], props: [], torches: [] };
+    const layer = (perK: number, salt: number, make: (x: number, z: number, rng: Rng, wood: number) => void): void => {
+      if (perK <= 0) return;
+      const n = Math.max(1, Math.round(CHUNK / Math.sqrt(1000 / perK))); // cells along a side
+      const cellW = CHUNK / n;
+      const rng = Rng.fromSeed(`${ctx.seed}:${i}:${j}:${salt}`);
+      for (let b = 0; b < n; b++) {
+        for (let a = 0; a < n; a++) {
+          const x = i * CHUNK + (a + rng.next()) * cellW, z = j * CHUNK + (b + rng.next()) * cellW;
+          // `make` draws all it needs before it may reject, so one cell never changes what another gets.
+          make(x, z, rng, wood(x, z));
+        }
+      }
+    };
+    layer(w.trees, 1, (x, z, rng, m) => {
+      const roll = rng.next(), seed = 1 + rng.int(60), kind = w.mix?.length ? w.mix[rng.int(w.mix.length)] : undefined;
+      if (roll >= m || !free(x, z, 1.6, 1.4, 2.4)) return;
+      out.trees.push(kind ? { x, z, seed, kind } : { x, z, seed });
+    });
+    layer(w.shrubs ?? 0, 2, (x, z, rng, m) => {
+      const roll = rng.next(), seed = 1 + rng.int(60), size = 0.8 + rng.next() * 0.5;
+      if (roll >= 0.35 + 0.65 * m || !free(x, z, 1.6, 1.4, 1.2)) return;
+      out.props.push({ kind: 'shrub', x, z, seed, size });
+    });
+    layer(w.boulders ?? 0, 3, (x, z, rng) => {
+      const roll = rng.next(), seed = 1 + rng.int(60), size = 0.8 + rng.next() * 0.9;
+      if (roll >= 0.5 || !free(x, z, 1.6, 1.8, 1.8)) return;
+      out.props.push({ kind: 'boulder', x, z, seed, size });
+    });
+    return out;
+  };
+}
 
 // --- compiling -------------------------------------------------------------
 
@@ -277,7 +368,15 @@ export function compileMap(spec: MapSpec): CompiledMap {
     });
   }
 
-  const compiled: CompiledMap = { name: spec.name, ground, layout, hero, walk, problems };
+  // The wilderness: made per chunk, kept off roads, water, houses and the hero's feet.
+  let generator: ChunkGenerator | undefined;
+  if (spec.wild) {
+    generator = wildGenerator(spec.wild, { seed: spec.seed, half, edge, lakeD, roadD, houses: new ShapeIndex(boxes), clear: [{ x: hero[0], z: hero[1], r: 3 }] });
+  }
+  const index = new PlacedIndex(layout, generator);
+  if (generator) ground.extraShade = (x, z) => index.shadeAt(x, z);
+
+  const compiled: CompiledMap = { name: spec.name, ground, layout, placed: index, hero, walk, problems };
   problems.push(...validate(spec, compiled, built.map((b, i) => ({ id: b.place.id, box: boxes[i], door: houseToWorld(b.place, b.model.door[0], b.model.door[2] - 0.9) }))));
   return compiled;
 }
