@@ -22,20 +22,21 @@ import { PlacedIndex } from '../core/world3d/placed';
 import { footprints } from '../core/world3d/roomplan';
 import { type HouseEntry, HouseIndex } from '../core/world3d/houses';
 import type { MeshData } from '../core/world3d/mesh';
-import { LAUNDRY_HANG, type PlacedProp, buildBoulder, buildCart, buildCrates, buildFence, buildLaundry, buildShrub, buildWell, buildWoodpile } from '../core/world3d/props';
+import { LAUNDRY_HANG, type PlacedProp } from '../core/world3d/props';
+import type { ThingMaterial } from '../core/world3d/things';
+import { THINGS } from '../content/things';
 import { cloudDrift, cloudThreshold } from '../core/world3d/sky';
 import { type Actor, type Rounds, Walking, keeperRounds, newActor, stepRounds } from '../core/world3d/actors';
 import { NavGrid, type P2, type Shape, shapeDist } from '../core/world3d/space';
 import { type Ground3D, groundHeight, lakeDist, splatAt } from '../core/world3d/terrain';
 import { TEXELS_PER_M } from '../core/world3d/tiers';
-import { type Clump, buildTree } from '../core/world3d/tree';
+import type { Clump } from '../core/world3d/tree';
 import { fbm } from '../core/noise';
 import { Weather } from '../core/world3d/weather';
 import { makeFlame, makeOrb } from './fire';
 import { EXPLORED_WINDOW, type LitOpts, SEE_SLOTS, WORLD, exploredTexture, lit, pixTexture, shellOf, sightTexture } from './materials';
 import { SCORCH_SIZE, scorchImage } from '../core/world3d/scorch';
 import { RAYS, type SightLight, type VisionSpec, angleGap, castSight, lightReach, litSeenAt, seenAt, turnToward, visibleLights, visionOf } from '../core/world3d/vision';
-import { buildMore, isMore } from '../core/world3d/propsMore';
 import { Leaves } from './leaves';
 import { Rain } from './rain';
 import { type Chimney, Smoke } from './smoke';
@@ -398,10 +399,9 @@ export class SpikeWorld {
     for (let j = Math.floor((this.focus.z - reach) / CHUNK); j <= Math.floor((this.focus.z + reach) / CHUNK); j++) {
       for (let i = Math.floor((this.focus.x - reach) / CHUNK); i <= Math.floor((this.focus.x + reach) / CHUNK); i++) {
         for (const t of this.placed.chunk(i, j).trees) {
-          // Broadleaves shed; pines and dead trees hold (or have) nothing to lose.
-          if (t.kind === 'pine' || t.kind === 'dead') continue;
-          const h = t.kind === 'young' ? 2.6 : 5.2;
-          out.push({ x: t.x, y: groundHeight(this.ground, t.x, t.z) + h, z: t.z, r: t.kind === 'young' ? 1 : 2 });
+          // Broadleaves shed; pines and dead trees hold (or have) nothing to lose: their kind has no crown to shed from.
+          const crown = THINGS.get(t.kind ?? 'oak').tree?.crown;
+          if (crown) out.push({ x: t.x, y: groundHeight(this.ground, t.x, t.z) + crown.y, z: t.z, r: crown.r });
         }
       }
     }
@@ -521,7 +521,7 @@ export class SpikeWorld {
     const houseIndex = this.houseIndex;
     // Feet: the houses' walls and furniture block (held whole, in an index), and so do the trunks, posts and props the
     // placed index knows by chunk, so the ground is asked only about what is near; so does the water.
-    this.placed = map.placed ?? new PlacedIndex(layout);
+    this.placed = map.placed ?? new PlacedIndex(layout, THINGS);
     const placed = this.placed;
     this.nav = new NavGrid(g.size, { near: (x0, z0, x1, z1) => [...houseIndex.shapesNear(x0, z0, x1, z1), ...placed.near(x0, z0, x1, z1)] }, { radius: 0.2, blocked: (x, z) => lakeDist(g, x, z) < 0.2 });
     // Walking holds houses by id and asks the index (not what is standing), so a house streaming out changes nothing for the people in it.
@@ -784,16 +784,16 @@ export class SpikeWorld {
   private treeGeos = new Map<string, { wood: THREE.BufferGeometry; leaves: THREE.BufferGeometry | null }>();
 
   private barkMat: THREE.MeshLambertMaterial | null = null;
-  private leafMat: THREE.MeshLambertMaterial | null = null;
-  private leafOpts: LitOpts | null = null;
-  private pineMat: THREE.MeshLambertMaterial | null = null;
-  private pineOpts: LitOpts | null = null;
+  /** Leaf materials by tint (0: the broadleaf green). */
+  private leafMats = new Map<number, { mat: THREE.MeshLambertMaterial; opts: LitOpts }>();
 
   private buildTree(place: PlacedTree, st: Standing): void {
-    const key = `${place.kind ?? 'oak'}:${place.seed}`;
+    const kind = place.kind ?? 'oak', look = THINGS.get(kind).tree;
+    if (!look) return;
+    const key = `${kind}:${place.seed}`;
     let geo = this.treeGeos.get(key);
     if (!geo) {
-      const t = buildTree(place.seed, 7, place.kind);
+      const t = look.model(place.seed);
       geo = { wood: geometryOf(t.wood), leaves: t.clumps.length ? lumpGeometry(t.clumps, t.height, 1) : null }; // a dead tree has no leaves
       geo.wood.userData.shared = true;
       if (geo.leaves) geo.leaves.userData.shared = true;
@@ -809,17 +809,21 @@ export class SpikeWorld {
     this.scene.add(group);
     st.objects.push(group);
     if (!geo.leaves) return;
-    // Pines are darker and bluer than broadleaves.
-    const pine = place.kind === 'pine';
-    this.leafOpts ??= { map: tex(leafTex(5)), ao: true, sway: { from: 2.5, amount: 0.018 }, seeThrough: true };
-    this.pineOpts ??= { ...this.leafOpts, color: 0x7fa596 };
-    const leafOpts = pine ? this.pineOpts : this.leafOpts;
-    this.leafMat ??= lit(this.leafOpts);
-    this.pineMat ??= lit(this.pineOpts);
-    const leaves = new THREE.Mesh(geo.leaves, pine ? this.pineMat : this.leafMat);
+    // The crown in its kind's colour (a pine's is darker and bluer than a broadleaf's).
+    const tint = look.leafTint ?? 0;
+    if (!this.leafMats.has(0)) {
+      const green: LitOpts = { map: tex(leafTex(5)), ao: true, sway: { from: 2.5, amount: 0.018 }, seeThrough: true };
+      this.leafMats.set(0, { mat: lit(green), opts: green });
+    }
+    let leaf = this.leafMats.get(tint);
+    if (!leaf) {
+      const opts: LitOpts = { ...this.leafMats.get(0)!.opts, color: tint };
+      this.leafMats.set(tint, (leaf = { mat: lit(opts), opts }));
+    }
+    const leaves = new THREE.Mesh(geo.leaves, leaf.mat);
     leaves.castShadow = leaves.receiveShadow = true;
     group.add(leaves);
-    this.addShells(leaves, leafOpts, { density: 0.55, tint: 1.18, step: 0.12 }, null, st.shells);
+    this.addShells(leaves, leaf.opts, { density: 0.55, tint: 1.18, step: 0.12 }, null, st.shells);
   }
 
   private stoneMat: THREE.MeshLambertMaterial | null = null;
@@ -850,56 +854,41 @@ export class SpikeWorld {
   }
   private wellWater: THREE.MeshLambertMaterial | null = null;
 
-  /** A shrub, boulder or woodpile, standing on the ground where it is placed. */
+  /** The material a part of a thing is drawn with (see `ThingMaterial`); made once, shared by everything drawn with it. */
+  private thingMat(m: ThingMaterial, colour = 0): THREE.MeshLambertMaterial {
+    switch (m) {
+      case 'bark': return (this.logMat ??= lit({ map: tex(barkTex(4)), ao: true, wettable: true, seeThrough: true }));
+      case 'stone': return (this.stoneMat ??= lit({ map: tex(stoneTex(3)), ao: true, wettable: true, seeThrough: true }));
+      case 'plank': return this.plankMat();
+      case 'hay': return this.hayMat();
+      case 'water': return (this.wellWater ??= new THREE.MeshLambertMaterial({ color: 0x2f6a8a, emissive: 0x0b2434 }));
+      case 'cloth': return this.clothMat(colour, false);
+      case 'clothHang': return this.clothMat(colour, true); // the cloth swings from the line
+      // Bushes are low, so they sway from the ground up (trees keep their trunks still), and nobody hides behind them.
+      case 'bush': return (this.shrubMat ??= lit({ map: tex(leafTex(5)), ao: true, sway: { from: 0, amount: 0.05 }, seeThrough: true }));
+    }
+  }
+
+  /** A placed thing, drawn as its kind says (`content/things/kinds/`), standing on the ground where it is placed. */
   private buildProp(p: PlacedProp, st: Standing): void {
     const group = new THREE.Group();
-    const s = p.size ?? 1;
-    const solid = (data: MeshData, mat: THREE.MeshLambertMaterial): void => {
-      const m = new THREE.Mesh(geometryOf(data), mat);
-      m.castShadow = m.receiveShadow = true;
+    const kind = THINGS.get(p.kind), parts = THINGS.parts(p);
+    for (const part of parts.meshes) {
+      const m = new THREE.Mesh(geometryOf(part.mesh), this.thingMat(part.material, part.colour));
+      // (Water lies flat in its ring: it takes shadow, it casts none.)
+      m.castShadow = part.material !== 'water';
+      m.receiveShadow = true;
       group.add(m);
-    };
-    this.logMat ??= lit({ map: tex(barkTex(4)), ao: true, wettable: true, seeThrough: true });
-    this.stoneMat ??= lit({ map: tex(stoneTex(3)), ao: true, wettable: true, seeThrough: true });
-    if (p.kind === 'woodpile') solid(buildWoodpile(p.seed), this.logMat);
-    else if (p.kind === 'crates') solid(buildCrates(p.seed), this.logMat);
-    else if (p.kind === 'fence') solid(buildFence(p.len ?? 4, p.seed), this.logMat);
-    else if (p.kind === 'cart') solid(buildCart(p.seed), this.logMat);
-    else if (isMore(p.kind)) {
-      const parts = buildMore(p);
-      if (parts.wood) solid(parts.wood, p.kind === 'stump' ? this.logMat : this.plankMat());
-      if (parts.stone) solid(parts.stone, this.stoneMat);
-      if (parts.hay) solid(parts.hay, this.hayMat());
-      for (const c of parts.cloth ?? []) solid(c.mesh, this.clothMat(c.colour, false));
-    } else if (p.kind === 'laundry') {
-      const l = buildLaundry(p.len ?? 3, p.seed);
-      solid(l.wood, this.logMat);
-      for (const c of l.cloths) solid(c.mesh, this.clothMat(c.colour, true)); // the cloth swings from the line
     }
-    else if (p.kind === 'well') {
-      const w = buildWell();
-      solid(w.stone, this.stoneMat);
-      solid(w.wood, this.logMat);
-      this.wellWater ??= new THREE.MeshLambertMaterial({ color: 0x2f6a8a, emissive: 0x0b2434 });
-      const water = new THREE.Mesh(geometryOf(w.water), this.wellWater);
-      water.receiveShadow = true;
-      group.add(water);
-    } else if (p.kind === 'boulder') {
-      const b = buildBoulder(p.seed);
-      const m = new THREE.Mesh(lumpGeometry(b.clumps, b.height, 1), this.stoneMat);
-      m.castShadow = m.receiveShadow = true;
-      group.add(m);
-    } else {
-      const b = buildShrub(p.seed);
-      // Shrubs are low, so they sway from the ground up (trees keep their trunks still), and nobody hides behind them.
-      this.shrubMat ??= lit({ map: tex(leafTex(5)), ao: true, sway: { from: 0, amount: 0.05 }, seeThrough: true });
-      const m = new THREE.Mesh(lumpGeometry(b.clumps, b.height, 1), this.shrubMat);
+    if (parts.lumps) {
+      const { lumps, material } = parts.lumps;
+      const m = new THREE.Mesh(lumpGeometry(lumps.clumps, lumps.height, 1), this.thingMat(material));
       m.castShadow = m.receiveShadow = true;
       group.add(m);
     }
-    group.scale.setScalar(s);
+    group.scale.setScalar(p.size ?? 1);
     group.rotation.y = p.rot ?? 0;
-    group.position.set(p.x, this.store.heightAt(p.x, p.z) - (p.kind === 'woodpile' ? 0.02 : 0), p.z);
+    group.position.set(p.x, this.store.heightAt(p.x, p.z) - (kind.sink ?? 0), p.z);
     this.scene.add(group);
     st.objects.push(group);
   }

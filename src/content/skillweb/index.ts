@@ -1,5 +1,6 @@
 import type { Library } from '../../core/skillweb';
 import { PEOPLE_LIBRARY } from '../people';
+import { THINGS } from '../things';
 import { HOOKS } from './hooks';
 import { DEFAULTS, KIND_PARENTS, PEOPLES } from './kinds';
 import { RELATIONS } from './relations';
@@ -16,7 +17,9 @@ export { HOOKS, PLANNED } from './hooks';
  * - relations.ts: how peoples see each other; content/people: facets, leanings and kinship.
  */
 export const LIBRARY: Library = {
-  parents: KIND_PARENTS,
+  // The world's kinds of thing (a well, a palisade, an oak) are leaves on the same tree, so the hooks on `water`,
+  // `wall` or `tree` reach them (content/things; tests/thing-kinds.test.ts checks the two agree).
+  parents: { ...THINGS.parents, ...KIND_PARENTS },
   hooks: HOOKS,
   defaults: DEFAULTS,
   peoples: PEOPLES,

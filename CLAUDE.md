@@ -34,7 +34,7 @@ Read only the handover for the area you're asked about; don't read the whole `di
 | Skills, people, hooks | `/skills/` | `director/design/skill-map-handover.md` | `src/content/skillweb`, `src/content/people`, `src/core/skillweb.ts`, `src/core/people.ts` |
 | Character creator | `/chargen/` | `director/design/character-creator.md` | `src/core/chargen`, `src/content/chargen`, `src/chargen` |
 | Gate scene rules (data for the skill map; its hex page is gone) | | `director/archive/exploration-scenes.md` | `src/core/scene.ts`, `src/content/scenes` |
-| **3D world (current focus, three.js)** | `/spike3d/` | `director/design/world3d-handover.md` (then `world3d-m0.md`, `voxel-engine-brief.md`), and the open items in `director/design/review-2026-10-29.md` | `src/core/world3d`, `src/engine3d`, `src/art/textures3d.ts`, `src/content/spike3d.ts`, `src/content/maps`, `src/content/furnish.ts`, `src/spike3d` |
+| **3D world (current focus, three.js)** | `/spike3d/` | `director/design/world-structure.md`, then `world3d-handover.md` (then `world3d-m0.md`, `voxel-engine-brief.md`), and the open items in `director/design/review-2026-10-29.md` | `src/core/world3d`, `src/engine3d`, `src/art/textures3d.ts`, `src/content/spike3d.ts`, `src/content/maps`, `src/content/furnish.ts`, `src/spike3d` |
 | Magic | | `director/design/magic-filaments.md`, `magic-on-map.md` | `src/core/filaments.ts` (rules), `src/core/world3d/filaments3d.ts` (field) |
 
 The deeper designs (`skill-web.md`, `people-library.md`, `ways-of-use.md`) are for when you change the shape, not for every task. Debug hook: `window.spike` (see the 3D handover).
@@ -71,6 +71,7 @@ tests/       Vitest tests for core/ and content/.
 public/      Static assets.
 ```
 Rules of thumb:
+- **Everything in the world is a kind of thing** (`content/things/kinds/`, one file each, inheriting down the kind tree; see `director/design/world-structure.md`). Never write `if (kind === 'well')`: give kinds a property, and put a new thing in the tree (what is it a kind of?) before building it.
 - Keep rules in `core/` and data in `content/`; the engine renders and animates, it doesn't decide rules. People who walk are `Actor`s (`core/world3d/actors.ts`); the renderer only places their cards.
 - Check visual work in a real browser (dev server + Chrome tools) before pushing.
 - Game state must be plain JSON-serialisable (it goes into the save).

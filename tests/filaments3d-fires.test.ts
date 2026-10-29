@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Environment } from '../src/core/environment';
 import { type FSource, FilamentField, HEARTH_FIRE, TORCH_FIRE } from '../src/core/world3d/filaments3d';
-import { propSource } from '../src/core/world3d/props';
+import { THINGS } from '../src/content/things';
 
 const world = (sources: FSource[]) => ({ size: 64, ground: () => 'grass' as const, indoors: () => false, sources });
 const DUSK: Environment = { time: 'dusk', sky: 'clear', windForce: 1, windDir: 0, hour: 18.5 };
@@ -35,7 +35,7 @@ describe('fires in the free world are sized to what they are', () => {
   });
 
   it('a signpost lifts the meanings round it, and only those (and a little of the symbols)', () => {
-    const src = propSource({ kind: 'signpost', x: 0.8, z: 0.8, seed: 1 });
+    const src = THINGS.source({ kind: 'signpost', x: 0.8, z: 0.8, seed: 1 });
     expect(src?.kind).toBe('sign');
     const f = read([src!], DAY);
     expect(f.readAt(0.8, 0.8).semo.level).toBe(1); // open country is -1 without it

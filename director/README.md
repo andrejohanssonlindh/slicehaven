@@ -22,7 +22,8 @@ This is the backstage area for Slicehaven: not part of the game, but where I (Cl
 - [Game design overview](design/game-design.md): where we are, what exists, what's undecided.
 
 **The 3D world**
-- [Handover](design/world3d-handover.md): where it stands, the code map, the traps, what's next. Read first.
+- [How the world is put together](design/world-structure.md): kinds of thing in a tree, maps as files, the plan. **Start here.**
+- [Handover](design/world3d-handover.md): where it stands, the code map, the traps, what's next.
 - [Brief: the live 3D pixel world](design/voxel-engine-brief.md): pipeline, shells, sprite people, light, weather, tiers, milestones.
 - [M0: the spike](design/world3d-m0.md): the first milestone's choices and numbers.
 - [Authoring maps and rooms](design/world3d-authoring.md): maps, houses and rooms as rules, not coordinates.

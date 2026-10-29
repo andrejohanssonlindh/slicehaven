@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { furnish, type RoomSet } from '../src/content/furnish';
 import { mapNamed } from '../src/content/maps';
+import { THINGS } from '../src/content/things';
 import { buildHouses, furnitureObstacles, houseToWorld, layoutObstacles } from '../src/core/world3d/layout';
 import { footprints } from '../src/core/world3d/roomplan';
 import { NavGrid, findPath, shapeDist } from '../src/core/world3d/space';
@@ -11,7 +12,7 @@ describe('furniture blocks feet', () => {
   const map = mapNamed('hamlet');
   const built = buildHouses(map.layout);
   const rooms = built.map((b) => furnish((b.place.room ?? 'home') as RoomSet, b.model.room, b.model.door[0], b.place.spec.seed));
-  const shapes = [...layoutObstacles(map.layout, built), ...built.flatMap((b, i) => furnitureObstacles(b, footprints(rooms[i].plan)))];
+  const shapes = [...layoutObstacles(map.layout, built, THINGS),...built.flatMap((b, i) => furnitureObstacles(b, footprints(rooms[i].plan)))];
   const nav = new NavGrid(map.ground.size, shapes, { radius: 0.2, blocked: (x, z) => lakeDist(map.ground, x, z) < 0.2 });
 
   it('the middle of every standing piece is not walkable', () => {

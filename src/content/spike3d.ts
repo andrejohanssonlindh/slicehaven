@@ -1,7 +1,7 @@
 import { type FSource, type FilamentWorld, type Ground, TORCH_FIRE } from '../core/world3d/filaments3d';
-import { type BuiltHouse, type Layout, houseOuterBox } from '../core/world3d/layout';
+import { type BuiltHouse, type Layout, houseOuterBox, treeProp } from '../core/world3d/layout';
 import type { PlacedIndex } from '../core/world3d/placed';
-import { propSource } from '../core/world3d/props';
+import { THINGS } from './things';
 import { type Shape, shapeDist } from '../core/world3d/space';
 import { lakeDist, riverDist, splatAt } from '../core/world3d/terrain';
 import type { Ground3D } from '../core/world3d/terrain';
@@ -58,9 +58,10 @@ export function filamentWorld(g: Ground3D, layout: Layout, houses: BuiltHouse[] 
       return null;
     },
     sources: [
-      ...layout.trees.map((t): FSource => ({ x: t.x, z: t.z, kind: 'tree' })),
+      // (Each thing gives off what its kind says: a pine is a pine here too, as in the streaming field.)
+      ...layout.trees.flatMap((t) => THINGS.source(treeProp(t)) ?? []),
       ...layout.torches.map(([x, z]): FSource => ({ x, z, kind: 'fire', weight: TORCH_FIRE })),
-      ...layout.props.flatMap((p) => propSource(p) ?? []),
+      ...layout.props.flatMap((p) => THINGS.source(p) ?? []),
       ...extra,
     ],
   };

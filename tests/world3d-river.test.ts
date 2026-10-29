@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { SPIKE_GROUND, SPIKE_HERO, SPIKE_LAYOUT } from '../src/content/spike3d';
 import { mapNamed } from '../src/content/maps';
+import { THINGS } from '../src/content/things';
 import { buildHouses, layoutObstacles } from '../src/core/world3d/layout';
 import { NavGrid, findPath } from '../src/core/world3d/space';
 import { DECK_Y, HOLLOW_DEPTH, groundHeight, hollowAt, lakeDist, riverDist, riverFlow } from '../src/core/world3d/terrain';
@@ -31,7 +32,7 @@ describe('the stream and its bridge', () => {
     const mid = r.pts[4];
     expect(groundHeight(g, mid[0], mid[1])).toBeLessThan(0);
     const houses = buildHouses(SPIKE_LAYOUT);
-    const grid = new NavGrid(g.size, layoutObstacles(SPIKE_LAYOUT, houses), { radius: 0.2, blocked: (x, z) => lakeDist(g, x, z) < 0.2 });
+    const grid = new NavGrid(g.size, layoutObstacles(SPIKE_LAYOUT, houses, THINGS), { radius: 0.2, blocked: (x, z) => lakeDist(g, x, z) < 0.2 });
     expect(grid.walkable(mid[0], mid[1])).toBe(false);
     // The deck is dry, level and walkable down its middle; the way across is found.
     expect(lakeDist(g, bridge.x, bridge.z)).toBeGreaterThan(0);

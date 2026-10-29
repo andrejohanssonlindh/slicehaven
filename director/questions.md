@@ -4,6 +4,15 @@ Newest on top. Answer in chat (just reference the number, e.g. "Q11: option B").
 
 ---
 
+### Q25 — How do maps join up? *(open, no rush: needed before step 6 of [the world structure](design/world-structure.md))*
+Today one map is loaded per page (`?map=hamlet`). Once maps are files, the game needs to know how you get from one to another. Options, any mix:
+- **Exits at the edge**: walk off the end of the road and arrive at the start of the next map's road (a forest, the next village). Simple; every map is a room.
+- **Doors that are maps**: a cave mouth, a manor's cellar or a castle's inside is its own map, entered by a door.
+- **One big world** that streams forever (the engine can already do kilometres), with maps as regions of it.
+- **A travel map** between places (days on the road happen off-screen, with events).
+
+Also: does a map carry its own weather and hour, or does the world's clock run on across maps? My lean: **exits plus doors-as-maps, and one clock for the whole world**. Say which you want, or "later".
+
 ### Q24 — "Add all filaments": how far? *(answered: do the reasonable ones; see [decisions](decisions.md))*
 The book names 22 aspects; the field has the 8 that come from the ground, the weather and the living. The rest need a source in the world before a number means anything. My proposal, by group (say which, or "all"):
 

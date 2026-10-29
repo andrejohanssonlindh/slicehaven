@@ -1,8 +1,9 @@
 import { CHUNK, chunkKey } from './chunks';
 import { type FSource, TORCH_FIRE } from './filaments3d';
-import { POST, TRUNK, type Layout, type PlacedTree } from './layout';
-import { type PlacedProp, blocksSight, propShapes, propSource } from './props';
+import { POST, type Layout, type PlacedTree, treeProp } from './layout';
+import type { PlacedProp } from './props';
 import { type Shape, type ShapeSource, circle } from './space';
+import type { Things } from './things';
 
 /**
  * The things placed out in the world (trees, props, torch posts) by chunk, so a
@@ -37,7 +38,7 @@ export class PlacedIndex implements ShapeSource {
   private readonly shapes = new Map<string, Shape[]>();
   private readonly sights = new Map<string, Shape[]>();
 
-  constructor(layout: Pick<Layout, 'trees' | 'props' | 'torches'>, private readonly generator?: ChunkGenerator) {
+  constructor(layout: Pick<Layout, 'trees' | 'props' | 'torches'>, private readonly things: Things, private readonly generator?: ChunkGenerator) {
     const at = (x: number, z: number): ChunkContent => {
       const k = chunkKey(Math.floor(x / CHUNK), Math.floor(z / CHUNK));
       let c = this.authored.get(k);
@@ -76,7 +77,8 @@ export class PlacedIndex implements ShapeSource {
     let s = this.shapes.get(k);
     if (!s) {
       const c = this.chunk(i, j);
-      s = [...c.trees.map((t) => circle(t.x, t.z, TRUNK)), ...c.torches.map(([x, z]) => circle(x, z, POST)), ...c.props.flatMap(propShapes)];
+      const th = this.things;
+      s = [...c.trees.flatMap((t) => th.shapes(treeProp(t))), ...c.torches.map(([x, z]) => circle(x, z, POST)), ...c.props.flatMap((p) => th.shapes(p))];
       this.shapes.set(k, s);
     }
     return s;
@@ -98,7 +100,8 @@ export class PlacedIndex implements ShapeSource {
       let s = this.sights.get(k);
       if (!s) {
         const c = this.chunk(i, j);
-        s = [...c.trees.map((t) => circle(t.x, t.z, TRUNK)), ...c.props.filter(blocksSight).flatMap(propShapes)];
+        const th = this.things;
+        s = [...c.trees.map(treeProp), ...c.props].filter((p) => th.blocksSight(p)).flatMap((p) => th.shapes(p));
         this.sights.set(k, s);
       }
       out.push(...s);
@@ -112,12 +115,13 @@ export class PlacedIndex implements ShapeSource {
     const inside = (x: number, z: number): boolean => x >= x0 && x < x1 && z >= z0 && z < z1;
     for (const [i, j] of this.chunksIn(x0, z0, x1, z1)) {
       const c = this.chunk(i, j);
-      for (const t of c.trees) if (inside(t.x, t.z)) out.push({ x: t.x, z: t.z, kind: t.kind === 'pine' ? 'pine' : 'tree' });
-      for (const [x, z] of c.torches) if (inside(x, z)) out.push({ x, z, kind: 'fire', weight: TORCH_FIRE });
-      for (const p of c.props) {
-        const s = inside(p.x, p.z) ? propSource(p) : null;
+      const add = (p: PlacedProp): void => {
+        const s = inside(p.x, p.z) ? this.things.source(p) : null;
         if (s) out.push(s);
-      }
+      };
+      c.trees.forEach((t) => add(treeProp(t)));
+      for (const [x, z] of c.torches) if (inside(x, z)) out.push({ x, z, kind: 'fire', weight: TORCH_FIRE });
+      c.props.forEach(add);
     }
     return out;
   }

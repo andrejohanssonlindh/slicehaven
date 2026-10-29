@@ -1,20 +1,17 @@
 import { Rng } from '../rng';
 import type { Clump } from './tree';
 import { type MeshData, type Vec3, addBeam, addBox, addFace, addOrientedBox, emptyMesh } from './mesh';
-import { type Shape, circle } from './space';
-import type { FSource } from './filaments3d';
-import { type MoreKind, SIGHT_BLOCKING, isMore, moreShapes } from './propsMore';
 
 /**
- * Small things placed in the world: shrubs, boulders, woodpiles. Each has a
- * model, a collision shape for feet, and (shrub, boulder) a filament source.
- * The renderer turns clumps into lumpy balls, as it does for trees.
+ * Small things placed in the world, and the mesh builders for the first set of them (shrubs, boulders, woodpiles,
+ * crates, the well, fences, carts, washing; the rest are in `propsMore.ts`). What each kind *is* (its footprint,
+ * whether it stops the eye, what it gives the filaments, which builder draws it) is its kind's business:
+ * `content/things/kinds/`. The renderer turns clumps into lumpy balls, as it does for trees.
  */
 
-export type PropKind = 'shrub' | 'boulder' | 'woodpile' | 'crates' | 'well' | 'fence' | 'cart' | 'laundry' | MoreKind;
-
 export interface PlacedProp {
-  kind: PropKind;
+  /** A kind of thing (`content/things/kinds/`). */
+  kind: string;
   x: number;
   z: number;
   /** Turn about y, like `rotation.y`. Shrubs, boulders and wells do not care. */
@@ -33,7 +30,6 @@ export interface Lumps {
   height: number;
 }
 
-const sizeOf = (p: PlacedProp): number => p.size ?? 1;
 
 /** A low bush: a handful of overlapping leaf balls close to the ground. */
 export function buildShrub(seed: number): Lumps {
@@ -185,40 +181,4 @@ export function buildLaundry(len: number, seed: number): { wood: MeshData; cloth
     x += w + 0.12 + rng.next() * 0.2;
   }
   return { wood, cloths: cloths.filter((c) => c.mesh.positions.length > 0) };
-}
-
-/** Everything that blocks feet for a prop (a gate is two posts and, shut, a leaf between them). */
-export function propShapes(p: PlacedProp): Shape[] {
-  return isMore(p.kind) ? moreShapes(p) : [propShape(p)];
-}
-
-/** Whether the eye is stopped by it: boulders, palisades, walls, towers. */
-export const blocksSight = (p: PlacedProp): boolean => p.kind === 'boulder' || SIGHT_BLOCKING.includes(p.kind);
-
-/** What blocks feet (the first of `propShapes`). */
-export function propShape(p: PlacedProp): Shape {
-  if (isMore(p.kind)) return moreShapes(p)[0];
-  const s = sizeOf(p);
-  const rot = p.rot ?? 0;
-  switch (p.kind) {
-    case 'woodpile': return { kind: 'box', x: p.x, z: p.z, hw: 0.9 * s, hd: 0.55 * s, rot };
-    case 'crates': return { kind: 'box', x: p.x, z: p.z, hw: 0.6 * s, hd: 0.35 * s, rot };
-    case 'cart': return { kind: 'box', x: p.x, z: p.z, hw: 0.8 * s, hd: 0.55 * s, rot };
-    case 'laundry':
-    case 'fence': return { kind: 'box', x: p.x, z: p.z, hw: ((p.len ?? 4) / 2) * s, hd: 0.1, rot };
-    // The ring's outer edge (0.72) and no more: the hero's own radius is added when walking, so they can stand right against the stones.
-    case 'well': return circle(p.x, p.z, 0.72 * s);
-    default: return circle(p.x, p.z, (p.kind === 'boulder' ? 0.75 : 0.5) * s);
-  }
-}
-
-/** The filament source a prop is, if any: bushes are thicket, boulders are rock. */
-export function propSource(p: PlacedProp): FSource | null {
-  if (p.kind === 'shrub') return { x: p.x, z: p.z, kind: 'thicket' };
-  if (p.kind === 'boulder') return { x: p.x, z: p.z, kind: 'rock' };
-  if (p.kind === 'well') return { x: p.x, z: p.z, kind: 'water', weight: 0.6 };
-  // A signpost is a sign to read; a stall's awning is a pattern, a small one.
-  if (p.kind === 'signpost') return { x: p.x, z: p.z, kind: 'sign' };
-  if (p.kind === 'stall') return { x: p.x, z: p.z, kind: 'art', weight: 0.6 };
-  return null;
 }

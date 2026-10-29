@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { MAPS, mapNamed } from '../src/content/maps';
-import { type MapSpec, compileMap, roadLength, roadPoint } from '../src/core/world3d/mapgen';
+import { THINGS } from '../src/content/things';
+import { type CompiledMap, type MapSpec, compileMap, roadLength, roadPoint } from '../src/core/world3d/mapgen';
+
+const compile = (spec: MapSpec): CompiledMap => compileMap(spec, THINGS);
 
 /** The gate every map passes: whatever the author wrote, it compiles to a world with nothing wrong in it. */
 describe('every map', () => {
@@ -12,7 +15,7 @@ describe('every map', () => {
     });
 
     it(`${name} compiles the same every time`, () => {
-      expect(JSON.stringify(compileMap(MAPS[name]))).toBe(JSON.stringify(compileMap(MAPS[name])));
+      expect(JSON.stringify(compile(MAPS[name]))).toBe(JSON.stringify(compile(MAPS[name])));
     });
   }
 });
@@ -23,7 +26,7 @@ describe('placing along a road', () => {
   };
 
   it('puts houses on the named side, facing the road, with the gap asked for', () => {
-    const c = compileMap({
+    const c = compile({
       ...base,
       houses: [
         { id: 'n', size: 'medium', at: { road: 0, t: 0.5, side: 'north', gap: 2 } },
@@ -42,7 +45,7 @@ describe('placing along a road', () => {
   });
 
   it('reports a house in the lake, a road clash, and two houses touching', () => {
-    const c = compileMap({
+    const c = compile({
       ...base,
       lake: { x: 0, z: -12, r: 6 },
       houses: [
@@ -58,7 +61,7 @@ describe('placing along a road', () => {
   });
 
   it('scatters keep clear of houses, roads, water and each other, and say when there is no room', () => {
-    const c = compileMap({
+    const c = compile({
       ...base,
       lake: { x: 30, z: 30, r: 8 },
       houses: [{ id: 'h', size: 'medium', at: { road: 0, t: 0.5, side: 'north' } }],
@@ -72,12 +75,12 @@ describe('placing along a road', () => {
       expect(Math.hypot(t.x - 30, t.z - 30)).toBeGreaterThan(8 + 1.5); // off the lake
       for (let j = i + 1; j < c.layout.trees.length; j++) expect(Math.hypot(t.x - c.layout.trees[j].x, t.z - c.layout.trees[j].z)).toBeGreaterThan(2.5);
     }
-    const crowded = compileMap({ ...base, size: 30, scatter: [{ kind: 'tree', count: 400, area: { all: true } }] });
+    const crowded = compile({ ...base, size: 30, scatter: [{ kind: 'tree', count: 400, area: { all: true } }] });
     expect(crowded.problems.some((p) => p.includes('only room for'))).toBe(true);
   });
 
   it('lines torches up along a road, and stamps door mud', () => {
-    const c = compileMap({
+    const c = compile({
       ...base,
       doorMud: true,
       houses: [{ id: 'h', at: { road: 0, t: 0.5, side: 'north' } }],
@@ -91,9 +94,9 @@ describe('placing along a road', () => {
   });
 
   it('starts the hero in front of the named house, and complains about an unknown one', () => {
-    const c = compileMap({ ...base, houses: [{ id: 'h', at: { road: 0, t: 0.5, side: 'north' } }], hero: { house: 'h' } });
+    const c = compile({ ...base, houses: [{ id: 'h', at: { road: 0, t: 0.5, side: 'north' } }], hero: { house: 'h' } });
     expect(c.problems).toEqual([]);
     expect(c.hero[1]).toBeLessThan(1.5); // between the house and the road, not across it
-    expect(compileMap({ ...base, hero: { house: 'nope' } }).problems.some((p) => p.includes('nope'))).toBe(true);
+    expect(compile({ ...base, hero: { house: 'nope' } }).problems.some((p) => p.includes('nope'))).toBe(true);
   });
 });

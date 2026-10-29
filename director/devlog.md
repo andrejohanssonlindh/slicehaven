@@ -1,5 +1,13 @@
 # Devlog
 
+## 2026-10-29 — Kinds of thing: everything in the world is an object in a tree
+
+- **The structure** (director's ask): every object in the world is a *kind of thing*, one small file in `content/things/kinds/` that says what it is a kind of and inherits the rest. Written up as the main plan: [How the world is put together](design/world-structure.md).
+- **Done:** all 25 props and the four trees are kinds (families `tree` and `wall` carry what they share). They are leaves on the skill library's kind tree, so a well is `water` and a palisade a `wall` to the hooks too. Feet, sight, filaments, the map compiler and the renderer ask the kind (`core/world3d/things.ts`, `THINGS`); every `if (kind === …)` is gone, and `buildProp` is one generic routine. A bridge's deck over water is now a property (`deck`), not its name.
+- **Checked:** a temporary test compared every kind against the old code, turned, scaled, long and short, gate open and shut: identical. Two fixes fell out: the washing line's footprint assumed 4 m while it drew 3 m, and the plain filament world counted pines as broadleaves.
+- Maps that place a kind nobody defined, or a family, are told so. New tests: `tests/thing-kinds.test.ts`.
+- **Next steps** (in the plan): torches, furniture and buildings as kinds; kinds of person; maps as files; tapping things to use skills; how maps join (Q25).
+
 ## 2026-10-29 — Walking moved out of the renderer (review item 4)
 
 - **`core/world3d/actors.ts`:** the hero and the innkeeper are `Actor`s (plain data, can be saved), moved by `Walking` (paths, stairs, key steering, doors) and, for the keeper, a `Rounds` routine. Houses are held by id, not by what the renderer stood up. `world.ts` lost 250 lines of rules.

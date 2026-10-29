@@ -1,19 +1,12 @@
 import { Rng } from '../rng';
 import { type MeshData, type Vec3, addBeam, addBox, addOrientedBox, emptyMesh } from './mesh';
-import type { PlacedProp } from './props';
-import { type Shape, circle } from './space';
 
 /**
- * The second set of small things: the walls and gates of a settlement (palisade, tower, gate, archway, drystone wall) and
- * what stands in its lanes (barrel, hay, signpost, market stall, bench, trough, stump). Each is local metres with x along
- * its length, turned by `rot` like the rest. The renderer picks a material per part.
+ * Mesh builders for the second set of small things: the walls and gates of a settlement (palisade, tower, gate,
+ * archway, drystone wall) and what stands in its lanes (barrel, hay, signpost, market stall, bench, trough, stump,
+ * bridge). Each is local metres with x along its length. Which builder a kind uses, and its footprint, are in its
+ * kind (`content/things/kinds/`).
  */
-
-export type MoreKind = 'palisade' | 'tower' | 'gate' | 'archway' | 'stonewall' | 'barrel' | 'hay' | 'signpost' | 'stall' | 'bench' | 'trough' | 'stump' | 'bridge';
-
-export const MORE_KINDS: readonly MoreKind[] = ['palisade', 'tower', 'gate', 'archway', 'stonewall', 'barrel', 'hay', 'signpost', 'stall', 'bench', 'trough', 'stump', 'bridge'];
-
-export const isMore = (k: string): k is MoreKind => (MORE_KINDS as readonly string[]).includes(k);
 
 /** What a prop is made of: meshes by material. `bark` is the round-timber look (stump), `wood` planks and posts. */
 export interface PropParts {
@@ -27,7 +20,7 @@ export interface PropParts {
 const X: Vec3 = [1, 0, 0];
 
 /** A run of palisade: close-set stakes with sharpened tips, tied with two rails on the inside. */
-function palisade(len: number, seed: number): PropParts {
+export function palisade(len: number, seed: number): PropParts {
   const rng = Rng.fromSeed(seed);
   const m = emptyMesh();
   const n = Math.max(2, Math.ceil(len / 0.2));
@@ -42,7 +35,7 @@ function palisade(len: number, seed: number): PropParts {
 }
 
 /** A watch tower: four legs braced, a platform with a rail, a plank roof, a ladder. About 2.4 m square. */
-function tower(seed: number): PropParts {
+export function tower(seed: number): PropParts {
   const rng = Rng.fromSeed(seed);
   const m = emptyMesh();
   const L = 1.0, PLAT = 3.0;
@@ -97,7 +90,7 @@ function leaf(m: MeshData, hx: number, dir: 1 | -1, w: number, open: boolean): v
 }
 
 /** A timber gate: two posts and a lintel; the leaves are shut across the opening or swung back on their hinges. */
-function gate(len: number, open: boolean): PropParts {
+export function gate(len: number, open: boolean): PropParts {
   const m = emptyMesh();
   const h = len / 2;
   for (const x of [-h - 0.17, h + 0.17]) addBox(m, [x - 0.17, -0.1, -0.17], [x + 0.17, 3.1, 0.17], { aoBottom: 0.6 });
@@ -109,7 +102,7 @@ function gate(len: number, open: boolean): PropParts {
 }
 
 /** A stone archway: two piers and a lintel with a cap. */
-function archway(len: number, seed: number): PropParts {
+export function archway(len: number, seed: number): PropParts {
   const rng = Rng.fromSeed(seed);
   const m = emptyMesh();
   const h = len / 2;
@@ -127,7 +120,7 @@ function archway(len: number, seed: number): PropParts {
 }
 
 /** A low drystone wall: coursed rough blocks, uneven along the top. */
-function stonewall(len: number, seed: number): PropParts {
+export function stonewall(len: number, seed: number): PropParts {
   const rng = Rng.fromSeed(seed);
   const m = emptyMesh();
   let x = -len / 2;
@@ -145,7 +138,7 @@ function stonewall(len: number, seed: number): PropParts {
 }
 
 /** A barrel: bellied staves, a lid and two hoops. */
-function barrel(): PropParts {
+export function barrel(): PropParts {
   const m = emptyMesh();
   const N = 8;
   for (let k = 0; k < N; k++) {
@@ -160,7 +153,7 @@ function barrel(): PropParts {
 }
 
 /** Hay: two bales side by side and one across the top. */
-function hay(seed: number): PropParts {
+export function hay(seed: number): PropParts {
   const rng = Rng.fromSeed(seed);
   const m = emptyMesh();
   const j = (): number => (rng.next() - 0.5) * 0.05;
@@ -171,7 +164,7 @@ function hay(seed: number): PropParts {
 }
 
 /** A signpost: a post with two pointing boards. */
-function signpost(): PropParts {
+export function signpost(): PropParts {
   const m = emptyMesh();
   addBeam(m, [0, -0.1, 0], [0, 2.3, 0], 0.14, [0, 0, 1], { aoBottom: 0.6 });
   addBox(m, [0.07, 1.85, -0.04], [0.95, 2.1, 0.04]);
@@ -182,7 +175,7 @@ function signpost(): PropParts {
 }
 
 /** A market stall: a counter, four posts and a striped awning slanting toward the street (+z). */
-function stall(seed: number): PropParts {
+export function stall(seed: number): PropParts {
   const rng = Rng.fromSeed(seed);
   const wood = emptyMesh();
   for (const sx of [-1.05, 1.05]) for (const sz of [-0.55, 0.65]) addBeam(wood, [sx, -0.05, sz], [sx, sz < 0 ? 2.45 : 2.05, sz], 0.1, [0, 0, 1]);
@@ -211,7 +204,7 @@ export const BRIDGE_WIDTH = 1.7;
  * span (along local x). The ground under it is raised to the deck (`terrain.ts`), so the model stands on that level:
  * the planks are a hand above it, and the timbers reach down to the water so the raised ground does not show.
  */
-function bridge(len: number, seed: number): PropParts {
+export function bridge(len: number, seed: number): PropParts {
   const rng = Rng.fromSeed(seed);
   const m = emptyMesh();
   const W = BRIDGE_WIDTH / 2;
@@ -235,7 +228,7 @@ function bridge(len: number, seed: number): PropParts {
 }
 
 /** A bench: a plank on two slab legs. */
-function bench(): PropParts {
+export function bench(): PropParts {
   const m = emptyMesh();
   addBox(m, [-0.75, 0.42, -0.17], [0.75, 0.5, 0.17]);
   for (const x of [-0.6, 0.6]) addBox(m, [x - 0.05, 0, -0.14], [x + 0.05, 0.42, 0.14], { aoBottom: 0.6 });
@@ -243,7 +236,7 @@ function bench(): PropParts {
 }
 
 /** A trough: four boards and two feet, hollow. */
-function trough(): PropParts {
+export function trough(): PropParts {
   const m = emptyMesh();
   addBox(m, [-0.85, 0.15, -0.3], [0.85, 0.2, 0.3]);
   addBox(m, [-0.85, 0.2, -0.3], [0.85, 0.65, -0.24], { aoBottom: 0.8 });
@@ -254,7 +247,7 @@ function trough(): PropParts {
 }
 
 /** A tree stump with a few roots. */
-function stump(seed: number): PropParts {
+export function stump(seed: number): PropParts {
   const rng = Rng.fromSeed(seed);
   const m = emptyMesh();
   const h = 0.4 + rng.next() * 0.15;
@@ -265,58 +258,3 @@ function stump(seed: number): PropParts {
   }
   return { wood: m };
 }
-
-export function buildMore(p: PlacedProp): PropParts {
-  switch (p.kind as MoreKind) {
-    case 'palisade': return palisade(p.len ?? 4, p.seed);
-    case 'tower': return tower(p.seed);
-    case 'gate': return gate(p.len ?? 3, !!p.open);
-    case 'archway': return archway(p.len ?? 3.2, p.seed);
-    case 'stonewall': return stonewall(p.len ?? 4, p.seed);
-    case 'barrel': return barrel();
-    case 'hay': return hay(p.seed);
-    case 'signpost': return signpost();
-    case 'stall': return stall(p.seed);
-    case 'bench': return bench();
-    case 'trough': return trough();
-    case 'stump': return stump(p.seed);
-    case 'bridge': return bridge(p.len ?? 5, p.seed);
-  }
-}
-
-/** What blocks feet (an open gate and an archway block only their posts). */
-export function moreShapes(p: PlacedProp): Shape[] {
-  const s = p.size ?? 1;
-  const rot = p.rot ?? 0;
-  const at = (lx: number, lz: number): { x: number; z: number } => ({ x: p.x + (lx * Math.cos(rot) + lz * Math.sin(rot)) * s, z: p.z + (-lx * Math.sin(rot) + lz * Math.cos(rot)) * s });
-  const box = (lx: number, lz: number, hw: number, hd: number): Shape => ({ kind: 'box', ...at(lx, lz), hw: hw * s, hd: hd * s, rot });
-  switch (p.kind as MoreKind) {
-    case 'palisade': return [box(0, 0, (p.len ?? 4) / 2, 0.2)];
-    case 'stonewall': return [box(0, 0, (p.len ?? 4) / 2, 0.3)];
-    case 'tower': return [box(0, 0, 1.2, 1.2)];
-    case 'gate': {
-      const h = (p.len ?? 3) / 2;
-      const posts = [box(-h - 0.17, 0, 0.19, 0.19), box(h + 0.17, 0, 0.19, 0.19)];
-      return p.open ? posts : [...posts, box(0, 0, h, 0.12)];
-    }
-    case 'archway': {
-      const h = (p.len ?? 3.2) / 2;
-      return [box(-h - 0.4, 0, 0.45, 0.42), box(h + 0.4, 0, 0.45, 0.42)];
-    }
-    case 'hay': return [box(0, 0, 0.95, 0.34)];
-    case 'stall': return [box(0, 0.35, 1.1, 0.45)];
-    case 'bench': return [box(0, 0, 0.75, 0.18)];
-    case 'trough': return [box(0, 0, 0.85, 0.3)];
-    case 'barrel': return [circle(p.x, p.z, 0.33 * s)];
-    case 'signpost': return [circle(p.x, p.z, 0.15 * s)];
-    case 'stump': return [circle(p.x, p.z, 0.3 * s)];
-    // Only the rails: the way between them is the walkway.
-    case 'bridge': {
-      const h = (p.len ?? 5) / 2, w = BRIDGE_WIDTH / 2;
-      return [box(0, -w, h, 0.07), box(0, w, h, 0.07)];
-    }
-  }
-}
-
-/** Things the eye cannot see through (a boulder does too; see `blocksSight`). */
-export const SIGHT_BLOCKING: readonly string[] = ['palisade', 'stonewall', 'tower'];

@@ -5,8 +5,7 @@ import { type House3DSpec, type HousePlan, PLAN_SIZE, type RoofKind, type WallKi
 import { type Layout, type PlacedHouse, type PlacedTree, buildHouses, houseOuterBox, houseToWorld, layoutObstacles, layoutPads, layoutShade } from './layout';
 import { type ChunkContent, type ChunkGenerator, PlacedIndex } from './placed';
 import { type PlacedProp } from './props';
-import { BRIDGE_WIDTH } from './propsMore';
-import type { TreeKind } from './tree';
+import type { Things } from './things';
 import { NavGrid, type Shape, ShapeIndex, type ShapeSource, findPath, shapeDist } from './space';
 import { type Ground3D, type Road, type XZ, lakeDist, roadDist } from './terrain';
 
@@ -70,8 +69,8 @@ export interface Scatter {
   /** Extra space kept clear around each, metres. */
   gap?: number;
   seed?: number;
-  /** Trees only: the kinds to mix (each tree picks one at random; omitted, all are oaks). */
-  mix?: TreeKind[];
+  /** Trees only: the kinds of tree to mix (each tree picks one at random; omitted, all are oaks). */
+  mix?: string[];
 }
 
 /**
@@ -81,7 +80,8 @@ export interface Scatter {
 export interface WildSpec {
   /** Trees per 1000 m² in the thick of a wood (about 15 is a wood, 40 a thicket). */
   trees: number;
-  mix?: TreeKind[];
+  /** The kinds of tree to mix. */
+  mix?: string[];
   /** Bushes and boulders per 1000 m² (anywhere, thicker in woods for bushes). */
   shrubs?: number;
   boulders?: number;
@@ -239,7 +239,8 @@ export function wildGenerator(w: WildSpec, ctx: WildContext): ChunkGenerator {
 
 // --- compiling -------------------------------------------------------------
 
-export function compileMap(spec: MapSpec): CompiledMap {
+/** Compile a map. `things` is the kinds of thing (`content/things`): what every placed thing is. */
+export function compileMap(spec: MapSpec, things: Things): CompiledMap {
   const problems: string[] = [];
   const rng = Rng.fromSeed(spec.seed);
   const half = spec.size / 2;
@@ -346,7 +347,7 @@ export function compileMap(spec: MapSpec): CompiledMap {
     }
   }
   // A bridge prop makes the ground under it a deck (the span `len` is along the prop's own x; its width is the walkway and the rails).
-  const bridges = layout.props.filter((p) => p.kind === 'bridge').map((p) => ({ x: p.x, z: p.z, len: p.len ?? 5, width: BRIDGE_WIDTH + 0.3, rot: p.rot ?? 0 }));
+  const bridges = layout.props.filter((p) => things.has(p.kind) && things.get(p.kind).deck).map((p) => ({ x: p.x, z: p.z, len: things.placed(p).len, width: things.get(p.kind).deck!, rot: p.rot ?? 0 }));
   const ground: Ground3D = { seed: spec.seed, size: spec.size, roads: spec.roads, mud, lake: spec.lake, rivers: spec.rivers, bridges, pads: layoutPads(layout), shade: layoutShade(layout) };
 
   // The hero.
@@ -380,16 +381,29 @@ export function compileMap(spec: MapSpec): CompiledMap {
   if (spec.wild) {
     generator = wildGenerator(spec.wild, { seed: spec.seed, half, edge, lakeD, roadD, houses: new ShapeIndex(boxes), clear: [{ x: hero[0], z: hero[1], r: 3 }] });
   }
-  const index = new PlacedIndex(layout, generator);
+  // Every kind a map names must be one, and one that can be placed (else nothing below can ask about it).
+  const unknown = new Set<string>();
+  const kindOk = (k: string, what: string): boolean => {
+    if (things.has(k) && !things.get(k).abstract) return true;
+    unknown.add(`${what}: no kind of thing called ${k}${things.has(k) ? ' that can be placed' : ''}`);
+    return false;
+  };
+  layout.props = layout.props.filter((p) => kindOk(p.kind, 'prop'));
+  layout.trees = layout.trees.filter((t) => kindOk(t.kind ?? 'oak', 'tree'));
+  for (const sc of spec.scatter ?? []) for (const k of sc.mix ?? []) kindOk(k, 'scatter mix');
+  for (const k of spec.wild?.mix ?? []) kindOk(k, 'wild mix');
+  problems.push(...unknown);
+
+  const index = new PlacedIndex(layout, things, generator);
   if (generator) ground.extraShade = (x, z) => index.shadeAt(x, z);
 
   const compiled: CompiledMap = { name: spec.name, ground, layout, placed: index, hero, walk, problems };
-  problems.push(...validate(spec, compiled, built.map((b, i) => ({ id: b.place.id, box: boxes[i], door: houseToWorld(b.place, b.model.door[0], b.model.door[2] - 0.9) }))));
+  problems.push(...validate(spec, compiled, things, built.map((b, i) => ({ id: b.place.id, box: boxes[i], door: houseToWorld(b.place, b.model.door[0], b.model.door[2] - 0.9) }))));
   return compiled;
 }
 
 /** What is wrong with a compiled map (empty if nothing). */
-function validate(spec: MapSpec, c: CompiledMap, houses: { id: string; box: Shape; door: { x: number; z: number } }[]): string[] {
+function validate(spec: MapSpec, c: CompiledMap, things: Things, houses: { id: string; box: Shape; door: { x: number; z: number } }[]): string[] {
   const out: string[] = [];
   const g = c.ground;
   const half = g.size / 2;
@@ -432,10 +446,10 @@ function validate(spec: MapSpec, c: CompiledMap, houses: { id: string; box: Shap
     }
   });
   for (const t of c.layout.trees) if (!inMap(t.x, t.z, 0.5) || lakeD(t.x, t.z) < 0.5) out.push(`tree at ${t.x.toFixed(1)},${t.z.toFixed(1)} is off the map or in the lake`);
-  for (const p of c.layout.props) if (!inMap(p.x, p.z, 0.5) || (p.kind !== 'bridge' && lakeD(p.x, p.z) < 0.5)) out.push(`${p.kind} at ${p.x.toFixed(1)},${p.z.toFixed(1)} is off the map or in the lake`);
+  for (const p of c.layout.props) if (!inMap(p.x, p.z, 0.5) || (!things.get(p.kind).deck && lakeD(p.x, p.z) < 0.5)) out.push(`${p.kind} at ${p.x.toFixed(1)},${p.z.toFixed(1)} is off the map or in the lake`);
   // Every door can be reached from where the hero starts.
   if (!out.length) {
-    const grid = new NavGrid(g.size, layoutObstacles(c.layout, built), { radius: 0.2, blocked: (x, z) => lakeD(x, z) < 0.2 });
+    const grid = new NavGrid(g.size, layoutObstacles(c.layout, built, things), { radius: 0.2, blocked: (x, z) => lakeD(x, z) < 0.2 });
     if (!grid.walkable(c.hero[0], c.hero[1])) out.push('the hero starts somewhere blocked');
     else {
       // Each door is tried from the nearest place already known to be reachable (the hero, then the doors found so far),

@@ -1,7 +1,7 @@
 import { type House3DSpec, type HouseModel, buildHouse } from './house';
-import { type PlacedProp, propShapes } from './props';
+import type { PlacedProp } from './props';
 import { type Shape, boxOfFootprint, circle, shapeDist } from './space';
-import type { TreeKind } from './tree';
+import type { Things } from './things';
 
 /**
  * A layout is the list of things placed in the world: houses, trees, torch posts.
@@ -24,9 +24,12 @@ export interface PlacedTree {
   x: number;
   z: number;
   seed: number;
-  /** Default: an oak. */
-  kind?: TreeKind;
+  /** A kind of tree (`content/things/kinds/tree.ts`). Default: an oak. */
+  kind?: string;
 }
+
+/** A tree as a placed thing of its kind, for asking the kinds of thing about it. */
+export const treeProp = (t: PlacedTree): PlacedProp => ({ kind: t.kind ?? 'oak', x: t.x, z: t.z, seed: t.seed });
 
 export interface Layout {
   houses: PlacedHouse[];
@@ -66,7 +69,6 @@ export function houseToLocal(h: PlacedHouse, x: number, z: number): { x: number;
   return { x: dx * c - dz * s, z: dx * s + dz * c };
 }
 
-export const TRUNK = 0.5;
 export const POST = 0.12;
 /**
  * A house's four thin walls, so the inside can be walked, with a gap at the door (`withDoor` false: whole,
@@ -107,13 +109,13 @@ export function houseBox(b: BuiltHouse): Shape {
 /** The house with its porch, whole, for the filament field's "indoors". */
 export const houseOuterBox = (b: BuiltHouse): Shape => boxOfFootprint(b.model.footprint, b.place.x, b.place.z, b.place.rot);
 
-/** What blocks feet: house walls, tree trunks, torch posts. */
-export function layoutObstacles(l: Layout, houses: BuiltHouse[]): Shape[] {
+/** What blocks feet: house walls, tree trunks, torch posts, props (asked of their kinds). */
+export function layoutObstacles(l: Layout, houses: BuiltHouse[], things: Things): Shape[] {
   return [
     ...houses.flatMap((b) => levelWalls(b, 0)),
-    ...l.trees.map((t) => circle(t.x, t.z, TRUNK)),
+    ...l.trees.flatMap((t) => things.shapes(treeProp(t))),
     ...l.torches.map(([x, z]) => circle(x, z, POST)),
-    ...l.props.flatMap(propShapes),
+    ...l.props.flatMap((p) => things.shapes(p)),
   ];
 }
 

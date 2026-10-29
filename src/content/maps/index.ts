@@ -1,4 +1,5 @@
 import { type CompiledMap, type MapSpec, compileMap } from '../../core/world3d/mapgen';
+import { THINGS } from '../things';
 import { HAMLET_MAP } from './hamlet';
 import { SPIKE_MAP } from './spike';
 import { WILDS_MAP } from './wilds';
@@ -18,7 +19,7 @@ export function mapNamed(name: string): CompiledMap {
   if (!c) {
     const spec = MAPS[name];
     if (!spec) throw new Error(`no map called ${name}`);
-    compiled.set(name, (c = compileMap(spec)));
+    compiled.set(name, (c = compileMap(spec, THINGS)));
   }
   return c;
 }

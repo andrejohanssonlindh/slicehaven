@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { SPIKE_GROUND, SPIKE_HERO, SPIKE_LAYOUT, SPIKE_TORCHES } from '../src/content/spike3d';
 import { buildHouses, houseAt, houseBox, houseOuterBox, houseToLocal, houseToWorld, houseWalls, layoutObstacles } from '../src/core/world3d/layout';
-import { buildBoulder, buildCart, buildCrates, buildFence, buildShrub, buildWell, buildWoodpile, propShape, propSource } from '../src/core/world3d/props';
+import { THINGS } from '../src/content/things';
+import { type PlacedProp, buildBoulder, buildCart, buildCrates, buildFence, buildShrub, buildWell, buildWoodpile } from '../src/core/world3d/props';
+
+const propSource = (p: PlacedProp) => THINGS.source(p);
 import { NavGrid, findPath, shapeDist } from '../src/core/world3d/space';
 import { WATER_Y, groundHeight, lakeDist, roadDist } from '../src/core/world3d/terrain';
 
@@ -47,7 +50,7 @@ describe('layout', () => {
   });
 
   it('the hero can walk in through every door, and each room is its own house', () => {
-    const grid = new NavGrid(g.size, layoutObstacles(SPIKE_LAYOUT, houses), { radius: 0.2, blocked: (x, z) => lakeDist(g, x, z) < 0.2 });
+    const grid = new NavGrid(g.size, layoutObstacles(SPIKE_LAYOUT, houses, THINGS), { radius: 0.2, blocked: (x, z) => lakeDist(g, x, z) < 0.2 });
     const boxes = houses.map(houseBox);
     houses.forEach((h, i) => {
       const m = h.model;
@@ -61,7 +64,7 @@ describe('layout', () => {
 
   it('props stand on dry ground, off the road, clear of houses, and block feet', () => {
     const boxes = houses.map(houseOuterBox);
-    const grid = new NavGrid(g.size, layoutObstacles(SPIKE_LAYOUT, houses), { radius: 0.2 });
+    const grid = new NavGrid(g.size, layoutObstacles(SPIKE_LAYOUT, houses, THINGS), { radius: 0.2 });
     for (const p of SPIKE_LAYOUT.props) {
       const id = `${p.kind}@${p.x},${p.z}`;
       // (A bridge is the one thing that stands over water, and its walkway is open.)
@@ -94,7 +97,7 @@ describe('layout', () => {
       const p = { kind, x: 3, z: 4, seed: 1 };
       // (A well holds water; the rest give off nothing.)
       expect(propSource(p)?.kind ?? null).toBe(kind === 'well' ? 'water' : null);
-      expect(shapeDist(propShape(p), 3, 4)).toBeLessThan(0);
+      expect(shapeDist(THINGS.shapes(p)[0], 3, 4)).toBeLessThan(0);
     }
   });
 
@@ -107,31 +110,26 @@ describe('layout', () => {
 });
 
 describe('settlement props', () => {
-  const at = (kind: string, extra: object = {}) => ({ kind, x: 5, z: 5, seed: 3, ...extra }) as import('../src/core/world3d/props').PlacedProp;
+  const at = (kind: string, extra: object = {}) => ({ kind, x: 5, z: 5, seed: 3, ...extra }) as PlacedProp;
 
-  it('every kind builds the same twice, has geometry in some material, and blocks feet', async () => {
-    const { MORE_KINDS, buildMore } = await import('../src/core/world3d/propsMore');
-    const { propShapes } = await import('../src/core/world3d/props');
-    for (const k of MORE_KINDS) {
-      const a = buildMore(at(k)), b = buildMore(at(k));
+  it('every kind that draws builds the same twice, has geometry, and blocks feet', () => {
+    for (const k of THINGS.placeable.filter((k) => THINGS.get(k).draw)) {
+      const a = THINGS.parts(at(k)), b = THINGS.parts(at(k));
       expect(JSON.stringify(a), k).toBe(JSON.stringify(b));
-      const meshes = [a.wood, a.stone, a.hay, ...(a.cloth ?? []).map((c) => c.mesh)].filter(Boolean);
-      expect(meshes.length, k).toBeGreaterThan(0);
-      for (const m of meshes) expect(m!.indices.length, k).toBeGreaterThan(0);
-      expect(propShapes(at(k)).length, k).toBeGreaterThan(0);
+      expect(a.meshes.length + (a.lumps ? 1 : 0), k).toBeGreaterThan(0);
+      for (const m of a.meshes) expect(m.mesh.indices.length, k).toBeGreaterThan(0);
+      expect(THINGS.shapes(at(k)).length, k).toBeGreaterThan(0);
     }
   });
 
-  it('a shut gate bars the way, an open one leaves only its posts; an archway is two piers', async () => {
-    const { propShapes } = await import('../src/core/world3d/props');
-    expect(propShapes(at('gate', { open: true, len: 3 }))).toHaveLength(2);
-    expect(propShapes(at('gate', { len: 3 }))).toHaveLength(3);
-    expect(propShapes(at('archway'))).toHaveLength(2);
+  it('a shut gate bars the way, an open one leaves only its posts; an archway is two piers', () => {
+    expect(THINGS.shapes(at('gate', { open: true, len: 3 }))).toHaveLength(2);
+    expect(THINGS.shapes(at('gate', { len: 3 }))).toHaveLength(3);
+    expect(THINGS.shapes(at('archway'))).toHaveLength(2);
   });
 
-  it('palisades, walls and towers stop the eye; stalls and barrels do not', async () => {
-    const { blocksSight } = await import('../src/core/world3d/props');
-    for (const k of ['palisade', 'stonewall', 'tower', 'boulder']) expect(blocksSight(at(k)), k).toBe(true);
-    for (const k of ['stall', 'barrel', 'gate', 'fence']) expect(blocksSight(at(k)), k).toBe(false);
+  it('palisades, walls and towers stop the eye; stalls and barrels do not', () => {
+    for (const k of ['palisade', 'stonewall', 'tower', 'boulder', 'oak', 'pine']) expect(THINGS.blocksSight(at(k)), k).toBe(true);
+    for (const k of ['stall', 'barrel', 'gate', 'fence']) expect(THINGS.blocksSight(at(k)), k).toBe(false);
   });
 });
