@@ -1,5 +1,17 @@
 # Devlog
 
+## 2026-10-29 (later) — Session 26b: bug list, magic lights, and a world that can be kilometres across
+
+- **Things sticking out of houses** (director: an item to the left of the rightmost house's wall): a piece's footprint is smaller than what its card draws (the art shows a side face), so a piece against a wall poked through. The solver now also keeps what is *drawn* (`vw`) inside the walls when the room allows, and falls back to the footprint when it is too tight.
+- **Could not walk round behind houses**: a tap anywhere on a house's picture (its roof over the ground behind it) counted as "go in". Now a tap means the house only if the ground point under the tap is inside its footprint, so you can tap past a roof to walk round the back (`houseTapped`). The nav grid is also finer (0.25 m cells), so the hero gets within about 0.35 m of a wall.
+- **Walking through furniture inside**: it was already blocked (new test: the middle of every standing piece in every hamlet house is not walkable, and no path crosses one); what you see is the card being taller and wider than its footprint. Footprints now cover more of it.
+- **Magic lights**: *Light orb* (a floating swarm of chunky bits round a pulsing core, with a cool point light, follows the hero) and *Light ray* (a spot light and a faint beam cone from the hero's hand along the way they face, like a lantern). Lights are added to the scene only while on.
+- **Walk ×1/2/3** button (default ×2) for testing.
+- **Well**: water in the shaft, and it is a water source for the filament field (the lake's still-water filaments, smaller).
+- **Scale** (the big one): see [world3d-scale](design/world3d-scale.md). The nav grid, filament field, ground features and placed things no longer depend on the size of the map; there is a 8 km `wilds` map with woods made chunk by chunk. Open: houses are still built whole (cities), draw calls in thick woods.
+- Slips: I edited a few files through `sed` (two import lines, one test title) against the no-Bash-edits rule.
+
+
 ## 2026-10-29 — Session 26: tidy rooms, lightning and fires on buttons, build stamp
 
 - **Build stamp** at the top of `/spike3d/` (`v<commit count>·<hash> <date> <time>Z`, set in `vite.config.ts`): if it is the newest number, the page you load is the newest build.

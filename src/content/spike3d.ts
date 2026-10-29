@@ -1,5 +1,6 @@
 import { type FSource, type FilamentWorld, type Ground } from '../core/world3d/filaments3d';
 import { type BuiltHouse, type Layout, houseOuterBox } from '../core/world3d/layout';
+import type { PlacedIndex } from '../core/world3d/placed';
 import { propSource } from '../core/world3d/props';
 import { shapeDist } from '../core/world3d/space';
 import { lakeDist, splatAt } from '../core/world3d/terrain';
@@ -44,6 +45,26 @@ export function filamentWorld(g: Ground3D, layout: Layout, houses: BuiltHouse[],
       ...layout.props.flatMap((p) => propSource(p) ?? []),
       ...extra,
     ],
+  };
+}
+
+/**
+ * The filament world of a streaming map: ground and indoors as for any map, and the fixed sources asked for by
+ * rectangle from the placed index (trees, rocks, bushes, torches, wells by chunk) plus the extras (house fires and
+ * hand-lit campfires), which `extras` gives afresh each time the field is told its sources changed.
+ */
+export function streamingFilamentWorld(g: Ground3D, placed: PlacedIndex, houses: BuiltHouse[], extras: () => FSource[]): FilamentWorld {
+  const base = filamentWorld(g, { houses: [], trees: [], torches: [], props: [] }, houses, []);
+  let own = extras();
+  return {
+    ...base,
+    sources: [],
+    sourcesIn: (x0, z0, x1, z1) => {
+      const found = placed.sourcesIn(x0, z0, x1, z1);
+      return [...found, ...own.filter((s) => s.x >= x0 && s.x < x1 && s.z >= z0 && s.z < z1)];
+    },
+    // (`setSources` on the field is the signal that the extras changed: read them again.)
+    refresh: () => { own = extras(); },
   };
 }
 

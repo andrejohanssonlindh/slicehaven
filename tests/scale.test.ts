@@ -82,7 +82,7 @@ describe('the wilds, eight kilometres across', () => {
     const field = new FilamentField(world);
     const t = performance.now();
     const r = field.readAt(3000, -2000);
-    expect(r.flora ?? r.foto).toBeDefined();
+    expect(r.foto).toBeDefined();
     expect(performance.now() - t).toBeLessThan(500);
   });
 

@@ -48,6 +48,8 @@ export interface FilamentWorld {
    * index). It must return the same things each time until `setSources` is called.
    */
   sourcesIn?(x0: number, z0: number, x1: number, z1: number): readonly FSource[];
+  /** Called when `setSources` says the fixed sources changed, before they are asked for again. */
+  refresh?(): void;
 }
 
 export interface Conditions {
@@ -158,6 +160,7 @@ export class FilamentField {
 
   /** Fixed sources changed (a fire lit, a tree felled, a chunk streamed in or out). */
   setSources(s: readonly FSource[]): void {
+    this.world.refresh?.();
     this.staticCells.clear();
     this.staticAsked.clear();
     if (!this.world.sourcesIn) for (const src of s) this.put(this.staticCells, src);

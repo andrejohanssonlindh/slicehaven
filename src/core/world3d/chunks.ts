@@ -32,8 +32,11 @@ export function chunkRange(g: Ground3D): { i0: number; i1: number; j0: number; j
 export function chunksNear(g: Ground3D, x: number, z: number, radius: number): ChunkId[] {
   const r = chunkRange(g);
   const out: { id: ChunkId; d: number }[] = [];
-  for (let j = r.j0; j <= r.j1; j++) {
-    for (let i = r.i0; i <= r.i1; i++) {
+  // Only the window round the point: a map of kilometres has tens of thousands of chunks and this runs every frame.
+  const j0 = Math.max(r.j0, Math.floor((z - radius) / CHUNK)), j1 = Math.min(r.j1, Math.floor((z + radius) / CHUNK));
+  const i0 = Math.max(r.i0, Math.floor((x - radius) / CHUNK)), i1 = Math.min(r.i1, Math.floor((x + radius) / CHUNK));
+  for (let j = j0; j <= j1; j++) {
+    for (let i = i0; i <= i1; i++) {
       const dx = Math.max(i * CHUNK - x, 0, x - (i + 1) * CHUNK), dz = Math.max(j * CHUNK - z, 0, z - (j + 1) * CHUNK);
       const d = Math.hypot(dx, dz);
       if (d <= radius) out.push({ id: { i, j }, d });

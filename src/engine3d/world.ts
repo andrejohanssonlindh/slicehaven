@@ -8,7 +8,7 @@ import {
 } from '../art/textures3d';
 import { PEOPLE } from '../content/village/folk';
 import { mapNamed } from '../content/maps';
-import { filamentWorld } from '../content/spike3d';
+import { streamingFilamentWorld } from '../content/spike3d';
 import type { CompiledMap } from '../core/world3d/mapgen';
 import type { AspectId, HexFilaments } from '../core/filaments';
 import { type FSource, FilamentField } from '../core/world3d/filaments3d';
@@ -16,12 +16,13 @@ import { CHUNK, type ChunkTerrain, TerrainStore, chunkKey, chunksNear } from '..
 import { type Environment3D, environment } from '../core/world3d/environment3d';
 import { Rng } from '../core/rng';
 import type { HouseMaterial } from '../core/world3d/house';
-import { type BuiltHouse, type Layout, type PlacedTree, buildHouses, furnitureObstacles, houseAt, houseBox, houseOuterBox, houseToLocal, houseToWorld, layoutObstacles } from '../core/world3d/layout';
+import { type BuiltHouse, type Layout, type PlacedTree, buildHouses, furnitureObstacles, houseAt, houseBox, houseOuterBox, houseToLocal, houseToWorld, houseWalls } from '../core/world3d/layout';
+import { PlacedIndex } from '../core/world3d/placed';
 import { footprints } from '../core/world3d/roomplan';
 import type { MeshData } from '../core/world3d/mesh';
 import { type PlacedProp, buildBoulder, buildCart, buildCrates, buildFence, buildShrub, buildWell, buildWoodpile } from '../core/world3d/props';
 import { cloudDrift, cloudThreshold } from '../core/world3d/sky';
-import { NavGrid, type P2, type Shape, findPath, followPath, pathLength } from '../core/world3d/space';
+import { NavGrid, type P2, type Shape, ShapeIndex, findPath, followPath, pathLength } from '../core/world3d/space';
 import { type Ground3D, groundHeight, lakeDist, splatAt } from '../core/world3d/terrain';
 import { TEXELS_PER_M } from '../core/world3d/tiers';
 import { type Clump, buildTree } from '../core/world3d/tree';
@@ -91,6 +92,15 @@ interface LoadedChunk {
   ground: THREE.Mesh;
   grass: THREE.InstancedMesh | null;
   heat: Heat | null;
+  /** The chunk's trees, props and torch posts. */
+  standing: Standing;
+}
+
+/** What stands in a loaded chunk (trees, props, torch posts), kept so it can be taken down when the chunk leaves. */
+interface Standing {
+  objects: THREE.Object3D[];
+  shells: Shell[];
+  torches: Torch[];
 }
 
 interface Shell {
@@ -147,6 +157,8 @@ export class SpikeWorld {
   private chunkBuilds = 0;
   /** What is placed in the world (see `core/world3d/layout.ts`). */
   readonly layout: Layout;
+  /** Trees, props and torch posts by chunk (the layout's, and any the map makes as it goes). */
+  readonly placed: PlacedIndex;
   readonly houses: HouseInst[] = [];
   private shells: Shell[] = [];
   private torches: Torch[] = [];
@@ -193,7 +205,7 @@ export class SpikeWorld {
   private cloudOff = new THREE.Vector2();
   settings: WorldSettings;
 
-  constructor(settings: WorldSettings, grassCount: number, map: Pick<CompiledMap, 'ground' | 'layout' | 'hero' | 'walk'> = mapNamed('spike')) {
+  constructor(settings: WorldSettings, grassCount: number, map: Pick<CompiledMap, 'ground' | 'layout' | 'hero' | 'walk'> & Partial<Pick<CompiledMap, 'placed'>> = mapNamed('spike')) {
     this.settings = settings;
     const { ground, layout } = map;
     const g = ground;
@@ -222,16 +234,17 @@ export class SpikeWorld {
     const built = buildHouses(layout);
     // Each room is furnished by rules (see `content/furnish.ts`); what stands on the floor blocks feet.
     const rooms = built.map((b) => furnish((b.place.room ?? 'home') as RoomSet, b.model.room, b.model.door[0], b.place.spec.seed));
-    // Feet: the houses' walls and furniture, trunks and posts block; so does the water.
-    const shapes = [...layoutObstacles(layout, built), ...built.flatMap((b, i) => furnitureObstacles(b, footprints(rooms[i].plan)))];
-    this.nav = new NavGrid(g.size, shapes, { radius: 0.2, blocked: (x, z) => lakeDist(g, x, z) < 0.2 });
+    // Feet: the houses' walls and furniture block (held whole, in an index), and so do the trunks, posts and props the
+    // placed index knows by chunk, so the ground is asked only about what is near; so does the water.
+    this.placed = map.placed ?? new PlacedIndex(layout);
+    const placed = this.placed;
+    const houseShapes = new ShapeIndex([...built.flatMap(houseWalls), ...built.flatMap((b, i) => furnitureObstacles(b, footprints(rooms[i].plan)))]);
+    this.nav = new NavGrid(g.size, { near: (x0, z0, x1, z1) => [...houseShapes.near(x0, z0, x1, z1), ...placed.near(x0, z0, x1, z1)] }, { radius: 0.2, blocked: (x, z) => lakeDist(g, x, z) < 0.2 });
 
     // The houses.
     built.forEach((b, i) => this.houses.push(this.buildHouse(b, rooms[i])));
 
-    // Trees, grass, water, torches, people.
-    for (const t of layout.trees) this.buildTree(t);
-    for (const p of layout.props) this.buildProp(p);
+    // Water and torches; trees, props and torch posts stand up as their chunk streams in (see `fillChunk`).
     this.water = makeWater(g);
     if (this.water) this.scene.add(this.water.mesh);
     this.buildTorches();
@@ -258,7 +271,12 @@ export class SpikeWorld {
     this.scene.add(this.marker);
 
     this.weather.setWind(2, 1);
-    this.field = new FilamentField(filamentWorld(g, layout, built, this.fires));
+    this.field = new FilamentField(streamingFilamentWorld(g, placed, built, () => this.fieldExtras()));
+  }
+
+  /** The fixed sources that are not placed things: house fires, the door torch, campfires lit by hand. */
+  private fieldExtras(): FSource[] {
+    return [...this.fires, ...this.camps.map((c): FSource => ({ x: c.x, z: c.z, kind: 'fire', weight: 1 }))];
   }
 
   private houseGlow: THREE.DataTexture | null = null;
@@ -355,45 +373,64 @@ export class SpikeWorld {
   }
 
   /** Two shells: `step` metres out, then twice that, each sparser than the last. */
-  private addShells(base: THREE.Mesh, opts: LitOpts, s: { density: number; tint: number; step: number }, cutOf: HouseInst | null): void {
+  private addShells(base: THREE.Mesh, opts: LitOpts, s: { density: number; tint: number; step: number }, cutOf: HouseInst | null, collect?: Shell[]): void {
     for (const layer of [1, 2]) {
-      const mat = shellOf(base.material as THREE.MeshLambertMaterial, opts, {
-        layer, offset: s.step * layer, density: s.density / (layer * layer), tint: layer === 1 ? s.tint : s.tint * 1.08,
-      });
+      // One shell material per look (the material it grows from, and the layer), shared by every thing that has it.
+      const key = `${(base.material as THREE.Material).uuid}:${layer}:${s.density}:${s.step}`;
+      let mat = this.shellMats.get(key);
+      if (!mat) {
+        mat = shellOf(base.material as THREE.MeshLambertMaterial, opts, {
+          layer, offset: s.step * layer, density: s.density / (layer * layer), tint: layer === 1 ? s.tint : s.tint * 1.08,
+        });
+        this.shellMats.set(key, mat);
+      }
       const m = new THREE.Mesh(base.geometry, mat);
       m.position.copy(base.position);
       m.rotation.copy(base.rotation);
       m.scale.copy(base.scale);
       m.receiveShadow = true;
       base.parent ? base.parent.add(m) : base.add(m);
-      this.shells.push({ mesh: m, layer, cutOf });
+      const shell = { mesh: m, layer, cutOf };
+      this.shells.push(shell);
+      collect?.push(shell);
     }
   }
+
+  private shellMats = new Map<string, THREE.MeshLambertMaterial>();
+  /** Tree geometry by kind and seed: built once, shared by every tree that looks like it (never disposed). */
+  private treeGeos = new Map<string, { wood: THREE.BufferGeometry; leaves: THREE.BufferGeometry | null }>();
 
   private barkMat: THREE.MeshLambertMaterial | null = null;
   private leafMat: THREE.MeshLambertMaterial | null = null;
   private leafOpts: LitOpts | null = null;
 
-  private buildTree(place: PlacedTree): void {
-    const t = buildTree(place.seed, 7, place.kind);
+  private buildTree(place: PlacedTree, st: Standing): void {
+    const key = `${place.kind ?? 'oak'}:${place.seed}`;
+    let geo = this.treeGeos.get(key);
+    if (!geo) {
+      const t = buildTree(place.seed, 7, place.kind);
+      geo = { wood: geometryOf(t.wood), leaves: t.clumps.length ? lumpGeometry(t.clumps, t.height, 2) : null }; // a dead tree has no leaves
+      geo.wood.userData.shared = true;
+      if (geo.leaves) geo.leaves.userData.shared = true;
+      this.treeGeos.set(key, geo);
+    }
     const group = new THREE.Group();
     // Bark and leaf textures are painted once and shared by every tree.
     this.barkMat ??= lit({ map: tex(barkTex(4)), ao: true, wettable: true, seeThrough: true });
-    const wood = new THREE.Mesh(geometryOf(t.wood), this.barkMat);
+    const wood = new THREE.Mesh(geo.wood, this.barkMat);
     wood.castShadow = wood.receiveShadow = true;
     group.add(wood);
-    const gx = place.x, gz = place.z;
-    group.position.set(gx, this.store.heightAt(gx, gz), gz);
+    group.position.set(place.x, this.store.heightAt(place.x, place.z), place.z);
     this.scene.add(group);
-    if (!t.clumps.length) return; // a dead tree has no leaves
-    const merged = lumpGeometry(t.clumps, t.height, 2);
+    st.objects.push(group);
+    if (!geo.leaves) return;
     this.leafOpts ??= { map: tex(leafTex(5)), ao: true, sway: { from: 2.5, amount: 0.018 }, seeThrough: true };
     const leafOpts = this.leafOpts;
     this.leafMat ??= lit(leafOpts);
-    const leaves = new THREE.Mesh(merged, this.leafMat);
+    const leaves = new THREE.Mesh(geo.leaves, this.leafMat);
     leaves.castShadow = leaves.receiveShadow = true;
     group.add(leaves);
-    this.addShells(leaves, leafOpts, { density: 0.55, tint: 1.18, step: 0.12 }, null);
+    this.addShells(leaves, leafOpts, { density: 0.55, tint: 1.18, step: 0.12 }, null, st.shells);
   }
 
   private stoneMat: THREE.MeshLambertMaterial | null = null;
@@ -402,7 +439,7 @@ export class SpikeWorld {
   private wellWater: THREE.MeshLambertMaterial | null = null;
 
   /** A shrub, boulder or woodpile, standing on the ground where it is placed. */
-  private buildProp(p: PlacedProp): void {
+  private buildProp(p: PlacedProp, st: Standing): void {
     const group = new THREE.Group();
     const s = p.size ?? 1;
     const solid = (data: MeshData, mat: THREE.MeshLambertMaterial): void => {
@@ -441,6 +478,7 @@ export class SpikeWorld {
     group.rotation.y = p.rot ?? 0;
     group.position.set(p.x, this.store.heightAt(p.x, p.z) - (p.kind === 'woodpile' ? 0.02 : 0), p.z);
     this.scene.add(group);
+    st.objects.push(group);
   }
 
   private grassGeo: THREE.BufferGeometry | null = null;
@@ -527,10 +565,34 @@ export class SpikeWorld {
       grass.count = Math.min(grass.userData.full as number, this.grassLimit(grass));
       this.scene.add(grass);
     }
-    const lc: LoadedChunk = { id: c, ground: mesh, grass, heat: null };
+    const standing: Standing = { objects: [], shells: [], torches: [] };
+    const lc: LoadedChunk = { id: c, ground: mesh, grass, heat: null, standing };
     this.chunks.set(chunkKey(i, j), lc);
+    this.fillChunk(i, j, standing);
     this.syncHeat(lc);
     this.chunkBuilds++;
+  }
+
+  /** Stand up what the placed index says is in chunk (i, j): trees, props, torch posts. */
+  private fillChunk(i: number, j: number, st: Standing): void {
+    const content = this.placed.chunk(i, j);
+    for (const t of content.trees) this.buildTree(t, st);
+    for (const p of content.props) this.buildProp(p, st);
+    for (const [x, z] of content.torches) this.placeTorch(x, this.store.heightAt(x, z) + 1.9, z, true, st);
+  }
+
+  /** Take down what a chunk held. Geometry shared between things (the tree looks) stays. */
+  private emptyChunk(st: Standing): void {
+    for (const o of st.objects) {
+      this.scene.remove(o);
+      o.traverse((c) => {
+        const g = (c as THREE.Mesh).geometry as THREE.BufferGeometry | undefined;
+        if (g && !g.userData.shared && g !== this.postGeo) g.dispose();
+      });
+    }
+    for (const t of st.torches) this.torches.splice(this.torches.indexOf(t), 1);
+    for (const s of st.shells) this.shells.splice(this.shells.indexOf(s), 1);
+    st.objects.length = st.shells.length = st.torches.length = 0;
   }
 
   private unloadChunk(key: string): void {
@@ -549,6 +611,7 @@ export class SpikeWorld {
       this.scene.remove(lc.grass);
       lc.grass.dispose();
     }
+    this.emptyChunk(lc.standing);
     this.chunks.delete(key);
     this.store.drop(lc.id.i, lc.id.j);
   }
@@ -642,31 +705,44 @@ export class SpikeWorld {
   private grassShare = 1;
 
   private buildTorches(): void {
-    const postMat = lit({ map: tex(timberTex(21)) });
-    const place = (x: number, y: number, z: number, post: boolean): void => {
-      if (post) {
-        const p = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.9, 0.14), postMat);
-        p.position.set(x, y - 0.95, z);
-        p.castShadow = true;
-        this.scene.add(p);
-      }
-      const fx = makeFlame(0.42, 10, this.torches.length * 11);
-      fx.object.position.set(x, y + 0.02, z);
-      this.scene.add(fx.object);
-      const light = new THREE.PointLight(0xffa458, 9, 11, 2);
-      light.position.set(x, y + 0.3, z);
-      this.scene.add(light);
-      this.torches.push({ light, flame: fx.object, tick: fx.tick, base: 9, seed: this.torches.length * 7 + 1 });
-    };
-    for (const [x, z] of this.layout.torches) place(x, this.store.heightAt(x, z) + 1.9, z, true);
     // On a bracket beside the first house's door.
     const hs = this.houses[0];
     if (!hs) return;
     const d = hs.built.model.door;
     const w = houseToWorld(hs.built.place, d[0] + 0.95, d[2] + 0.25);
-    place(w.x, hs.group.position.y + hs.built.model.floorY + 1.85, w.z, false);
+    this.placeTorch(w.x, hs.group.position.y + hs.built.model.floorY + 1.85, w.z, false, null);
     this.fires.push({ x: w.x, z: w.z, kind: 'fire', weight: 1 });
   }
+
+  private postMat: THREE.MeshLambertMaterial | null = null;
+  private postGeo = new THREE.BoxGeometry(0.14, 1.9, 0.14);
+
+  /** A flame on a post (or on a bracket, with no post), with its light; into `st` when it belongs to a chunk. */
+  private placeTorch(x: number, y: number, z: number, post: boolean, st: Standing | null): void {
+    this.postMat ??= lit({ map: tex(timberTex(21)) });
+    if (post) {
+      const p = new THREE.Mesh(this.postGeo, this.postMat);
+      p.position.set(x, y - 0.95, z);
+      p.castShadow = true;
+      this.scene.add(p);
+      st?.objects.push(p);
+    }
+    const fx = makeFlame(0.42, 10, this.torchSeed);
+    fx.object.position.set(x, y + 0.02, z);
+    this.scene.add(fx.object);
+    const light = new THREE.PointLight(0xffa458, 9, 11, 2);
+    light.position.set(x, y + 0.3, z);
+    this.scene.add(light);
+    const torch: Torch = { light, flame: fx.object, tick: fx.tick, base: 9, seed: this.torchSeed * 7 / 11 + 1 };
+    this.torchSeed++;
+    this.torches.push(torch);
+    if (st) {
+      st.objects.push(fx.object, light);
+      st.torches.push(torch);
+    }
+  }
+
+  private torchSeed = 0;
 
   setShadowMap(size: number): void {
     const sh = this.sun.shadow;
@@ -1103,7 +1179,7 @@ export class SpikeWorld {
   }
 
   private syncFires(): void {
-    this.field.setSources([...this.fires, ...this.camps.map((c): FSource => ({ x: c.x, z: c.z, kind: 'fire', weight: 1 }))]);
+    this.field.setSources([]); // the field asks `fieldExtras` again
   }
 
   update(dtMs: number): void {
