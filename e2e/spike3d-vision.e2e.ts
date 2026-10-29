@@ -49,12 +49,12 @@ describe('spike3d vision and the explored map', () => {
     await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 90_000 });
     const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; return ${fn}; })()`);
     await w('(w.weather.setHour(0), w.weather.set("clear"), w.dayMinutes = 0, 0)');
-    // Stand 50 m out in front of the door torch, facing it (the house is behind the torch, not in the way).
+    // Stand 42 m out in front of the door torch, facing it (the house is behind the torch, not in the way).
     const torch = (await w('({ x: w.fires.find((f) => f.kind === "fire").x, z: w.fires.find((f) => f.kind === "fire").z })')) as { x: number; z: number };
     const rot = (await w('w.houses[0].built.place.rot')) as number;
     const fx = Math.sin(rot), fz = Math.cos(rot); // the way the door faces
     const face = Math.atan2(-fz, -fx);
-    await w(`(w.hero.x = ${torch.x + fx * 50}, w.hero.z = ${torch.z + fz * 50}, w.heroDir = { x: ${-fx}, z: ${-fz} }, w.facing = ${face}, w.focus.x = w.hero.x, w.focus.z = w.hero.z, 0)`);
+    await w(`(w.hero.x = ${torch.x + fx * 42}, w.hero.z = ${torch.z + fz * 42}, w.heroDir = { x: ${-fx}, z: ${-fz} }, w.facing = ${face}, w.focus.x = w.hero.x, w.focus.z = w.hero.z, 0)`);
     await page.waitForTimeout(2500);
     const range = (await w('w.spec.range')) as number;
     expect(range).toBeLessThan(45);

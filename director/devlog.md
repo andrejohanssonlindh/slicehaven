@@ -1,5 +1,15 @@
 # Devlog
 
+## 2026-10-30 — Houses stream in and out by chunk; Eastgate, a town to test it
+
+- **`HouseIndex`** (`core/world3d/houses.ts`): the map's houses by chunk. A house's model and boxes are made when asked (`lite`, cheap), its furnished room, walls, furniture and fires when something near it asks (`entry`). The renderer stands a house up when its chunk streams in (`standHouse`) and takes it down with the chunk (`dropHouse`: geometry, its own materials, cards, hearth light, shells). `world.houses` is now the houses *standing*; `world.houseIndex` knows them all.
+- Walking (`NavGrid`), sight (`blockers`), the filament field ("indoors", "settled", lee of a house, hearth/books/art sources) and the grass all ask the index by rectangle, so they cost what is near, not the town. The room's sources feed the field whether or not the house is standing.
+- Furniture art is made once per look and shared (`artCache` in `furnish.ts`), so a city does not grow the sprite atlas house by house. House models are cached by spec.
+- Map validation checks each door from the nearest door already known to be reachable (a street is a chain of short walks), which made an 80-house map compile in about a second.
+- **Eastgate** on `wilds` (`content/maps/wilds.ts`, `eastgate()`): 70 houses, one every 20 m on both sides of the road for 700 m east of the hamlet, rooms and roofs by rule (homes, fishers, weavers, bakers, herbalists, a store, an inn). The stats overlay shows `houses standing/total  furnished n`.
+- **Test:** `e2e/spike3d-streaming.e2e.ts` (hamlet only at start, Eastgate stands when the hero is there and the hamlet is gone, walk into a streamed-in house, run down the street, back again with nothing furnished twice), and `tests/houses.test.ts`.
+- **Not done:** furnished entries are kept for the life of the page (no eviction); compile still builds every house's model once (to know door and footprint), which is fine for hundreds and would want a cheaper footprint for tens of thousands.
+
 ## 2026-10-30 — Symbols and meanings by the book's description, furniture feeds the field, a torch in the hand
 
 - **Iconotropy / semotropy:** the book gives no ambient strength for these two (its tables cover eight aspects), only where they live. So now: **weak (−1) in open country, normal (0) among homes** (within 8 m of a house, or on a road/building on a hex) **and indoors**; roads add a little semotropy. `Context.settled`, `FilamentWorld.settled`.

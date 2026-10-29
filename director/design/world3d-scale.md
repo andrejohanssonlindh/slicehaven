@@ -26,7 +26,8 @@
 
 ## What is not done (the honest list)
 
-1. **Houses are still built whole at start.** A city of a few hundred houses will be slow to start and heavy: each house is a model, furniture sprites and a light. Next: stream houses by chunk the same way (build a house when its chunk is near, drop it when far), with a light `HouseMeta` (footprint, door, room) kept for walking and the field. `world.houses` becomes "the loaded ones". The `PlacedIndex` is the place for it.
+1. ~~**Houses are still built whole at start.**~~ **Done (2026-10-30):** `HouseIndex`, houses stream with their chunk; see the devlog. Remaining: entries are never evicted, and compile still builds each model once. The old text follows.
+    A city of a few hundred houses will be slow to start and heavy: each house is a model, furniture sprites and a light. Next: stream houses by chunk the same way (build a house when its chunk is near, drop it when far), with a light `HouseMeta` (footprint, door, room) kept for walking and the field. `world.houses` becomes "the loaded ones". The `PlacedIndex` is the place for it.
 2. **Authored scatter is O(n²)** (each new thing is compared with every earlier one). Fine for the hamlet, wrong for thousands: use `wild`, or an index.
 3. **One lake per map**, and ground made from the height function and a few features. A river, many lakes or a coast need `Ground3D` to take features per chunk.
 4. **Draw calls in thick woods.** Per-tree meshes are culled one by one, but 200 calls on a phone is a lot. Instancing was tried on the small maps and lost (see the devlog); at this density, instance per chunk with few looks per kind and re-test.

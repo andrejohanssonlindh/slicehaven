@@ -299,6 +299,7 @@ function loop(now: number): void {
       `${pipeline.rw}×${pipeline.rh} ×${pipeline.factor}  ${world.ppm} px/m`,
       `tier ${tier.name}${governor.level ? ` -${governor.level}` : ''}  shadow ${world.settings.shadowMap}`,
       `chunks ${world.chunkCount}  atlases ${spriteAtlas().count}`,
+      `houses ${world.houses.length}/${world.layout.houses.length}  furnished ${world.houseIndex.made}`,
       magic,
     ].filter(Boolean).join('\n');
   }

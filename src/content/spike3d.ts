@@ -2,7 +2,7 @@ import { type FSource, type FilamentWorld, type Ground } from '../core/world3d/f
 import { type BuiltHouse, type Layout, houseOuterBox } from '../core/world3d/layout';
 import type { PlacedIndex } from '../core/world3d/placed';
 import { propSource } from '../core/world3d/props';
-import { shapeDist } from '../core/world3d/space';
+import { type Shape, shapeDist } from '../core/world3d/space';
 import { lakeDist, splatAt } from '../core/world3d/terrain';
 import type { Ground3D } from '../core/world3d/terrain';
 import { mapNamed } from './maps';
@@ -28,8 +28,14 @@ export const SPIKE_HERO = SPIKE.hero;
 /** How near a house a place is still among homes, metres. */
 const SETTLED = 8;
 
-export function filamentWorld(g: Ground3D, layout: Layout, houses: BuiltHouse[], extra: FSource[] = []): FilamentWorld {
-  const boxes = houses.map(houseOuterBox);
+/** The houses as the field asks about them: the whole-house boxes near a point (all of a few, or the ones near of a city). */
+export interface HouseBoxes {
+  outerBoxesNear(x: number, z: number, r: number): Shape[];
+}
+
+export function filamentWorld(g: Ground3D, layout: Layout, houses: BuiltHouse[] | HouseBoxes, extra: FSource[] = []): FilamentWorld {
+  const all = Array.isArray(houses) ? houses.map(houseOuterBox) : null;
+  const near = (x: number, z: number, r: number): Shape[] => all ?? (houses as HouseBoxes).outerBoxesNear(x, z, r);
   return {
     size: g.size,
     ground(x, z): Ground {
@@ -41,13 +47,13 @@ export function filamentWorld(g: Ground3D, layout: Layout, houses: BuiltHouse[],
       if (s.wild > 0.5) return 'tallgrass';
       return 'grass';
     },
-    indoors: (x, z) => boxes.some((b) => shapeDist(b, x, z) < 0),
-    settled: (x, z) => boxes.some((b) => shapeDist(b, x, z) < SETTLED),
+    indoors: (x, z) => near(x, z, 1).some((b) => shapeDist(b, x, z) < 0),
+    settled: (x, z) => near(x, z, SETTLED).some((b) => shapeDist(b, x, z) < SETTLED),
     windBreak: (x, z, dx, dz, reach) => {
       const l = Math.hypot(dx, dz) || 1;
       for (let d = 0.75; d <= reach; d += 0.75) {
         const px = x + (dx / l) * d, pz = z + (dz / l) * d;
-        if (boxes.some((b) => shapeDist(b, px, pz) < 0)) return 'house';
+        if (near(px, pz, 1).some((b) => shapeDist(b, px, pz) < 0)) return 'house';
       }
       return null;
     },
@@ -65,14 +71,14 @@ export function filamentWorld(g: Ground3D, layout: Layout, houses: BuiltHouse[],
  * rectangle from the placed index (trees, rocks, bushes, torches, wells by chunk) plus the extras (house fires and
  * hand-lit campfires), which `extras` gives afresh each time the field is told its sources changed.
  */
-export function streamingFilamentWorld(g: Ground3D, placed: PlacedIndex, houses: BuiltHouse[], extras: () => FSource[]): FilamentWorld {
+export function streamingFilamentWorld(g: Ground3D, placed: PlacedIndex, houses: BuiltHouse[] | (HouseBoxes & { sourcesIn?(x0: number, z0: number, x1: number, z1: number): FSource[] }), extras: () => FSource[]): FilamentWorld {
   const base = filamentWorld(g, { houses: [], trees: [], torches: [], props: [] }, houses, []);
   let own = extras();
   return {
     ...base,
     sources: [],
     sourcesIn: (x0, z0, x1, z1) => {
-      const found = placed.sourcesIn(x0, z0, x1, z1);
+      const found = [...placed.sourcesIn(x0, z0, x1, z1), ...(Array.isArray(houses) ? [] : houses.sourcesIn?.(x0, z0, x1, z1) ?? [])];
       return [...found, ...own.filter((s) => s.x >= x0 && s.x < x1 && s.z >= z0 && s.z < z1)];
     },
     // (`setSources` on the field is the signal that the extras changed: read them again.)

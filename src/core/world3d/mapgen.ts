@@ -424,7 +424,17 @@ function validate(spec: MapSpec, c: CompiledMap, houses: { id: string; box: Shap
   if (!out.length) {
     const grid = new NavGrid(g.size, layoutObstacles(c.layout, built), { radius: 0.2, blocked: (x, z) => lakeD(x, z) < 0.2 });
     if (!grid.walkable(c.hero[0], c.hero[1])) out.push('the hero starts somewhere blocked');
-    else for (const h of houses) if (!findPath(grid, { x: c.hero[0], z: c.hero[1] }, h.door)) out.push(`the door of ${h.id} cannot be reached`);
+    else {
+      // Each door is tried from the nearest place already known to be reachable (the hero, then the doors found so far),
+      // so a long street is a chain of short walks, not a hundred long ones.
+      const known: { x: number; z: number }[] = [{ x: c.hero[0], z: c.hero[1] }];
+      for (const h of houses) {
+        let from = known[0];
+        for (const k of known) if (Math.hypot(k.x - h.door.x, k.z - h.door.z) < Math.hypot(from.x - h.door.x, from.z - h.door.z)) from = k;
+        if (findPath(grid, from, h.door)) known.push(h.door);
+        else out.push(`the door of ${h.id} cannot be reached`);
+      }
+    }
   }
   if (spec.houses.length !== new Set(spec.houses.map((h) => h.id)).size) out.push('two houses share an id');
   return out;

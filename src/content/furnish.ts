@@ -230,10 +230,20 @@ function opaqueHalf(p: Prop): number {
 /** 1 / cos(the camera's yaw 0.42), a touch generous: the widest a card is drawn across its house's axis. */
 const CARD_STRETCH = 1.12;
 
+/** Art is made once for each look and shared by every room that has it (the sprite atlas takes each look once, however many houses a city has). */
+const artCache = new Map<string, Prop>();
+let smithyArt: Prop[] | undefined;
+
 const makePiece = (key: PieceKey, line: Line): Prop => {
-  if (key === 'counter') return makeCounter((line.variant as CounterKind) ?? 'general', line.seed ?? 20);
-  if (key === 'shelf' && line.variant) return makeWallShelves(line.variant as ShelfKind, line.seed ?? 23);
-  return PIECES[key].make();
+  const id = `${key}|${line.variant ?? ''}|${line.seed ?? ''}`;
+  let p = artCache.get(id);
+  if (!p) {
+    if (key === 'counter') p = makeCounter((line.variant as CounterKind) ?? 'general', line.seed ?? 20);
+    else if (key === 'shelf' && line.variant) p = makeWallShelves(line.variant as ShelfKind, line.seed ?? 23);
+    else p = PIECES[key].make();
+    artCache.set(id, p);
+  }
+  return p;
 };
 
 export interface Furnished {
@@ -265,7 +275,8 @@ export function furnish(set: RoomSet, room: RoomRect, doorX: number, seed = 0): 
   };
   if (set === 'smithy') {
     // The workshop's art is its own (forge, anvil, trough, bench, coal bin, tool rack); the rules are ours.
-    const [forge, anvil, trough, bench, coal, rack] = smithyItems().map((it) => it.prop);
+    smithyArt ??= smithyItems().map((it) => it.prop);
+    const [forge, anvil, trough, bench, coal, rack] = smithyArt;
     add('forge', forge, { kind: 'floor', d: 0.9, maxW: 1.4 }, { rule: corner('backRight'), fire: true });
     add('workbench', bench, { kind: 'floor', d: 0.6, maxW: 1.6 }, { rule: back(0.1) });
     add('toolrack', rack, { kind: 'hung', maxW: 1.4 }, { rule: back(0.55), lift: 22 });
