@@ -4,6 +4,19 @@ Newest on top. Answer in chat (just reference the number, e.g. "Q11: option B").
 
 ---
 
+### Q24 — "Add all filaments": how far? *(open)*
+The book names 22 aspects; the field has the 8 that come from the ground, the weather and the living. The rest need a source in the world before a number means anything. My proposal, by group (say which, or "all"):
+
+- **Grundkrafter: heat and cold** (Termotropi, Kryotropi): from fire, sun, season, snow, water. Cheap, and they tie into the clock (warm noon, cold night). *I'd do these first.*
+- **Himlakrafter: sun, stars, moon** (Heliotropi, Astrotropi, Selenotropi, Kosmotropi): all read the clock and the sky (sun up, clear night sky, the moon's phase). Cheap now that there is a 24 h clock.
+- **Symbols** (Ikonotropi, Semotropi): need things to read (signs, carvings, shrines). Wait for placed things that carry meaning.
+- **Primal** (Ataxotropi chaos, Nomotropi order, Kronotropi time, Topotropi space): abstract; I'd start them flat at "normal" and let storms, lightning, ruins and the like push them later.
+- **Souls** (Psykotropi, Daimotropi, Teotropi, Oneirotropi): the book says ordinary mages cannot work these, so they would exist as a reading but not a spell source. Flat "normal" for now.
+
+Also: **I changed necrotropy** (normal everywhere, a little weaker under living trees; see the devlog). Tell me if you would rather forests were *exactly* normal.
+
+---
+
 ### Q23 — The 3D spike (M0): does the look work, and is it fast enough on your phone? *(answered: yes, "nearly exactly what I want", never under 60 fps → go; see [decisions](decisions.md))*
 Open **[the spike](https://andrejohanssonlindh.github.io/slicehaven/spike3d/)** on the phone. What it shows and every button is in [the M0 page](design/world3d-m0.md). What I need:
 

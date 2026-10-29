@@ -1,5 +1,15 @@
 # Devlog
 
+## 2026-10-30 — Session 27: your notes, first pass (necrotropy, wind shelter, a 24 h clock, cone vision, lightning scars)
+
+- **Necrotropy base.** The book gives no ambient figure for death; its sources are corpses, the sick, refuse and rot. The old `Forest −1` was my invention and applied to *every* cell, with `+1.5` leaf litter in forest. Now: **normal (0) everywhere**, **−0.5 "Living wood"** on forest ground, no litter bonus. Corpses and undead read one step higher than before (3 / 2 / 1 where it was 2 / 1 / 0).
+- **Wind shelter.** `FilamentWorld.windBreak` walks 7 m upwind of a cell; if a house is in the way the cell reads "In the lee of a house" (−1 air). Trees keep their own radial shelter.
+- **24 h clock** (`core/environment.ts`: `timeOfDayAt`, `lightAt`; `core/world3d/sky.ts`: `bodyDir`). `Weather.hour` (null in the hex games), `setHour`, `advance`. The sun crosses the sky 6–18 h (east, over the south, west) and the moon 18–6 h; colours blend through dawn and dusk (first light 5–7, sunset 17–20). The rules still read day / dusk / night, now as a reading of the clock. Page: Dawn/Day/Dusk/Night jump the clock, a slider sets any hour, and a button runs a whole day in 6, 2 or 0.5 minutes (or stops it). A jump sweeps the sun across in about a second.
+- **Vision rebuilt** (`core/world3d/vision.ts`, 256 rays). Sight is a **cone ahead** (width 70–150° from Alertness) plus a **circle round** (2.5–7 m, you notice what is close behind you), out to a **range from Alertness** (6 + 2.4 × Alertness m, 40% shorter at full night, capped by the tier's radius). Rays are cast over the ground from the hero's eye and stop where they leave the first solid thing: **houses** (seen whole from outside, so the roof shows; the hero's own house is its real walls with the door gap, so you see out through the door), **trunks** and **boulders**. The renderer reads the rays as a 256 × 1 texture; the explored map now records only what was truly seen. Facing eases toward the walking direction. A person out of sight is not drawn. *Alertness* button on the page (4–18).
+- **See-through everywhere solid:** logs, stones, bushes and posts join houses and trees.
+- **Lightning scar** (`core/world3d/scorch.ts`): a burnt disc with a ragged ash ring, fused-glass specks and a fern-like scar running outward, laid flat where the bolt lands (last ten kept). It is *burnt ground* to the filament field (ash, scorched earth).
+- **Not done yet: "add all filaments".** The book lists 22 aspects; we have 8 (the five groups that matter on the ground: life, light/dark, earth/air/fire/water, death). See Q24.
+
 ## 2026-10-30 — Session 26d: sight is the hero's, and the map remembers
 
 - **Vision follows the hero**, not the camera (director's catch). The hero sees out to the tier's inner/outer radius.
