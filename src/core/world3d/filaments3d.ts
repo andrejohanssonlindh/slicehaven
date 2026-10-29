@@ -24,7 +24,7 @@ export const FCELL = CHUNK / 20;
 /** How far a source's reach is stretched, against the hex table (which was tuned for 1.5 m hexes). */
 export const REACH = 1.7;
 
-export type SourceKind = 'tree' | 'pine' | 'thicket' | 'rock' | 'fire' | 'burnt' | 'corpse' | 'undead' | 'friend' | 'beast' | 'water';
+export type SourceKind = 'tree' | 'pine' | 'thicket' | 'rock' | 'fire' | 'burnt' | 'corpse' | 'undead' | 'friend' | 'beast' | 'water' | 'light';
 
 export interface FSource {
   x: number;
@@ -221,6 +221,8 @@ export class FilamentField {
   /** What one source (or the water of one ground cell) gives off, with its strength scale. */
   private emissionsOf(s: FSource, i: number, j: number): Emission[] {
     let ems = this.emCache.get(s);
+    // Magic light (an orb, a ray): only phototropy, a little stronger than a torch's reach.
+    if (!ems && s.kind === 'light') this.emCache.set(s, (ems = [{ aspect: 'foto', label: 'Magic light', fall: [1.6, 0.9, 0.3], cap: 3 }]));
     if (!ems) {
       const { env } = this.cond;
       const opts = { isUndead: (u: Unit) => u.kind === 'undead' };

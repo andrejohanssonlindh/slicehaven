@@ -152,6 +152,14 @@ function buildControls(): void {
     world.showFilaments(ids[(ids.indexOf(world.shownAspect as never) + 1) % ids.length]);
   });
 
+  // Vision: past it the world is grey, then black, and is not built or animated.
+  button('row-perf', () => (world.vision.outer > 0 ? t('spike.vision', 'Vision {n} m', { n: Math.round(world.vision.outer) }) : t('spike.visionoff', 'Vision: all')), () => world.vision.outer > 0, () => {
+    const base = VISION[tier.name][1];
+    const steps = [0, base * 0.7, base, base * 1.5];
+    const at = steps.findIndex((s) => Math.abs(s - world.vision.outer) < 1);
+    const next = steps[(at + 1) % steps.length];
+    world.setVision(next * 0.7, next);
+  });
   button('row-perf', () => t('spike.tier', 'Tier: {n}', { n: tier.name }), () => false, () => {
     setTier(cycle(['low', 'medium', 'high'] as TierName[], tier.name));
   });
@@ -169,8 +177,12 @@ function buildControls(): void {
   for (const b of buttons) b.refresh();
 }
 
+/** How far each tier sees (grey from, black at), metres from the view's focus. */
+const VISION: Record<TierName, [number, number]> = { low: [30, 44], medium: [40, 56], high: [52, 72] };
+
 function setTier(name: TierName): void {
   tier = { ...TIERS[name] };
+  if (typeof world !== 'undefined' && world.vision.outer > 0) world.setVision(...VISION[name]);
   zoomIndex = tier.zoom;
   pipeline.settings.pixelCss = tier.pixelCss;
   governor.level = 0;
@@ -290,6 +302,7 @@ setTimeout(() => {
   const size = Number(params.get('world')) || map.ground.size;
   world = new SpikeWorld({ shells: Math.min(2, tier.shells), lights: Math.min(3, tier.lights), shadowMap: tier.shadowMap }, TIERS.high.grass, { ...map, ground: { ...map.ground, size } });
   world.setGrass(tier.grass);
+  if (!params.has('novision')) world.setVision(...VISION[tier.name]);
   pipeline.renderer.info.autoReset = false;
   fit();
   new ResizeObserver(fit).observe(stage);

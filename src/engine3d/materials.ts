@@ -22,6 +22,8 @@ export const WORLD = {
   uPixWorld: { value: 1 / 21 },
   /** Holes through things in front of people (see `SEE_SLOTS`): xy the centre in view space, z how far from the camera, w 1 if used. */
   uSee: { value: Array.from({ length: 4 }, () => new THREE.Vector4(0, 0, 0, 0)) },
+  /** Vision: xy the centre (metres), z where the world starts to grey, w where it is black (w <= 0: off). */
+  uVision: { value: new THREE.Vector4(0, 0, 0, 0) },
 };
 
 /** How many people can have a see-through oval at once. */
@@ -126,10 +128,19 @@ ${o.sway ? `{
       .replace('#include <common>', `#include <common>
 uniform float uWet;
 uniform vec2 uCamPix;
+uniform vec4 uVision;
 varying vec3 vWPos;
 varying vec3 vVPos;
 uniform vec4 uSee[${SEE_SLOTS}];
 ${NOISE_GLSL}`)
+      // Beyond the edge of what can be seen the world loses its colour, then goes black.
+      .replace('#include <fog_fragment>', `#include <fog_fragment>
+if (uVision.w > 0.0) {
+  float k = smoothstep(uVision.z, uVision.w, length(vWPos.xz - uVision.xy));
+  float lum = dot(gl_FragColor.rgb, vec3(0.3, 0.59, 0.11));
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(lum * 0.8), clamp(k * 1.5, 0.0, 1.0) * 0.75);
+  gl_FragColor.rgb *= 1.0 - smoothstep(0.5, 1.0, k);
+}`)
       .replace('#include <color_fragment>', `#include <color_fragment>
 ${o.seeThrough ? `for (int i = 0; i < ${SEE_SLOTS}; i++) {
   vec4 s = uSee[i];

@@ -20,6 +20,21 @@ describe('spike3d magic lights, speed, and tapping round the back', () => {
     // Walk a few metres so the hero faces somewhere, then light both.
     await w('w.walkTo(w.hero.x + 5, w.hero.z + 3)');
     await page.waitForFunction(() => !(window as any).spike.world.walking, undefined, { timeout: 30_000 });
+    // Raising a light must not freeze the game: no frame gap anywhere near the second a shader rebuild takes.
+    const worstGap = async (fn: string): Promise<number> => page.evaluate(`new Promise((done) => {
+      const w = window.spike.world; let last = performance.now(), worst = 0, n = 0;
+      ${fn};
+      const f = (t) => { worst = Math.max(worst, t - last); last = t; if (++n < 40) requestAnimationFrame(f); else done(worst); };
+      requestAnimationFrame(f);
+    })`) as Promise<number>;
+    await page.waitForTimeout(500);
+    const calm = await worstGap('0');
+    const orbGap = await worstGap('w.toggleOrb()');
+    const rayGap = await worstGap('w.toggleRay()');
+    console.info(`frame gaps: calm ${calm.toFixed(0)} ms, raising the orb ${orbGap.toFixed(0)} ms, the ray ${rayGap.toFixed(0)} ms`);
+    expect(orbGap).toBeLessThan(Math.max(300, calm * 4));
+    expect(rayGap).toBeLessThan(Math.max(300, calm * 4));
+    await w('(w.toggleOrb(), w.toggleRay(), 0)');
     await w('(w.toggleOrb(), w.toggleRay(), 0)');
     await page.waitForTimeout(1200);
     expect(await w('w.orbOn && w.rayOn')).toBe(true);
@@ -43,6 +58,10 @@ describe('spike3d magic lights, speed, and tapping round the back', () => {
     await page.waitForFunction(() => !(window as any).spike.world.walking, undefined, { timeout: 30_000 });
     expect(Math.hypot(((await w('w.hero.x')) as number) - behind[0], ((await w('w.hero.z')) as number) - behind[1])).toBeLessThan(1);
     expect(await w('w.heroIndoors')).toBe(false);
+    // Behind the house the hero shows through it, in a see-through oval.
+    await w('(w.weather.setTime("day"), 0)');
+    await page.waitForTimeout(1500);
+    await page.screenshot({ path: `${OUT}spike3d-behind-house.png` });
     expect(errors).toEqual([]);
   });
 });

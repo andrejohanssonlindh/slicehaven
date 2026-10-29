@@ -82,6 +82,8 @@ interface Torch {
   flame: THREE.Object3D;
   /** Moves the flame's bits (see fire.ts), if it has any. */
   tick?: (t: number, wind: { x: number; z: number }) => void;
+  /** Shines by day as by night (magic), instead of fading with the daylight. */
+  always?: boolean;
   base: number;
   seed: number;
 }
@@ -94,6 +96,8 @@ interface LoadedChunk {
   heat: Heat | null;
   /** The chunk's trees, props and torch posts. */
   standing: Standing;
+  /** Unloaded: queued work for it is dropped. */
+  dead?: boolean;
 }
 
 /** What stands in a loaded chunk (trees, props, torch posts), kept so it can be taken down when the chunk leaves. */
@@ -163,6 +167,17 @@ export class SpikeWorld {
   private shells: Shell[] = [];
   private torches: Torch[] = [];
 
+  /**
+   * Vision (metres from the view's focus): the world greys from `inner` and is black at `outer`; chunks beyond are not
+   * built or animated. `outer` 0 turns it off. Set by tier from the page.
+   */
+  vision = { inner: 0, outer: 0 };
+  private tmpV = new THREE.Vector3();
+
+  setVision(inner: number, outer: number): void {
+    this.vision = { inner, outer };
+  }
+
   /** For testing: how many times faster than a stroll (1.6 m/s) the hero walks. */
   speedMul = 2;
   /** The way the hero last walked (unit-ish, world x/z): the ray of light points along it. */
@@ -227,7 +242,7 @@ export class SpikeWorld {
     this.sun.shadow.radius = 2;
     this.sun.shadow.camera.layers.enable(1);
     this.setShadowMap(settings.shadowMap);
-    this.scene.add(this.sun, this.sun.target, this.boltLight);
+    this.scene.add(this.sun, this.sun.target, this.boltLight, this.rayLight, this.rayLight.target);
 
     // Ground chunks stream in once the view is sized (see `frame`); until then the exact height function stands in.
     this.layout = layout;
@@ -309,7 +324,8 @@ export class SpikeWorld {
     const matFor = (m: HouseMaterial, cut: boolean): { mat: THREE.MeshLambertMaterial; opts: LitOpts } => {
       let s = this.houseMats.get(m);
       if (!s) {
-        const opts = this.houseMatOpts(m);
+        // Houses get the see-through oval too: a person behind one shows through it, as behind a tree.
+        const opts: LitOpts = { ...this.houseMatOpts(m), seeThrough: true };
         s = { mat: lit(opts), opts };
         this.houseMats.set(m, s);
         if (m === 'window') this.windowMats.push(s.mat);
@@ -568,17 +584,31 @@ export class SpikeWorld {
     const standing: Standing = { objects: [], shells: [], torches: [] };
     const lc: LoadedChunk = { id: c, ground: mesh, grass, heat: null, standing };
     this.chunks.set(chunkKey(i, j), lc);
-    this.fillChunk(i, j, standing);
+    this.fillChunk(i, j, lc);
     this.syncHeat(lc);
     this.chunkBuilds++;
   }
 
-  /** Stand up what the placed index says is in chunk (i, j): trees, props, torch posts. */
-  private fillChunk(i: number, j: number, st: Standing): void {
-    const content = this.placed.chunk(i, j);
-    for (const t of content.trees) this.buildTree(t, st);
-    for (const p of content.props) this.buildProp(p, st);
-    for (const [x, z] of content.torches) this.placeTorch(x, this.store.heightAt(x, z) + 1.9, z, true, st);
+  /** Work left to do for chunks that have loaded: one tree, prop or post at a time, spread over frames. */
+  private fillQueue: { lc: LoadedChunk; run: () => void }[] = [];
+
+  /** Queue what the placed index says is in chunk (i, j): trees, props, torch posts (built by `pumpFill`). */
+  private fillChunk(i: number, j: number, lc: LoadedChunk): void {
+    const content = this.placed.chunk(i, j), st = lc.standing;
+    for (const t of content.trees) this.fillQueue.push({ lc, run: () => this.buildTree(t, st) });
+    for (const p of content.props) this.fillQueue.push({ lc, run: () => this.buildProp(p, st) });
+    for (const [x, z] of content.torches) this.fillQueue.push({ lc, run: () => this.placeTorch(x, this.store.heightAt(x, z) + 1.9, z, true, st) });
+  }
+
+  /** Do queued chunk work for up to `budgetMs`, so a chunk streaming in costs a few frames of a little, not one long one. */
+  private pumpFill(budgetMs: number): void {
+    const t0 = performance.now();
+    let n = 0;
+    while (n < this.fillQueue.length && performance.now() - t0 < budgetMs) {
+      const job = this.fillQueue[n++];
+      if (!job.lc.dead) job.run();
+    }
+    this.fillQueue.splice(0, n);
   }
 
   /** Take down what a chunk held. Geometry shared between things (the tree looks) stays. */
@@ -611,6 +641,7 @@ export class SpikeWorld {
       this.scene.remove(lc.grass);
       lc.grass.dispose();
     }
+    lc.dead = true;
     this.emptyChunk(lc.standing);
     this.chunks.delete(key);
     this.store.drop(lc.id.i, lc.id.j);
@@ -628,7 +659,8 @@ export class SpikeWorld {
    * chunk costs a texture paint), nearest first; drops those well outside.
    */
   private streamChunks(all = false): void {
-    const r = this.viewRadius();
+    // Only what can be seen is built: with vision on, that is the vision's radius (and a margin), not the whole view.
+    const r = this.vision.outer > 0 ? Math.min(this.viewRadius(), this.vision.outer + 6) : this.viewRadius();
     const want = chunksNear(this.ground, this.focus.x, this.focus.z, r);
     for (const id of want) {
       if (this.chunks.has(chunkKey(id.i, id.j))) continue;
@@ -681,6 +713,7 @@ export class SpikeWorld {
     this.field.setMovers([
       { x: this.hero.x, z: this.hero.z, kind: 'friend' },
       { x: this.walker.mesh.position.x, z: this.walker.mesh.position.z, kind: 'friend' },
+      ...this.magicLightSources(),
     ]);
   }
 
@@ -768,8 +801,10 @@ export class SpikeWorld {
     Object.assign(c, { left: -span, right: span, top: span, bottom: -span, near: 1, far: 90 });
     c.updateProjectionMatrix();
     // The first sizing builds every chunk the view needs; later ones stream a chunk per frame.
-    this.streamChunks(!this.framed);
+    const first = !this.framed;
+    this.streamChunks(first);
     this.framed = true;
+    if (first) this.pumpFill(Infinity); // the first view is built whole; later chunks fill in a little each frame
   }
 
   private framed = false;
@@ -1102,9 +1137,12 @@ export class SpikeWorld {
   }
 
   // --- magic lights: an orb that floats beside the hero, and a ray like a lantern's beam ---
-  // A light is added to the scene only while it is on (adding or removing one recompiles the shaders once).
-  private orb: { group: THREE.Group; light: THREE.PointLight; fx: { object: THREE.Object3D; tick(t: number): void } } | null = null;
-  private ray: { group: THREE.Group; light: THREE.SpotLight; beam: THREE.Mesh } | null = null;
+  // Adding a light the shaders were not built for freezes the game while every one is rebuilt, so neither light is new:
+  // the orb takes a place in the pool of point lights (the nearest few shine, the rest do not, as with torches), and the
+  // ray's spot light is always in the scene, dark until it is raised.
+  private orb: { group: THREE.Group; torch: Torch; fx: { object: THREE.Object3D; tick(t: number): void } } | null = null;
+  private ray: { group: THREE.Group; beam: THREE.Mesh } | null = null;
+  private rayLight = new THREE.SpotLight(0xfff1cc, 0, 24, 0.42, 0.55, 1.1);
 
   get orbOn(): boolean {
     return this.orb !== null;
@@ -1118,6 +1156,7 @@ export class SpikeWorld {
   toggleOrb(): void {
     if (this.orb) {
       this.scene.remove(this.orb.group);
+      this.torches.splice(this.torches.indexOf(this.orb.torch), 1);
       this.orb = null;
       return;
     }
@@ -1127,20 +1166,21 @@ export class SpikeWorld {
     const light = new THREE.PointLight(0xa8dcff, 14, 15, 1.6);
     group.add(light);
     this.scene.add(group);
-    this.orb = { group, light, fx };
+    // (Its flame is a stand-in: the pool scales a torch's flame with its flicker, and the orb should not stretch.)
+    const torch: Torch = { light, flame: new THREE.Object3D(), tick: (t) => fx.tick(t), base: 14, seed: 5, always: true };
+    this.torches.push(torch);
+    this.orb = { group, torch, fx };
   }
 
   /** Raise (or lower) a beam of light from the hero's hand along the way they face, like a lantern's. */
   toggleRay(): void {
     if (this.ray) {
       this.scene.remove(this.ray.group);
-      this.ray.group.parent?.remove(this.ray.light.target);
+      this.rayLight.intensity = 0;
       this.ray = null;
       return;
     }
     const group = new THREE.Group();
-    const light = new THREE.SpotLight(0xfff1cc, 60, 24, 0.42, 0.55, 1.1);
-    group.add(light);
     // The visible beam: a faint additive cone, pointing from the apex (the hand) outward along +z in its own frame.
     const len = RAY_LENGTH;
     const cone = new THREE.ConeGeometry(Math.tan(0.42) * len * 0.8, len, 16, 1, true);
@@ -1149,8 +1189,19 @@ export class SpikeWorld {
     const beam = new THREE.Mesh(cone, new THREE.MeshBasicMaterial({ color: 0xfff1cc, transparent: true, opacity: 0.07, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false }));
     beam.renderOrder = 2;
     group.add(beam);
-    this.scene.add(group, light.target);
-    this.ray = { group, light, beam };
+    this.scene.add(group);
+    this.ray = { group, beam };
+  }
+
+  /** The light the orb and the ray add to the field, for the next reading: they are filaments of light. */
+  magicLightSources(): FSource[] {
+    const out: FSource[] = [];
+    if (this.orb) out.push({ x: this.orb.group.position.x, z: this.orb.group.position.z, kind: 'light', weight: 1 });
+    if (this.ray) {
+      const hp = this.heroCard.mesh.position, dl = Math.hypot(this.heroDir.x, this.heroDir.z) || 1;
+      for (const s of [1.5, 3.5, 5.5, 7.5]) out.push({ x: hp.x + (this.heroDir.x / dl) * s, z: hp.z + (this.heroDir.z / dl) * s, kind: 'light', weight: 0.6 });
+    }
+    return out;
   }
 
   private stepMagicLights(): void {
@@ -1159,8 +1210,6 @@ export class SpikeWorld {
       // Floats at the hero's shoulder, bobbing, a little behind the way they are going.
       const bob = Math.sin(this.time * 2.1) * 0.12;
       this.orb.group.position.set(hp.x - this.heroDir.x * 0.4 + 0.5, hp.y + 1.9 + bob, hp.z - this.heroDir.z * 0.4 - 0.3);
-      this.orb.fx.tick(this.time);
-      this.orb.light.intensity = 14 * (0.9 + 0.1 * Math.sin(this.time * 7.3));
     }
     if (this.ray) {
       const dl = Math.hypot(this.heroDir.x, this.heroDir.z) || 1;
@@ -1168,9 +1217,10 @@ export class SpikeWorld {
       const from = new THREE.Vector3(hp.x + dx * 0.35, hp.y + 1.15, hp.z + dz * 0.35);
       const to = new THREE.Vector3(hp.x + dx * RAY_LENGTH, hp.y + 0.2, hp.z + dz * RAY_LENGTH);
       this.ray.group.position.copy(from);
-      this.ray.light.position.set(0, 0, 0);
-      this.ray.light.target.position.copy(to);
-      this.ray.light.target.updateMatrixWorld();
+      this.rayLight.position.copy(from);
+      this.rayLight.target.position.copy(to);
+      this.rayLight.target.updateMatrixWorld();
+      this.rayLight.intensity = 60;
       this.ray.group.updateMatrixWorld(true);
       this.ray.beam.lookAt(to); // +z of the cone toward the far end
       // The beam breathes a little.
@@ -1208,7 +1258,9 @@ export class SpikeWorld {
     this.fog.color.copy(fogC);
     this.fog.near = CAM_DIST + env.fogNear - 30;
     this.fog.far = CAM_DIST + env.fogFar;
-    this.scene.background = fogC;
+    // With vision on, what lies past it is black, not sky.
+    this.scene.background = this.vision.outer > 0 ? fogC.clone().multiplyScalar(0.05) : fogC;
+    WORLD.uVision.value.set(this.focus.x, this.focus.z, this.vision.inner, this.vision.outer);
 
     // World uniforms: time, clouds, wetness, wind.
     WORLD.uTime.value = this.time;
@@ -1218,11 +1270,14 @@ export class SpikeWorld {
     WORLD.uWind.value.set(w.windX, w.windY, w.wind);
 
     // Torches flicker; real point lights only for the nearest few.
-    const order = [...this.torches].sort((a, b) => a.light.getWorldPosition(new THREE.Vector3()).distanceTo(this.focus) - b.light.getWorldPosition(new THREE.Vector3()).distanceTo(this.focus));
-    order.forEach((t, i) => {
-      t.light.visible = i < this.settings.lights;
+    // (Distances are measured once each, not inside the sort: a sort asks for them n log n times, and each ask made a vector.)
+    const far = this.vision.outer > 0 ? this.vision.outer + 8 : Infinity;
+    const order = this.torches.map((t) => ({ t, d: t.light.getWorldPosition(this.tmpV).distanceTo(this.focus) })).sort((a, b) => a.d - b.d);
+    order.forEach(({ t, d }, i) => {
+      t.light.visible = i < this.settings.lights && d < far;
+      if (d > far) return; // out of sight is out of mind: not animated
       const f = 0.82 + 0.18 * Math.sin(this.time * 11 + t.seed) * Math.sin(this.time * 7.3 + t.seed * 2);
-      t.light.intensity = t.base * f * (0.35 + 0.65 * env.night);
+      t.light.intensity = t.base * f * (t.always ? 1 : 0.35 + 0.65 * env.night);
       t.flame.scale.set(1, 0.85 + f * 0.3, 1);
       t.tick?.(this.time, { x: w.windX, z: w.windY });
     });
@@ -1252,6 +1307,7 @@ export class SpikeWorld {
     this.placeCamera();
     this.updateSee();
     this.streamChunks();
+    this.pumpFill(3);
     // The heat map and the reading follow the weather and the living, twice a second.
     this.heatT -= dt;
     if (this.heatT <= 0) {
@@ -1264,6 +1320,10 @@ export class SpikeWorld {
     }
     const span = Math.max(this.camera.right, this.camera.top) * 1.1;
     this.rain.update(dt, w.rain, this.focus, span, { x: w.windX, z: w.windY }, env.ambient * 0.6 + env.sunIntensity * 0.15 + w.flash);
+    if (this.water && this.ground.lake) {
+      const lk = this.ground.lake;
+      this.water.mesh.visible = this.vision.outer <= 0 || Math.hypot(this.focus.x - lk.x, this.focus.z - lk.z) < lk.r * 1.4 + this.vision.outer;
+    }
     if (this.water) this.water.light(this.sun.color, this.sun.intensity, lin(env.skyHorizon), this.hemi.color.clone().multiplyScalar(env.ambient * 0.5), env.night);
   }
 

@@ -1,5 +1,14 @@
 # Devlog
 
+## 2026-10-29 (night) — Session 26c: see-through houses, no freeze on lights, vision
+
+- **See-through oval for houses** (as for trees): the hero shows through a roof or wall they are behind.
+- **No freeze when raising the orb or ray**: a new light the shaders were not built for rebuilds every shader at once. The orb now takes a place in the pool of point lights (the nearest few shine), and the ray's spot light is always in the scene, dark until raised. Measured: raising the orb is one normal frame; the ray 117 ms (its beam's first draw), down from about a second.
+- **Orb and ray give off filaments** (phototropy, "Magic light"): the orb at its place, the ray as four points along the beam.
+- **Small jolts**: torches were sorted with a vector made per comparison (garbage every frame); distances are now measured once. A streamed chunk's trees, props and posts are built a few milliseconds a frame (`pumpFill`) instead of all at once. Ground painting of a chunk is still one piece (a likely remaining jolt; profile on a phone).
+- **Zoom**: the farthest zoom-out is 10.5 px/m on every tier (it was 7 on high).
+- **Vision**: the world greys from an inner radius and is black at an outer one (tier: 30/44, 40/56, 52/72 m from the view's focus); chunks and things beyond are not built, lit or animated; the sky behind is black. Button *Vision* cycles off / shorter / tier / longer. `?novision` turns it off. It does not remember what you have seen (explored-but-grey); that is the next step if wanted.
+
 ## 2026-10-29 (later) — Session 26b: bug list, magic lights, and a world that can be kilometres across
 
 - **Things sticking out of houses** (director: an item to the left of the rightmost house's wall): a piece's footprint is smaller than what its card draws (the art shows a side face), so a piece against a wall poked through. The solver now also keeps what is *drawn* (`vw`) inside the walls when the room allows, and falls back to the footprint when it is too tight.
