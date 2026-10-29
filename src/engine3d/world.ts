@@ -94,6 +94,24 @@ type Leg =
   | { kind: 'walk'; path: P2[]; house: HouseInst | null; level: number }
   | { kind: 'climb'; house: HouseInst; pts: { x: number; z: number; y: number }[]; to: number };
 
+/** Someone who goes from room to room of a house on every storey, by the stairs, and out again, pausing at each. */
+interface Keeper {
+  place: PlacedHouse;
+  card: WalkCard;
+  blob: THREE.Mesh;
+  x: number;
+  z: number;
+  level: number;
+  floor: number | null;
+  legs: Leg[];
+  legI: number;
+  legS: number;
+  /** Where they go next: house-local points on a storey. */
+  stops: { x: number; z: number; level: number }[];
+  stop: number;
+  wait: number;
+}
+
 /** Where a climber is after `s` metres along a flight's points, with the height of their foot there. */
 function followClimb(pts: readonly { x: number; z: number; y: number }[], s: number): { x: number; z: number; y: number; dx: number; dz: number; done: boolean } {
   let left = Math.max(0, s);
@@ -422,6 +440,8 @@ export class SpikeWorld {
   readonly people: Person[] = [];
   private walker: WalkCard;
   private walkerBlob: THREE.Mesh;
+  /** The innkeeper: goes about the inn's floors by the stairs (see `stepKeeper`). */
+  private keeper: Keeper | null = null;
   private walkS = 0;
   private sprites: SpriteCard[] = [];
   /** The invisible navigation grid the hero walks on. */
@@ -1412,10 +1432,30 @@ export class SpikeWorld {
    */
   walkTo(x: number, z: number, level?: number): number | null {
     const from = this.houses[this.heroHouse()] ?? null;
+    const legs = this.planWalk({ x: this.hero.x, z: this.hero.z, level: from ? this.heroLevel : 0, house: from }, x, z, level);
+    if (!legs) return null;
+    this.legs = legs;
+    this.legI = 0;
+    this.legS = 0;
+    this.follow = true;
+    const end = legs[legs.length - 1] as Extract<Leg, { kind: 'walk' }>;
+    const e = end.path[end.path.length - 1];
+    const gy = end.house ? end.house.group.position.y + end.house.built.model.levels[end.level].floorY : this.store.heightAt(e.x, e.z);
+    this.marker.position.set(e.x, gy + 0.04, e.z);
+    this.marker.visible = true;
+    return legs.reduce((n, l) => n + (l.kind === 'walk' ? pathLength(l.path) : l.pts.reduce((m, p, i) => (i ? m + Math.hypot(p.x - l.pts[i - 1].x, p.z - l.pts[i - 1].z) : m), 0)), 0);
+  }
+
+  /**
+   * The stages of a walk for anyone (the hero, a villager) from where they stand (`cur`: in `house` on storey `level`,
+   * or outdoors) to a point on a storey: out by the stairs and the door if need be, in and up if need be. Null if no way.
+   */
+  private planWalk(start: { x: number; z: number; level: number; house: HouseInst | null }, x: number, z: number, level?: number): Leg[] | null {
+    const from = start.house;
     const target = this.houseHolding(x, z);
-    const to = Math.max(0, Math.min(level ?? (target && target === from ? this.heroLevel : 0), target ? target.built.model.levels.length - 1 : 0));
+    const to = Math.max(0, Math.min(level ?? (target && target === from ? start.level : 0), target ? target.built.model.levels.length - 1 : 0));
     const legs: Leg[] = [];
-    const cur = { x: this.hero.x, z: this.hero.z, level: from ? this.heroLevel : 0 };
+    const cur = { x: start.x, z: start.z, level: from ? start.level : 0 };
     const walkOn = (house: HouseInst | null, lv: number, px: number, pz: number): boolean => {
       const nav = house ? this.upperNav(house, lv) : this.nav;
       const path = nav ? findPath(nav, cur, { x: px, z: pz }) : null;
@@ -1442,17 +1482,7 @@ export class SpikeWorld {
     else if (from && target === from) while (ok && cur.level !== to) ok = climb(from, cur.level, cur.level + Math.sign(to - cur.level));
     if (ok && target && target !== from) for (let l = 0; ok && l < to; l++) ok = climb(target, l, l + 1);
     if (ok) ok = walkOn(target && to > 0 ? target : null, to, x, z);
-    if (!ok) return null;
-    this.legs = legs;
-    this.legI = 0;
-    this.legS = 0;
-    this.follow = true;
-    const end = legs[legs.length - 1] as Extract<Leg, { kind: 'walk' }>;
-    const e = end.path[end.path.length - 1];
-    const gy = end.house ? end.house.group.position.y + end.house.built.model.levels[end.level].floorY : this.store.heightAt(e.x, e.z);
-    this.marker.position.set(e.x, gy + 0.04, e.z);
-    this.marker.visible = true;
-    return legs.reduce((n, l) => n + (l.kind === 'walk' ? pathLength(l.path) : l.pts.reduce((m, p, i) => (i ? m + Math.hypot(p.x - l.pts[i - 1].x, p.z - l.pts[i - 1].z) : m), 0)), 0);
+    return ok ? legs : null;
   }
 
   /** Go up (+1) or down (-1) the stairs of the house the hero is in, to the next storey. Null if there is none that way. */
@@ -2002,6 +2032,7 @@ export class SpikeWorld {
 
     // The villager walks the road, there and back.
     this.walkVillager(dt);
+    this.stepKeeper(dt);
     this.stepHero(dt);
     this.focus.y = 0.5 + this.focusLift;
     if (this.follow) {
@@ -2059,6 +2090,94 @@ export class SpikeWorld {
       this.water.mesh.visible = this.vision.outer <= 0 || Math.hypot(this.focus.x - b.x, this.focus.z - b.z) < b.r + this.vision.outer;
     }
     if (this.water) this.water.light(this.sun.color, this.sun.intensity, lin(env.skyHorizon), this.hemi.color.clone().multiplyScalar(env.ambient * 0.5), env.night);
+  }
+
+  /**
+   * The innkeeper: the first house with a stair. They go to the middle of each storey's last room, up to the top, and
+   * back down and out to the door, and again. Only seen when the hero could see them: outdoors, or in the same house
+   * on the same storey.
+   */
+  private stepKeeper(dt: number): void {
+    if (!this.keeper) {
+      const place = this.layout.houses.find((h) => this.houseIndex.lite(h).built.model.stairs.length > 0);
+      if (!place) return;
+      const m = this.houseIndex.lite(place).built.model;
+      const mid = (r: { x0: number; x1: number; z0: number; z1: number }): { x: number; z: number } => ({ x: (r.x0 + r.x1) / 2, z: (r.z0 + r.z1) / 2 });
+      const stops = m.levels.map((lv, level) => ({ ...mid(lv.rooms[lv.rooms.length - 1].rect), level }));
+      const out = { x: m.door[0], z: m.door[2] + 1.6, level: 0 };
+      const card = walkCard(makeWalkSet(PEOPLE.wife), PITCH);
+      const blob = blobShadow(0.32);
+      this.scene.add(card.mesh, blob);
+      this.sprites.push(card);
+      const w = houseToWorld(place, out.x, out.z);
+      this.keeper = { place, card, blob, x: w.x, z: w.z, level: 0, floor: null, legs: [], legI: 0, legS: 0, stops: [...stops, ...stops.slice(0, -1).reverse(), out], stop: 0, wait: 1 };
+    }
+    const k = this.keeper;
+    const hs = this.houses.find((h) => h.built.place === k.place) ?? null;
+    const inside = hs ? this.houseHolding(k.x, k.z) === hs : false;
+    // Out of sight is out of mind: the house is not standing, so the keeper waits.
+    if (!hs) {
+      k.card.mesh.visible = false;
+      k.blob.visible = false;
+      return;
+    }
+    if (!k.legs.length) {
+      k.wait -= dt;
+      if (k.wait <= 0) {
+        const s = k.stops[k.stop];
+        k.stop = (k.stop + 1) % k.stops.length;
+        const w = houseToWorld(k.place, s.x, s.z);
+        const legs = this.planWalk({ x: k.x, z: k.z, level: k.level, house: inside ? hs : null }, w.x, w.z, s.level);
+        if (legs) {
+          k.legs = legs;
+          k.legI = 0;
+          k.legS = 0;
+        }
+        k.wait = 2.5;
+      }
+    }
+    let dx = 0, dz = 1, moving = false;
+    if (k.legs.length) {
+      const leg = k.legs[k.legI];
+      k.legS += dt * 1.1;
+      let p: { x: number; z: number; dx: number; dz: number; done: boolean };
+      if (leg.kind === 'walk') {
+        p = followPath(leg.path, k.legS);
+        k.floor = null;
+      } else {
+        const c = followClimb(leg.pts, k.legS);
+        p = c;
+        k.floor = c.y;
+      }
+      k.x = p.x;
+      k.z = p.z;
+      dx = p.dx;
+      dz = p.dz;
+      moving = true;
+      if (p.done) {
+        if (leg.kind === 'climb') {
+          k.level = leg.to;
+          k.floor = null;
+        }
+        if (k.legI === k.legs.length - 1) {
+          k.legs = [];
+          moving = false;
+        } else {
+          k.legI++;
+          k.legS = 0;
+        }
+      }
+    }
+    const nowIn = this.houseHolding(k.x, k.z) === hs;
+    if (!nowIn) k.level = 0;
+    const y = nowIn ? hs.group.position.y + (k.floor ?? hs.built.model.levels[k.level].floorY) : this.store.heightAt(k.x, k.z);
+    k.card.mesh.position.set(k.x, y, k.z);
+    k.blob.position.set(k.x, y + 0.03, k.z);
+    this.faceWalker(k.card, dx, dz, moving, 1.1);
+    // Seen outdoors (by sight), or when the hero is in the same house on the same storey (the roof is lifted there).
+    const shown = nowIn ? hs.open && hs.view === k.level : this.seen(k.x, k.z) >= 0.25;
+    k.card.mesh.visible = shown;
+    k.blob.visible = shown;
   }
 
   private walkVillager(dt: number): void {

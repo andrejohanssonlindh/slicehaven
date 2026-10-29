@@ -8,7 +8,7 @@
 - **Rooms furnished per room** (`furnishHouse`, `LevelRoom.role` -> recipe): inn hall (two long tables, benches, more to sit at), `guestroom` (bed or two, chest, stool), `landing`, `attic` (a row of beds, pallets), `upstairs`, `stall` (a horse on straw, hay rack, bucket), `aisle` (hay, tack, chest). `planRoom` takes `reserved` floor (stairs, doorways), `zones` and an `entry` for rooms entered from a stair. New art: `art/guest.ts` (guest bed, blanket by seed), `art/stable.ts` (horse in five coats, hay bale, hay rack). Horses are rough; art is not polished on purpose.
 - **Hamlet** (`/spike3d/?map=hamlet`) now has the new inn, a shop (`store`) and a stable on the south side.
 - Tests: `tests/buildings.test.ts` (storeys, stairs, furnishing, walkability from the door to every room on every floor). Furnish test no longer runs the upstairs recipes in cottages.
-- Fixed after: back wall fades when a house faces away; stall rail gates; guest-room door frames and open doors; inner tall walls stop sight on the storey you are on (`Level.sight`). Still open: people other than the hero do not use stairs (nobody but the road villager walks yet).
+- Fixed after: back wall fades when a house faces away; stall rail gates; guest-room door frames and open doors; inner tall walls stop sight on the storey you are on (`Level.sight`). An innkeeper (`stepKeeper`) walks the first house with a stair: each storey, up and back down and out, by `planWalk` (shared with the hero). Seen only outdoors or in the same house on the same storey.
 - Slip: used `sed -i` and a python edit a few times for small edits; Edit from here.
 
 
