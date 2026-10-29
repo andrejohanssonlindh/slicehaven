@@ -68,12 +68,73 @@ function padDist(p: Ground3D['pads'][number], x: number, z: number): number {
   return Math.hypot(dx, dz);
 }
 
+/**
+ * The ground's features in square buckets, so a sample costs the features near it and not all of them. A feature is in
+ * every bucket its reach touches (how far it changes the ground: a pad 3 m past its edge, a road 0.6 widths, a mud patch
+ * or a shade circle its radius). Built the first time the ground is sampled, and again if features are added.
+ */
+const BUCKET = 32;
+interface GroundIndex {
+  sig: string;
+  pads: Map<number, Ground3D['pads']>;
+  mud: Map<number, Ground3D['mud']>;
+  shade: Map<number, Ground3D['shade']>;
+  /** Per bucket, per road, the segments that can reach it. */
+  roads: Map<number, Map<Road, [XZ, XZ][]>>;
+}
+const indexes = new WeakMap<Ground3D, GroundIndex>();
+const bkey = (i: number, j: number): number => (j + 32768) * 65536 + (i + 32768);
+
+function groundIndex(g: Ground3D): GroundIndex {
+  const sig = `${g.pads.length},${g.mud.length},${g.shade.length},${g.roads.length},${g.roads.reduce((n, r) => n + r.pts.length, 0)}`;
+  const have = indexes.get(g);
+  if (have && have.sig === sig) return have;
+  const ix: GroundIndex = { sig, pads: new Map(), mud: new Map(), shade: new Map(), roads: new Map() };
+  const each = (x0: number, z0: number, x1: number, z1: number, fn: (k: number) => void): void => {
+    for (let j = Math.floor(z0 / BUCKET); j <= Math.floor(z1 / BUCKET); j++) for (let i = Math.floor(x0 / BUCKET); i <= Math.floor(x1 / BUCKET); i++) fn(bkey(i, j));
+  };
+  const push = <K, T>(m: Map<K, T[]>, k: K, v: T): void => {
+    const l = m.get(k);
+    if (l) l.push(v);
+    else m.set(k, [v]);
+  };
+  for (const p of g.pads) {
+    const r = Math.hypot(p.hw, p.hd) + 3;
+    each(p.x - r, p.z - r, p.x + r, p.z + r, (k) => push(ix.pads, k, p));
+  }
+  for (const m of g.mud) each(m.x - m.r, m.z - m.r, m.x + m.r, m.z + m.r, (k) => push(ix.mud, k, m));
+  for (const s of g.shade) each(s.x - s.r, s.z - s.r, s.x + s.r, s.z + s.r, (k) => push(ix.shade, k, s));
+  for (const r of g.roads) {
+    const reach = r.width * 0.6;
+    for (let i = 0; i + 1 < r.pts.length; i++) {
+      const a = r.pts[i], b = r.pts[i + 1];
+      each(Math.min(a[0], b[0]) - reach, Math.min(a[1], b[1]) - reach, Math.max(a[0], b[0]) + reach, Math.max(a[1], b[1]) + reach, (k) => {
+        let per = ix.roads.get(k);
+        if (!per) ix.roads.set(k, (per = new Map()));
+        push(per, r, [a, b] as [XZ, XZ]);
+      });
+    }
+  }
+  indexes.set(g, ix);
+  return ix;
+}
+
+const at = (x: number, z: number): number => bkey(Math.floor(x / BUCKET), Math.floor(z / BUCKET));
+
+/** Distance to the nearest of a road's segments that can reach this spot (Infinity if none can). */
+function nearRoadDist(segs: readonly [XZ, XZ][], x: number, z: number): number {
+  let d = Infinity;
+  for (const [a, b] of segs) d = Math.min(d, segDist(x, z, a, b));
+  return d;
+}
+
 export function groundHeight(g: Ground3D, x: number, z: number): number {
   let h = BASE_Y + (fbm(x / 14, z / 14, g.seed) - 0.5) * 1.1 + (fbm(x / 4, z / 4, g.seed + 1) - 0.5) * 0.12;
+  const ix = groundIndex(g), k = at(x, z);
   // Buildings stand on levelled ground; roads are worn a little flatter.
-  for (const p of g.pads) h += (BASE_Y - h) * (1 - smooth(0, 2.5, padDist(p, x, z)));
-  for (const r of g.roads) {
-    const d = roadDist(r, x, z);
+  for (const p of ix.pads.get(k) ?? []) h += (BASE_Y - h) * (1 - smooth(0, 2.5, padDist(p, x, z)));
+  for (const [r, segs] of ix.roads.get(k) ?? []) {
+    const d = nearRoadDist(segs, x, z);
     h -= 0.06 * (1 - smooth(r.width * 0.3, r.width * 0.6, d));
   }
   // The lake bed falls away from the shore.
@@ -97,14 +158,15 @@ export interface Splat {
 /** How much of each ground type is at (x, z), 0..1 each; grass is what is left. */
 export function splatAt(g: Ground3D, x: number, z: number): Splat {
   let road = 0, mud = 0, shade = 0;
-  for (const r of g.roads) road = Math.max(road, 1 - smooth(r.width * 0.35, r.width * 0.6, roadDist(r, x, z)));
-  for (const m of g.mud) mud = Math.max(mud, 1 - smooth(m.r * 0.55, m.r, Math.hypot(x - m.x, z - m.z)));
-  for (const s of g.shade) shade = Math.max(shade, 1 - smooth(s.r * 0.5, s.r, Math.hypot(x - s.x, z - s.z)));
+  const ix = groundIndex(g), k = at(x, z);
+  for (const [r, segs] of ix.roads.get(k) ?? []) road = Math.max(road, 1 - smooth(r.width * 0.35, r.width * 0.6, nearRoadDist(segs, x, z)));
+  for (const m of ix.mud.get(k) ?? []) mud = Math.max(mud, 1 - smooth(m.r * 0.55, m.r, Math.hypot(x - m.x, z - m.z)));
+  for (const s of ix.shade.get(k) ?? []) shade = Math.max(shade, 1 - smooth(s.r * 0.5, s.r, Math.hypot(x - s.x, z - s.z)));
   const ld = lakeDist(g, x, z);
   const shore = 1 - smooth(0.2, 1.6, ld);
   // Wild grass grows where nobody walks: far from roads, pads and mud.
   let busy = Math.max(road, mud);
-  for (const p of g.pads) busy = Math.max(busy, 1 - smooth(0.5, 3, padDist(p, x, z)));
+  for (const p of ix.pads.get(k) ?? []) busy = Math.max(busy, 1 - smooth(0.5, 3, padDist(p, x, z)));
   const wild = clamp01((fbm(x / 6, z / 6, g.seed + 9) - 0.42) * 3) * (1 - busy) * (1 - shore);
   return { road, mud, shore, shade, wild };
 }
