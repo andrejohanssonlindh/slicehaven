@@ -22,7 +22,7 @@ export const FCELL = CHUNK / 20;
 /** How far a source's reach is stretched, against the hex table (which was tuned for 1.5 m hexes). */
 export const REACH = 1.7;
 
-export type SourceKind = 'tree' | 'pine' | 'thicket' | 'rock' | 'fire' | 'burnt' | 'corpse' | 'undead' | 'friend' | 'beast';
+export type SourceKind = 'tree' | 'pine' | 'thicket' | 'rock' | 'fire' | 'burnt' | 'corpse' | 'undead' | 'friend' | 'beast' | 'water';
 
 export interface FSource {
   x: number;
@@ -145,6 +145,7 @@ export class FilamentField {
       const w = src.weight ?? 1;
       switch (src.kind) {
         case 'tree': case 'pine': case 'thicket': case 'rock': cell.feature = src.kind; break;
+        case 'water': cell.ground = 'pond'; cell.water = true; break; // a well: still water, small
         case 'fire': cell.fire = 'burning'; break;
         case 'burnt': cell.fire = 'burnt'; break;
         case 'corpse': cell.corpses = w; break;
@@ -195,7 +196,8 @@ export class FilamentField {
       if (!this.inside(i, j)) continue;
       const { cell, units } = this.pseudoCell(i, j, s);
       // Emissions of the ground under it are already counted above; take only what the source adds.
-      const ems = emissions(cell, units, env, opts).filter((e) => !(e.label === 'Water' || e.label === 'Still water' || e.label === 'Sun glare off water'));
+      // (A water source is the one thing that adds its own water.)
+      const ems = emissions(cell, units, env, opts).filter((e) => s.kind === 'water' || !(e.label === 'Water' || e.label === 'Still water' || e.label === 'Sun glare off water'));
       spread(i, j, ems, s.kind === 'corpse' ? 1 : (s.weight ?? 1));
     }
     return inc;

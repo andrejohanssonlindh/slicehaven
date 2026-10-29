@@ -22,6 +22,53 @@ const hash = (i: number, k: number): number => {
 };
 
 /**
+ * A floating orb of light: a bright core cube and a swarm of small bits circling it on tilted rings, each on its own
+ * radius and speed, flickering between white and pale blue. The same chunky look as the flame.
+ */
+export function makeOrb(size = 1, count = 14): Flame {
+  const n = count + 1;
+  const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ fog: false }), n);
+  mesh.frustumCulled = false;
+  const dummy = new THREE.Object3D();
+  const col = new THREE.Color();
+  const PALE = [new THREE.Color(0xffffff), new THREE.Color(0xbfe8ff), new THREE.Color(0x7cc4ff)];
+  const bits = Array.from({ length: count }, (_, i) => ({
+    r: (0.16 + hash(i, 21) * 0.2) * size,
+    speed: (1.2 + hash(i, 22) * 2.2) * (i % 2 ? 1 : -1),
+    phase: hash(i, 23) * Math.PI * 2,
+    tilt: hash(i, 24) * Math.PI,
+    s: (0.035 + hash(i, 25) * 0.05) * size,
+  }));
+  const tick = (t: number): void => {
+    // The core pulses; its bit never changes colour, only brightness.
+    const pulse = 1 + 0.12 * Math.sin(t * 6.5) + 0.06 * Math.sin(t * 15.3);
+    dummy.position.set(0, 0, 0);
+    dummy.rotation.set(t * 0.7, t * 1.1, 0);
+    dummy.scale.setScalar(0.17 * size * pulse);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(0, dummy.matrix);
+    mesh.setColorAt(0, col.setHex(0xffffff));
+    for (let i = 0; i < count; i++) {
+      const b = bits[i];
+      const a = t * b.speed + b.phase;
+      // A ring tilted about x by `tilt`, seen from any side.
+      const x = Math.cos(a) * b.r, y0 = Math.sin(a) * b.r;
+      dummy.position.set(x, y0 * Math.cos(b.tilt), y0 * Math.sin(b.tilt));
+      dummy.rotation.set(a, a * 0.7, 0);
+      const blink = 0.55 + 0.45 * Math.sin(t * 9 + i * 1.7);
+      dummy.scale.setScalar(b.s * (0.6 + blink * 0.6));
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i + 1, dummy.matrix);
+      mesh.setColorAt(i + 1, col.copy(PALE[(i + Math.floor(t * 3)) % 3]));
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  };
+  tick(0);
+  return { object: mesh, tick };
+}
+
+/**
  * @param size 1 = a campfire (about 0.8 m tall); a post torch is about 0.4.
  * @param count how many flame bits (sparks come on top, a quarter as many)
  */

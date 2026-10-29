@@ -206,6 +206,19 @@ function opaqueSize(p: Prop): { w: number; h: number } {
   return x1 < 0 ? { w: 0, h: 0 } : { w: x1 - x0 + 1, h: y1 - y0 + 1 };
 }
 
+/** How far the opaque part of a sprite reaches from its anchor sideways, in sprite pixels (the wider side). */
+function opaqueHalf(p: Prop): number {
+  const f = p.frames[0];
+  let x0 = f.w, x1 = -1;
+  for (let y = 0; y < f.h; y++) for (let x = 0; x < f.w; x++) if (f.data[(y * f.w + x) * 4 + 3] > 0) {
+    x0 = Math.min(x0, x); x1 = Math.max(x1, x);
+  }
+  return x1 < 0 ? 0 : Math.max(p.ax - x0, x1 + 1 - p.ax);
+}
+
+/** 1 / cos(the camera's yaw 0.42), a touch generous: the widest a card is drawn across its house's axis. */
+const CARD_STRETCH = 1.12;
+
 const makePiece = (key: PieceKey, line: Line): Prop => {
   if (key === 'counter') return makeCounter((line.variant as CounterKind) ?? 'general', line.seed ?? 20);
   if (key === 'shelf' && line.variant) return makeWallShelves(line.variant as ShelfKind, line.seed ?? 23);
@@ -223,13 +236,17 @@ export function furnish(set: RoomSet, room: RoomRect, doorX: number, seed = 0): 
   const props = new Map<string, Prop>();
   const ins: PieceIn[] = [];
   const add = (id: string, prop: Prop, def: { kind: PieceIn['kind']; d?: number; maxW?: number }, line: { rule: Rule; lift?: number; fire?: boolean }): void => {
-    // The sprites are drawn obliquely, so their width is part depth: a floor piece's real width is about 0.6 of it.
     const px = opaqueSize(prop);
     const m = px.w / TEXELS_PER_M;
+    // The sprites are drawn obliquely, so their width is part depth: a floor piece's real width (its footprint, what
+    // blocks feet and other pieces) is about 0.6 of it.
     const w = Math.min(def.maxW ?? 9, def.kind === 'flat' ? m * 0.8 : def.kind === 'hung' ? m * 0.62 : m * 0.6);
+    // The card itself follows the house's axes, stretched sideways by 1/cos(yaw) to keep one art pixel per screen pixel,
+    // and covers more than the footprint: the solver keeps all of it inside the walls (`vw`).
+    const vw = def.kind === 'flat' ? w : Math.max(w, 2 * opaqueHalf(prop) / TEXELS_PER_M * CARD_STRETCH);
     const d = def.kind === 'flat' ? Math.max(0.4, (px.h / TEXELS_PER_M) * 0.9) : def.d !== undefined ? def.d * 0.75 : Math.min(0.9, Math.max(0.3, w * 0.55));
     props.set(id, prop);
-    ins.push({ id, w, d, kind: def.kind, lift: def.kind === 'hung' ? (line.lift ?? 22) / TEXELS_PER_M : undefined, rule: line.rule, fire: line.fire });
+    ins.push({ id, w, vw, d, kind: def.kind, lift: def.kind === 'hung' ? (line.lift ?? 22) / TEXELS_PER_M : undefined, rule: line.rule, fire: line.fire });
   };
   if (set === 'smithy') {
     // The workshop's art is its own (forge, anvil, trough, bench, coal bin, tool rack); the rules are ours.

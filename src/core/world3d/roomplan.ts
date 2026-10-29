@@ -43,6 +43,8 @@ export interface PieceIn {
   id: string;
   /** Footprint on the floor, metres (width across, depth front to back). */
   w: number;
+  /** How wide the piece is drawn, if wider than its footprint `w` (art that shows a side face): all of it must stay inside the walls. */
+  vw?: number;
   d: number;
   /** `floor` stands and blocks; `flat` lies on the floor (rug) and blocks nothing; `hung` is on the back wall, up off the floor. */
   kind: 'floor' | 'flat' | 'hung';
@@ -89,7 +91,7 @@ export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn
   const doorZone: RoomRect = { x0: doorX - DOOR_CLEAR.half, x1: doorX + DOOR_CLEAR.half, z0: room.z1 - DOOR_CLEAR.depth, z1: room.z1 + 1 };
   const W = room.x1 - room.x0, D = room.z1 - room.z0;
 
-  const inside = (r: RoomRect): boolean => r.x0 >= room.x0 + WALL && r.x1 <= room.x1 - WALL && r.z0 >= room.z0 + WALL && r.z1 <= room.z1 - WALL;
+  const inside = (r: RoomRect): boolean => r.x0 - pad >= room.x0 + WALL && r.x1 + pad <= room.x1 - WALL && r.z0 >= room.z0 + WALL && r.z1 <= room.z1 - WALL;
   /**
    * Would the door still reach nearly all the free floor with this piece added? (0.25 m cells, grown by a
    * walker's radius.) A recipe can then never wall a room in, whatever the room's size.
@@ -121,6 +123,7 @@ export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn
     return reached >= total * 0.92;
   };
   let standing = true; // is the piece being placed a floor piece (which must keep the room connected)?
+  let pad = 0; // how much further sideways than its footprint the piece being placed is drawn (kept inside the walls too)
   const fits = (r: RoomRect): boolean => inside(r) && !overlap(r, doorZone) && !solid.some((s) => overlap(r, s.r, GAP)) && (!standing || connectedWith(r));
   const take = (p: PieceIn, x: number, z: number): void => {
     const lift = p.lift ?? 0;
@@ -143,7 +146,7 @@ export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn
 
   const find = (p: PieceIn): { x: number; z: number } | null => {
     const r = p.rule;
-    const hw = p.w / 2, hd = p.d / 2;
+    const hwa = p.w / 2, hw = hwa + pad, hd = p.d / 2; // `hw` is what a piece against a wall needs, drawn width included
     switch (r.at) {
       case 'fixed':
         return { x: room.x0 + r.u * W, z: room.z1 - r.d * D };
@@ -193,7 +196,7 @@ export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn
           const side = sides[(k + start) % 4];
           for (const off of [0, -0.45, 0.45, -0.9, 0.9]) {
             const g = GAP + 0.02; // just clear of the piece it sits next to
-            const x = side === 'front' || side === 'back' ? tcx + off : side === 'left' ? t.x0 - hw - g : t.x1 + hw + g;
+            const x = side === 'front' || side === 'back' ? tcx + off : side === 'left' ? t.x0 - hwa - g : t.x1 + hwa + g;
             const z = side === 'left' || side === 'right' ? tcz + off : side === 'front' ? t.z1 + hd + g : t.z0 - hd - g;
             if (fits(rectAt(x, z, p.w, p.d))) return { x, z };
           }
@@ -220,9 +223,14 @@ export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn
     if (p.kind === 'hung') {
       // On the back wall: no floor, but not on top of another hung piece at the same height.
       const r = p.rule;
-      const from = room.x0 + p.w / 2 + (r.at === 'back' ? r.x ?? 0 : 0.5) * Math.max(0, W - p.w);
       const lift = p.lift ?? 1;
       let x: number | null = null;
+      // The wanted spot is pulled in so that all that is drawn stays on the wall; the search then only needs the core
+      // of the piece (its footprint) to be free, since two hung things may overlap in what is drawn.
+      const vw = p.vw ?? p.w;
+      const want = room.x0 + p.w / 2 + (r.at === 'back' ? r.x ?? 0 : 0.5) * Math.max(0, W - p.w);
+      const lo = room.x0 + WALL + vw / 2, hi = room.x1 - WALL - vw / 2;
+      const from = lo <= hi ? Math.min(hi, Math.max(lo, want)) : (room.x0 + room.x1) / 2;
       for (let k = 0; k < 60 && x === null; k++) {
         const t = from + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.15;
         if (t - p.w / 2 < room.x0 + WALL || t + p.w / 2 > room.x1 - WALL) continue;
@@ -233,8 +241,21 @@ export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn
       continue;
     }
     standing = p.kind === 'floor';
-    // The first-choice place, else anywhere free (the fire stays strict: it belongs where its rule says).
-    const spot = find(p) ?? (p.fire || p.rule.at === 'free' ? null : find({ ...p, rule: { at: 'free' } }));
+    // The first-choice place, else anywhere free (the fire stays strict: it belongs where its rule says). First with
+    // everything that is drawn kept inside the walls; if the room is too tight for that, with just the footprint.
+    let spot: { x: number; z: number } | null = null;
+    for (const full of [true, false]) {
+      pad = full ? Math.max(0, ((p.vw ?? p.w) - p.w) / 2) : 0;
+      spot = find(p);
+      if (spot) break;
+    }
+    if (!spot && !p.fire && p.rule.at !== 'free') {
+      for (const full of [true, false]) {
+        pad = full ? Math.max(0, ((p.vw ?? p.w) - p.w) / 2) : 0;
+        spot = find({ ...p, rule: { at: 'free' } });
+        if (spot) break;
+      }
+    }
     if (!spot) {
       unplaced.push(p.id);
       continue;

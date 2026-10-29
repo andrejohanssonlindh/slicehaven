@@ -1,6 +1,6 @@
 import { Rng } from '../rng';
 import type { Clump } from './tree';
-import { type MeshData, type Vec3, addBeam, addBox, addOrientedBox, emptyMesh } from './mesh';
+import { type MeshData, type Vec3, addBeam, addBox, addFace, addOrientedBox, emptyMesh } from './mesh';
 import { type Shape, circle } from './space';
 import type { FSource } from './filaments3d';
 
@@ -90,8 +90,8 @@ export function buildCrates(seed: number): MeshData {
 }
 
 /** A well: a stone ring, two posts and a small roof beam with a bucket's rope. Stone and wood are separate meshes. */
-export function buildWell(): { stone: MeshData; wood: MeshData } {
-  const stone = emptyMesh(), wood = emptyMesh();
+export function buildWell(): { stone: MeshData; wood: MeshData; water: MeshData } {
+  const stone = emptyMesh(), wood = emptyMesh(), water = emptyMesh();
   const R = 0.62, T = 0.2, H = 0.7, N = 10;
   // The ring: short boxes round a circle, each turned to follow it.
   for (let i = 0; i < N; i++) {
@@ -105,7 +105,11 @@ export function buildWell(): { stone: MeshData; wood: MeshData } {
   // A pitched cover.
   addBox(wood, [-R - 0.25, 1.95, -0.5], [R + 0.25, 2.02, 0.5]);
   addBeam(wood, [0, 1.84, 0], [0, 1.4, 0], 0.03, [0, 0, 1]);
-  return { stone, wood };
+  // The water, a little below the rim, so the shaft is not grass.
+  const ring: Vec3[] = [];
+  for (let i = 0; i < 12; i++) ring.push([Math.cos((i / 12) * Math.PI * 2) * (R - T / 2 + 0.02), H * 0.5, -Math.sin((i / 12) * Math.PI * 2) * (R - T / 2 + 0.02)]);
+  for (let i = 1; i < 11; i++) addFace(water, [ring[0], ring[i], ring[i + 1]], [1, 1, 1]);
+  return { stone, wood, water };
 }
 
 /** A run of fence along local x, `len` metres: posts every ~1.4 m and two rails. */
@@ -166,5 +170,6 @@ export function propShape(p: PlacedProp): Shape {
 export function propSource(p: PlacedProp): FSource | null {
   if (p.kind === 'shrub') return { x: p.x, z: p.z, kind: 'thicket' };
   if (p.kind === 'boulder') return { x: p.x, z: p.z, kind: 'rock' };
+  if (p.kind === 'well') return { x: p.x, z: p.z, kind: 'water', weight: 0.6 };
   return null;
 }

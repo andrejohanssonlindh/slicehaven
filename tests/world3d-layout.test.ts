@@ -80,7 +80,7 @@ describe('layout', () => {
     expect(propSource({ kind: 'woodpile', x: 1, z: 2, seed: 1 })).toBeNull();
   });
 
-  it('crates, wells, fences and carts build, are deterministic, block feet, and are no filament sources', () => {
+  it('crates, wells, fences and carts build, are deterministic and block feet; only the well is a (water) source', () => {
     expect(JSON.stringify(buildCrates(5))).toBe(JSON.stringify(buildCrates(5)));
     expect(buildCrates(5).indices.length).toBeGreaterThan(0);
     const w = buildWell();
@@ -90,7 +90,8 @@ describe('layout', () => {
     expect(buildCart(6).indices.length).toBeGreaterThan(0);
     for (const kind of ['crates', 'well', 'fence', 'cart'] as const) {
       const p = { kind, x: 3, z: 4, seed: 1 };
-      expect(propSource(p)).toBeNull();
+      // (A well holds water; the rest give off nothing.)
+      expect(propSource(p)?.kind ?? null).toBe(kind === 'well' ? 'water' : null);
       expect(shapeDist(propShape(p), 3, 4)).toBeLessThan(0);
     }
   });

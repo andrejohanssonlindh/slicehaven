@@ -16,7 +16,7 @@ import { CHUNK, type ChunkTerrain, TerrainStore, chunkKey, chunksNear } from '..
 import { type Environment3D, environment } from '../core/world3d/environment3d';
 import { Rng } from '../core/rng';
 import type { HouseMaterial } from '../core/world3d/house';
-import { type BuiltHouse, type Layout, type PlacedTree, buildHouses, furnitureObstacles, houseAt, houseBox, houseToLocal, houseToWorld, layoutObstacles } from '../core/world3d/layout';
+import { type BuiltHouse, type Layout, type PlacedTree, buildHouses, furnitureObstacles, houseAt, houseBox, houseOuterBox, houseToLocal, houseToWorld, layoutObstacles } from '../core/world3d/layout';
 import { footprints } from '../core/world3d/roomplan';
 import type { MeshData } from '../core/world3d/mesh';
 import { type PlacedProp, buildBoulder, buildCart, buildCrates, buildFence, buildShrub, buildWell, buildWoodpile } from '../core/world3d/props';
@@ -27,7 +27,7 @@ import { TEXELS_PER_M } from '../core/world3d/tiers';
 import { type Clump, buildTree } from '../core/world3d/tree';
 import { fbm } from '../core/noise';
 import { Weather } from '../engine/weather';
-import { makeFlame } from './fire';
+import { makeFlame, makeOrb } from './fire';
 import { type LitOpts, SEE_SLOTS, WORLD, lit, pixTexture, shellOf } from './materials';
 import { Rain } from './rain';
 import { type SpriteCard, type WalkCard, blobShadow, spriteCard, walkCard } from './sprites';
@@ -67,6 +67,11 @@ export function geometryOf(m: MeshData): THREE.BufferGeometry {
 interface CutPart {
   mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial>;
 }
+
+/** A stroll, metres a second. */
+const HERO_SPEED = 1.6;
+/** How far the ray of light reaches, metres. */
+const RAY_LENGTH = 9;
 
 /** How long a lightning bolt stays on screen, seconds. */
 const BOLT_LIFE = 0.5;
@@ -145,6 +150,11 @@ export class SpikeWorld {
   readonly houses: HouseInst[] = [];
   private shells: Shell[] = [];
   private torches: Torch[] = [];
+
+  /** For testing: how many times faster than a stroll (1.6 m/s) the hero walks. */
+  speedMul = 2;
+  /** The way the hero last walked (unit-ish, world x/z): the ray of light points along it. */
+  heroDir = { x: 0, z: 1 };
 
   // --- test controls: lightning and campfires ---
   /** Storm weather throws bolts by itself (off: only `strike()` does). */
@@ -389,6 +399,7 @@ export class SpikeWorld {
   private stoneMat: THREE.MeshLambertMaterial | null = null;
   private logMat: THREE.MeshLambertMaterial | null = null;
   private shrubMat: THREE.MeshLambertMaterial | null = null;
+  private wellWater: THREE.MeshLambertMaterial | null = null;
 
   /** A shrub, boulder or woodpile, standing on the ground where it is placed. */
   private buildProp(p: PlacedProp): void {
@@ -409,6 +420,10 @@ export class SpikeWorld {
       const w = buildWell();
       solid(w.stone, this.stoneMat);
       solid(w.wood, this.logMat);
+      this.wellWater ??= new THREE.MeshLambertMaterial({ color: 0x2f6a8a, emissive: 0x0b2434 });
+      const water = new THREE.Mesh(geometryOf(w.water), this.wellWater);
+      water.receiveShadow = true;
+      group.add(water);
     } else if (p.kind === 'boulder') {
       const b = buildBoulder(p.seed);
       const m = new THREE.Mesh(lumpGeometry(b.clumps, b.height, 1), this.stoneMat);
@@ -711,6 +726,17 @@ export class SpikeWorld {
     return best;
   }
 
+  /**
+   * The house a tap on the ground means: the one whose footprint (porch included) the tapped ground point lies in.
+   * A roof that only covers ground behind the house does not count, so the hero can walk round the back.
+   */
+  houseTapped(ndcX: number, ndcY: number): number | null {
+    const g = this.groundAt(ndcX, ndcY);
+    if (!g) return null;
+    const i = houseAt(this.houses.map((h) => h.built), this.houses.map((h) => houseOuterBox(h.built)), g.x, g.z, 0);
+    return i >= 0 ? i : null;
+  }
+
   /** The house the hero is in, else the one nearest the view's focus. */
   private activeHouse(): number {
     const h = this.heroHouse();
@@ -812,12 +838,14 @@ export class SpikeWorld {
       this.wasIn = now;
     }
     if (!this.path) return;
-    this.pathS += dt * 1.6;
+    const speed = HERO_SPEED * this.speedMul;
+    this.pathS += dt * speed;
     const p = followPath(this.path, this.pathS);
     this.hero.x = p.x;
     this.hero.z = p.z;
+    if (p.dx || p.dz) this.heroDir = { x: p.dx, z: p.dz };
     this.placeHero();
-    this.faceWalker(this.heroCard, p.dx, p.dz, !p.done, 1.6);
+    this.faceWalker(this.heroCard, p.dx, p.dz, !p.done, speed);
     if (p.done) {
       this.path = null;
       this.marker.visible = false;
@@ -997,6 +1025,83 @@ export class SpikeWorld {
     return this.camps.length;
   }
 
+  // --- magic lights: an orb that floats beside the hero, and a ray like a lantern's beam ---
+  // A light is added to the scene only while it is on (adding or removing one recompiles the shaders once).
+  private orb: { group: THREE.Group; light: THREE.PointLight; fx: { object: THREE.Object3D; tick(t: number): void } } | null = null;
+  private ray: { group: THREE.Group; light: THREE.SpotLight; beam: THREE.Mesh } | null = null;
+
+  get orbOn(): boolean {
+    return this.orb !== null;
+  }
+
+  get rayOn(): boolean {
+    return this.ray !== null;
+  }
+
+  /** Call up (or dismiss) a ball of cool light that follows the hero. */
+  toggleOrb(): void {
+    if (this.orb) {
+      this.scene.remove(this.orb.group);
+      this.orb = null;
+      return;
+    }
+    const group = new THREE.Group();
+    const fx = makeOrb(1.8);
+    group.add(fx.object);
+    const light = new THREE.PointLight(0xa8dcff, 14, 15, 1.6);
+    group.add(light);
+    this.scene.add(group);
+    this.orb = { group, light, fx };
+  }
+
+  /** Raise (or lower) a beam of light from the hero's hand along the way they face, like a lantern's. */
+  toggleRay(): void {
+    if (this.ray) {
+      this.scene.remove(this.ray.group);
+      this.ray.group.parent?.remove(this.ray.light.target);
+      this.ray = null;
+      return;
+    }
+    const group = new THREE.Group();
+    const light = new THREE.SpotLight(0xfff1cc, 60, 24, 0.42, 0.55, 1.1);
+    group.add(light);
+    // The visible beam: a faint additive cone, pointing from the apex (the hand) outward along +z in its own frame.
+    const len = RAY_LENGTH;
+    const cone = new THREE.ConeGeometry(Math.tan(0.42) * len * 0.8, len, 16, 1, true);
+    cone.translate(0, -len / 2, 0); // apex at the origin, opening toward -y
+    cone.rotateX(-Math.PI / 2); // ... now opening toward +z
+    const beam = new THREE.Mesh(cone, new THREE.MeshBasicMaterial({ color: 0xfff1cc, transparent: true, opacity: 0.07, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false }));
+    beam.renderOrder = 2;
+    group.add(beam);
+    this.scene.add(group, light.target);
+    this.ray = { group, light, beam };
+  }
+
+  private stepMagicLights(): void {
+    const hp = this.heroCard.mesh.position;
+    if (this.orb) {
+      // Floats at the hero's shoulder, bobbing, a little behind the way they are going.
+      const bob = Math.sin(this.time * 2.1) * 0.12;
+      this.orb.group.position.set(hp.x - this.heroDir.x * 0.4 + 0.5, hp.y + 1.9 + bob, hp.z - this.heroDir.z * 0.4 - 0.3);
+      this.orb.fx.tick(this.time);
+      this.orb.light.intensity = 14 * (0.9 + 0.1 * Math.sin(this.time * 7.3));
+    }
+    if (this.ray) {
+      const dl = Math.hypot(this.heroDir.x, this.heroDir.z) || 1;
+      const dx = this.heroDir.x / dl, dz = this.heroDir.z / dl;
+      const from = new THREE.Vector3(hp.x + dx * 0.35, hp.y + 1.15, hp.z + dz * 0.35);
+      const to = new THREE.Vector3(hp.x + dx * RAY_LENGTH, hp.y + 0.2, hp.z + dz * RAY_LENGTH);
+      this.ray.group.position.copy(from);
+      this.ray.light.position.set(0, 0, 0);
+      this.ray.light.target.position.copy(to);
+      this.ray.light.target.updateMatrixWorld();
+      this.ray.group.updateMatrixWorld(true);
+      this.ray.beam.lookAt(to); // +z of the cone toward the far end
+      // The beam breathes a little.
+      (this.ray.beam.material as THREE.MeshBasicMaterial).opacity = 0.065 + 0.015 * Math.sin(this.time * 9);
+    }
+  }
+
   private syncFires(): void {
     this.field.setSources([...this.fires, ...this.camps.map((c): FSource => ({ x: c.x, z: c.z, kind: 'fire', weight: 1 }))]);
   }
@@ -1008,6 +1113,7 @@ export class SpikeWorld {
     w.update(dtMs);
     if (this.autoBolts && w.sky === 'storm' && Math.random() < dt / 5) this.strike();
     this.stepBolt(dt);
+    this.stepMagicLights();
     // The clouds drift downwind; the offset is part of the environment so the rules can ask the same field.
     const drift = cloudDrift(w.windForce);
     this.cloudOff.x += w.wx * drift * dt;

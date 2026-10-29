@@ -128,6 +128,10 @@ function buildControls(): void {
   });
   button('row-fx', () => t('spike.douse', 'Douse'), () => false, () => { world.douseFires(); });
 
+  button('row-fx', () => t('spike.orb', 'Light orb'), () => world.orbOn, () => { world.toggleOrb(); });
+  button('row-fx', () => t('spike.ray', 'Light ray'), () => world.rayOn, () => { world.toggleRay(); });
+  button('row-fx', () => t('spike.speed', 'Walk ×{n}', { n: world.speedMul }), () => world.speedMul > 1, () => { world.speedMul = cycle([1, 2, 3], world.speedMul); });
+
   button('row-look', () => t('spike.inside', 'Inside'), () => world.inside, () => { world.inside = !world.inside; });
   button('row-look', () => t('spike.shells', 'Shells {n}', { n: world.settings.shells }), () => world.settings.shells > 0, () => {
     world.settings.shells = cycle([0, 1, 2], world.settings.shells);
@@ -196,7 +200,7 @@ function bindInput(): void {
     if (down.moved < 8) {
       const r = canvas.getBoundingClientRect();
       const nx = ((e.clientX - r.left) / r.width) * 2 - 1, ny = -(((e.clientY - r.top) / r.height) * 2 - 1);
-      const house = world.pick(nx, ny);
+      const house = e.shiftKey ? world.pick(nx, ny) : world.houseTapped(nx, ny);
       if (e.shiftKey && house !== null) {
         // Dev: shift-click lifts or lowers that roof by hand.
         world.toggleRoof(house);
