@@ -34,6 +34,7 @@ import { makeFlame, makeOrb } from './fire';
 import { EXPLORED_WINDOW, type LitOpts, SEE_SLOTS, WORLD, exploredTexture, lit, pixTexture, shellOf, sightTexture } from './materials';
 import { SCORCH_SIZE, scorchImage } from '../core/world3d/scorch';
 import { RAYS, type SightLight, type VisionSpec, angleGap, castSight, lightReach, litSeenAt, seenAt, turnToward, visibleLights, visionOf } from '../core/world3d/vision';
+import { Leaves } from './leaves';
 import { Rain } from './rain';
 import { type Chimney, Smoke } from './smoke';
 import { type SpriteCard, type WalkCard, blobShadow, spriteCard, walkCard } from './sprites';
@@ -353,6 +354,7 @@ export class SpikeWorld {
   private water: Water | null;
   private rain = new Rain(1400);
   private smoke = new Smoke(24);
+  private leaves = new Leaves(48);
   /**
    * The people in the world. Anyone with `reveals` gets a see-through oval cut in the trees
    * between them and the camera; leave it off for someone who should stay hidden.
@@ -444,6 +446,8 @@ export class SpikeWorld {
     this.buildTorches();
     this.scene.add(this.rain.lines);
     this.scene.add(this.smoke.mesh);
+    this.scene.add(this.rain.splashes);
+    this.scene.add(this.leaves.mesh);
 
     this.walker = walkCard(makeWalkSet(PEOPLE.baker), PITCH);
     this.people.push({ id: 'villager', card: this.walker, reveals: true });
@@ -1729,7 +1733,9 @@ export class SpikeWorld {
       }
     }
     const span = Math.max(this.camera.right, this.camera.top) * 1.1;
-    this.rain.update(dt, w.rain, this.focus, span, { x: w.windX, z: w.windY }, env.ambient * 0.6 + env.sunIntensity * 0.15 + w.flash);
+    const groundAt = (x: number, z: number): number => groundHeight(this.ground, x, z);
+    this.rain.update(dt, w.rain, this.focus, span, { x: w.windX, z: w.windY }, env.ambient * 0.6 + env.sunIntensity * 0.15 + w.flash, groundAt);
+    this.leaves.update(dt, this.time, Math.hypot(w.windX, w.windY), this.focus, span, { x: w.windX, z: w.windY }, 1 - env.night * 0.7, groundAt);
     // Chimney smoke: the nearest chimneys in sight (a smoking chimney is a long way to see, but not through the dark).
     const sm: { c: Chimney; d: number }[] = [];
     for (const hs of this.houses) {

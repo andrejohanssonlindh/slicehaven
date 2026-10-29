@@ -1,5 +1,11 @@
 # Devlog
 
+## 2026-10-30 — M4: rain splashes and wind-blown leaves
+
+- Most of M4 was already there (continuous clock, clouds, rain, wind sway, lightning, fog, wetness from `environment()`). What the brief still asked for and was missing is now in: **splashes** where rain lands (`Rain`: a ring of 140 tiny crosses that open and fade, on the real ground height via `groundAt`; 12% of drops splash) and **falling leaves** (`engine3d/leaves.ts`: up to 48 flat bits that come loose above wind force 0.3, tumble downwind and sink; none in still air, dimmer at night). Smoke already leans with the wind (M3).
+- Left from the brief's weather list: laundry on lines (no laundry prop yet), height-based fog (fog is distance only), specular glints on wet surfaces. Say if you want them.
+- (I edited `rain.ts` through a Python one-off instead of Edit; no harm, but against the working rules. Not repeated.)
+
 ## 2026-10-30 — M3: chimney smoke and puddles
 
 - **Smoke** (`engine3d/smoke.ts`): every standing house with a fire gets seven chunky grey cubes rising from its chimney (`model.smoke`), swelling then shrinking away, leaning with the wind, dark grey at night, thinner in rain. One instanced draw for the nearest 24 chimneys within 60 m that are in sight. Tunables: `PUFFS`, `LIFE` and the rise/lean numbers in `Smoke.update`.
