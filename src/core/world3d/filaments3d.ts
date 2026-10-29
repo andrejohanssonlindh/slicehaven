@@ -24,7 +24,15 @@ export const FCELL = CHUNK / 20;
 /** How far a source's reach is stretched, against the hex table (which was tuned for 1.5 m hexes). */
 export const REACH = 1.7;
 
-export type SourceKind = 'tree' | 'pine' | 'thicket' | 'rock' | 'fire' | 'burnt' | 'corpse' | 'undead' | 'friend' | 'beast' | 'water' | 'light' | 'book' | 'art';
+export type SourceKind = 'tree' | 'pine' | 'thicket' | 'rock' | 'fire' | 'burnt' | 'corpse' | 'undead' | 'friend' | 'beast' | 'water' | 'light' | 'book' | 'art' | 'sign';
+
+/**
+ * How strong the fires of the free world are, against the hex table's campfire (weight 1): a torch is too small to
+ * lift the fire reading above normal on its own (level 0 beside it, a little warmth), a hearth gives +1 at its stones,
+ * and three hearths' worth reaches +2 (the label's cap stops it there).
+ */
+export const TORCH_FIRE = 0.4;
+export const HEARTH_FIRE = 0.7;
 
 export interface FSource {
   x: number;
@@ -238,6 +246,11 @@ export class FilamentField {
     ]));
     // Art: pictures, hangings, rugs and weaving, the patterns that iconotropy lives in.
     if (!ems && s.kind === 'art') this.emCache.set(s, (ems = [{ aspect: 'ikono', label: 'Patterns and pictures', fall: [1, 0.6, 0.25], cap: 1.5 }]));
+    // A sign: something written to be read, so the meanings gather round it (and a little of the symbols).
+    if (!ems && s.kind === 'sign') this.emCache.set(s, (ems = [
+      { aspect: 'semo', label: 'A sign', fall: [2, 1.2, 0.5], cap: 2 },
+      { aspect: 'ikono', label: 'A sign', fall: [0.6, 0.3, 0.1], cap: 0.6 },
+    ]));
     if (!ems && s.kind === 'light') this.emCache.set(s, (ems = [{ aspect: 'foto', label: 'Magic light', fall: [1.6, 0.9, 0.3], cap: 3 }]));
     if (!ems) {
       const { env } = this.cond;
@@ -246,6 +259,11 @@ export class FilamentField {
       // Emissions of the ground under it are counted from the ground itself; take only what the source adds.
       // (A water source is the one thing that adds its own water.)
       ems = emissions(cell, units, env, opts).filter((e) => s.kind === 'water' || !(e.label === 'Water' || e.label === 'Still water' || e.label === 'Sun glare off water'));
+      // A flame adds little to the light of day: its glow counts in full only in the dark.
+      if (s.kind === 'fire') {
+        const k = env.time === 'day' ? 0.3 : env.time === 'dusk' ? 0.65 : 1;
+        ems = ems.map((e) => (e.label === 'Firelight' ? { ...e, fall: e.fall.map((v) => v * k) as Emission['fall'], cap: e.cap * k } : e));
+      }
       this.emCache.set(s, ems);
     }
     return ems;

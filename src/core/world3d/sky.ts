@@ -31,8 +31,8 @@ export interface SkyLight {
 /** Key frames: day (0), dusk (1), night (2). */
 const KEYS: Omit<SkyLight, 'fogNear' | 'fogFar'>[] = [
   {
-    sunDir: [-0.45, 0.8, 0.55], sunColor: [1.0, 0.95, 0.84], sunIntensity: 2.4,
-    skyTop: [0.55, 0.7, 0.92], skyHorizon: [0.82, 0.86, 0.9], groundBounce: [0.42, 0.4, 0.28], ambient: 1.25,
+    sunDir: [-0.45, 0.8, 0.55], sunColor: [1.0, 0.95, 0.84], sunIntensity: 2.8,
+    skyTop: [0.55, 0.7, 0.92], skyHorizon: [0.82, 0.86, 0.9], groundBounce: [0.46, 0.44, 0.31], ambient: 1.65,
     fog: [0.76, 0.8, 0.84], night: 0,
   },
   {

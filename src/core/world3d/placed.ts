@@ -1,5 +1,5 @@
 import { CHUNK, chunkKey } from './chunks';
-import type { FSource } from './filaments3d';
+import { type FSource, TORCH_FIRE } from './filaments3d';
 import { POST, TRUNK, type Layout, type PlacedTree } from './layout';
 import { type PlacedProp, blocksSight, propShapes, propSource } from './props';
 import { type Shape, type ShapeSource, circle } from './space';
@@ -113,7 +113,7 @@ export class PlacedIndex implements ShapeSource {
     for (const [i, j] of this.chunksIn(x0, z0, x1, z1)) {
       const c = this.chunk(i, j);
       for (const t of c.trees) if (inside(t.x, t.z)) out.push({ x: t.x, z: t.z, kind: t.kind === 'pine' ? 'pine' : 'tree' });
-      for (const [x, z] of c.torches) if (inside(x, z)) out.push({ x, z, kind: 'fire', weight: 1 });
+      for (const [x, z] of c.torches) if (inside(x, z)) out.push({ x, z, kind: 'fire', weight: TORCH_FIRE });
       for (const p of c.props) {
         const s = inside(p.x, p.z) ? propSource(p) : null;
         if (s) out.push(s);

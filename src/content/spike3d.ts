@@ -1,4 +1,4 @@
-import { type FSource, type FilamentWorld, type Ground } from '../core/world3d/filaments3d';
+import { type FSource, type FilamentWorld, type Ground, TORCH_FIRE } from '../core/world3d/filaments3d';
 import { type BuiltHouse, type Layout, houseOuterBox } from '../core/world3d/layout';
 import type { PlacedIndex } from '../core/world3d/placed';
 import { propSource } from '../core/world3d/props';
@@ -59,7 +59,7 @@ export function filamentWorld(g: Ground3D, layout: Layout, houses: BuiltHouse[] 
     },
     sources: [
       ...layout.trees.map((t): FSource => ({ x: t.x, z: t.z, kind: 'tree' })),
-      ...layout.torches.map(([x, z]): FSource => ({ x, z, kind: 'fire', weight: 1 })),
+      ...layout.torches.map(([x, z]): FSource => ({ x, z, kind: 'fire', weight: TORCH_FIRE })),
       ...layout.props.flatMap((p) => propSource(p) ?? []),
       ...extra,
     ],

@@ -1,5 +1,14 @@
 # Devlog
 
+## 2026-10-30 — Fires sized right, signs, fog blown downwind, lake drift, leaves under sight, brighter day
+
+- **Filaments (free world).** Fires were all the hex table's campfire. Now `TORCH_FIRE` 0.4 and `HEARTH_FIRE` 0.7 (`core/world3d/filaments3d.ts`; campfires lit by hand stay 1). Checked in `tests/filaments3d-fires.test.ts`: a torch leaves **Fire at 0** (level), a hearth **+1**, three hearths **+2** (the label's cap); **Heat** beside a torch **1**, a hearth **2** (at dusk, when the air is neutral; by clear midday the sun's own +1 is added, so 2 and 3). A flame's **light** counts only 30% by day, 65% at dusk, full at night, so a torch no longer makes midday +3. **Signs:** a signpost is now a source of Semotropy (+2 at the post, fading over ~4 m) and a little Iconotropy; a stall's awning gives a little Iconotropy. The hex games' tables are untouched.
+- **Fog blows away downwind:** instead of fading, a clear patch opens on the upwind side and sweeps downwind (`uMistBlow`; `MIST_REACH`/`MIST_SOFT` in `world.ts`), faster the harder it blows, gone by about force 4. The ask stays and the mist comes back when the wind drops.
+- **Lake animation ran backwards when the wind stopped:** the ripples were placed by wind × time, so a change of wind jumped them. They now follow an accumulated drift (`WORLD.uDrift`).
+- **Leaves** are not drawn where the hero cannot see. **Admin menu:** Wind is now Auto / Calm / Force 1–6 / direction; Fog is Auto / 25 / 50 / 75 / 100%.
+- **Brighter clear day:** sun 2.4 -> 2.8, ambient 1.25 -> 1.65, cloud shadows 0.72 -> 0.55 as dark. Dusk and night untouched.
+- Not done: rain is still drawn in unseen ground (say if it should hide too).
+
 ## 2026-10-30 — Gale, leaves from trees, wind on water, wind clears fog, bench off the well
 
 - **Gale:** the wind the world feels is as set up to force 3, then climbs fast (`gale` in `SpikeWorld.update`: force 6 is about 2.3 times what it was). It drives tree and cloth sway, rain slant, smoke lean, flames, leaves and the new `WORLD.uGale` (water). Tunable: the `2.8` in the `wk` line.

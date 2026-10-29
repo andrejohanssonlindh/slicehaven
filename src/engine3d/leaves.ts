@@ -39,7 +39,7 @@ export class Leaves {
    * @param light 0..1, brightness of the day, so they do not glow at night
    * @param crowns the broadleaf crowns near the view
    */
-  update(dt: number, t: number, force: number, focus: THREE.Vector3, span: number, wind: { x: number; z: number }, light: number, groundAt: (x: number, z: number) => number, crowns: readonly Crown[]): void {
+  update(dt: number, t: number, force: number, focus: THREE.Vector3, span: number, wind: { x: number; z: number }, light: number, groundAt: (x: number, z: number) => number, crowns: readonly Crown[], seen: (x: number, z: number) => boolean = () => true): void {
     const allowed = Math.floor(this.max * Math.min(1, Math.max(0, (force - 0.3) / 1.2)));
     const len = Math.hypot(wind.x, wind.z) || 1;
     const dx = wind.x / len, dz = wind.z / len;
@@ -84,7 +84,7 @@ export class Leaves {
       if (this.p[o + 1] < groundAt(this.p[o], this.p[o + 2]) + 0.04 || out) {
         this.alive[i] = 0;
         this.dummy.scale.setScalar(0.0001);
-      } else this.dummy.scale.setScalar(1);
+      } else this.dummy.scale.setScalar(seen(this.p[o], this.p[o + 2]) ? 1 : 0.0001); // what the hero cannot see is not drawn
       this.dummy.position.set(this.p[o], this.p[o + 1], this.p[o + 2]);
       this.dummy.rotation.set(t * 3 + i, t * 2.1 + i * 2, t * 2.7);
       this.dummy.updateMatrix();

@@ -217,5 +217,8 @@ export function propSource(p: PlacedProp): FSource | null {
   if (p.kind === 'shrub') return { x: p.x, z: p.z, kind: 'thicket' };
   if (p.kind === 'boulder') return { x: p.x, z: p.z, kind: 'rock' };
   if (p.kind === 'well') return { x: p.x, z: p.z, kind: 'water', weight: 0.6 };
+  // A signpost is a sign to read; a stall's awning is a pattern, a small one.
+  if (p.kind === 'signpost') return { x: p.x, z: p.z, kind: 'sign' };
+  if (p.kind === 'stall') return { x: p.x, z: p.z, kind: 'art', weight: 0.6 };
   return null;
 }

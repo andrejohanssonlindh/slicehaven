@@ -73,8 +73,7 @@ describe('spike3d admin menu', () => {
     expect(await page.locator('#radial').isVisible()).toBe(true);
     await page.screenshot({ path: `${OUT}spike3d-admin.png` });
     await page.locator('#radial button', { hasText: /^Wind$/ }).click();
-    await page.locator('#radial button', { hasText: /^Wind: weather/ }).click(); // pins at 0
-    for (let k = 0; k < 4; k++) await page.locator('#radial button', { hasText: /^Wind \d/ }).click(); // up to force 4
+    await page.locator('#radial button', { hasText: /^Force 4$/ }).click();
     await page.screenshot({ path: `${OUT}spike3d-admin-wind.png` });
     expect(await page.evaluate(() => (window as any).spike.world.weather.windForce)).toBe(4);
     // A sky change leaves the pinned wind alone.

@@ -229,15 +229,15 @@ function buildControls(): void {
   // Admin only: time steps, wind (the weather's own unless set here) and fog at a chosen strength.
   adminButton('time', () => t('spike.hourplus', '+3 h'), () => false, () => { w.setHour((w.hour ?? 12) + 3); });
   adminButton('time', () => t('spike.hourminus', '−3 h'), () => false, () => { w.setHour((w.hour ?? 12) - 3); });
-  adminButton('wind', () => (w.windPinned ? t('spike.windforce', 'Wind {n}', { n: w.windForce }) : t('spike.windweather', 'Wind: weather')), () => w.windPinned, () => {
-    if (!w.windPinned) w.pinWind(0);
-    else if (w.windForce >= 6) w.unpinWind();
-    else w.pinWind(w.windForce + 1);
-  });
+  // Wind: "Auto" lets the sky decide; 0 to 6 fixes the force (and keeps it when the sky changes); the last button turns it.
+  adminButton('wind', () => t('spike.windauto', 'Auto'), () => !w.windPinned, () => { w.unpinWind(); });
+  for (let f = 0; f <= 6; f++) {
+    adminButton('wind', () => (f === 0 ? t('spike.windcalm', 'Calm') : t('spike.windforce', 'Force {n}', { n: f })), () => w.windPinned && w.windForce === f, () => { w.pinWind(f); });
+  }
   adminButton('wind', () => t('spike.winddir', 'Blows {n}', { n: WIND_DIRS[w.windDir].name }), () => false, () => { w.pinWind(w.windForce, w.windDir + 1); });
-  adminButton('wind', () => t('spike.windweather2', 'Weather wind'), () => !w.windPinned, () => { w.unpinWind(); });
+  // Fog: "Auto" leaves it to the weather (rain brings a little); the others fix how thick it lies.
   for (const v of [0, 0.25, 0.5, 0.75, 1]) {
-    adminButton('fog', () => (v === 0 ? t('spike.fogweather', 'Weather') : `${Math.round(v * 100)}%`), () => Math.abs(world.mistAmount - v) < 0.01, () => { world.setMist(v); });
+    adminButton('fog', () => (v === 0 ? t('spike.fogauto', 'Auto') : `${Math.round(v * 100)}%`), () => Math.abs(world.mistAmount - v) < 0.01, () => { world.setMist(v); });
   }
   buildAdmin();
   for (const b of buttons) b.refresh();

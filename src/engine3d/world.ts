@@ -11,7 +11,7 @@ import { mapNamed } from '../content/maps';
 import { streamingFilamentWorld } from '../content/spike3d';
 import type { CompiledMap } from '../core/world3d/mapgen';
 import type { AspectId, HexFilaments } from '../core/filaments';
-import { type FSource, FilamentField } from '../core/world3d/filaments3d';
+import { type FSource, FilamentField, HEARTH_FIRE, TORCH_FIRE } from '../core/world3d/filaments3d';
 import { CHUNK, type ChunkTerrain, TerrainStore, chunkKey, chunksNear } from '../core/world3d/chunks';
 import { type Environment3D, environment } from '../core/world3d/environment3d';
 import { Rng } from '../core/rng';
@@ -51,6 +51,9 @@ export const YAW = 0.42;
 /** About 39°: ground is squashed to ~0.63, as in the old hex art (20 px rows on 32 px tiles). */
 export const PITCH = 0.68;
 const CAM_DIST = 60;
+/** The wind sweeps mist clear over this many metres each side of the view's focus, with a soft edge of this many. */
+const MIST_REACH = 40;
+const MIST_SOFT = 12;
 
 export interface WorldSettings {
   shells: number;
@@ -404,6 +407,9 @@ export class SpikeWorld {
   /** Mist asked for, 0..1 (0 leaves it to the weather), and the eased value in use. */
   private mist = 0;
   private mistNow = 0;
+  /** How much of the view the wind has swept clear of mist, 0..1, and the way it sweeps (xz, unit). */
+  private mistBlow = 0;
+  private mistDir = new THREE.Vector2(1, 0);
   private mistTint: THREE.Color | null = null;
   private mistTintK = 1;
 
@@ -466,7 +472,7 @@ export class SpikeWorld {
       const fire = room.plan.pieces.filter((p) => p.fire).pop();
       if (fire) {
         const w = houseToWorld(b.place, fire.x, fire.z + 0.2);
-        sources.push({ x: w.x, z: w.z, kind: 'fire', weight: 1 });
+        sources.push({ x: w.x, z: w.z, kind: 'fire', weight: HEARTH_FIRE });
       }
       for (const s of room.sources) {
         const w = houseToWorld(b.place, s.x, s.z);
@@ -1146,7 +1152,7 @@ export class SpikeWorld {
     const d = built.model.door;
     const w = houseToWorld(place, d[0] + 0.95, d[2] + 0.25);
     this.placeTorch(w.x, groundHeight(this.ground, place.x, place.z) - 0.05 + built.model.floorY + 1.85, w.z, false, null);
-    this.fires.push({ x: w.x, z: w.z, kind: 'fire', weight: 1 });
+    this.fires.push({ x: w.x, z: w.z, kind: 'fire', weight: TORCH_FIRE });
   }
 
   private postMat: THREE.MeshLambertMaterial | null = null;
@@ -1654,7 +1660,7 @@ export class SpikeWorld {
   magicLightSources(): FSource[] {
     const out: FSource[] = [];
     if (this.orb) out.push({ x: this.orb.group.position.x, z: this.orb.group.position.z, kind: 'light', weight: 1 });
-    if (this.hand) out.push({ x: this.hand.fx.object.position.x, z: this.hand.fx.object.position.z, kind: 'fire', weight: 0.5 });
+    if (this.hand) out.push({ x: this.hand.fx.object.position.x, z: this.hand.fx.object.position.z, kind: 'fire', weight: TORCH_FIRE });
     if (this.ray) {
       const hp = this.heroCard.mesh.position, dl = Math.hypot(this.heroDir.x, this.heroDir.z) || 1;
       for (const s of [1.5, 3.5, 5.5, 7.5]) out.push({ x: hp.x + (this.heroDir.x / dl) * s, z: hp.z + (this.heroDir.z / dl) * s, kind: 'light', weight: 0.6 });
@@ -1727,13 +1733,19 @@ export class SpikeWorld {
     // The wind as the world feels it: as set up to a stiff breeze (force 3), then it climbs fast, so force 6 is a gale.
     const wk = w.wind <= 0.6 ? 1 : (0.6 + (w.wind - 0.6) * 2.8) / w.wind;
     const wx = w.windX * wk, wz = w.windY * wk, gale = w.wind * wk;
-    // Wind blows asked-for mist away: gone by about force 4 (the ask stays, so it comes back when the wind drops).
-    const clearing = 1 - Math.min(1, Math.max(0, (w.wind - 0.25) / 0.55));
-    const wantMist = Math.max(this.mist * clearing, 0.3 * Math.min(1, w.rain) * (0.4 + 0.6 * clearing));
+    const wantMist = Math.max(this.mist, 0.3 * Math.min(1, w.rain));
     this.mistNow += (wantMist - this.mistNow) * (1 - Math.exp(-dt / 2.5));
+    // Wind blows mist away: a clear patch opens on the upwind side and sweeps downwind across the view (`uMistBlow`), the
+    // faster the harder it blows, until nothing is left by about force 4. The ask stays; the mist comes back when the wind drops.
+    const blowWant = Math.min(1, Math.max(0, (w.wind - 0.25) / 0.55));
+    this.mistBlow += (blowWant - this.mistBlow) * (1 - Math.exp(-dt / (6 - 3 * blowWant)));
+    if (w.wind > 0.05) this.mistDir.set(w.wx, w.wy).normalize();
+    const reach = MIST_REACH + MIST_SOFT;
+    WORLD.uMistBlow.value.set(this.mistDir.x, this.mistDir.y, THREE.MathUtils.lerp(-reach, reach, this.mistBlow), MIST_SOFT);
     const m = this.mistNow;
-    this.fog.near = CAM_DIST + THREE.MathUtils.lerp(env.fogNear - 30, -6, m);
-    this.fog.far = CAM_DIST + THREE.MathUtils.lerp(env.fogFar, 22, m);
+    const mFog = m * (1 - this.mistBlow);
+    this.fog.near = CAM_DIST + THREE.MathUtils.lerp(env.fogNear - 30, -6, mFog);
+    this.fog.far = CAM_DIST + THREE.MathUtils.lerp(env.fogFar, 22, mFog);
     WORLD.uMist.value.set(m, 2.2 + m * 1.6, groundHeight(this.ground, this.focus.x, this.focus.z), this.mistTint ? this.mistTintK : 0);
     WORLD.uMistAt.value.set(this.focus.x, this.focus.z);
     if (this.mistTint) WORLD.uMistColor.value.set(this.mistTint.r, this.mistTint.g, this.mistTint.b);
@@ -1762,11 +1774,13 @@ export class SpikeWorld {
 
     // World uniforms: time, clouds, wetness, wind.
     WORLD.uTime.value = this.time;
-    WORLD.uCloud.value.set(cloudThreshold(env.cloudCover), 0.72 * (1 - env.night * 0.7), this.cloudOff.x, this.cloudOff.y);
+    WORLD.uCloud.value.set(cloudThreshold(env.cloudCover), 0.55 * (1 - env.night * 0.7), this.cloudOff.x, this.cloudOff.y);
     this.wet += (env.wetness - this.wet) * (1 - Math.exp(-dt / (env.wetness > 0.5 ? 6 : 25)));
     WORLD.uWet.value = this.wet;
     WORLD.uWind.value.set(wx, wz, gale);
     WORLD.uGale.value = gale;
+    WORLD.uDrift.value.x += wx * dt * 0.6;
+    WORLD.uDrift.value.y += wz * dt * 0.6;
 
     // Torches flicker; real point lights only for the nearest few.
     // (Distances are measured once each, not inside the sort: a sort asks for them n log n times, and each ask made a vector.)
@@ -1831,7 +1845,7 @@ export class SpikeWorld {
     const span = Math.max(this.camera.right, this.camera.top) * 1.1;
     const groundAt = (x: number, z: number): number => groundHeight(this.ground, x, z);
     this.rain.update(dt, w.rain, this.focus, span, { x: wx, z: wz }, env.ambient * 0.6 + env.sunIntensity * 0.15 + w.flash, groundAt);
-    this.leaves.update(dt, this.time, gale, this.focus, span, { x: wx, z: wz }, 1 - env.night * 0.7, groundAt, this.leafTrees());
+    this.leaves.update(dt, this.time, gale, this.focus, span, { x: wx, z: wz }, 1 - env.night * 0.7, groundAt, this.leafTrees(), (x, z) => this.seen(x, z) > 0.3);
     // Chimney smoke: the nearest chimneys in sight (a smoking chimney is a long way to see, but not through the dark).
     const sm: { c: Chimney; d: number }[] = [];
     for (const hs of this.houses) {

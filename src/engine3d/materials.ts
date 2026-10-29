@@ -19,8 +19,12 @@ export const WORLD = {
   uMist: { value: new THREE.Vector4(0, 2.2, 0, 0) },
   /** Where the mist is thinnest (the view's focus, xz) and its tint, used when `uMist.w` > 0. */
   uMistAt: { value: new THREE.Vector2(0, 0) },
+  /** Mist blown away by wind: xy the way it blows (unit), z how far downwind of the focus mist is left from (metres; below -reach: all left), w the soft edge. */
+  uMistBlow: { value: new THREE.Vector4(1, 0, -60, 12) },
   uMistColor: { value: new THREE.Vector3(0.7, 0.72, 0.76) },
-  /** How hard the wind blows as the world feels it: 0 calm, about 0.6 a stiff breeze, over 2 a gale. */
+  /** How far the wind has carried the water's ripples (xz): the wind's push added up over time, so a change of wind never jumps them. */
+  uDrift: { value: new THREE.Vector2(0, 0) },
+  /** How hard the wind blows as the world feels it:0 calm, about 0.6 a stiff breeze, over 2 a gale. */
   uGale: { value: 0 },
   /** xy: wind direction × strength, z: gustiness. */
   uWind: { value: new THREE.Vector3(0.2, 0, 0.5) },
@@ -211,6 +215,7 @@ ${o.sway ? `{
 uniform float uWet;
 uniform vec4 uMist;
 uniform vec2 uMistAt;
+uniform vec4 uMistBlow;
 uniform vec3 uMistColor;
 uniform float uTime;
 uniform float uPixWorld;
@@ -228,7 +233,7 @@ ${o.wettable ? `if (uWet > 0.05) {
   vec2 gc = floor(vWPos.xz / uPixWorld);
   float gr = shHash(int(gc.x), int(gc.y), 5 + int(floor(uTime * 2.0)));
   float spark = step(0.993 - poolMask * 0.03, gr);
-  float day = clamp(uCloud.y / 0.72, 0.0, 1.0);
+  float day = clamp(uCloud.y / 0.55, 0.0, 1.0);
   gl_FragColor.rgb += vec3(0.85, 0.92, 1.0) * spark * smoothstep(0.7, 0.95, gn.y) * uWet * cloudSun * day * (0.25 + poolMask * 0.5);
 }` : ''}
 {
@@ -236,6 +241,8 @@ ${o.wettable ? `if (uWet > 0.05) {
   float md = length(vWPos.xz - uMistAt);
   float mh = 1.0 - smoothstep(0.0, uMist.y, vWPos.y - uMist.z);
   float mk = uMist.x * mix(0.25, 1.0, mh) * smoothstep(1.5, mix(34.0, 9.0, uMist.x), md);
+  // Blown away: only what lies downwind of the sweeping front is left.
+  mk *= smoothstep(uMistBlow.z - uMistBlow.w, uMistBlow.z + uMistBlow.w, dot(vWPos.xz - uMistAt, uMistBlow.xy));
   gl_FragColor.rgb = mix(gl_FragColor.rgb, mix(fogColor, uMistColor, uMist.w), clamp(mk, 0.0, 0.92));
 }
 ${VISION_BODY}`)

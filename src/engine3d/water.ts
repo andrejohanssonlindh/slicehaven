@@ -27,6 +27,7 @@ uniform vec4 uDepthRect;
 uniform float uTime;
 uniform vec3 uWind;
 uniform float uGale;
+uniform vec2 uDrift;
 uniform vec3 uSun;
 uniform vec3 uSky;
 uniform vec3 uAmbient;
@@ -40,7 +41,7 @@ void main() {
   vec2 cell = floor(vWPos.xz * ${TEXELS_PER_M.toFixed(1)}) / ${TEXELS_PER_M.toFixed(1)};
   float depth = texture2D(tDepth, (cell - uDepthRect.xy) / uDepthRect.zw).r * 2.0;
   if (depth <= 0.0) discard;
-  vec2 drift = uWind.xy * uTime * 0.6;
+  vec2 drift = uDrift;
   float r1 = shValue(vec2(cell.x * 1.7 - drift.x, cell.y * 4.5 - drift.y), 5);
   float r2 = shValue(vec2(cell.x * 3.1 + uTime * 0.21, cell.y * 7.0 - uTime * 0.13), 6);
   // Wind roughens it: from a stiff breeze the ripples shorten and sharpen, and in a gale the crests break white and the shore foam churns.
@@ -115,6 +116,7 @@ export function makeWater(g: Ground3D): Water | null {
   mat.uniforms.uTime = WORLD.uTime;
   mat.uniforms.uWind = WORLD.uWind;
   mat.uniforms.uGale = WORLD.uGale;
+  mat.uniforms.uDrift = WORLD.uDrift;
   mat.uniforms.uCloud = WORLD.uCloud;
   for (const k of VISION_UNIFORMS) mat.uniforms[k] = WORLD[k];
   mat.uniforms.tDepth.value = depth;
