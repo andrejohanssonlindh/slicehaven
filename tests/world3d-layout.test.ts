@@ -64,11 +64,12 @@ describe('layout', () => {
     const grid = new NavGrid(g.size, layoutObstacles(SPIKE_LAYOUT, houses), { radius: 0.2 });
     for (const p of SPIKE_LAYOUT.props) {
       const id = `${p.kind}@${p.x},${p.z}`;
-      expect(lakeDist(g, p.x, p.z), id).toBeGreaterThan(1);
+      // (A bridge is the one thing that stands over water, and its walkway is open.)
+      if (p.kind !== 'bridge') expect(lakeDist(g, p.x, p.z), id).toBeGreaterThan(1);
       for (const r of g.roads) expect(roadDist(r, p.x, p.z), id).toBeGreaterThan(r.width / 2 + 0.3);
       for (const b of boxes) expect(shapeDist(b, p.x, p.z), id).toBeGreaterThan(0.4);
       // (A way through, an open gate or an archway, is walkable in the middle; its posts are what block.)
-      expect(grid.walkable(p.x, p.z), id).toBe(p.kind === 'archway' || (p.kind === 'gate' && !!p.open));
+      expect(grid.walkable(p.x, p.z), id).toBe(p.kind === 'archway' || p.kind === 'bridge' || (p.kind === 'gate' && !!p.open));
     }
   });
 

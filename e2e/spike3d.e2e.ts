@@ -45,6 +45,13 @@ describe('spike3d', () => {
     await page.waitForTimeout(4000);
     await page.screenshot({ path: `${OUT}spike3d-rain.png` });
     await clickBtn(page, 'Clear');
+    // The stream and its bridge, and pools in the hollows after rain.
+    await page.evaluate(() => { const w = (window as any).spike.world; w.follow = false; w.focus.x = 6; w.focus.z = -16; });
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: `${OUT}spike3d-stream.png` });
+    await page.evaluate(() => { const w = (window as any).spike.world; w.pool = 1; w.focus.x = 2; w.focus.z = 2; });
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: `${OUT}spike3d-pools.png` });
     // Mist on demand, looking at the washing line.
     await page.evaluate(() => { const w = (window as any).spike.world; w.follow = false; w.focus.x = 15.5; w.focus.z = 7; });
     await page.waitForTimeout(500);

@@ -3,7 +3,7 @@ import { type BuiltHouse, type Layout, houseOuterBox } from '../core/world3d/lay
 import type { PlacedIndex } from '../core/world3d/placed';
 import { propSource } from '../core/world3d/props';
 import { type Shape, shapeDist } from '../core/world3d/space';
-import { lakeDist, splatAt } from '../core/world3d/terrain';
+import { lakeDist, riverDist, splatAt } from '../core/world3d/terrain';
 import type { Ground3D } from '../core/world3d/terrain';
 import { mapNamed } from './maps';
 
@@ -39,7 +39,7 @@ export function filamentWorld(g: Ground3D, layout: Layout, houses: BuiltHouse[] 
   return {
     size: g.size,
     ground(x, z): Ground {
-      if (lakeDist(g, x, z) < 0) return 'pond';
+      if (lakeDist(g, x, z) < 0) return riverDist(g, x, z) < 0 ? 'river' : 'pond';
       const s = splatAt(g, x, z);
       if (s.mud > 0.5) return 'mud';
       if (s.road > 0.5) return 'path';

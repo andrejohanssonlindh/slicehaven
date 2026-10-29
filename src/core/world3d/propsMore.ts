@@ -9,9 +9,9 @@ import { type Shape, circle } from './space';
  * its length, turned by `rot` like the rest. The renderer picks a material per part.
  */
 
-export type MoreKind = 'palisade' | 'tower' | 'gate' | 'archway' | 'stonewall' | 'barrel' | 'hay' | 'signpost' | 'stall' | 'bench' | 'trough' | 'stump';
+export type MoreKind = 'palisade' | 'tower' | 'gate' | 'archway' | 'stonewall' | 'barrel' | 'hay' | 'signpost' | 'stall' | 'bench' | 'trough' | 'stump' | 'bridge';
 
-export const MORE_KINDS: readonly MoreKind[] = ['palisade', 'tower', 'gate', 'archway', 'stonewall', 'barrel', 'hay', 'signpost', 'stall', 'bench', 'trough', 'stump'];
+export const MORE_KINDS: readonly MoreKind[] = ['palisade', 'tower', 'gate', 'archway', 'stonewall', 'barrel', 'hay', 'signpost', 'stall', 'bench', 'trough', 'stump', 'bridge'];
 
 export const isMore = (k: string): k is MoreKind => (MORE_KINDS as readonly string[]).includes(k);
 
@@ -203,6 +203,37 @@ function stall(seed: number): PropParts {
   return { wood, cloth: [{ colour: ca, mesh: A }, { colour: cb, mesh: B }] };
 }
 
+/** Half the width of a bridge's deck between its rails, metres (the ground's own deck, `Bridge.width`, is a little wider). */
+export const BRIDGE_WIDTH = 1.7;
+
+/**
+ * A footbridge over a stream: planks laid across two heavy side timbers, a rail and posts on each side. `len` is the
+ * span (along local x). The ground under it is raised to the deck (`terrain.ts`), so the model stands on that level:
+ * the planks are a hand above it, and the timbers reach down to the water so the raised ground does not show.
+ */
+function bridge(len: number, seed: number): PropParts {
+  const rng = Rng.fromSeed(seed);
+  const m = emptyMesh();
+  const W = BRIDGE_WIDTH / 2;
+  const n = Math.ceil(len / 0.26);
+  for (let i = 0; i < n; i++) {
+    const x = -len / 2 + ((i + 0.5) * len) / n;
+    addBox(m, [x - 0.125, 0, -W], [x + 0.125, 0.07 + rng.next() * 0.015, W], { aoBottom: 0.8 });
+  }
+  for (const sz of [-1, 1]) {
+    // The side timber, down to below the water; the rail on top of posts.
+    addBox(m, [-len / 2 - 0.1, -0.6, sz * (W + 0.02) - 0.1], [len / 2 + 0.1, 0.1, sz * (W + 0.02) + 0.1], { aoBottom: 0.5 });
+    const posts = Math.max(2, Math.round(len / 1.4) + 1);
+    for (let i = 0; i < posts; i++) {
+      const x = -len / 2 + (i / (posts - 1)) * len;
+      addBeam(m, [x, 0.05, sz * W], [x, 0.95, sz * W], 0.1, [0, 0, 1], { aoBottom: 0.8 });
+    }
+    addBox(m, [-len / 2 - 0.05, 0.85, sz * W - 0.05], [len / 2 + 0.05, 0.93, sz * W + 0.05]);
+    addBox(m, [-len / 2, 0.45, sz * W - 0.03], [len / 2, 0.5, sz * W + 0.03]);
+  }
+  return { wood: m };
+}
+
 /** A bench: a plank on two slab legs. */
 function bench(): PropParts {
   const m = emptyMesh();
@@ -249,6 +280,7 @@ export function buildMore(p: PlacedProp): PropParts {
     case 'bench': return bench();
     case 'trough': return trough();
     case 'stump': return stump(p.seed);
+    case 'bridge': return bridge(p.len ?? 5, p.seed);
   }
 }
 
@@ -278,6 +310,11 @@ export function moreShapes(p: PlacedProp): Shape[] {
     case 'barrel': return [circle(p.x, p.z, 0.33 * s)];
     case 'signpost': return [circle(p.x, p.z, 0.15 * s)];
     case 'stump': return [circle(p.x, p.z, 0.3 * s)];
+    // Only the rails: the way between them is the walkway.
+    case 'bridge': {
+      const h = (p.len ?? 5) / 2, w = BRIDGE_WIDTH / 2;
+      return [box(0, -w, h, 0.07), box(0, w, h, 0.07)];
+    }
   }
 }
 

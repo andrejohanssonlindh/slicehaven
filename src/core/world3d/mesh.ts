@@ -14,6 +14,8 @@ export interface MeshData {
   /** Baked ambient occlusion per vertex, 1 = open, lower = tucked away. */
   ao: number[];
   indices: number[];
+  /** Ground only: how much of a hollow each vertex is in, 0..1 (where rain stands). */
+  hollow?: number[];
 }
 
 export const emptyMesh = (): MeshData => ({ positions: [], normals: [], uvs: [], ao: [], indices: [] });

@@ -1,4 +1,4 @@
-import { type Ground3D, groundHeight } from './terrain';
+import { type Ground3D, groundHeight, hollowAt } from './terrain';
 import { type MeshData, emptyMesh } from './mesh';
 
 /**
@@ -70,6 +70,7 @@ export function buildChunk(g: Ground3D, i: number, j: number, step = 0.5): Chunk
   const H = (a: number, b: number): number => apron[(b + 1) * m + (a + 1)];
   const heights: number[] = [];
   const mesh = emptyMesh();
+  mesh.hollow = [];
   for (let b = 0; b < n; b++) {
     for (let a = 0; a < n; a++) {
       const x = x0 + a * step, z = z0 + b * step, y = H(a, b);
@@ -81,6 +82,7 @@ export function buildChunk(g: Ground3D, i: number, j: number, step = 0.5): Chunk
       mesh.uvs.push(x, z);
       const hollow = (H(a - 1, b) + H(a + 1, b) + H(a, b - 1) + H(a, b + 1)) / 4 - y;
       mesh.ao.push(clamp01(1 - Math.max(0, hollow) * 3));
+      mesh.hollow.push(hollowAt(g, x, z));
     }
   }
   for (let b = 0; b < cells; b++) {

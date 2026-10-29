@@ -22,6 +22,10 @@ export interface Ground3D {
   roads: Road[];
   mud: { x: number; z: number; r: number }[];
   lake?: { x: number; z: number; r: number };
+  /** Streams, flowing from the first point to the last (which should reach the lake or the map's edge). `width` is bank to bank. */
+  rivers?: Road[];
+  /** Footbridges over water: the ground is raised to the deck inside (x, z, span `len` along local x, `width` across). */
+  bridges?: { x: number; z: number; len: number; width: number; rot: number }[];
   /** Flat pads where buildings stand (centre, half sizes, rotation). */
   pads: { x: number; z: number; hw: number; hd: number; rot: number }[];
   /** Darker, leafy ground under trees. */
@@ -53,12 +57,78 @@ export function roadDist(r: Road, x: number, z: number): number {
   return d;
 }
 
-/** Signed distance to the lake shore (negative is in the water), with a wobbly bank. */
-export function lakeDist(g: Ground3D, x: number, z: number): number {
+/** Signed distance to the lake's shore alone (negative is in the water), with a wobbly bank. */
+function lakeOnlyDist(g: Ground3D, x: number, z: number): number {
   if (!g.lake) return Infinity;
   const a = Math.atan2(z - g.lake.z, x - g.lake.x);
   const wob = (fbm(Math.cos(a) * 1.6 + 5, Math.sin(a) * 1.6 + 5, g.seed + 3) - 0.5) * 0.55;
   return Math.hypot(x - g.lake.x, z - g.lake.z) - g.lake.r * (1 + wob);
+}
+
+/** Signed distance to the nearest river's bank (negative is in the water), the banks a little uneven. Infinity with no rivers. */
+export function riverDist(g: Ground3D, x: number, z: number): number {
+  if (!g.rivers) return Infinity;
+  let d = Infinity;
+  for (const r of g.rivers) d = Math.min(d, roadDist(r, x, z) - r.width / 2);
+  if (d < 6) d -= (fbm(x / 4, z / 4, g.seed + 5) - 0.5) * 0.5;
+  return d;
+}
+
+/** The way the nearest river runs at (x, z), a unit vector toward its mouth (the last point), and its strength 0..1 (0 away from the water). */
+export function riverFlow(g: Ground3D, x: number, z: number): { x: number; z: number; k: number } {
+  let best = Infinity, fx = 0, fz = 0, half = 1;
+  for (const r of g.rivers ?? []) {
+    for (let i = 0; i + 1 < r.pts.length; i++) {
+      const d = segDist(x, z, r.pts[i], r.pts[i + 1]);
+      if (d < best) {
+        best = d;
+        half = r.width / 2;
+        const ex = r.pts[i + 1][0] - r.pts[i][0], ez = r.pts[i + 1][1] - r.pts[i][1], l = Math.hypot(ex, ez) || 1;
+        fx = ex / l;
+        fz = ez / l;
+      }
+    }
+  }
+  // Swiftest mid-stream, slow at the banks.
+  return { x: fx, z: fz, k: best === Infinity ? 0 : 1 - smooth(half * 0.4, half * 1.1, best) };
+}
+
+/** Height of a bridge's deck above the water line, metres. */
+export const DECK_Y = 0.5;
+
+/** How much a bridge holds the ground at its deck at (x, z): 1 on the deck, falling to 0 over a ramp at each end and a hand's width at the sides. */
+export function bridgeWeight(g: Ground3D, x: number, z: number): number {
+  let w = 0;
+  for (const b of g.bridges ?? []) {
+    const c = Math.cos(b.rot), s = Math.sin(b.rot);
+    const lx = (x - b.x) * c - (z - b.z) * s, lz = (x - b.x) * s + (z - b.z) * c; // as in `padDist`
+    const along = Math.max(0, Math.abs(lx) - b.len / 2), across = Math.max(0, Math.abs(lz) - b.width / 2);
+    w = Math.max(w, (1 - smooth(0, 1.4, along)) * (1 - smooth(0, 0.12, across)));
+  }
+  return w;
+}
+
+/** Signed distance to open water, a lake or a river (negative is in it). A bridge's deck is dry land. */
+export function lakeDist(g: Ground3D, x: number, z: number): number {
+  const d = Math.min(lakeOnlyDist(g, x, z), riverDist(g, x, z));
+  if (d < 0.3 && g.bridges?.length && bridgeWeight(g, x, z) > 0.6) return Math.max(d, 0.3);
+  return d;
+}
+
+/** How deep the ground sinks in a hollow, metres, and what the lowest of them is (puddles gather there). */
+export const HOLLOW_DEPTH = 0.12;
+
+/**
+ * How much of a natural hollow is at (x, z), 0..1: the low places rain stands in. Scattered by slow noise, a few
+ * metres across; the churned mud by doors is one too; none under buildings; none near water, where the ground drains
+ * toward it. `ld` is the distance to water if the caller has it.
+ */
+export function hollowAt(g: Ground3D, x: number, z: number, ld = lakeDist(g, x, z)): number {
+  const ix = groundIndex(g), k = at(x, z);
+  let hl = smooth(0.66, 0.78, fbm(x / 6.5, z / 6.5, g.seed + 21));
+  for (const m of ix.mud.get(k) ?? []) hl = Math.max(hl, 0.55 * (1 - smooth(m.r * 0.2, m.r * 0.9, Math.hypot(x - m.x, z - m.z))));
+  for (const p of ix.pads.get(k) ?? []) hl *= smooth(0.8, 2.5, padDist(p, x, z));
+  return hl * smooth(2.5, 5, ld);
 }
 
 /** Distance outside a building pad (0 inside). */
@@ -139,11 +209,19 @@ export function groundHeight(g: Ground3D, x: number, z: number): number {
     const d = nearRoadDist(segs, x, z);
     h -= 0.06 * (1 - smooth(r.width * 0.3, r.width * 0.6, d));
   }
-  // The lake bed falls away from the shore.
   const ld = lakeDist(g, x, z);
+  // Low places where rain stands.
+  h -= HOLLOW_DEPTH * hollowAt(g, x, z, ld);
+  // The bed falls away from the shore (a stream's, being narrow, quickly).
   if (ld < 2) {
+    const fall = riverDist(g, x, z) < lakeOnlyDist(g, x, z) ? 1.6 : 4;
     const shoreH = Math.min(h, WATER_Y + 0.12 + Math.max(0, ld) * 0.12);
-    h = ld > 0 ? h + (shoreH - h) * (1 - smooth(0, 2, ld)) : WATER_Y + 0.12 - smooth(0, 4, -ld) * 1.4;
+    h = ld > 0 ? h + (shoreH - h) * (1 - smooth(0, 2, ld)) : WATER_Y + 0.12 - smooth(0, fall, -ld) * 1.4;
+  }
+  // A bridge holds the ground at its deck, over the water too.
+  if (g.bridges?.length) {
+    const bw = bridgeWeight(g, x, z);
+    if (bw > 0) h += (DECK_Y - 0.02 - h) * bw;
   }
   return h;
 }

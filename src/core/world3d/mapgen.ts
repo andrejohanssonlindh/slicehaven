@@ -5,6 +5,7 @@ import type { House3DSpec, RoofKind, WallKind } from './house';
 import { type Layout, type PlacedHouse, type PlacedTree, buildHouses, houseOuterBox, houseToWorld, layoutObstacles, layoutPads, layoutShade } from './layout';
 import { type ChunkContent, type ChunkGenerator, PlacedIndex } from './placed';
 import { type PlacedProp } from './props';
+import { BRIDGE_WIDTH } from './propsMore';
 import type { TreeKind } from './tree';
 import { NavGrid, type Shape, ShapeIndex, type ShapeSource, findPath, shapeDist } from './space';
 import { type Ground3D, type Road, type XZ, lakeDist, roadDist } from './terrain';
@@ -95,6 +96,8 @@ export interface MapSpec {
   size: number;
   roads: Road[];
   lake?: { x: number; z: number; r: number };
+  /** Streams, flowing from the first point to the last (see `Ground3D.rivers`). A `bridge` prop over one makes the crossing walkable. */
+  rivers?: Road[];
   mud?: { x: number; z: number; r: number }[];
   /** Stamp mud in front of every door. */
   doorMud?: boolean;
@@ -241,7 +244,7 @@ export function compileMap(spec: MapSpec): CompiledMap {
   const edge = 4;
 
   // The ground's own shoreline (it is not a perfect circle), so scatter and validation agree with what is drawn.
-  const shape: Ground3D = { seed: spec.seed, size: spec.size, roads: spec.roads, mud: [], lake: spec.lake, pads: [], shade: [] };
+  const shape: Ground3D = { seed: spec.seed, size: spec.size, roads: spec.roads, mud: [], lake: spec.lake, rivers: spec.rivers, pads: [], shade: [] };
   const lakeD = (x: number, z: number): number => lakeDist(shape, x, z);
   const roadD = (x: number, z: number): number => spec.roads.reduce((m, r) => Math.min(m, roadDist(r, x, z) - r.width / 2), Infinity);
 
@@ -340,7 +343,9 @@ export function compileMap(spec: MapSpec): CompiledMap {
       mud.push({ x: p.x, z: p.z, r: 1.9 });
     }
   }
-  const ground: Ground3D = { seed: spec.seed, size: spec.size, roads: spec.roads, mud, lake: spec.lake, pads: layoutPads(layout), shade: layoutShade(layout) };
+  // A bridge prop makes the ground under it a deck (the span `len` is along the prop's own x; its width is the walkway and the rails).
+  const bridges = layout.props.filter((p) => p.kind === 'bridge').map((p) => ({ x: p.x, z: p.z, len: p.len ?? 5, width: BRIDGE_WIDTH + 0.3, rot: p.rot ?? 0 }));
+  const ground: Ground3D = { seed: spec.seed, size: spec.size, roads: spec.roads, mud, lake: spec.lake, rivers: spec.rivers, bridges, pads: layoutPads(layout), shade: layoutShade(layout) };
 
   // The hero.
   let hero: [number, number] = [0, 0];
@@ -419,7 +424,7 @@ function validate(spec: MapSpec, c: CompiledMap, houses: { id: string; box: Shap
     }
   });
   for (const t of c.layout.trees) if (!inMap(t.x, t.z, 0.5) || lakeD(t.x, t.z) < 0.5) out.push(`tree at ${t.x.toFixed(1)},${t.z.toFixed(1)} is off the map or in the lake`);
-  for (const p of c.layout.props) if (!inMap(p.x, p.z, 0.5) || lakeD(p.x, p.z) < 0.5) out.push(`${p.kind} at ${p.x.toFixed(1)},${p.z.toFixed(1)} is off the map or in the lake`);
+  for (const p of c.layout.props) if (!inMap(p.x, p.z, 0.5) || (p.kind !== 'bridge' && lakeD(p.x, p.z) < 0.5)) out.push(`${p.kind} at ${p.x.toFixed(1)},${p.z.toFixed(1)} is off the map or in the lake`);
   // Every door can be reached from where the hero starts.
   if (!out.length) {
     const grid = new NavGrid(g.size, layoutObstacles(c.layout, built), { radius: 0.2, blocked: (x, z) => lakeD(x, z) < 0.2 });

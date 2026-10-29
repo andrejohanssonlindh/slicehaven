@@ -22,6 +22,8 @@ export const WORLD = {
   /** Mist blown away by wind: xy the way it blows (unit), z how far downwind of the focus mist is left from (metres; below -reach: all left), w the soft edge. */
   uMistBlow: { value: new THREE.Vector4(1, 0, -60, 12) },
   uMistColor: { value: new THREE.Vector3(0.7, 0.72, 0.76) },
+  /** How full the hollows are with rain, 0..1: it climbs slowly while it rains and drains slowly after. */
+  uPool: { value: 0 },
   /** How far the wind has carried the water's ripples (xz): the wind's push added up over time, so a change of wind never jumps them. */
   uDrift: { value: new THREE.Vector2(0, 0) },
   /** How hard the wind blows as the world feels it:0 calm, about 0.6 a stiff breeze, over 2 a gale. */
@@ -181,6 +183,7 @@ function patch(mat: THREE.MeshLambertMaterial, o: LitOpts, shell?: ShellOpts): v
 uniform float uTime;
 uniform vec3 uWind;
 uniform float uPixWorld;
+${o.puddles ? 'attribute float aHollow;\nvarying float vHollow;' : ''}
 varying vec3 vWPos;
 varying vec3 vVPos;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
@@ -205,6 +208,7 @@ ${o.sway ? `{
   #endif
   vWPos = (modelMatrix * wp).xyz;
   vVPos = mvPosition.xyz;
+  ${o.puddles ? 'vHollow = aHollow;' : ''}
 }`);
     const lights = THREE.ShaderChunk.lights_fragment_begin.replace(
       'getDirectionalLightInfo( directionalLight, directLight );',
@@ -213,6 +217,7 @@ ${o.sway ? `{
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
 uniform float uWet;
+${o.puddles ? 'uniform float uPool;\nvarying float vHollow;' : ''}
 uniform vec4 uMist;
 uniform vec2 uMistAt;
 uniform vec4 uMistBlow;
@@ -263,17 +268,18 @@ ${o.seeThrough ? `for (int i = 0; i < ${SEE_SLOTS}; i++) {
   }
 }` : ''}
 ${o.wettable ? 'diffuseColor.rgb *= 1.0 - uWet * 0.28;' : ''}
-${o.puddles ? `if (uWet > 0.3) {
-  // Pools sit in the flat parts; the noise is sampled per art pixel so the rim is a hard pixel edge, and it grows as the rain goes on.
+${o.puddles ? `if (uPool > 0.02) {
+  // Pools stand in the hollows (vHollow, from the ground itself) and fill from the lowest point outward as the rain goes on;
+  // the rim is ragged and a hard pixel edge.
   vec3 fn = normalize(cross(dFdx(vWPos), dFdy(vWPos)));
   vec2 pp = floor(vWPos.xz / uPixWorld) * uPixWorld;
-  float pool = shFbm(pp / 2.6, 913);
-  float edge = 0.71 - (uWet - 0.3) * 0.2;
-  float inPool = step(edge, pool) * smoothstep(0.93, 0.99, abs(fn.y));
+  float rag = (shValue(pp * 2.5, 913) - 0.5) * 0.16;
+  float edge = 1.0 - uPool * 0.6;
+  float inPool = step(edge + rag, vHollow) * step(0.12, vHollow) * smoothstep(0.93, 0.99, abs(fn.y));
   // Dark water with a pale sky in it, a ring of ripples while it falls.
   float ripple = uWet > 0.55 ? 0.5 + 0.5 * sin(length(pp - floor(pp * 0.9 + 0.5) / 0.9) * 40.0 - uTime * 6.0) : 0.0;
-  vec3 water = vec3(0.13, 0.18, 0.25) + vec3(0.07, 0.09, 0.12) * smoothstep(edge, edge + 0.1, pool) + ripple * 0.03;
-  diffuseColor.rgb = mix(diffuseColor.rgb, water, inPool * 0.8);
+  vec3 water = vec3(0.13, 0.18, 0.25) + vec3(0.07, 0.09, 0.12) * smoothstep(edge, edge + 0.25, vHollow) + ripple * 0.03;
+  diffuseColor.rgb = mix(diffuseColor.rgb, water, inPool * 0.85);
   poolMask = inPool;
 }` : ''}
 ${shell ? `{

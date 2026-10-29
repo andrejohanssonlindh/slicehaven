@@ -11,6 +11,8 @@ export const SPIKE_MAP: MapSpec = {
   size: 64,
   roads: [{ pts: [[-32, 8], [-24, 7], [-12, 5.2], [-3, 4.6], [6, 5.4], [14, 4.2], [24, 6], [32, 9]], width: 2.8 }],
   lake: { x: -13, z: -9, r: 7 },
+  // A stream from the upper right (north-east) down to the lake, crossed by a footbridge.
+  rivers: [{ pts: [[34, -30], [26, -23], [17, -19.5], [8, -17.5], [0, -16.5], [-6, -14.5], [-9.5, -12.5]], width: 2.2 }],
   mud: [
     { x: -0.6, z: 1.6, r: 3.2 },
     { x: 3.5, z: 4.4, r: 2.4 },
@@ -76,6 +78,8 @@ export const SPIKE_MAP: MapSpec = {
     { kind: 'bench', x: -14.5, z: 9.2, seed: 44 },
     { kind: 'trough', x: 11, z: 12.8, seed: 45 },
     { kind: 'stump', x: -12, z: 13, seed: 46 },
+    // The footbridge over the stream, north of the home (the span runs across the water).
+    { kind: 'bridge', x: 8, z: -17.5, rot: -1.35, len: 5, seed: 47 },
   ],
   hero: [2.4, 1.2],
   walk: [[-12, 5.6], [-3, 5.0], [6, 5.8], [12, 4.8]],

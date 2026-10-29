@@ -71,6 +71,7 @@ export function geometryOf(m: MeshData): THREE.BufferGeometry {
   const c = new Float32Array(m.ao.length * 3);
   m.ao.forEach((a, i) => c.set([a, a, a], i * 3));
   g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+  if (m.hollow) g.setAttribute('aHollow', new THREE.Float32BufferAttribute(m.hollow, 1));
   g.setIndex(m.indices);
   return g;
 }
@@ -404,6 +405,8 @@ export class SpikeWorld {
   /** The camera follows the hero while it walks, until the player drags the view. */
   follow = false;
   private wet = 0;
+  /** How full the hollows are with rain, 0..1 (`WORLD.uPool`). */
+  private pool = 0;
   /** Mist asked for, 0..1 (0 leaves it to the weather), and the eased value in use. */
   private mist = 0;
   private mistNow = 0;
@@ -1777,6 +1780,10 @@ export class SpikeWorld {
     WORLD.uCloud.value.set(cloudThreshold(env.cloudCover), 0.55 * (1 - env.night * 0.7), this.cloudOff.x, this.cloudOff.y);
     this.wet += (env.wetness - this.wet) * (1 - Math.exp(-dt / (env.wetness > 0.5 ? 6 : 25)));
     WORLD.uWet.value = this.wet;
+    // Hollows fill slowly (steady rain takes minutes to leave pools, a storm about a minute and a half) and drain slower still.
+    const downpour = Math.max(0, w.rain - 0.15);
+    this.pool = Math.min(1, Math.max(0, this.pool + (downpour > 0 ? (downpour * dt) / 80 : -dt / 240)));
+    WORLD.uPool.value = this.pool;
     WORLD.uWind.value.set(wx, wz, gale);
     WORLD.uGale.value = gale;
     WORLD.uDrift.value.x += wx * dt * 0.6;
@@ -1865,9 +1872,9 @@ export class SpikeWorld {
     for (const k of this.camps) sm.push({ c: k.smoke, d: Math.hypot(k.x - this.focus.x, k.z - this.focus.z) });
     sm.sort((a, b) => a.d - b.d);
     this.smoke.update(this.time, sm.map((s) => s.c), { x: wx, z: wz }, 1 - env.night * 0.8, 1 - Math.min(1, w.rain) * 0.5);
-    if (this.water && this.ground.lake) {
-      const lk = this.ground.lake;
-      this.water.mesh.visible = this.vision.outer <= 0 || Math.hypot(this.focus.x - lk.x, this.focus.z - lk.z) < lk.r * 1.4 + this.vision.outer;
+    if (this.water) {
+      const b = this.water.bounds;
+      this.water.mesh.visible = this.vision.outer <= 0 || Math.hypot(this.focus.x - b.x, this.focus.z - b.z) < b.r + this.vision.outer;
     }
     if (this.water) this.water.light(this.sun.color, this.sun.intensity, lin(env.skyHorizon), this.hemi.color.clone().multiplyScalar(env.ambient * 0.5), env.night);
   }

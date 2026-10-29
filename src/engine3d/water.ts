@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { type Ground3D, WATER_Y, groundHeight } from '../core/world3d/terrain';
+import { type Ground3D, WATER_Y, groundHeight, riverFlow } from '../core/world3d/terrain';
 import { TEXELS_PER_M } from '../core/world3d/tiers';
 import { NOISE_GLSL, VISION_BODY, VISION_DECLS, VISION_UNIFORMS, WORLD } from './materials';
 
@@ -39,9 +39,13 @@ ${NOISE_GLSL}
 #include <fog_pars_fragment>
 void main() {
   vec2 cell = floor(vWPos.xz * ${TEXELS_PER_M.toFixed(1)}) / ${TEXELS_PER_M.toFixed(1)};
-  float depth = texture2D(tDepth, (cell - uDepthRect.xy) / uDepthRect.zw).r * 2.0;
+  vec4 tx = texture2D(tDepth, (cell - uDepthRect.xy) / uDepthRect.zw);
+  float depth = tx.r * 2.0;
   if (depth <= 0.0) discard;
-  vec2 drift = uDrift;
+  // A stream runs: its ripples are carried along its way (toward the lake) at a walking pace, the wind's drift only on still water.
+  vec2 flow = (tx.gb - 0.5) * 2.0;
+  float run = min(1.0, length(flow));
+  vec2 drift = uDrift * (1.0 - run) + flow * uTime * 0.9;
   float r1 = shValue(vec2(cell.x * 1.7 - drift.x, cell.y * 4.5 - drift.y), 5);
   float r2 = shValue(vec2(cell.x * 3.1 + uTime * 0.21, cell.y * 7.0 - uTime * 0.13), 6);
   // Wind roughens it: from a stiff breeze the ripples shorten and sharpen, and in a gale the crests break white and the shore foam churns.
@@ -76,25 +80,44 @@ void main() {
 
 export interface Water {
   mesh: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
+  /** A circle that holds all the water (to skip drawing it when it is far from view). */
+  bounds: { x: number; z: number; r: number };
   /** Light it to match the sky. Colours linear. */
   light(sun: THREE.Color, sunI: number, sky: THREE.Color, ambient: THREE.Color, night: number): void;
 }
 
 export function makeWater(g: Ground3D): Water | null {
-  if (!g.lake) return null;
-  const span = g.lake.r * 3.2;
-  const x0 = g.lake.x - span / 2, z0 = g.lake.z - span / 2;
-  // Depth below the water line on a coarse grid, 0..2 m in a byte.
-  const n = Math.ceil(span * 4);
-  const data = new Uint8Array(n * n * 4);
-  for (let j = 0; j < n; j++) {
-    for (let i = 0; i < n; i++) {
-      const d = WATER_Y - groundHeight(g, x0 + ((i + 0.5) / n) * span, z0 + ((j + 0.5) / n) * span);
+  if (!g.lake && !g.rivers?.length) return null;
+  // The rectangle that holds the lake and every stream (with a margin for the banks).
+  let ax = Infinity, az = Infinity, bx = -Infinity, bz = -Infinity;
+  const take = (x: number, z: number, m: number): void => {
+    ax = Math.min(ax, x - m);
+    az = Math.min(az, z - m);
+    bx = Math.max(bx, x + m);
+    bz = Math.max(bz, z + m);
+  };
+  if (g.lake) take(g.lake.x, g.lake.z, g.lake.r * 1.6);
+  for (const r of g.rivers ?? []) for (const [x, z] of r.pts) take(x, z, r.width + 3);
+  const spanX = bx - ax, spanZ = bz - az;
+  const x0 = ax, z0 = az;
+  // Per texel (4 a metre): depth below the water line, 0..2 m, in red; the stream's way in green and blue (0.5 is still).
+  const nx = Math.ceil(spanX * 4), nz = Math.ceil(spanZ * 4);
+  const data = new Uint8Array(nx * nz * 4);
+  for (let j = 0; j < nz; j++) {
+    for (let i = 0; i < nx; i++) {
+      const x = x0 + ((i + 0.5) / nx) * spanX, z = z0 + ((j + 0.5) / nz) * spanZ;
+      const d = WATER_Y - groundHeight(g, x, z);
       const v = Math.max(0, Math.min(255, Math.round((d / 2) * 255)));
-      data.set([v, v, v, 255], (j * n + i) * 4);
+      let fx = 0, fz = 0;
+      if (g.rivers && d > 0) {
+        const f = riverFlow(g, x, z);
+        fx = f.x * f.k;
+        fz = f.z * f.k;
+      }
+      data.set([v, Math.round((0.5 + fx * 0.5) * 255), Math.round((0.5 + fz * 0.5) * 255), 255], (j * nx + i) * 4);
     }
   }
-  const depth = new THREE.DataTexture(data, n, n, THREE.RGBAFormat);
+  const depth = new THREE.DataTexture(data, nx, nz, THREE.RGBAFormat);
   depth.minFilter = depth.magFilter = THREE.LinearFilter;
   depth.needsUpdate = true;
   const mat = new THREE.ShaderMaterial({
@@ -102,7 +125,7 @@ export function makeWater(g: Ground3D): Water | null {
     fragmentShader: FRAG,
     uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {
       tDepth: { value: depth },
-      uDepthRect: { value: new THREE.Vector4(x0, z0, span, span) },
+      uDepthRect: { value: new THREE.Vector4(x0, z0, spanX, spanZ) },
       uSun: { value: new THREE.Color(1, 1, 1) },
       uSky: { value: new THREE.Color(0.5, 0.6, 0.8) },
       uAmbient: { value: new THREE.Color(0.4, 0.4, 0.4) },
@@ -120,13 +143,14 @@ export function makeWater(g: Ground3D): Water | null {
   mat.uniforms.uCloud = WORLD.uCloud;
   for (const k of VISION_UNIFORMS) mat.uniforms[k] = WORLD[k];
   mat.uniforms.tDepth.value = depth;
-  const geo = new THREE.PlaneGeometry(span, span);
+  const geo = new THREE.PlaneGeometry(spanX, spanZ);
   geo.rotateX(-Math.PI / 2);
   const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set(g.lake.x, WATER_Y, g.lake.z);
+  mesh.position.set(x0 + spanX / 2, WATER_Y, z0 + spanZ / 2);
   mesh.renderOrder = 2;
   return {
     mesh,
+    bounds: { x: x0 + spanX / 2, z: z0 + spanZ / 2, r: Math.hypot(spanX, spanZ) / 2 },
     light(sun, sunI, sky, ambient, night) {
       mat.uniforms.uSun.value.copy(sun).multiplyScalar(sunI * 0.4);
       mat.uniforms.uSky.value.copy(sky);
