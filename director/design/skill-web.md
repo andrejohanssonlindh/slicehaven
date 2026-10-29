@@ -2,7 +2,7 @@
 
 *Plan, 2026-10-26. From the director's notes on skills. **Not to be built in one go**: it grows one skill and one kind of thing at a time, each as a small vignette. Haiku (or any session) can fill in the content tables once the shape below is built.*
 
-Related: [Exploration scenes](exploration-scenes.md) (the gate scene is where this starts), [Character creator](character-creator.md), [Filaments](magic-filaments.md) (terrain and weather feed in here).
+Related: [Exploration scenes](../archive/exploration-scenes.md) (the gate scene is where this starts), [Character creator](character-creator.md), [Filaments](magic-filaments.md) (terrain and weather feed in here).
 
 ## The problem
 Today a skill is "useful here" only where a scene author wrote it in by hand. That makes skills feel like keys for one lock: Search finds the cart's pass, Climb gets over the boulder. The director wants skills to feel **usable almost everywhere**, without being obvious or single-purpose. Also, noting "you could climb over" in a scene with no quest hands the player the answer; that should be a skill check instead.

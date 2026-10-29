@@ -1,5 +1,11 @@
 # Devlog
 
+## 2026-10-29 — The 2D engine removed; code review of the 3D world
+
+- **Review** of everything since M2: [review-2026-10-29](design/review-2026-10-29.md). The core is sound. The weak spot is `engine3d/world.ts`, which holds the walking and stairs rules. Bugs found: the hero drops to the ground floor if the view is dragged far from them, and some materials leak as houses and torches stream. Nothing fixed yet; the order of work is at the end of the review.
+- **Removed:** the hex sandbox (`/`), the gate scene page (`/scene/`), Reedwater (`/village/`), the Art Lab (`/artlab/`), the Director's "Village art" tab, `src/engine/`, the hex and battle core, and their tests (543 → 395 tests). `/` is now a plain hub. All of it is kept in the git tag **`2d-archive`**, and the art as [pictures](archive/2d-art.md). The old design pages moved to `director/archive/`.
+- **Untangled:** the 3D world no longer needs any hex code. The filament rules (`core/filaments.ts`) have their own cell type (`FCell`), the weather moved to `core/world3d/weather.ts` without the 2D rain and leaves, and the ground painter is `art/ground.ts`. The gate scene's rules and data stay: the skill map reads them.
+
 ## 2026-10-30 — Stairs made easy, WASD, rooms upstairs, slimmer horses
 
 - **Stairs are a ramp, not a cutscene:** the hero can stop half way, steer on, or turn back (`SpikeWorld.onStair`, `planFromStair` picks the nearer end). **Up/Down buttons** appear when the hero is in a house with another storey; tapping a flight (or near it, at any height along it) climbs it from the floor it starts on and goes down from the floor it comes up to.

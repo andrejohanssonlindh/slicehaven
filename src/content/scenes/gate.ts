@@ -1,4 +1,3 @@
-import type { MobKind } from '../../art/mapScene';
 import { DIFFICULTY } from '../../core/checks';
 import type { Effect, SceneDef } from '../../core/scene';
 import { SKILL_SETS } from '../rollables';
@@ -13,6 +12,9 @@ import { surveyChallenge } from '../skillweb/challenges';
  */
 
 /** How the people in this scene are drawn. */
+/** Which figure stands for a kind of person or beast (the hex scene's sprites; kept as data for the skill map). */
+export type MobKind = 'shepherd' | 'rat' | 'wolf' | 'skeleton' | 'guard' | 'villager';
+
 export const GATE_KINDS: Record<string, { sprite: MobKind; variant?: string; tool?: 'crook' | 'spear' | 'stick' }> = {
   hero: { sprite: 'shepherd' },
   guard: { sprite: 'guard' },
@@ -41,7 +43,7 @@ export const GATE_SCENE: SceneDef = {
     'Night has fallen by the time you reach the village. The gate is shut, a torch burns beside it, and a guard leans on his spear.',
     'You have 100 silver and nowhere to sleep.',
   ],
-  // Offset coords, 10 × 12. Row 3 is the palisade. Legend: see engine/scene.ts.
+  // Offset coords, 10 × 12. Row 3 is the palisade. (The hex scene that drew this is in the `2d-archive` git tag, engine/scene.ts.)
   layout: [
     'ggTgpgggPg',
     'gggppggggT',

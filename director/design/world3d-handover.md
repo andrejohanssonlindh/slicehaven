@@ -2,6 +2,8 @@
 
 *2026-10-28, after M0. Read this first, then [the M0 page](world3d-m0.md) for the choices and numbers, then [the brief](voxel-engine-brief.md) §7–§10 for the later milestones.*
 
+**2026-10-29: read the [code review](review-2026-10-29.md) first.** It lists the bugs (one failing vision e2e among them) and the order of work before M5. The 2D engine is gone: `Weather` is `core/world3d/weather.ts`, the filament rules use `FCell`/`FUnit` (`core/filaments.ts`), and the ground colours are `art/ground.ts`.
+
 ## Where we are
 *2026-10-28, after M1 and steps 2 and 3 of the old list.*
 - **M0 passed** (the look is right, 60 fps on the phone). **M1 core is done** (below), tap-to-walk works, and the filament field exists with a heat-map overlay.

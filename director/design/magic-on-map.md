@@ -1,6 +1,6 @@
 # Magic on the map: what each mystic skill could do
 
-*Started 2026-10-26. A note for later, from the director's feedback on the character creator: the creator now has all the mystic skills, but most of them don't do anything on the map yet.*
+*Started 2026-10-26. A note for later, from the director's feedback on the character creator: the creator now has all the mystic skills, but most of them don't do anything on the map yet. Written when the map was hexes: read "hex" as a 1.6 m filament cell, or a distance in metres. The hex sensing code it mentions was removed with the 2D engine (it is in the `2d-archive` git tag).*
 
 ## Where we stand
 - The map already knows **how strongly each aspect flows on every hex** (see [Magic: filaments](magic-filaments.md)). That is the ground every mystic skill stands on.

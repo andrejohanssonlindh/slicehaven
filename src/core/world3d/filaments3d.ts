@@ -1,6 +1,5 @@
-import type { Cell, Unit } from '../battle';
 import { type Environment, windVector } from '../environment';
-import { ASPECTS, type AspectId, BASE, type Context, type Emission, type HexFilaments, type Part, emissions } from '../filaments';
+import { ASPECTS, type AspectId, BASE, type Context, type Emission, type FCell, type FUnit, type Ground, type HexFilaments, type Part, emissions } from '../filaments';
 import { CHUNK } from './chunks';
 
 /**
@@ -42,7 +41,7 @@ export interface FSource {
   weight?: number;
 }
 
-export type Ground = NonNullable<Cell['ground']>;
+export type { Ground };
 
 export interface FilamentWorld {
   /** The world patch, centred on the origin, metres across (the field covers the whole chunks it touches). */
@@ -208,28 +207,20 @@ export class FilamentField {
     return this.staticCells.get(k) ?? [];
   }
 
-  private pseudoCell(i: number, j: number, src?: FSource): { cell: Cell; units: Unit[] } {
+  private pseudoCell(i: number, j: number, src?: FSource): { cell: FCell; units: FUnit[] } {
     const ground = this.inside(i, j) ? this.groundOf(i, j) : GROUND_CODES[0];
-    const cell: Cell = {
-      at: { q: i, r: j },
-      obstacle: false,
-      flammable: false,
-      water: ground === 'river' || ground === 'pond' || ground === 'ford',
-      fire: 'none',
-      ground,
-      indoors: this.inside(i, j) && this.indoorsOf(i, j),
-    };
-    const units: Unit[] = [];
+    const cell: FCell = { fire: 'none', ground, indoors: this.inside(i, j) && this.indoorsOf(i, j) };
+    const units: FUnit[] = [];
     if (src) {
       const w = src.weight ?? 1;
       switch (src.kind) {
         case 'tree': case 'pine': case 'thicket': case 'rock': cell.feature = src.kind; break;
-        case 'water': cell.ground = 'pond'; cell.water = true; break; // a well: still water, small
+        case 'water': cell.ground = 'pond'; break; // a well: still water, small
         case 'fire': cell.fire = 'burning'; break;
         case 'burnt': cell.fire = 'burnt'; break;
         case 'corpse': cell.corpses = w; break;
         default:
-          units.push({ id: '', kind: src.kind, name: src.kind, team: src.kind === 'friend' ? 'party' : 'foe', at: { q: i, r: j }, hp: 1, maxHp: 1 });
+          units.push({ kind: src.kind, team: src.kind === 'friend' ? 'party' : 'foe' });
       }
     }
     return { cell, units };
@@ -254,7 +245,7 @@ export class FilamentField {
     if (!ems && s.kind === 'light') this.emCache.set(s, (ems = [{ aspect: 'foto', label: 'Magic light', fall: [1.6, 0.9, 0.3], cap: 3 }]));
     if (!ems) {
       const { env } = this.cond;
-      const opts = { isUndead: (u: Unit) => u.kind === 'undead' };
+      const opts = { isUndead: (u: FUnit) => u.kind === 'undead' };
       const { cell, units } = this.pseudoCell(i, j, s);
       // Emissions of the ground under it are counted from the ground itself; take only what the source adds.
       // (A water source is the one thing that adds its own water.)
@@ -271,7 +262,7 @@ export class FilamentField {
 
   private waterEmissions(i: number, j: number): Emission[] {
     const { env } = this.cond;
-    return emissions(this.pseudoCell(i, j).cell, [], env, { isUndead: (u: Unit) => u.kind === 'undead' });
+    return emissions(this.pseudoCell(i, j).cell, [], env, { isUndead: (u: FUnit) => u.kind === 'undead' });
   }
 
   /**

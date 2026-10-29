@@ -36,24 +36,8 @@ function show(name: string): void {
   window.scrollTo(0, 0);
 }
 
-const artPane = document.getElementById('art') as HTMLElement;
-let studioMounted = false;
-
 function route(): void {
-  const name = decodeURIComponent(location.hash.slice(1)) || 'README';
-  const art = name === 'art';
-  main.hidden = art;
-  artPane.hidden = !art;
-  select.hidden = art;
-  document.getElementById('tab-notes')!.classList.toggle('on', !art);
-  document.getElementById('tab-art')!.classList.toggle('on', art);
-  if (art) {
-    if (!studioMounted) {
-      studioMounted = true;
-      void import('./artStudio').then((m) => m.mountStudio(artPane));
-    }
-    window.scrollTo(0, 0);
-  } else show(name);
+  show(decodeURIComponent(location.hash.slice(1)) || 'README');
 }
 
 select.addEventListener('change', () => (location.hash = select.value));

@@ -21,16 +21,13 @@ export default defineConfig({
   base: '/slicehaven/',
   define: { __BUILD__: JSON.stringify(buildStamp()) },
   build: {
-    chunkSizeWarningLimit: 2000, // Phaser alone is ~1.3 MB
+    chunkSizeWarningLimit: 2000, // three.js and the world are ~740 kB
     rollupOptions: {
       input: {
-        game: 'index.html',
+        home: 'index.html',
         director: 'director/index.html',
-        artlab: 'artlab/index.html',
         chargen: 'chargen/index.html',
-        scene: 'scene/index.html',
         skills: 'skills/index.html',
-        village: 'village/index.html',
         spike3d: 'spike3d/index.html',
       },
     },

@@ -8,38 +8,44 @@ This is the backstage area for Slicehaven: not part of the game, but where I (Cl
 - **[Questions for you](questions.md)**: things I need your call on. Answer in chat whenever.
 - **[Devlog](devlog.md)**: what got done, session by session.
 - **[Decisions](decisions.md)**: what we've locked in, and why.
+- **[Code review 2026-10-29](design/review-2026-10-29.md)**: what in the 3D world will hurt us later, and in what order to fix it.
 
 ## Try it
+- [The 3D world](https://andrejohanssonlindh.github.io/slicehaven/spike3d/): the live 3D pixel world (`?map=hamlet`, `?map=wilds` for Eastgate and the big map).
 - [Character creator](https://andrejohanssonlindh.github.io/slicehaven/chargen/)
-- [Village gate scene](https://andrejohanssonlindh.github.io/slicehaven/scene/)
-- [3D spike (M0)](https://andrejohanssonlindh.github.io/slicehaven/spike3d/): the live-3D pixel world on trial ([what to look at](design/world3d-m0.md))
-- [Engine sandbox](https://andrejohanssonlindh.github.io/slicehaven/) (hex movement, weather, fire, magic flow)
-- [Art Lab](https://andrejohanssonlindh.github.io/slicehaven/artlab/) (art tests; the final style isn't set)
+- [Skill map](https://andrejohanssonlindh.github.io/slicehaven/skills/): how skills relate (tags, examples, hooks, conflicts, counters, every way a skill can be used).
 
 ## Your vision
 - [Director's notes 2026-10-25](vision/2026-10-25-director-notes.md): movement, party traits, progression, the shepherd story. Ambitions to build on, not a checklist.
 
 ## Design
 - [Game design overview](design/game-design.md): where we are, what exists, what's undecided.
-- [Character creator](design/character-creator.md): plan, status, handover notes.
-- [Exploration scenes: the village gate](design/exploration-scenes.md): skills, talking, multi-hex things.
-- [Brief: the live-3D pixel world](design/voxel-engine-brief.md): three.js, pixel pipeline, shells, sprite people, soft light, weather, quality tiers, milestones. Written for the engineer.
-- [3D world, M0: the spike](design/world3d-m0.md): what the spike shows, the buttons, the choices made and the numbers.
-- [Reedwater: the first full village](design/village.md): the map, 15 houses, who lives where, new shop art.
-- [Magic: filaments](design/magic-filaments.md): where magic flows strong or weak, and why.
-- [Magic on the map](design/magic-on-map.md): what each mystic skill could do in play.
-- [Roadmap](design/roadmap.md): candidate vignettes.
-- [Skill map](../skills/) (a game page): how skills relate: tags, examples, hooks, conflicts, counters, and every way a skill can be used.
-- [Ways a skill can be used](design/ways-of-use.md): the list of every way of use we have considered, built and planned.
-- [Skill map handover](design/skill-map-handover.md): skills, the people library and hooks: what is done, what is not, where things live.
-- [Skill hooks: structure review](design/skill-structure-review.md): is the shape right before we fill in more (2026-10-27).
-- [Backlog (ranked)](design/backlog.md): what's open in the creator and in skills, in priority order.
-- [Skill web](design/skill-web.md): how skills meet the world (standard / object / quest hooks, intentions, gear, people, drives, terrain).
-- [Creator: next design pass](design/creator-next.md): pre-set characters, clearer event cards, life events as game hooks.
 
-## World and art
+**The 3D world**
+- [Handover](design/world3d-handover.md): where it stands, the code map, the traps, what's next. Read first.
+- [Brief: the live 3D pixel world](design/voxel-engine-brief.md): pipeline, shells, sprite people, light, weather, tiers, milestones.
+- [M0: the spike](design/world3d-m0.md): the first milestone's choices and numbers.
+- [Authoring maps and rooms](design/world3d-authoring.md): maps, houses and rooms as rules, not coordinates.
+- [Scale](design/world3d-scale.md): how a map can be kilometres across.
+
+**Rules: hero, skills, people, magic**
+- [Character creator](design/character-creator.md): plan, status, handover notes.
+- [Creator: next design pass](design/creator-next.md): pre-set characters, event cards, life events as game hooks.
+- [Skill map handover](design/skill-map-handover.md): skills, the people library and hooks.
+- [Skill web](design/skill-web.md): how skills meet the world.
+- [Ways a skill can be used](design/ways-of-use.md)
+- [People library](design/people-library.md)
+- [Skill hooks: structure review](design/skill-structure-review.md) (2026-10-27)
+- [Backlog (ranked)](design/backlog.md): open work in the creator and skills.
+- [Magic: filaments](design/magic-filaments.md) and [magic on the map](design/magic-on-map.md)
+
+## World
 - [World notes (Eon)](world/eon-notes.md): what we borrow and where we start.
-- [Art direction](art/art-direction.md): the current look, which is provisional.
+
+## Archive
+The 2D hex engine (the sandbox, the gate scene page, Reedwater, the Art Lab) was removed on 2026-10-29. Its code is kept in git under the tag `2d-archive`.
+- [The 2D art and pages, as pictures](archive/2d-art.md)
+- Old design pages: [game design (hex days)](archive/game-design-2026-10-26.md), [roadmap](archive/roadmap-2026-10-26.md), [the gate scene](archive/exploration-scenes.md), [Reedwater](archive/village-reedwater.md), [2D art direction](archive/art-direction-2d.md)
 
 ## Roles I'm filling
 Programmer · game designer · level designer · pixel artist · writer · (later) sound. You're the producer/director: you set direction, I propose and build, you veto.

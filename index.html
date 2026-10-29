@@ -2,45 +2,28 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#1a1420" />
     <title>Slicehaven</title>
     <link rel="stylesheet" href="/src/ui/style.css" />
+    <style>
+      body { overflow: auto; }
+      .hub { max-width: 420px; margin: 0 auto; padding: 24px 16px; display: flex; flex-direction: column; gap: 12px; }
+      .hub h1 { color: var(--accent); letter-spacing: 3px; font-family: 'Courier New', monospace; font-size: 22px; margin: 8px 0 0; }
+      .hub p { color: var(--muted); margin: 0 0 8px; font-size: 14px; }
+      .hub a { display: block; padding: 14px 16px; background: var(--panel); color: var(--ink); text-decoration: none; border-radius: 6px; }
+      .hub a b { display: block; color: var(--accent); margin-bottom: 2px; }
+      .hub a span { color: var(--muted); font-size: 13px; }
+    </style>
   </head>
   <body>
-    <div id="topbar">
-      <span class="logo">SLICEHAVEN</span>
-      <span class="tag">engine sandbox</span>
-      <span class="spacer"></span>
-      <button id="btn-save" type="button">Save</button>
-      <a class="btn" href="scene/">Gate</a>
-      <a class="btn" href="village/">Village</a>
-      <a class="btn" href="skills/">Skills</a>
-      <a class="btn" href="chargen/">Hero</a>
-      <a class="btn" href="artlab/">Art</a>
-      <a class="btn" href="director/">Director</a>
-    </div>
-    <div id="stage">
-      <canvas id="view"></canvas>
-      <div id="zoom">
-        <button type="button" data-zoom="1" aria-label="Zoom in">+</button>
-        <button type="button" data-zoom="-1" aria-label="Zoom out">−</button>
-        <button type="button" data-zoom="0" aria-label="Fit map">⤢</button>
-      </div>
-    </div>
-    <div id="panel">
-      <div id="info"></div>
-      <div class="tabs">
-        <button type="button" data-tab="act" class="on">Actions</button>
-        <button type="button" data-tab="world">World</button>
-        <button type="button" data-tab="magic">Magic</button>
-      </div>
-      <div id="magic-readout" hidden></div>
-      <div class="bar" id="bar-act"></div>
-      <div class="bar" id="bar-world" hidden></div>
-      <div class="bar" id="bar-magic" hidden></div>
-    </div>
-    <div id="toast" hidden></div>
-    <script type="module" src="/src/main.ts"></script>
+    <main class="hub">
+      <h1>SLICEHAVEN</h1>
+      <p>In the making: everything here is a test.</p>
+      <a href="spike3d/"><b>The world</b><span>The 3D world: walk the hamlet, houses, weather, magic.</span></a>
+      <a href="chargen/"><b>Make a hero</b><span>The character creator.</span></a>
+      <a href="skills/"><b>Skill map</b><span>How skills, people and hooks connect.</span></a>
+      <a href="director/"><b>Director's Room</b><span>Notes, questions, devlog.</span></a>
+    </main>
   </body>
 </html>

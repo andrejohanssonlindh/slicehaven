@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type Battle, type Unit, fit, unitAt, walkReach } from '../src/core/battle';
 import { advantages, modify, rollOpen, test } from '../src/core/checks';
-import { SHAPES, around, cover, gap } from '../src/core/footprint';
-import { hex, hexKey } from '../src/core/hex';
 import { byGroup, defaultHero, isRollable } from '../src/content/rollables';
 import { Rng } from '../src/core/rng';
 import {
@@ -13,18 +10,6 @@ import {
 } from '../src/core/social';
 import { GATE_SCENE } from '../src/content/scenes/gate';
 
-function grid(w: number, h: number, obstacles: [number, number][] = []): Battle {
-  const blocked = new Set(obstacles.map(([q, r]) => hexKey(hex(q, r))));
-  const cells: Battle['cells'] = {};
-  for (let q = 0; q < w; q++) {
-    for (let r = 0; r < h; r++) {
-      const at = hex(q, r);
-      cells[hexKey(at)] = { at, obstacle: blocked.has(hexKey(at)), flammable: false, water: false, fire: 'none' };
-    }
-  }
-  return { cells, units: [] };
-}
-
 /** An Rng that returns these d6 faces in order (then 1s). */
 function dice(...faces: number[]): Rng {
   const r = Rng.fromSeed(1);
@@ -32,44 +17,6 @@ function dice(...faces: number[]): Rng {
   r.int = (n: number) => (n === 6 ? (faces[i++] ?? 1) - 1 : 0);
   return r;
 }
-
-describe('footprints', () => {
-  it('covers its shape from the anchor', () => {
-    expect(cover(hex(2, 2), SHAPES.three).map(hexKey)).toEqual(['2,2', '3,2', '2,3']);
-  });
-
-  it('measures edge to edge and finds the hexes around', () => {
-    const rock = cover(hex(0, 0), SHAPES.three);
-    expect(gap(rock, [hex(2, 0)])).toBe(1);
-    expect(gap(rock, [hex(3, 0)])).toBe(2);
-    const ring = around(rock);
-    expect(ring.length).toBe(9);
-    expect(ring.some((h) => rock.some((x) => hexKey(x) === hexKey(h)))).toBe(false);
-  });
-
-  it('a big unit occupies every hex it covers', () => {
-    const b = grid(6, 6);
-    const troll: Unit = { id: 't', kind: 't', name: 't', team: 'foe', at: hex(1, 1), hp: 9, maxHp: 9, shape: SHAPES.three };
-    b.units.push(troll);
-    expect(unitAt(b, hex(2, 1))).toBe(troll);
-    expect(unitAt(b, hex(1, 2))).toBe(troll);
-    expect(unitAt(b, hex(2, 2))).toBeUndefined();
-  });
-
-  it('a big unit cannot squeeze through a one-hex gap', () => {
-    // A wall along q = 2 with one opening at r = 2.
-    const wall: [number, number][] = [0, 1, 3, 4, 5].map((r) => [2, r]);
-    const b = grid(5, 6, wall);
-    const small: Unit = { id: 's', kind: 's', name: 's', team: 'party', at: hex(0, 2), hp: 1, maxHp: 1 };
-    const big: Unit = { ...small, id: 'b', at: hex(0, 1), shape: SHAPES.three };
-    b.units.push(small);
-    expect(walkReach(b, small, 6).has('3,2')).toBe(true);
-    b.units = [big];
-    expect(fit(b, big, hex(1, 1))).toBe('blocked'); // its east hex would be in the wall
-    expect(fit(b, big, hex(1, 2))).toBe('stop'); // nosing into the gap is fine
-    expect([...walkReach(b, big, 8).keys()].some((k) => Number(k.split(',')[0]) >= 3)).toBe(false);
-  });
-});
 
 describe('open-ended rolls', () => {
   it('a six is replaced by two more dice and never counts itself', () => {

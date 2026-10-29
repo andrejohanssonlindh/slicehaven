@@ -29,7 +29,7 @@ import { type Ground3D, groundHeight, lakeDist, splatAt } from '../core/world3d/
 import { TEXELS_PER_M } from '../core/world3d/tiers';
 import { type Clump, buildTree } from '../core/world3d/tree';
 import { fbm } from '../core/noise';
-import { Weather } from '../engine/weather';
+import { Weather } from '../core/world3d/weather';
 import { makeFlame, makeOrb } from './fire';
 import { EXPLORED_WINDOW, type LitOpts, SEE_SLOTS, WORLD, exploredTexture, lit, pixTexture, shellOf, sightTexture } from './materials';
 import { SCORCH_SIZE, scorchImage } from '../core/world3d/scorch';
@@ -212,7 +212,7 @@ interface HouseInst {
 export class SpikeWorld {
   readonly scene = new THREE.Scene();
   readonly camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 160);
-  readonly weather = new Weather(1, 1);
+  readonly weather = new Weather();
   readonly focus = new THREE.Vector3(0, 0.5, 1);
   readonly camPix = new THREE.Vector2();
   ppm = 21;

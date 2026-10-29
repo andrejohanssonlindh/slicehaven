@@ -34,7 +34,7 @@ The 3D world has no hexes. How should fights and ranges work there? **A)** Dista
 ---
 
 ### Q21 — Reedwater, the first full village: what next?
-Open **Village** in the top bar. Pan, zoom, try Dusk and Night, tap houses and people, and **Step inside** the shops. The [design page](design/village.md) has the map and who lives where. Things I need from you:
+Open **Village** in the top bar. Pan, zoom, try Dusk and Night, tap houses and people, and **Step inside** the shops. The [design page](archive/village-reedwater.md) has the map and who lives where. Things I need from you:
 
 - **Is the gate scene this village?** I put the old palisade gate standing open across the west end of the main street, as a leftover from when the village was small. If the gate scene is a *different* village, say so and I'll take the gate out.
 - **Which shops matter?** I made nine insides: inn, bakery, smithy, herbalist, fishmonger, general store, weaver and two fisher homes. Names and owners are placeholders. Which ones do you want to play first, and which trades are missing (tanner, chandler, boatwright)?
@@ -79,7 +79,7 @@ Tell me A or B and I'll do the rest. I won't change repo visibility without your
 - **Q9 Filaments v2 / world step** → right direction; radiation too weak next to sources (fixed in 5b); want both turn-based and free-flowing time. Nature & magic good enough for now. *(2026-10-25)*
 - **Q7 Engine sandbox** → feels good; fixes requested (done in session 5). *(2026-10-25)*
 - **Q8 Filaments v1** → good start; sources should radiate, world should move in turns, shadows, bodies stay (done in session 5). *(2026-10-25)*
-- **Q6 Art test #1** → approved at the time; mobs need work; zoom needed. The final style is not set, see [art direction](art/art-direction.md). *(2026-10-25)*
+- **Q6 Art test #1** → approved at the time; mobs need work; zoom needed. The final style is not set, see [art direction](archive/art-direction-2d.md). *(2026-10-25)*
 - **Q1 Eon names** → keep the names. *(2026-10-25)*
 - **Q2 Party size** → variable, max 4; early game 1, later usually 2. *(2026-10-25)*
 - **Q4 Language** → English. *(2026-10-25)*

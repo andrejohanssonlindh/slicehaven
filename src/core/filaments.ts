@@ -1,19 +1,18 @@
-import { type Battle, type Cell, type Unit, cellAt } from './battle';
 import { type Environment, hourOf, moonLit, moonName } from './environment';
-import { DIRECTIONS, type Hex, hexAdd, hexDistance, hexKey, hexesWithin } from './hex';
 
 /**
- * Filaments: how strongly each magical aspect flows on each hex.
+ * Filaments: the rules for how strongly each magical aspect flows in a cell of
+ * ground. The field that applies them over the world is `world3d/filaments3d.ts`.
  *
  * Based on Eon's "Omgivningens tillstånd" (seven levels, from magic-dead to
  * extremely strong). Here: -3 (magic-dead) .. +3 (extreme).
  *
- * A hex's reading = the conditions on that hex (time, sky, wind, indoors, its
+ * A cell's reading = the conditions on that cell (time, sky, wind, indoors, its
  * ground, clouds and shadows) + what radiates into it from sources around it:
- * water, trees, stone, fire, ash, the dead, undead and the living. Sources
- * radiate to their own hex and up to two hexes out, weakening with distance,
- * and each kind of source is capped so stacking stays sane. The sum is
- * rounded and clamped. Every contribution is kept so the UI can explain it.
+ * water, trees, stone, fire, ash, the dead, undead and the living. Each source
+ * has a strength here, one cell away and two away (`Falloff`), and each kind of
+ * source is capped so stacking stays sane. The sum is rounded and clamped.
+ * Every contribution is kept so the UI can explain it.
  */
 export type AspectId =
   | 'bio' | 'foto' | 'geo' | 'hydro' | 'nekro' | 'pneumo' | 'pyro' | 'skoto'
@@ -62,11 +61,28 @@ export interface Reading {
 
 export type HexFilaments = Record<AspectId, Reading>;
 
+/** The ground of a cell, as the rules know it. */
+export type Ground = 'grass' | 'forest' | 'path' | 'tallgrass' | 'flowers' | 'mud' | 'river' | 'pond' | 'ford';
+
+/** What the rules need to know about one patch of ground (a cell of the field). */
+export interface FCell {
+  ground?: Ground;
+  feature?: 'tree' | 'pine' | 'rock' | 'thicket';
+  fire?: 'none' | 'burning' | 'burnt';
+  /** How many dead lie here. */
+  corpses?: number;
+  indoors?: boolean;
+}
+
+/** Someone alive (or undead) standing in a cell. */
+export interface FUnit {
+  kind: string;
+  team: 'party' | 'foe';
+}
+
 export interface FilamentOptions {
   /** Which units count as undead (they radiate necrotropy). */
-  isUndead?: (u: Unit) => boolean;
-  /** Is this hex under a cloud? (from the world's cloud field) */
-  isClouded?: (h: Hex) => boolean;
+  isUndead?: (u: FUnit) => boolean;
 }
 
 // --- sources --------------------------------------------------------------------
@@ -82,11 +98,11 @@ export interface Emission {
   cap: number;
 }
 
-export const isWater = (c: Cell): boolean => c.ground === 'river' || c.ground === 'pond' || c.ground === 'ford';
-export const isTall = (c: Cell): boolean =>
+export const isWater = (c: FCell): boolean => c.ground === 'river' || c.ground === 'pond' || c.ground === 'ford';
+export const isTall = (c: FCell): boolean =>
   (c.feature === 'tree' || c.feature === 'pine' || c.feature === 'thicket') && c.fire !== 'burnt';
 
-export function emissions(c: Cell, units: Unit[], env: Environment, opts: FilamentOptions): Emission[] {
+export function emissions(c: FCell, units: FUnit[], env: Environment, opts: FilamentOptions): Emission[] {
   const out: Emission[] = [];
   const e = (aspect: AspectId, label: string, fall: Falloff, cap: number) => out.push({ aspect, label, fall, cap });
   const lit = env.time !== 'night';
@@ -136,7 +152,7 @@ export function emissions(c: Cell, units: Unit[], env: Environment, opts: Filame
 // --- conditions on the hex itself ------------------------------------------------------
 
 export interface Context {
-  cell: Cell;
+  cell: FCell;
   env: Environment;
   outdoors: boolean;
   clouded: boolean;
@@ -144,15 +160,14 @@ export interface Context {
   shadowedBy: string | null;
   /** What breaks the wind here (a house upwind), if anything. Free-world fields only. */
   shelteredBy?: string | null;
-  /** Close to people's homes (free-world fields only; the hex games read roads and buildings off the hex). */
+  /** Close to people's homes. */
   settled?: boolean;
 }
 
 export type Base = (x: Context, add: (label: string, value: number) => void) => 'skipSources' | void;
 
-/** Where people live: told by the free world, or on a hex by a road or a building. */
-const isHomely = (cell: Cell, settled?: boolean): boolean =>
-  !!settled || cell.ground === 'path' || cell.feature === 'house' || cell.feature === 'wall' || cell.feature === 'gate' || cell.feature === 'cart' || cell.feature === 'campfire';
+/** Where people live: near homes, or on a road. */
+const isHomely = (cell: FCell, settled?: boolean): boolean => !!settled || cell.ground === 'path';
 
 export const overcast = (env: Environment): boolean => env.sky === 'rain' || env.sky === 'storm';
 
@@ -349,96 +364,3 @@ export const BASE: Record<AspectId, Base> = {
   },
 };
 
-/**
- * Object shadows. Light comes from the top-left, so by day trees throw their
- * shadow one hex to the south-east; at dusk the low sun throws long shadows
- * two hexes east (from trees) and one (from rocks). No shadows at night or
- * under a grey sky.
- */
-function shadowCaster(b: Battle, h: Hex, env: Environment, clouded: boolean): string | null {
-  if (env.time === 'night' || overcast(env) || clouded) return null;
-  const nameOf = (c: Cell | undefined, rocksToo: boolean): string | null => {
-    if (!c) return null;
-    if (isTall(c)) return c.feature === 'thicket' ? 'thicket' : 'tree';
-    if (rocksToo && c.feature === 'rock') return 'rock';
-    return null;
-  };
-  if (env.time === 'day') return nameOf(cellAt(b, hexAdd(h, DIRECTIONS[2])), false); // caster to the north-west
-  const w1 = hexAdd(h, DIRECTIONS[3]);
-  return nameOf(cellAt(b, w1), true) ?? nameOf(cellAt(b, hexAdd(w1, DIRECTIONS[3])), false); // casters to the west
-}
-
-// --- reading ---------------------------------------------------------------------
-
-interface Gathered {
-  total: number;
-  here: boolean;
-  near: number;
-  cap: number;
-}
-
-/** Filaments for every hex on the map. */
-export function readMap(b: Battle, env: Environment, opts: FilamentOptions = {}): Map<string, HexFilaments> {
-  // 1. Radiate every source out to its neighbourhood.
-  const incoming = new Map<string, Map<string, Gathered>>(); // hex -> "aspect|label" -> total
-  const unitsAt = new Map<string, Unit[]>();
-  for (const u of b.units) {
-    if (u.hp <= 0) continue;
-    const k = hexKey(u.at);
-    unitsAt.set(k, [...(unitsAt.get(k) ?? []), u]);
-  }
-  for (const [key, cell] of Object.entries(b.cells)) {
-    for (const em of emissions(cell, unitsAt.get(key) ?? [], env, opts)) {
-      for (const t of hexesWithin(cell.at, 2)) {
-        const d = hexDistance(cell.at, t);
-        const v = em.fall[d];
-        if (!v) continue;
-        const tk = hexKey(t);
-        if (!b.cells[tk]) continue;
-        let m = incoming.get(tk);
-        if (!m) incoming.set(tk, (m = new Map()));
-        const id = `${em.aspect}|${em.label}`;
-        const g = m.get(id) ?? { total: 0, here: false, near: 0, cap: em.cap };
-        g.total += v;
-        if (d === 0) g.here = true;
-        else g.near += 1;
-        m.set(id, g);
-      }
-    }
-  }
-
-  // 2. Add each hex's own conditions, then everything that reached it.
-  const out = new Map<string, HexFilaments>();
-  for (const [key, cell] of Object.entries(b.cells)) {
-    const clouded = !cell.indoors && !!opts.isClouded?.(cell.at);
-    const ctx: Context = {
-      cell,
-      env,
-      outdoors: !cell.indoors,
-      clouded,
-      shadowedBy: cell.indoors ? null : shadowCaster(b, cell.at, env, clouded),
-    };
-    const reading = {} as HexFilaments;
-    for (const a of ASPECTS) {
-      const parts: Part[] = [];
-      const skip = BASE[a.id](ctx, (label, value) => parts.push({ label, value }));
-      if (skip !== 'skipSources') {
-        for (const [id, g] of incoming.get(key) ?? []) {
-          const [aspect, label] = id.split('|');
-          if (aspect !== a.id) continue;
-          const value = g.cap >= 0 ? Math.min(g.total, g.cap) : Math.max(g.total, g.cap);
-          const where = g.here && g.near ? ` (here + ${g.near} near)` : g.here ? ' (here)' : ` ×${g.near} nearby`;
-          parts.push({ label: label + where, value });
-        }
-      }
-      const raw = parts.reduce((s, p) => s + p.value, 0);
-      reading[a.id] = { raw, parts, level: Math.max(-3, Math.min(3, Math.round(raw))) + 0 }; // +0 drops -0
-    }
-    out.set(key, reading);
-  }
-  return out;
-}
-
-export function readHex(b: Battle, h: Hex, env: Environment, opts: FilamentOptions = {}): HexFilaments | null {
-  return readMap(b, env, opts).get(hexKey(h)) ?? null;
-}

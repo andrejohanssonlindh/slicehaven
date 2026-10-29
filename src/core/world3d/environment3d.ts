@@ -2,7 +2,7 @@ import { cloudDensity, skyLight, type RGB } from './sky';
 
 /**
  * The one interface the renderer and the rules read for the world's
- * conditions (brief §6). Fed by the weather model (`engine/weather.ts`: eased
+ * conditions (brief §6). Fed by the weather model (`weather.ts`: eased
  * cloud cover, rain, wind, time of day) and nothing else, so what the player
  * sees is what the rules would be told.
  */

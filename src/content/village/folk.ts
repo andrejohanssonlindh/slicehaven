@@ -1,7 +1,7 @@
 import { CLOTH, FOLK, type FolkSpec, HAIR, SKIN } from '../../art/folk';
 
 /**
- * The people of Reedwater, as drawn. Who they are lives in reedwater.ts.
+ * The village people, as drawn (the cast of the old Reedwater map; the 3D world walks them as cards).
  * The first few reuse the art's starter cast; the rest are new combinations.
  */
 export const PEOPLE: Record<string, FolkSpec> = {

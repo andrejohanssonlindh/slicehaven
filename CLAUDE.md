@@ -1,6 +1,6 @@
 # Slicehaven — instructions for Claude
 
-Grounded fantasy campaign game on hex maps, built on a tabletop ruleset (D6 pools, skills, conflicts). Web game, hosted on GitHub Pages, saves in the browser. The original idea (Gloomhaven with dice instead of cards) is dropped.
+Grounded fantasy campaign game in a live 3D pixel world (measured in metres, no hexes), built on a tabletop ruleset (D6 pools, skills, conflicts). Web game, hosted on GitHub Pages, saves in the browser. The original idea (Gloomhaven with dice instead of cards) is dropped.
 
 ## Stage: design, building the engine
 - We are building the engine in **small vignettes** (a scene, a system). **Nothing is finished**: whatever the director does in the app is testing.
@@ -33,17 +33,17 @@ Read only the handover for the area you're asked about; don't read the whole `di
 |---|---|---|---|
 | Skills, people, hooks | `/skills/` | `director/design/skill-map-handover.md` | `src/content/skillweb`, `src/content/people`, `src/core/skillweb.ts`, `src/core/people.ts` |
 | Character creator | `/chargen/` | `director/design/character-creator.md` | `src/core/chargen`, `src/content/chargen`, `src/chargen` |
-| Exploration scenes (gate) | `/scene/` | `director/design/exploration-scenes.md` | `src/core/scene.ts`, `src/content/scenes`, `src/scene`, `src/engine/scene.ts` |
-| Village (full-map sketch) | `/village/` | `director/design/village.md` | `src/content/village`, `src/art/shopItems.ts`, `src/art/villageScene.ts`, `src/village` |
-| **3D world (current focus, three.js)** | `/spike3d/` | `director/design/world3d-handover.md` (then `world3d-m0.md`, `voxel-engine-brief.md`) | `src/core/world3d`, `src/engine3d`, `src/art/textures3d.ts`, `src/content/spike3d.ts`, `src/spike3d` |
-| Engine sandbox | `/` | `director/design/game-design.md` | `src/engine`, `src/art` |
-| Magic (planned) | | `director/design/magic-on-map.md`, `magic-filaments.md` | `src/core/filaments.ts` |
+| Gate scene rules (data for the skill map; its hex page is gone) | | `director/archive/exploration-scenes.md` | `src/core/scene.ts`, `src/content/scenes` |
+| **3D world (current focus, three.js)** | `/spike3d/` | `director/design/world3d-handover.md` (then `world3d-m0.md`, `voxel-engine-brief.md`), and the open items in `director/design/review-2026-10-29.md` | `src/core/world3d`, `src/engine3d`, `src/art/textures3d.ts`, `src/content/spike3d.ts`, `src/content/maps`, `src/content/furnish.ts`, `src/spike3d` |
+| Magic | | `director/design/magic-filaments.md`, `magic-on-map.md` | `src/core/filaments.ts` (rules), `src/core/world3d/filaments3d.ts` (field) |
 
-The deeper designs (`skill-web.md`, `people-library.md`, `ways-of-use.md`) are for when you change the shape, not for every task. Debug hooks: `window.scene` (`interact(id)`, `tapHex(col,row)`, `isBusy()`, `state`), `window.sandbox` (below).
+The deeper designs (`skill-web.md`, `people-library.md`, `ways-of-use.md`) are for when you change the shape, not for every task. Debug hook: `window.spike` (see the 3D handover).
+
+**The 2D hex engine was removed on 2026-10-29** (sandbox, gate scene page, Reedwater, Art Lab). Its code is in the git tag `2d-archive`, its art as pictures in `director/archive/2d-art.md`. Don't bring hex code back; take a painter from the tag only to give it a 3D use.
 
 ## Tech
-- Vite + TypeScript (strict), **own canvas engine** (no Phaser: dropped 2026-10-25, our art and lighting are per-pixel anyway). **three.js only for the 3D world pages** (`src/engine3d`, code-split; decision 2026-10-28). Vitest for unit tests (`tests/`). **Playwright** (Chromium) for browser tests and screenshots (`e2e/`; on a new machine run `npx playwright install chromium`, no sudo needed). `marked` for the Director's Room.
-- `npm run dev` (also on LAN with `--host`), `npm test`, `npm run build`, `npm run test:e2e` (Playwright browser tests in `e2e/`, ~1 min; run after changing `src/engine/scene.ts` or the scene UI).
+- Vite + TypeScript (strict). **three.js for the 3D world** (`src/engine3d`, code-split; decision 2026-10-28); art is still painted per pixel by code (`src/art`) and put on textures and sprite cards. Vitest for unit tests (`tests/`). **Playwright** (Chromium) for browser tests and screenshots (`e2e/`; on a new machine run `npx playwright install chromium`, no sudo needed). `marked` for the Director's Room.
+- `npm run dev` (also on LAN with `--host`), `npm test`, `npm run build`, `npm run test:e2e` (Playwright browser tests in `e2e/`, a few minutes; run after changing `src/engine3d` or the 3D page).
 - Deploy: `.github/workflows/deploy.yml` builds and publishes `dist/` on every push to `main`.
 - Vite `base` is `/slicehaven/`. Static assets go in `public/` and are referenced as `import.meta.env.BASE_URL + 'assets/...'`.
 
@@ -53,20 +53,18 @@ src/
   core/      Pure game rules. NO DOM imports. Deterministic (all randomness via core/rng.ts). Unit tested.
   content/   Game data, plain TS objects: chargen/, scenes/, npcs/, skillweb/ (skill tags, examples, hooks), people/ (facets, leanings).
   i18n/      Language support groundwork: t(key, 'English'). Language files are empty for now.
-  art/       Art generators: pixel buffers, terrain, props, mobs, icons. Everything is drawn by code.
-  engine/    Renderer, camera (zoom/pan), weather, lighting, effects, and the sandbox controller.
-  ui/        DOM overlays (top bar, menus, long text, dialogs) - text reads better in HTML than canvas on phones.
+  art/       Art generators: pixel buffers, people, furniture, wall/roof/ground textures (textures3d.ts). Everything is drawn by code.
+  engine3d/  The 3D renderer (three.js): world, pixel pipeline, materials, sprites, water, weather effects.
+  ui/        Shared page style and the character sheet.
   director/  Director's Room page script.
-  chargen/, scene/, skills/, artlab/   Page scripts for /chargen/, /scene/, /skills/, /artlab/ (each has an index.html at the root).
-director/    Markdown notes for the producer (design, world, art, story, questions, devlog).
-tests/       Vitest tests for core/.
-public/      Static assets (sprites, audio, fonts).
+  chargen/, skills/, spike3d/   Page scripts for /chargen/, /skills/, /spike3d/ (each has an index.html at the root; / is a plain hub).
+director/    Markdown notes for the producer (design, world, questions, devlog, archive). Images in public/director-art/.
+tests/       Vitest tests for core/ and content/.
+public/      Static assets.
 ```
 Rules of thumb:
-- Keep rules in `core/` and data in `content/`; the engine renders and animates, it doesn't decide rules.
+- Keep rules in `core/` and data in `content/`; the engine renders and animates, it doesn't decide rules. (`engine3d/world.ts` still breaks this for walking and the innkeeper; see the review.)
 - Check visual work in a real browser (dev server + Chrome tools) before pushing.
-- The sandbox exposes debug hooks on `window.sandbox` (`tap(q,r)`, `setMode`, `enemyTurn`, `isBusy`, state). Use them to fuzz-test async/animation code: random actions in a loop, record errors, flag if `isBusy()` stays true.
-- Animations: clamp progress to [0,1] and always resolve pending animation promises when a unit is removed.
 - Game state must be plain JSON-serialisable (it goes into the save).
-- Save formats carry a version (`core/save.ts`, `CHAR_VERSION`); data from another version is dropped, no migrations.
-- Phone-first: portrait 400×720 logical canvas, everything tappable, no hover-only UI.
+- Save formats carry a version (`CHAR_VERSION` in `core/chargen/state.ts`); data from another version is dropped, no migrations.
+- Phone-first: portrait, everything tappable, no hover-only UI.

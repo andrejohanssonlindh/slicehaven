@@ -5,10 +5,9 @@ import { THATCH, WOOD, boards, stoneWall } from './buildings';
 import { fbm, pick, white } from './grit';
 import { infill } from './houses';
 import { GW } from './humble';
-import { TILE_CENTER } from './hexTile';
+import { groundColor } from './ground';
 import { P } from './palette';
 import { Pix, ramp } from './pix';
-import { groundColor } from './terrain';
 
 /**
  * Textures for the 3D world, painted by the same hands as the 2D art: the
@@ -226,7 +225,6 @@ export function groundChunkPainter(g: Ground3D, ci: number, cj: number): { pix: 
   // Splat on a coarse grid (every 4 texels), interpolated: the noise does the edges.
   const S = 4, gn = Math.ceil(n / S) + 1;
   const grid = new Array(gn * gn);
-  const cx = TILE_CENTER.x, cy = TILE_CENTER.y;
   const SH = ['#1e1a16', '#2e2820', '#463c2e', '#5e523e', '#7a6c52'];
   let gridRow = 0, row = 0;
   const paintRow = (y: number): void => {
@@ -241,11 +239,11 @@ export function groundChunkPainter(g: Ground3D, ci: number, cj: number): { pix: 
       let col: string;
       if (w('shore') + jit > 0.5) {
         col = ramp(SH, 0.3 + fbm(wx / 5, wy / 4, 7) * 0.45 + (white(wx, wy, 8) - 0.5) * 0.25 - w('shore') * 0.2, wx, wy);
-      } else if (w('mud') + jit > 0.5) col = groundColor('mud', wx, wy, cx, cy);
-      else if (w('road') + jit > 0.5) col = groundColor('path', wx, wy, cx, cy);
-      else if (w('shade') + jit > 0.55) col = groundColor('forest', wx, wy, cx, cy);
-      else if (w('wild') + jit > 0.55) col = groundColor(fbm(wx / 30, wy / 30, 9) > 0.55 ? 'flowers' : 'tallgrass', wx, wy, cx, cy);
-      else col = groundColor('grass', wx, wy, cx, cy);
+      } else if (w('mud') + jit > 0.5) col = groundColor('mud', wx, wy);
+      else if (w('road') + jit > 0.5) col = groundColor('path', wx, wy);
+      else if (w('shade') + jit > 0.55) col = groundColor('forest', wx, wy);
+      else if (w('wild') + jit > 0.55) col = groundColor(fbm(wx / 30, wy / 30, 9) > 0.55 ? 'flowers' : 'tallgrass', wx, wy);
+      else col = groundColor('grass', wx, wy);
       p.set(x, y, col);
     }
   };

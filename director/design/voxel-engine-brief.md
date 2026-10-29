@@ -3,7 +3,7 @@
 *Written 2026-10-28 for the engineer (Opus) who will build it; **rewritten the same day** after the director chose live 3D over baked voxel sprites (the file keeps its old name so links hold). Read it once, then work milestone by milestone. It is a brief, not a spec: where it says "your call", it is.*
 
 ## 0. Why this exists
-The village page ([village.md](village.md), `/village/`) showed that the 2D hex renderer cannot scale: `VillageScene.render` redraws the whole map every frame and costs about **70 ms a frame at 38 × 31 hexes on a desktop**, worse on a phone. The director wants a **round village, about 75 to 100 m across (the "50 × 50 hex" idea), that you walk about in, with soft light, weather and clouds, and a world that is not made of hexes.**
+The village page ([village.md](../archive/village-reedwater.md), `/village/`, now removed) showed that the 2D hex renderer cannot scale: `VillageScene.render` redraws the whole map every frame and costs about **70 ms a frame at 38 × 31 hexes on a desktop**, worse on a phone. The director wants a **round village, about 75 to 100 m across (the "50 × 50 hex" idea), that you walk about in, with soft light, weather and clouds, and a world that is not made of hexes.**
 
 Decisions already made by the director (do not reopen them):
 1. **The world is real-time 3D**, rendered live, not baked. Use **three.js** (WebGL2). We are not writing a 3D engine.

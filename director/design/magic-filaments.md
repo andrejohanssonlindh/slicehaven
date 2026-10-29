@@ -1,6 +1,6 @@
 # Magic: filaments
 
-*Version 2, 2026-10-25. Try it in the sandbox's **Magic** tab.*
+*Version 2, 2026-10-25, written for the hex sandbox (now removed). The rules live on in the 3D world: hexes became 1.6 m cells with the same three-step falloff (`core/filaments.ts` for the rules, `core/world3d/filaments3d.ts` for the field). Try it in the 3D world's **Magic** group (the heat map).*
 
 ## The idea (director)
 We want to know which filaments are strong or weak where, changed by day/night (outdoors), indoors/outdoors and weather. Modifiers run from **−3 to +3**, with the extremes uncommon, but combinations can reach them (e.g. water around you + heavy weather). **Things radiate outward**: trees, rocks, fire, the dead and the living affect the hexes around them. **The world moves between turns**: clouds drift, fire spreads.
