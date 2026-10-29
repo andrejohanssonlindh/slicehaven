@@ -22,9 +22,24 @@ export const WORLD = {
   uPixWorld: { value: 1 / 21 },
   /** Holes through things in front of people (see `SEE_SLOTS`): xy the centre in view space, z how far from the camera, w 1 if used. */
   uSee: { value: Array.from({ length: 4 }, () => new THREE.Vector4(0, 0, 0, 0)) },
-  /** Vision: xy the centre (metres), z where the world starts to grey, w where it is black (w <= 0: off). */
+  /** Vision: xy the centre (metres), z where what is seen starts to fade, w where it is gone (w <= 0: off). */
   uVision: { value: new THREE.Vector4(0, 0, 0, 0) },
+  /** What has been seen before: a window of the explored map (one texel a metre), `uExploredBox` its corner (xy) and side (z), metres. */
+  uExplored: { value: null as THREE.DataTexture | null },
+  uExploredBox: { value: new THREE.Vector4(0, 0, 1, 0) },
 };
+
+/** Side of the explored-map window, in texels (metres). */
+export const EXPLORED_WINDOW = 160;
+/** The window's texture: a metre a texel, filtered so the edge of the known world is soft. */
+export const exploredTexture = ((): THREE.DataTexture => {
+  const t = new THREE.DataTexture(new Uint8Array(EXPLORED_WINDOW * EXPLORED_WINDOW), EXPLORED_WINDOW, EXPLORED_WINDOW, THREE.RedFormat);
+  t.magFilter = t.minFilter = THREE.LinearFilter;
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  t.needsUpdate = true;
+  return t;
+})();
+WORLD.uExplored.value = exploredTexture;
 
 /** How many people can have a see-through oval at once. */
 export const SEE_SLOTS = 4;
@@ -129,17 +144,21 @@ ${o.sway ? `{
 uniform float uWet;
 uniform vec2 uCamPix;
 uniform vec4 uVision;
+uniform vec4 uExploredBox;
+uniform sampler2D uExplored;
 varying vec3 vWPos;
 varying vec3 vVPos;
 uniform vec4 uSee[${SEE_SLOTS}];
 ${NOISE_GLSL}`)
-      // Beyond the edge of what can be seen the world loses its colour, then goes black.
+      // What is in sight is as it is; what was seen before is remembered in grey; the rest is black.
       .replace('#include <fog_fragment>', `#include <fog_fragment>
 if (uVision.w > 0.0) {
-  float k = smoothstep(uVision.z, uVision.w, length(vWPos.xz - uVision.xy));
+  float seen = 1.0 - smoothstep(uVision.z, uVision.w, length(vWPos.xz - uVision.xy));
+  vec2 euv = (vWPos.xz - uExploredBox.xy) / uExploredBox.z;
+  float known = (euv.x > 0.0 && euv.x < 1.0 && euv.y > 0.0 && euv.y < 1.0) ? texture2D(uExplored, euv).r : 0.0;
   float lum = dot(gl_FragColor.rgb, vec3(0.3, 0.59, 0.11));
-  gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(lum * 0.8), clamp(k * 1.5, 0.0, 1.0) * 0.75);
-  gl_FragColor.rgb *= 1.0 - smoothstep(0.5, 1.0, k);
+  vec3 remembered = vec3(lum * 0.62) * vec3(0.92, 0.95, 1.0) * known;
+  gl_FragColor.rgb = mix(remembered, gl_FragColor.rgb, seen);
 }`)
       .replace('#include <color_fragment>', `#include <color_fragment>
 ${o.seeThrough ? `for (int i = 0; i < ${SEE_SLOTS}; i++) {

@@ -1,5 +1,11 @@
 # Devlog
 
+## 2026-10-30 — Session 26d: sight is the hero's, and the map remembers
+
+- **Vision follows the hero**, not the camera (director's catch). The hero sees out to the tier's inner/outer radius.
+- **Explored map** (`core/world3d/explored.ts`, a hash map from chunk to a 32 × 32 mask of one-metre cells, with JSON for the save later): the hero marks everything within 95% of the inner radius as seen, every 2 m of walking. Drawn in the shader from a 160 m window of it (a 160 × 160 texture that follows the view): in sight is as it is, seen before is grey (62% brightness, a touch cool), never seen is black. Only chunks that were seen or are in sight now are built, so the grey places still show their houses and trees. *Forget map* clears it. Not saved yet.
+- Browser tests now start the 3D pages with `novision` unless the address says `vision=on` (they look at places away from the hero).
+
 ## 2026-10-29 (night) — Session 26c: see-through houses, no freeze on lights, vision
 
 - **See-through oval for houses** (as for trees): the hero shows through a roof or wall they are behind.

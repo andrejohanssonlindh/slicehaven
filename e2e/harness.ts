@@ -45,6 +45,10 @@ export async function openPage(env: Env, path: string, opts: { seed?: number; st
     if (m.type() === 'error') errors.push(`console.error: ${m.text()}`);
   });
   const q = opts.seed === undefined ? '' : `?seed=${opts.seed}`;
-  await page.goto(`${env.base}${path}${q}`);
+  // The 3D pages start with vision on (black past the hero's sight); most tests look at places away from the hero, so
+  // they run without it unless the address mentions it (`?vision=on`).
+  let p = path;
+  if (p.startsWith('/spike3d/') && !p.includes('vision')) p += `${p.includes('?') ? '&' : '?'}novision`;
+  await page.goto(`${env.base}${p}${q}`);
   return { page, errors };
 }

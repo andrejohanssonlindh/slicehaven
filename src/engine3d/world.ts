@@ -17,6 +17,7 @@ import { type Environment3D, environment } from '../core/world3d/environment3d';
 import { Rng } from '../core/rng';
 import type { HouseMaterial } from '../core/world3d/house';
 import { type BuiltHouse, type Layout, type PlacedTree, buildHouses, furnitureObstacles, houseAt, houseBox, houseOuterBox, houseToLocal, houseToWorld, houseWalls } from '../core/world3d/layout';
+import { Explored } from '../core/world3d/explored';
 import { PlacedIndex } from '../core/world3d/placed';
 import { footprints } from '../core/world3d/roomplan';
 import type { MeshData } from '../core/world3d/mesh';
@@ -29,7 +30,7 @@ import { type Clump, buildTree } from '../core/world3d/tree';
 import { fbm } from '../core/noise';
 import { Weather } from '../engine/weather';
 import { makeFlame, makeOrb } from './fire';
-import { type LitOpts, SEE_SLOTS, WORLD, lit, pixTexture, shellOf } from './materials';
+import { EXPLORED_WINDOW, type LitOpts, SEE_SLOTS, WORLD, exploredTexture, lit, pixTexture, shellOf } from './materials';
 import { Rain } from './rain';
 import { type SpriteCard, type WalkCard, blobShadow, spriteCard, walkCard } from './sprites';
 import { type Heat, makeFloorHeat, makeHeat } from './heat';
@@ -173,9 +174,49 @@ export class SpikeWorld {
    */
   vision = { inner: 0, outer: 0 };
   private tmpV = new THREE.Vector3();
+  /** Where the hero has been (seen within the vision radius): drawn grey where it is out of sight now. */
+  readonly explored = new Explored();
+  private markedAt: { x: number; z: number; r: number } | null = null;
+  private exploredWin = { ox: 0, oz: 0, dirty: true };
 
   setVision(inner: number, outer: number): void {
     this.vision = { inner, outer };
+  }
+
+  /** Forget everything seen (for testing). */
+  forgetMap(): void {
+    this.explored.clear();
+    this.markedAt = null;
+    this.exploredWin.dirty = true;
+  }
+
+  /** Is chunk (i, j) worth having: seen before, or inside the hero's sight now? (With vision off, always.) */
+  private worthLoading(i: number, j: number): boolean {
+    if (this.vision.outer <= 0 || this.explored.chunkSeen(i, j)) return true;
+    const h = this.hero;
+    const dx = Math.max(i * CHUNK - h.x, 0, h.x - (i + 1) * CHUNK), dz = Math.max(j * CHUNK - h.z, 0, h.z - (j + 1) * CHUNK);
+    return Math.hypot(dx, dz) <= this.vision.outer + 6;
+  }
+
+  /** Record what the hero can see, and keep the window the shader reads centred on the view. */
+  private stepExplored(): void {
+    const v = this.vision;
+    if (v.outer <= 0) return;
+    const h = this.hero, m = this.markedAt;
+    if (!m || m.r !== v.inner || Math.hypot(h.x - m.x, h.z - m.z) >= 2) {
+      if (this.explored.mark(h.x, h.z, v.inner * 0.95) > 0) this.exploredWin.dirty = true;
+      this.markedAt = { x: h.x, z: h.z, r: v.inner };
+    }
+    const half = EXPLORED_WINDOW / 2, w = this.exploredWin;
+    const cx = Math.floor(this.focus.x), cz = Math.floor(this.focus.z);
+    if (w.dirty || Math.abs(cx - (w.ox + half)) > 24 || Math.abs(cz - (w.oz + half)) > 24) {
+      w.ox = Math.floor((cx - half) / 8) * 8;
+      w.oz = Math.floor((cz - half) / 8) * 8;
+      this.explored.fill(exploredTexture.image.data as Uint8Array, EXPLORED_WINDOW, w.ox, w.oz);
+      exploredTexture.needsUpdate = true;
+      WORLD.uExploredBox.value.set(w.ox, w.oz, EXPLORED_WINDOW, 0);
+      w.dirty = false;
+    }
   }
 
   /** For testing: how many times faster than a stroll (1.6 m/s) the hero walks. */
@@ -659,16 +700,16 @@ export class SpikeWorld {
    * chunk costs a texture paint), nearest first; drops those well outside.
    */
   private streamChunks(all = false): void {
-    // Only what can be seen is built: with vision on, that is the vision's radius (and a margin), not the whole view.
-    const r = this.vision.outer > 0 ? Math.min(this.viewRadius(), this.vision.outer + 6) : this.viewRadius();
-    const want = chunksNear(this.ground, this.focus.x, this.focus.z, r);
+    // Only what has been seen, or can be seen now, is built (with vision on); the rest of the view stays black.
+    const r = this.viewRadius();
+    const want = chunksNear(this.ground, this.focus.x, this.focus.z, r).filter((c) => this.worthLoading(c.i, c.j));
     for (const id of want) {
       if (this.chunks.has(chunkKey(id.i, id.j))) continue;
       this.loadChunk(id.i, id.j);
       if (!all) break;
     }
     // Hysteresis: a chunk is dropped only well past the load radius.
-    const keep = new Set(chunksNear(this.ground, this.focus.x, this.focus.z, r + CHUNK * 0.75).map((c) => chunkKey(c.i, c.j)));
+    const keep = new Set(chunksNear(this.ground, this.focus.x, this.focus.z, r + CHUNK * 0.75).filter((c) => this.worthLoading(c.i, c.j)).map((c) => chunkKey(c.i, c.j)));
     for (const k of [...this.chunks.keys()]) if (!keep.has(k)) this.unloadChunk(k);
   }
 
@@ -1260,7 +1301,9 @@ export class SpikeWorld {
     this.fog.far = CAM_DIST + env.fogFar;
     // With vision on, what lies past it is black, not sky.
     this.scene.background = this.vision.outer > 0 ? fogC.clone().multiplyScalar(0.05) : fogC;
-    WORLD.uVision.value.set(this.focus.x, this.focus.z, this.vision.inner, this.vision.outer);
+    // Sight is the hero's, not the camera's.
+    WORLD.uVision.value.set(this.hero.x, this.hero.z, this.vision.inner, this.vision.outer);
+    this.stepExplored();
 
     // World uniforms: time, clouds, wetness, wind.
     WORLD.uTime.value = this.time;

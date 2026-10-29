@@ -160,6 +160,7 @@ function buildControls(): void {
     const next = steps[(at + 1) % steps.length];
     world.setVision(next * 0.7, next);
   });
+  button('row-perf', () => t('spike.forget', 'Forget map'), () => false, () => { world.forgetMap(); });
   button('row-perf', () => t('spike.tier', 'Tier: {n}', { n: tier.name }), () => false, () => {
     setTier(cycle(['low', 'medium', 'high'] as TierName[], tier.name));
   });
