@@ -31,6 +31,7 @@ import { fbm } from '../core/noise';
 import { Weather } from '../engine/weather';
 import { makeFlame, makeOrb } from './fire';
 import { EXPLORED_WINDOW, type LitOpts, SEE_SLOTS, WORLD, exploredTexture, lit, pixTexture, shellOf, sightTexture } from './materials';
+import { SCORCH_SIZE, scorchImage } from '../core/world3d/scorch';
 import { RAYS, type VisionSpec, angleGap, castSight, seenAt, turnToward, visionOf } from '../core/world3d/vision';
 import { Rain } from './rain';
 import { type SpriteCard, type WalkCard, blobShadow, spriteCard, walkCard } from './sprites';
@@ -266,6 +267,8 @@ export class SpikeWorld {
   autoBolts = true;
   /** The flash of the current bolt: one light that is always in the scene (adding lights at run time would recompile every shader). */
   private boltLight = new THREE.PointLight(0xcfe0ff, 0, 40, 1.5);
+  /** Where lightning has struck: the burnt ground it left (kept to a few; the oldest is cleared). */
+  private scorches: { x: number; z: number; mesh: THREE.Mesh }[] = [];
   private bolt: { group: THREE.Group; age: number; repeats: number[] } | null = null;
   private camps: { x: number; z: number; group: THREE.Group; torch: Torch }[] = [];
   private windowMats: THREE.MeshLambertMaterial[] = [];
@@ -370,9 +373,13 @@ export class SpikeWorld {
     this.field = new FilamentField(streamingFilamentWorld(g, placed, built, () => this.fieldExtras()));
   }
 
-  /** The fixed sources that are not placed things: house fires, the door torch, campfires lit by hand. */
+  /** The fixed sources that are not placed things: house fires, the door torch, campfires lit by hand, ground burnt by lightning. */
   private fieldExtras(): FSource[] {
-    return [...this.fires, ...this.camps.map((c): FSource => ({ x: c.x, z: c.z, kind: 'fire', weight: 1 }))];
+    return [
+      ...this.fires,
+      ...this.camps.map((c): FSource => ({ x: c.x, z: c.z, kind: 'fire', weight: 1 })),
+      ...this.scorches.map((c): FSource => ({ x: c.x, z: c.z, kind: 'burnt' })),
+    ];
   }
 
   private houseGlow: THREE.DataTexture | null = null;
@@ -1143,10 +1150,39 @@ export class SpikeWorld {
       group.add(seg);
     }
     this.scene.add(group);
+    this.scorch(x, z, rnd);
     this.bolt = { group, age: 0, repeats: [0.14, 0.3] };
     this.boltLight.position.set(x, y + 3, z);
     this.weather.flash = 1;
     return { x, z };
+  }
+
+  /** A burnt, fern-scarred patch where the bolt landed. It is ash to the filament field too. */
+  private scorch(x: number, z: number, rnd: () => number): void {
+    const img = scorchImage(rnd);
+    const map = pixTexture(img.data, img.size, img.size, { mips: false });
+    map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
+    const geo = new THREE.PlaneGeometry(SCORCH_SIZE, SCORCH_SIZE);
+    geo.rotateX(-Math.PI / 2);
+    // Lie on the highest ground under the patch, so a slope does not bury it.
+    const r = SCORCH_SIZE * 0.4;
+    const y = Math.max(...[[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]].map(([dx, dz]) => this.store.heightAt(x + dx, z + dz)));
+    const mat = lit({ map, sprite: true });
+    mat.polygonOffset = true;
+    mat.polygonOffsetFactor = -2;
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(x, y + 0.03, z);
+    mesh.rotation.y = rnd() * Math.PI * 2;
+    mesh.renderOrder = 1;
+    this.scene.add(mesh);
+    this.scorches.push({ x, z, mesh });
+    while (this.scorches.length > 10) {
+      const old = this.scorches.shift()!;
+      this.scene.remove(old.mesh);
+      old.mesh.geometry.dispose();
+      (old.mesh.material as THREE.Material).dispose();
+    }
+    this.syncFires();
   }
 
   private clearBolt(): void {

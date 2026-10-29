@@ -105,6 +105,13 @@ describe('spike3d lightning and fires', () => {
     await page.screenshot({ path: `${OUT}spike3d-fire.png` });
     await w('(w.douseFires(), 0)');
     expect(await w('w.campfires')).toBe(0);
+
+    // A strike on open ground by day leaves a burnt, fern-scarred patch that stays (and is ash to the filament field).
+    await w("(w.weather.setHour(12), w.autoBolts = false, w.strike({ x: w.hero.x + 3, z: w.hero.z + 4 }), 0)");
+    await page.waitForTimeout(1500);
+    expect(await w('w.scorches.length')).toBe(2); // (the night's bolt left one too)
+    expect(await w('w.field.readAt(w.hero.x + 3, w.hero.z + 4).nekro.parts.some((p) => p.label.startsWith("Ash"))')).toBe(true);
+    await page.screenshot({ path: `${OUT}spike3d-scorch.png` });
     expect(errors).toEqual([]);
   });
 });
