@@ -24,25 +24,25 @@ const MANE = ['#0e0a08', '#1e1610', '#33261a'];
  */
 export function makeHorse(seed = 1): Prop {
   const coat = COATS[((seed % COATS.length) + COATS.length) % COATS.length];
-  const p = new Pix(36, 54);
-  const g = 50; // ground
+  const p = new Pix(26, 52);
+  const g = 48; // ground
   const fur = (x: number, y: number, light: number): string => pick(coat, light + (fbm(x / 3, y / 2, seed) - 0.5) * 0.3 + (white(x, y, seed + 2) - 0.5) * 0.1, x, y);
-  // Far (front) legs peek out either side of the barrel; hind legs under the quarters.
-  for (const x of [11, 25]) capsule(p, x, 22, x, g - 22, 2.2, 1.5, coat.slice(0, 3), seed + 1, 0.2);
-  for (const x of [11, 25]) capsule(p, x, 34, x + (x < 18 ? -1 : 1), g - 3, 3, 1.6, coat, seed + 3, 0.2);
-  for (const x of [10, 26]) for (let dx = -2; dx <= 2; dx++) for (let dy = 0; dy < 3; dy++) p.set(x + dx, g - 2 + dy, '#1c1612');
-  // Neck and head, going away up the picture, with the mane along the crest and the ears.
-  ellipse(p, 18, 9, 4.6, 6.5, (x, y) => fur(x, y, 0.7 - (y - 3) * 0.02));
-  capsule(p, 18, 2, 18, 12, 1.7, 2.4, MANE, seed + 6, 0.4);
-  polyFill(p, [[13, 4], [14, 0], [16.5, 4]], () => coat[1]);
-  polyFill(p, [[20, 4], [22, 0], [23.5, 4]], () => coat[1]);
-  // The barrel, then the quarters, broad and rounded, lit from the top.
-  ellipse(p, 18, 19, 9, 9, (x, y) => fur(x, y, 0.85 - (y - 10) * 0.025));
-  ellipse(p, 18, 30, 11.5, 10, (x, y) => fur(x, y, 0.9 - (y - 20) * 0.03 - Math.abs(x - 15) * 0.012));
-  // The tail hangs down the middle of the rump.
-  capsule(p, 18, 24, 18, 44, 2.6, 1.5, MANE, seed + 5, 0.4);
-  if (seed % 3 === 0) for (let y = 4; y < 12; y++) p.set(18, y, '#d8d4cc');
-  return finish(p, 18, g, seed, 18);
+  // Hind legs under the quarters, the far legs showing a little either side of the barrel.
+  for (const x of [9, 17]) capsule(p, x, 24, x, g - 20, 1.6, 1.1, coat.slice(0, 3), seed + 1, 0.2);
+  for (const x of [9.5, 16.5]) capsule(p, x, 32, x + (x < 13 ? -0.5 : 0.5), g - 3, 2.2, 1.3, coat, seed + 3, 0.2);
+  for (const x of [9, 17]) for (let dx = -1; dx <= 1; dx++) for (let dy = 0; dy < 3; dy++) p.set(x + dx, g - 2 + dy, '#1c1612');
+  // Neck and head going away up the picture, the mane along the crest, the ears.
+  ellipse(p, 13, 9, 3.4, 6, (x, y) => fur(x, y, 0.7 - (y - 3) * 0.02));
+  capsule(p, 13, 2, 13, 12, 1.3, 1.8, MANE, seed + 6, 0.4);
+  polyFill(p, [[9.5, 4], [10.5, 0], [12, 4]], () => coat[1]);
+  polyFill(p, [[14.5, 4], [15.5, 0], [16.5, 4]], () => coat[1]);
+  // The barrel, then the quarters, lit from above.
+  ellipse(p, 13, 19, 5.6, 8, (x, y) => fur(x, y, 0.85 - (y - 11) * 0.025));
+  ellipse(p, 13, 29, 7, 8.5, (x, y) => fur(x, y, 0.9 - (y - 21) * 0.03 - Math.abs(x - 11) * 0.015));
+  // The tail hangs down the rump.
+  capsule(p, 13, 24, 13, 42, 1.8, 1.1, MANE, seed + 5, 0.4);
+  if (seed % 3 === 0) for (let y = 4; y < 11; y++) p.set(13, y, '#d8d4cc');
+  return finish(p, 13, g, seed, 14);
 }
 
 /** A bale of hay, bound with twine, and loose hay beside it. */

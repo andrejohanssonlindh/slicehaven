@@ -307,6 +307,25 @@ function buildAdmin(): void {
   const close = (): void => { ring.hidden = true; ring.replaceChildren(); for (const b of mine) buttons.splice(buttons.indexOf(b), 1); mine = []; };
   const toggle = (): void => (ring.hidden ? open() : close());
   cog.addEventListener('click', toggle);
+  // Steering by keys: WASD or the arrows (screen up, left, down, right); the world reads `input` every frame.
+  const held = new Set<string>();
+  const KEYS: Record<string, string> = { w: 'up', arrowup: 'up', s: 'down', arrowdown: 'down', a: 'left', arrowleft: 'left', d: 'right', arrowright: 'right' };
+  const steer = (): void => {
+    world.input.right = (held.has('right') ? 1 : 0) - (held.has('left') ? 1 : 0);
+    world.input.up = (held.has('up') ? 1 : 0) - (held.has('down') ? 1 : 0);
+  };
+  window.addEventListener('keydown', (e) => {
+    const k = KEYS[e.key.toLowerCase()];
+    if (!k || e.ctrlKey || e.metaKey || e.altKey || (e.target as HTMLElement)?.closest?.('input, textarea, select')) return;
+    e.preventDefault();
+    held.add(k);
+    steer();
+  });
+  window.addEventListener('keyup', (e) => {
+    const k = KEYS[e.key.toLowerCase()];
+    if (k) { held.delete(k); steer(); }
+  });
+  window.addEventListener('blur', () => { held.clear(); steer(); });
   window.addEventListener('keydown', (e) => {
     if (e.key === 'å' || e.key === 'Å') { e.preventDefault(); toggle(); }
     else if (e.key === 'Escape' && !ring.hidden) close();
@@ -384,6 +403,12 @@ function bindInput(): void {
 
 // --- the loop and the numbers -------------------------------------------------
 
+const stairsEl = document.getElementById('stairs')!;
+for (const b of stairsEl.querySelectorAll<HTMLButtonElement>('button')) {
+  b.addEventListener('click', () => {
+    if (world.climb(Number(b.dataset.climb) as 1 | -1) === null) notify(t('spike.nostairs', 'No stairs that way.'));
+  });
+}
 const frameMs: number[] = [];
 let frames = 0, fpsT = performance.now(), fps = 0, last = performance.now();
 
@@ -430,6 +455,11 @@ function loop(now: number): void {
       magic,
     ].filter(Boolean).join('\n');
   }
+  // The stairs buttons show what can be climbed from where the hero is.
+  const hint = world.stairsHint;
+  stairsEl.hidden = !hint.up && !hint.down;
+  stairsEl.querySelector<HTMLElement>('[data-climb="1"]')!.hidden = !hint.up;
+  stairsEl.querySelector<HTMLElement>('[data-climb="-1"]')!.hidden = !hint.down;
   requestAnimationFrame(loop);
 }
 

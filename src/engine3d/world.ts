@@ -15,7 +15,7 @@ import { type FSource, FilamentField, HEARTH_FIRE, TORCH_FIRE } from '../core/wo
 import { CHUNK, type ChunkTerrain, TerrainStore, chunkKey, chunksNear } from '../core/world3d/chunks';
 import { type Environment3D, environment } from '../core/world3d/environment3d';
 import { Rng } from '../core/rng';
-import type { HouseMaterial } from '../core/world3d/house';
+import type { HouseMaterial, Stair } from '../core/world3d/house';
 import { type BuiltHouse, type Layout, type PlacedHouse, type PlacedTree, furnitureObstacles, houseAt, houseOuterBox, houseToLocal, houseToWorld, houseWalls, levelWalls, sightWalls } from '../core/world3d/layout';
 import { Explored } from '../core/world3d/explored';
 import { PlacedIndex } from '../core/world3d/placed';
@@ -92,7 +92,7 @@ const HERO_SPEED = 1.6;
 /** A stage of the hero's walk: along a floor, or up or down a flight of stairs (points in the world, each with the local height of the foot). */
 type Leg =
   | { kind: 'walk'; path: P2[]; house: HouseInst | null; level: number }
-  | { kind: 'climb'; house: HouseInst; pts: { x: number; z: number; y: number }[]; to: number };
+  | { kind: 'climb'; house: HouseInst; pts: { x: number; z: number; y: number }[]; to: number; stair: Stair };
 
 /** Someone who goes from room to room of a house on every storey, by the stairs, and out again, pausing at each. */
 interface Keeper {
@@ -460,6 +460,11 @@ export class SpikeWorld {
   private level = 0;
   /** While on stairs, the foot's height (local to the house); otherwise null. */
   private heroFloor: number | null = null;
+  /** On a flight of stairs between floors (not at either end): which, and how far up it, 0 at the foot to 1 at the top. */
+  private onStair: { house: HouseInst; stair: Stair; t: number } | null = null;
+  /** The keys: how far right and how far up the screen the hero is being steered (-1..1 each). Set by the page. */
+  input = { right: 0, up: 0 };
+  private steering = false;
   /** How far the view is lifted for an upper storey, metres. */
   private focusLift = 0;
   private marker: THREE.Mesh;
@@ -1388,21 +1393,44 @@ export class SpikeWorld {
     if (hs) {
       const ray = new THREE.Raycaster();
       ray.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
-      const hit = new THREE.Vector3();
-      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -(hs.group.position.y + hs.built.model.levels[this.heroLevel].floorY));
-      if (ray.ray.intersectPlane(plane, hit) && shapeDist(hs.box, hit.x, hit.z) < 0) {
-        // Stairs: a tap on the flight that goes up from this storey climbs, one on the opening in the floor goes down.
-        const l = houseToLocal(hs.built.place, hit.x, hit.z);
-        const inRect = (r: { x0: number; x1: number; z0: number; z1: number }): boolean => l.x > r.x0 && l.x < r.x1 && l.z > r.z0 && l.z < r.z1;
-        for (const s of hs.built.model.stairs) {
-          if (s.from === this.heroLevel && inRect(s.rect)) return { x: hit.x, z: hit.z, level: this.heroLevel + 1 };
-          if (s.to === this.heroLevel && inRect(s.rect)) return { x: hit.x, z: hit.z, level: this.heroLevel - 1 };
+      const m = hs.built.model, gy = hs.group.position.y;
+      const at = (y: number): THREE.Vector3 | null => ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -(gy + y)), new THREE.Vector3());
+      // Stairs: a tap on or near a flight (the steps are drawn lower than the floor, so ask at the heights along it too)
+      // goes up it from the floor it starts on, down it from the floor it comes up to, and on from half way as asked.
+      const lvl = this.onStair ? -1 : this.level;
+      for (const s of m.stairs) {
+        const up = s.from === lvl, down = s.to === lvl, mid = this.onStair?.stair === s;
+        if (!up && !down && !mid) continue;
+        const y0 = m.levels[s.from].floorY, y1 = m.levels[s.to].floorY;
+        for (const y of [y0, (y0 + y1) / 2, y1]) {
+          const hit = at(y);
+          if (!hit) continue;
+          const l = houseToLocal(hs.built.place, hit.x, hit.z);
+          const near = 0.45;
+          if (l.x > s.rect.x0 - near && l.x < s.rect.x1 + near && l.z > s.rect.z0 - near && l.z < s.rect.z1 + near) {
+            // Half way up: the tap says which way by where it is along the flight.
+            const goUp = mid ? l.x > (s.rect.x0 + s.rect.x1) / 2 : up;
+            return { x: hit.x, z: hit.z, level: goUp ? s.to : s.from };
+          }
         }
-        return { x: hit.x, z: hit.z, level: this.heroLevel };
+      }
+      if (this.level > 0 && !this.onStair) {
+        const hit = at(m.levels[this.level].floorY);
+        if (hit && shapeDist(hs.box, hit.x, hit.z) < 0) return { x: hit.x, z: hit.z, level: this.level };
       }
     }
     const g = this.groundAt(ndcX, ndcY);
     return g ? { ...g } : null;
+  }
+
+  /** What the stairs buttons should offer: up, down, or neither (nothing to climb here). */
+  get stairsHint(): { up: boolean; down: boolean } {
+    const hs = this.houses[this.heroHouse()];
+    if (!hs) return { up: false, down: false };
+    const n = hs.built.model.levels.length;
+    if (n < 2) return { up: false, down: false };
+    if (this.onStair) return { up: true, down: true };
+    return { up: this.level < n - 1, down: this.level > 0 };
   }
 
   /** The upper floor's walking grid of a house (storey 1 and up); the ground floor is `nav`. */
@@ -1432,18 +1460,43 @@ export class SpikeWorld {
    */
   walkTo(x: number, z: number, level?: number): number | null {
     const from = this.houses[this.heroHouse()] ?? null;
-    const legs = this.planWalk({ x: this.hero.x, z: this.hero.z, level: from ? this.heroLevel : 0, house: from }, x, z, level);
+    const legs = this.onStair
+      ? this.planFromStair(this.onStair, x, z, level)
+      : this.planWalk({ x: this.hero.x, z: this.hero.z, level: from ? this.heroLevel : 0, house: from }, x, z, level);
     if (!legs) return null;
     this.legs = legs;
     this.legI = 0;
     this.legS = 0;
     this.follow = true;
     const end = legs[legs.length - 1] as Extract<Leg, { kind: 'walk' }>;
+    if (end.kind !== 'walk') return 0;
     const e = end.path[end.path.length - 1];
     const gy = end.house ? end.house.group.position.y + end.house.built.model.levels[end.level].floorY : this.store.heightAt(e.x, e.z);
     this.marker.position.set(e.x, gy + 0.04, e.z);
     this.marker.visible = true;
     return legs.reduce((n, l) => n + (l.kind === 'walk' ? pathLength(l.path) : l.pts.reduce((m, p, i) => (i ? m + Math.hypot(p.x - l.pts[i - 1].x, p.z - l.pts[i - 1].z) : m), 0)), 0);
+  }
+
+  /**
+   * A walk begun on a flight of stairs (the hero stopped or was steered half way): on to whichever end is the shorter way
+   * to where they are going, then the rest from there. So half a flight up and back down is allowed.
+   */
+  private planFromStair(st: { house: HouseInst; stair: Stair; t: number }, x: number, z: number, level?: number): Leg[] | null {
+    const { house, stair: s } = st;
+    const at = (p: { x: number; z: number; y: number }): { x: number; z: number; y: number } => ({ ...houseToWorld(house.built.place, p.x, p.z), y: p.y });
+    const here = { x: this.hero.x, z: this.hero.z, y: this.heroFloor ?? s.path[1].y };
+    const len = (pts: { x: number; z: number }[]): number => pts.reduce((n, p, i) => (i ? n + Math.hypot(p.x - pts[i - 1].x, p.z - pts[i - 1].z) : n), 0);
+    let best: { legs: Leg[]; len: number } | null = null;
+    for (const up of [false, true]) {
+      const end = at(up ? s.path[3] : s.path[0]), corner = at(up ? s.path[2] : s.path[1]);
+      const lv = up ? s.to : s.from;
+      const rest = this.planWalk({ x: end.x, z: end.z, level: lv, house }, x, z, level);
+      if (!rest) continue;
+      const pts = [here, corner, end];
+      const total = len(pts) + rest.reduce((n, l) => n + (l.kind === 'walk' ? pathLength(l.path) : len(l.pts)), 0);
+      if (!best || total < best.len) best = { legs: [{ kind: 'climb', house, pts, to: lv, stair: s }, ...rest], len: total };
+    }
+    return best?.legs ?? null;
   }
 
   /**
@@ -1471,7 +1524,7 @@ export class SpikeWorld {
       if (!s) return false;
       const pts = (up ? s.path : [...s.path].reverse()).map((p) => ({ ...houseToWorld(house.built.place, p.x, p.z), y: p.y }));
       if (!walkOn(house, a, pts[0].x, pts[0].z)) return false;
-      legs.push({ kind: 'climb', house, pts, to: b });
+      legs.push({ kind: 'climb', house, pts, to: b, stair: s });
       cur.x = pts[pts.length - 1].x;
       cur.z = pts[pts.length - 1].z;
       cur.level = b;
@@ -1489,7 +1542,7 @@ export class SpikeWorld {
   climb(dir: 1 | -1): number | null {
     const hs = this.houses[this.heroHouse()];
     if (!hs) return null;
-    const lv = this.heroLevel + dir;
+    const lv = this.onStair ? (dir > 0 ? this.onStair.stair.to : this.onStair.stair.from) : this.heroLevel + dir;
     if (lv < 0 || lv >= hs.built.model.levels.length) return null;
     const room = hs.built.model.levels[lv].rooms[0].rect;
     const p = houseToWorld(hs.built.place, (room.x0 + room.x1) / 2, (room.z0 + room.z1) / 2);
@@ -1534,6 +1587,96 @@ export class SpikeWorld {
     return this.walkTo(p.x, p.z);
   }
 
+  /**
+   * Steering by keys (WASD, arrows): the hero walks where the keys point, stopped by walls and furniture like a tapped walk,
+   * and cancels any walk in hand. At the end of a flight walking into it takes the hero on to the stairs, and on the stairs
+   * the keys go up or down them, as far as they like. Returns true while the keys are held.
+   */
+  private steer(dt: number, house: HouseInst | null): boolean {
+    const { right, up } = this.input;
+    const mag = Math.hypot(right, up);
+    if (mag < 0.1) {
+      if (this.steering) {
+        this.steering = false;
+        this.faceWalker(this.heroCard, this.heroDir.x, this.heroDir.z, false, 0);
+      }
+      return false;
+    }
+    this.steering = true;
+    this.legs = [];
+    this.marker.visible = false;
+    this.follow = true;
+    const sY = Math.sin(YAW), cY = Math.cos(YAW);
+    // Screen up is away from the camera, screen right is along the camera's right.
+    const wx = (up * -sY + right * cY) / mag, wz = (up * -cY + right * -sY) / mag;
+    const speed = HERO_SPEED * this.speedMul;
+    const step = speed * dt;
+    const st = this.onStair;
+    if (st) {
+      const s = st.stair, pl = st.house.built.place;
+      const A = s.path[1], B = s.path[2];
+      const run = Math.hypot(B.x - A.x, B.z - A.z);
+      // The flight's line in the world; the keys count only as far as they point along it.
+      const ax = Math.cos(pl.rot) * Math.sign(B.x - A.x), az = -Math.sin(pl.rot) * Math.sign(B.x - A.x);
+      const along = wx * ax + wz * az;
+      const t = st.t + (along * step) / (run * 1.05);
+      const lv = st.house.built.model.levels, y0 = lv[s.from].floorY, y1 = lv[s.to].floorY;
+      this.heroDir = { x: wx, z: wz };
+      if (t >= 1 || t <= 0) {
+        const end = t >= 1 ? s.path[3] : s.path[0];
+        const w = houseToWorld(pl, end.x, end.z);
+        this.hero.x = w.x;
+        this.hero.z = w.z;
+        this.level = t >= 1 ? s.to : s.from;
+        this.heroFloor = null;
+        this.onStair = null;
+      } else {
+        const pt = { x: A.x + (B.x - A.x) * t, z: A.z + (B.z - A.z) * t };
+        const w = houseToWorld(pl, pt.x, pt.z);
+        this.hero.x = w.x;
+        this.hero.z = w.z;
+        this.heroFloor = y0 + (y1 - y0) * t;
+        this.onStair = { ...st, t };
+      }
+      this.placeHero();
+      this.faceWalker(this.heroCard, wx, wz, Math.abs(along) > 0.05, speed);
+      return true;
+    }
+    // Walking into the end of a flight takes the hero on to it.
+    if (house) {
+      for (const s of house.built.model.stairs) {
+        const bottom = s.from === this.level, top = s.to === this.level;
+        if (!bottom && !top) continue;
+        const foot = houseToWorld(house.built.place, (bottom ? s.path[0] : s.path[3]).x, (bottom ? s.path[0] : s.path[3]).z);
+        const mouth = houseToWorld(house.built.place, (bottom ? s.path[1] : s.path[2]).x, (bottom ? s.path[1] : s.path[2]).z);
+        if (Math.hypot(foot.x - this.hero.x, foot.z - this.hero.z) < 0.8 && wx * (mouth.x - this.hero.x) + wz * (mouth.z - this.hero.z) > 0.1) {
+          this.hero.x = mouth.x;
+          this.hero.z = mouth.z;
+          this.heroFloor = house.built.model.levels[bottom ? s.from : s.to].floorY;
+          this.onStair = { house, stair: s, t: bottom ? 0.001 : 0.999 };
+          this.heroFloor += bottom ? 0.01 : -0.01;
+          this.placeHero();
+          return true;
+        }
+      }
+    }
+    const nav = house ? this.upperNav(house, this.level) : this.nav;
+    if (nav) {
+      for (const [sx, sz] of [[1, 1], [1, 0], [0, 1]]) {
+        const nx = this.hero.x + wx * step * sx, nz = this.hero.z + wz * step * sz;
+        if (nav.walkable(nx, nz)) {
+          this.hero.x = nx;
+          this.hero.z = nz;
+          break;
+        }
+      }
+    }
+    this.heroDir = { x: wx, z: wz };
+    this.placeHero();
+    this.faceWalker(this.heroCard, wx, wz, true, speed);
+    return true;
+  }
+
   private stepHero(dt: number): void {
     // Crossing a threshold opens that house's cut-away and closes the one left behind.
     const now = this.houses[this.heroHouse()] ?? null;
@@ -1543,11 +1686,13 @@ export class SpikeWorld {
       this.wasIn = now;
       this.level = 0; // (every door is on the ground floor)
       this.heroFloor = null;
+      this.onStair = null;
     }
     if (now) now.view = this.level;
     // The view follows the storey: up when the hero is upstairs, back down when not.
     const lift = now ? (this.heroFloor ?? now.built.model.levels[Math.min(this.level, now.built.model.levels.length - 1)].floorY) - now.built.model.floorY : 0;
     this.focusLift += (lift - this.focusLift) * (1 - Math.exp(-dt / 0.3));
+    if (this.steer(dt, now)) return;
     if (!this.legs.length) return;
     const speed = HERO_SPEED * this.speedMul;
     this.legS += dt * speed;
@@ -1560,14 +1705,18 @@ export class SpikeWorld {
       const c = followClimb(leg.pts, this.legS);
       p = c;
       this.heroFloor = c.y;
+      // Between the two floors the hero is on the stairs; the storey changes the moment they reach the far floor's height.
+      const lv = leg.house.built.model.levels, y0 = lv[leg.stair.from].floorY, y1 = lv[leg.stair.to].floorY;
+      this.onStair = c.y > y0 + 0.02 && c.y < y1 - 0.02 ? { house: leg.house, stair: leg.stair, t: (c.y - y0) / (y1 - y0) } : null;
+      if (Math.abs(c.y - lv[leg.to].floorY) < 0.02) this.level = leg.to;
     }
     this.hero.x = p.x;
     this.hero.z = p.z;
     if (p.dx || p.dz) this.heroDir = { x: p.dx, z: p.dz };
-    // A storey is changed at the end of a flight.
     if (p.done && leg.kind === 'climb') {
       this.level = leg.to;
       this.heroFloor = null;
+      this.onStair = null;
     }
     this.placeHero();
     const last = p.done && this.legI === this.legs.length - 1;

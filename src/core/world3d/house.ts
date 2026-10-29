@@ -342,7 +342,7 @@ export function buildHouse(spec: House3DSpec): HouseModel {
   const fullRect = rectOf(ix0, ix1, iz0, iz1);
 
   /** A wall segment between two points along x (or z) on one storey: a low part that always shows with the storey, and a tall part that is cut away. */
-  const partition = (k: number, r: Rect, lowOnly = false, height = 0.95): void => {
+  const partition = (k: number, r: Rect, lowOnly = false, height = 1.45): void => {
     const y0 = floorY[k], lowTop = y0 + Math.min(height, heights[k]);
     addBox(part('timber', upperLevel(k), 'timber').mesh, [r.x0, y0, r.z0], [r.x1, lowTop, r.z1], { aoBottom: 0.7, aoTop: 0.9 });
     if (!lowOnly) addBox(part('plaster', k, 'partition').mesh, [r.x0, lowTop, r.z0], [r.x1, wallTop[k], r.z1], { aoBottom: 0.8, aoTop: 0.72 });
@@ -445,47 +445,45 @@ export function buildHouse(spec: House3DSpec): HouseModel {
     const f1x1 = f1.rect.x1;
     levels[0].rooms.push({ rect: fullRect, doorX: dx, role: doorRoomKey, reserved: [rectOf(ix0, f1x1 + 0.1, iz1 - STAIR_W - 0.4, iz1)] });
     const head1 = f1.path[3];
-    if (plan === 'shop') {
-      slab(1, f1.rect);
-      levels[1].rooms.push({
-        rect: fullRect,
-        doorX: head1.x,
-        role: 'upstairs',
-        reserved: [f1.rect],
-        zones: [rectOf(f1x1, f1x1 + 1.5, iz1 - STAIR_W - 0.3, iz1)],
-        entry: { x: head1.x, z: head1.z },
-      });
-    } else {
-      // Inn: the second flight carries on from the first to the attic, and a corridor with guest rooms behind it fills the first floor.
-      const f2 = flight(1, f1x1, true);
-      const f2x1 = f2.rect.x1;
-      slab(1, f1.rect);
-      slab(2, f2.rect);
-      const corr = 2.3;
-      const zp = iz1 - corr; // the wall between the corridor and the rooms
-      const nRoom = 4;
-      const inner = ix1 - ix0, rw = (inner - PART_T * (nRoom - 1)) / nRoom;
+    /** The first floor: a corridor along the front (the stairs come up into it) and rooms behind, each with a doorway onto it. */
+    const firstFloor = (shares: number[], roles: string[], holes: Rect[]): void => {
+      const zp = iz1 - 2.3; // the wall between the corridor and the rooms
+      const n = shares.length;
+      const total = shares.reduce((a, b) => a + b, 0), inner = ix1 - ix0 - PART_T * (n - 1);
       const doors: number[] = [];
-      const roomRects: { r: Rect; d: number }[] = [];
-      for (let i = 0; i < nRoom; i++) {
-        const xa = ix0 + i * (rw + PART_T), xb = xa + rw;
+      const made: { r: Rect; d: number; role: string }[] = [];
+      let xa = ix0;
+      for (let i = 0; i < n; i++) {
+        const xb = xa + (inner * shares[i]) / total;
         const d = (xa + xb) / 2 + (rng.next() - 0.5) * 0.4;
         doors.push(d);
-        roomRects.push({ r: rectOf(xa, xb, iz0, zp - PART_T / 2), d });
+        made.push({ r: rectOf(xa, xb, iz0, zp - PART_T / 2), d, role: roles[i] });
         if (i > 0) partition(1, rectOf(xa - PART_T, xa, iz0, zp + PART_T / 2));
+        xa = xb + PART_T;
       }
       wallWithDoors(1, ix0, ix1, zp, doors);
-      // The corridor, entered from the stairs; its floor is kept clear along the flights.
+      // The corridor, entered from the stairs; its floor is kept clear along the flights and in front of every door.
       levels[1].rooms.push({
         rect: rectOf(ix0, ix1, zp + PART_T / 2, iz1),
         doorX: head1.x,
         role: 'landing',
-        // (And the floor in front of every guest door, so nothing blocks a doorway.)
-        reserved: [rectOf(xs1, f2x1, iz1 - STAIR_W, iz1), ...doors.map((d) => rectOf(d - 0.8, d + 0.8, zp, zp + 1.1))],
+        reserved: [...holes, ...doors.map((d) => rectOf(d - 0.8, d + 0.8, zp, zp + 1.1))],
         zones: [],
         entry: { x: head1.x, z: head1.z },
       });
-      for (const { r, d } of roomRects) levels[1].rooms.push({ rect: r, doorX: d, role: 'guest', reserved: [] });
+      for (const { r, d, role } of made) levels[1].rooms.push({ rect: r, doorX: d, role, reserved: [] });
+    };
+    if (plan === 'shop') {
+      // The shop: a bedroom and the keeper's own room off a landing.
+      slab(1, f1.rect);
+      firstFloor([0.4, 0.6], ['guest', 'upstairs'], [f1.rect]);
+    } else {
+      // Inn: the second flight carries on from the first to the attic, and a corridor with four guest rooms behind it fills the first floor.
+      const f2 = flight(1, f1x1, true);
+      const f2x1 = f2.rect.x1;
+      slab(1, f1.rect);
+      slab(2, f2.rect);
+      firstFloor([1, 1, 1, 1], ['guest', 'guest', 'guest', 'guest'], [rectOf(xs1, f2x1, iz1 - STAIR_W, iz1)]);
       // The attic: one long room under the roof, with the stairs coming up at its front.
       const head2 = f2.path[3];
       levels[2].rooms.push({

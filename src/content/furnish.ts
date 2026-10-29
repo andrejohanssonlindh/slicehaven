@@ -76,7 +76,7 @@ export const PIECES = {
   litter: flat(() => makeClutter()),
   // A guest's bed is the old, handsome one (a frame, a tick, a blanket); the village's own is the pallet.
   bed: floor(() => makeGuestBed(), 1.25, 2.0),
-  horse: floor(() => makeHorse(), 2.6, 1.0),
+  horse: floor(() => makeHorse(), 2.6, 0.8),
   hay: floor(() => makeHayBale(), 0.7, 1.0),
   hayRack: hung(() => makeHayRack(), 1.2),
 } satisfies Record<string, PieceDef>;
@@ -199,7 +199,6 @@ export const RECIPES: Record<Exclude<RoomSet, 'smithy'>, Line[]> = {
   // The rooms over a shop: the shopkeeper's home (a bed behind the hearth, table, chest).
   upstairs: [
     { piece: 'hearth', rule: corner('backRight'), fire: true },
-    { piece: 'bed', vary: true, rule: corner('backLeft') },
     { piece: 'shelf', rule: back(0.5), lift: 22, books: 1 },
     { piece: 'pegs', rule: back(0.72), lift: 4 },
     { piece: 'hanging', rule: back(0.3), lift: 30 },
@@ -208,7 +207,6 @@ export const RECIPES: Record<Exclude<RoomSet, 'smithy'>, Line[]> = {
     { piece: 'stool', tag: 'front', rule: { at: 'around', of: 'table', side: 'front' } },
     { piece: 'stool', tag: 'back', rule: { at: 'around', of: 'table', side: 'back' } },
     { piece: 'footlocker', rule: side('left', 0.55) },
-    { piece: 'bed', tag: 'second', vary: true, seed: 3, rule: side('left', 0.3) },
     { piece: 'keg', rule: side('right', 0.55) },
     { piece: 'broom', rule: side('left', 0.9) },
     { piece: 'basket', rule: free },

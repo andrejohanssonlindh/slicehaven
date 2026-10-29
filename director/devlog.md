@@ -1,5 +1,12 @@
 # Devlog
 
+## 2026-10-30 — Stairs made easy, WASD, rooms upstairs, slimmer horses
+
+- **Stairs are a ramp, not a cutscene:** the hero can stop half way, steer on, or turn back (`SpikeWorld.onStair`, `planFromStair` picks the nearer end). **Up/Down buttons** appear when the hero is in a house with another storey; tapping a flight (or near it, at any height along it) climbs it from the floor it starts on and goes down from the floor it comes up to.
+- **WASD / arrows** steer the hero relative to the screen (`SpikeWorld.input`, `steer`): walls and furniture stop them, walking into a flight's end takes them on to it, and keys along the flight go up and down it.
+- **Rooms upstairs:** partitions are 1.45 m high (the rest fades with the cut-away); the shop's first floor is now a landing with a bedroom and the keeper's room.
+- **Horses** slimmer (rear view). Not done: other people steering, doors that open.
+
 ## 2026-10-30 — Inn, shop and stable (several storeys, stairs, beds, horses)
 
 - **Three bigger buildings** (`House3DSpec.plan`: `inn | shop | stable`, sizes in `PLAN_SIZE`, `core/world3d/house.ts`). The cottage stays the one-room house. **Inn** 12.4 × 8.4 (about 5× a small cottage), two full storeys plus an **attic** under the roof (tall knee wall so it is a real half-storey): ground hall, a first-floor corridor with **four guest rooms** (partitions with doorways), and a long attic dorm. **Shop** 9.2 × 6.6, shop below and the keeper's home above. **Stable** 12.2 × 6.4, one storey: four stalls along the back, an aisle in front, a wide double door.

@@ -62,3 +62,9 @@
 #panel .row { display: flex; gap: 4px; }
 #panel .row button { flex: 1; min-height: 36px; font-size: 12px; padding: 2px 4px; }
 #panel .row button.on { border-color: var(--accent); color: var(--accent); }
+
+/* Stairs: big buttons, shown only while the hero is in a house with another storey. */
+#stairs { position: absolute; left: 50%; bottom: 52px; transform: translateX(-50%); display: flex; gap: 10px; z-index: 3; }
+#stairs[hidden] { display: none; }
+#stairs button { min-width: 84px; height: 46px; font-size: 16px; }
+#stairs button[hidden] { display: none; }
