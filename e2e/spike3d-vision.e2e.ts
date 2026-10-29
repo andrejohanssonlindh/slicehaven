@@ -83,7 +83,7 @@ describe('spike3d vision and the explored map', () => {
     await w('(w.toggleTorch(), 0)');
     await page.waitForTimeout(1500);
     expect(await w('w.torchOn')).toBe(true);
-    expect((await w('w.spec.near')) as number).toBeGreaterThan(near0 + 3);
+    expect((await w('w.spec.near')) as number).toBeGreaterThan(near0 + 2);
     expect((await w('w.spec.range')) as number).toBeGreaterThan(range0);
     await page.screenshot({ path: `${OUT}vision-hand-torch.png` });
     await w('(w.toggleTorch(), 0)');

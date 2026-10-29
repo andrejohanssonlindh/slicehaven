@@ -27,6 +27,8 @@ export const WORLD = {
   uVision: { value: new THREE.Vector4(0, 0, 0, 0) },
   /** The cone of sight: x the way the hero faces (radians, atan2(z, x)), y half the cone's width, z its soft edge, w the radius of all-round awareness. */
   uSight: { value: new THREE.Vector4(0, 1, 0.3, 3) },
+  /** How far behind the hero the cone's point lies, metres (`VisionSpec.back`). */
+  uSightBack: { value: 0 },
   /** Shining things in view (torches, fires): xy where, z the radius they light, w how clearly (0: unused). Seen from far beyond plain sight. */
   uLights: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 0, 0)) },
   /** How far the eye sees along each ray round the hero, as a share of the range (see `sightTexture`). */
@@ -164,6 +166,7 @@ uniform float uWet;
 uniform vec2 uCamPix;
 uniform vec4 uVision;
 uniform vec4 uSight;
+uniform float uSightBack;
 uniform vec4 uLights[6];
 uniform sampler2D uSightRays;
 uniform vec4 uExploredBox;
@@ -180,7 +183,9 @@ if (uVision.w > 0.0) {
   float sd = length(dv);
   float sa = atan(dv.y, dv.x);
   float ray = texture2D(uSightRays, vec2(fract(sa / 6.2831853) + ${(0.5 / SIGHT_RAYS).toFixed(6)}, 0.5)).r * uVision.w;
-  float turn = abs(mod(sa - uSight.x + 3.1415927, 6.2831853) - 3.1415927);
+  // The cone's point is a little behind the hero, so it is already wide where they stand and meets the small circle.
+  vec2 dc = dv + vec2(cos(uSight.x), sin(uSight.x)) * uSightBack;
+  float turn = abs(mod(atan(dc.y, dc.x) - uSight.x + 3.1415927, 6.2831853) - 3.1415927);
   float cone = 1.0 - smoothstep(uSight.y - uSight.z, uSight.y, turn);
   float close = 1.0 - smoothstep(uSight.w * 0.8, uSight.w, sd);
   float seen = max(cone, close) * (1.0 - smoothstep(uVision.z, uVision.w, sd)) * (1.0 - smoothstep(ray + 0.1, ray + 0.45, sd));
@@ -194,7 +199,8 @@ if (uVision.w > 0.0) {
   vec2 euv = (vWPos.xz - uExploredBox.xy) / uExploredBox.z;
   float known = (euv.x > 0.0 && euv.x < 1.0 && euv.y > 0.0 && euv.y < 1.0) ? texture2D(uExplored, euv).r : 0.0;
   float lum = dot(gl_FragColor.rgb, vec3(0.3, 0.59, 0.11));
-  vec3 remembered = vec3(lum * 0.62) * vec3(0.92, 0.95, 1.0) * known;
+  // What was seen before keeps most of its colour, a little cooler and dimmer: the step to what is in sight is gentle.
+  vec3 remembered = mix(vec3(lum), gl_FragColor.rgb, 0.45) * 0.78 * vec3(0.94, 0.97, 1.0) * known;
   gl_FragColor.rgb = mix(remembered, gl_FragColor.rgb, seen);
 }`)
       .replace('#include <color_fragment>', `#include <color_fragment>

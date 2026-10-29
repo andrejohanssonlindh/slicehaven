@@ -1,5 +1,11 @@
 # Devlog
 
+## 2026-10-30 — Less jolting while walking; far ground is forgotten; a gentler vision cone
+
+- **Why it jolted** (measured in the browser, JS time per piece): (1) every light that is *switched on* counts in every shader, and a house's hearth light (or a chunk's torch) was created switched on, for one frame, then switched off by the pool: two shader rebuilds per house (200+ ms each, 3 s on software GL). Lights are now created off, and dark spare lights make up the count so it never changes (`SpikeWorld.spares`). Render max went from 214 ms to 23 ms. (2) Painting a chunk's ground texture took ~110 ms in one go: now `groundChunkPainter` does it in slices (4 ms a frame) with a flat green standing in until it is done. (3) The first time a new kind of house streams in, its shaders were built then: `warmHouses` builds them all before the first frame.
+- **Forgetting:** `HouseIndex.forget` and `PlacedIndex.forget`, run every 3 s from `SpikeWorld.forgetFar`, let go of furnished rooms of houses and generated trees/props/posts of chunks beyond the view plus about 60 m (they are made again, the same, when asked). Still kept for the page's life: the explored map (that is the memory), nav blocks and filament cells (small), house models.
+- **Vision cone:** the circle is much smaller (about 2.3 m at Alertness 10, was 4.5), the cone's point lies a little behind the eye so it is already as wide as the circle where you stand (they meet), the edge is softer (24°), the fade toward the range starts earlier, and what was seen before keeps 45% of its colour, a bit dimmer, so the step to what is in sight is gentle. Unexplored is still black. A carried flame adds 2.5 m to the circle at night. Tunables: `visionOf` in `core/world3d/vision.ts` and the `remembered` line in `engine3d/materials.ts`.
+
 ## 2026-10-30 — Houses stream in and out by chunk; Eastgate, a town to test it
 
 - **`HouseIndex`** (`core/world3d/houses.ts`): the map's houses by chunk. A house's model and boxes are made when asked (`lite`, cheap), its furnished room, walls, furniture and fires when something near it asks (`entry`). The renderer stands a house up when its chunk streams in (`standHouse`) and takes it down with the chunk (`dropHouse`: geometry, its own materials, cards, hearth light, shells). `world.houses` is now the houses *standing*; `world.houseIndex` knows them all.

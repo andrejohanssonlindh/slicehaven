@@ -139,6 +139,19 @@ export class PlacedIndex implements ShapeSource {
     return shade;
   }
 
+  /** Let go of what was made for chunks `keep` says no to (the map's generator makes it again, the same, if it is asked for). Authored things stay. */
+  forget(keep: (i: number, j: number) => boolean): number {
+    let n = 0;
+    const gone = (k: string): boolean => {
+      const [i, j] = k.split(',').map(Number);
+      return !keep(i, j);
+    };
+    for (const k of [...this.made.keys()]) if (gone(k)) { this.made.delete(k); n++; }
+    for (const k of [...this.shapes.keys()]) if (gone(k)) this.shapes.delete(k);
+    for (const k of [...this.sights.keys()]) if (gone(k)) this.sights.delete(k);
+    return n;
+  }
+
   /** Number of chunks whose generated content has been made (a measure of how much of the world has been looked at). */
   get generatedChunks(): number {
     return this.made.size;

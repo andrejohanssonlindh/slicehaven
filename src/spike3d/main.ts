@@ -299,7 +299,7 @@ function loop(now: number): void {
       `${pipeline.rw}×${pipeline.rh} ×${pipeline.factor}  ${world.ppm} px/m`,
       `tier ${tier.name}${governor.level ? ` -${governor.level}` : ''}  shadow ${world.settings.shadowMap}`,
       `chunks ${world.chunkCount}  atlases ${spriteAtlas().count}`,
-      `houses ${world.houses.length}/${world.layout.houses.length}  furnished ${world.houseIndex.made}`,
+      `houses ${world.houses.length}/${world.layout.houses.length}  furnished ${world.houseIndex.made}  chunks held ${world.placed.generatedChunks}`,
       magic,
     ].filter(Boolean).join('\n');
   }
@@ -321,6 +321,10 @@ setTimeout(() => {
   pipeline.renderer.info.autoReset = false;
   fit();
   new ResizeObserver(fit).observe(stage);
+  // Build the shaders of every kind of house now: one built when a new kind streams in later would stall the game.
+  const warm = world.warmHouses();
+  pipeline.renderer.compile(world.scene, world.camera);
+  warm.done();
   buildControls();
   bindInput();
   loading.hidden = true;

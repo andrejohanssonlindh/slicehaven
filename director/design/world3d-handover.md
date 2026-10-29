@@ -63,6 +63,7 @@ Rooms are recipes of rules (`content/furnish.ts`, solver `core/world3d/roomplan.
 
 ## Session 28 (houses stream)
 - `world.houses` is only the houses **standing** (their chunk is resident); `world.houseIndex` (`core/world3d/houses.ts`) holds all. Anything that must know a house that may not be standing (sight, walking, the field) asks the index by rectangle (`liteNear`, `shapesNear`, `sourcesIn`). Index numbers of `world.houses` change as houses come and go: hold the `HouseInst`, not the number.
+- **Lights:** never create a `PointLight` switched on inside `update` (it counts in every shader until the pool switches it off: a stall). Create with `visible = false`; the pool in `update` switches the nearest on and dark `spares` fill the count.
 - `/spike3d/?map=wilds` has Eastgate (70 houses along the road east of the hamlet): the place to look at it. Overlay line `houses standing/total furnished n`.
 
 ## Next steps (in order, each its own commit + devlog line)

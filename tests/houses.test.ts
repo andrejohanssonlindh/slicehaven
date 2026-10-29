@@ -37,4 +37,18 @@ describe('the house index', () => {
     expect(idx.sourcesIn(35, -20, 45, 20).map((s) => s.x)).toEqual([40]);
     expect(idx.sourcesIn(1000, 1000, 1010, 1010)).toEqual([]);
   });
+
+  it('forgets furnished rooms it is told to, and makes them again, the same, when asked', () => {
+    let made = 0;
+    const idx = new HouseIndex(street(30), (b) => (made++, { room: b.place.id, shapes: [], sources: [] }));
+    idx.near(0, -20, 200, 20);
+    const first = idx.made;
+    expect(first).toBeGreaterThan(3);
+    const gone = idx.forget((p) => p.x < 60);
+    expect(gone).toBe(first - idx.made);
+    expect(idx.made).toBeLessThan(first);
+    const again = idx.near(0, -20, 200, 20);
+    expect(idx.made).toBe(first);
+    expect(again.map((e) => e.room)).toContain('h0');
+  });
 });

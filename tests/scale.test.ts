@@ -98,3 +98,17 @@ describe('the wilds, eight kilometres across', () => {
     expect(ix.count).toBe(1);
   });
 });
+
+describe('forgetting far ground', () => {
+  it('lets go of generated chunks it is told to and makes them again the same', () => {
+    const map = mapNamed('wilds');
+    const at = (i: number, j: number): string => JSON.stringify(map.placed.chunk(i, j));
+    const before = [at(-40, 3), at(-39, 3), at(40, 3)];
+    map.placed.forget(() => false);
+    expect(map.placed.generatedChunks).toBe(0);
+    expect([at(-40, 3), at(-39, 3), at(40, 3)]).toEqual(before);
+    expect(map.placed.generatedChunks).toBe(3);
+    expect(map.placed.forget((i) => i > 0)).toBe(2);
+    expect(map.placed.generatedChunks).toBe(1);
+  });
+});

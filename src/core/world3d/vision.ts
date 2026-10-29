@@ -18,6 +18,8 @@ export interface VisionSpec {
   near: number;
   /** Softness of the cone's edge, radians. */
   edge: number;
+  /** How far behind the eye the cone's point lies, metres: that is what makes the cone already wide where you stand, so it meets the small circle. */
+  back: number;
 }
 
 export interface VisionInput {
@@ -39,12 +41,23 @@ export function visionOf({ alertness, night = 0, cap = Infinity, light = 0 }: Vi
   const n = Math.max(0, Math.min(1, night)), l = Math.max(0, Math.min(1, light));
   // A carried flame wins back most of what the dark takes from the range, and lights a wider circle all round.
   const dark = 1 - 0.4 * n * (1 - 0.65 * l);
+  const fov = deg(Math.max(70, Math.min(150, 110 + 4 * (a - 10))));
+  // What is right round you is noticed (a small circle: you do not see behind you); the cone starts as wide as that
+  // circle, so the two meet without a notch. A carried flame lights a little more round you at night.
+  const near = Math.max(1.6, Math.min(2.6, 1.3 + 0.1 * a)) + 2.5 * n * l;
   return {
     range: Math.min(cap, Math.max(10, 6 + 2.4 * a) * dark),
-    fov: deg(Math.max(70, Math.min(150, 110 + 4 * (a - 10)))),
-    near: Math.max(2.5, Math.min(7, 2 + 0.25 * a)) + 3.5 * n * l,
-    edge: deg(18),
+    fov,
+    near,
+    edge: deg(24),
+    back: near / Math.tan(fov / 2),
   };
+}
+
+/** The angle between the way you face and the direction from the cone's point (a little behind the eye) to (x, z), 0..π. */
+export function coneGap(eye: P2, facing: number, spec: VisionSpec, x: number, z: number): number {
+  const ax = eye.x - Math.cos(facing) * spec.back, az = eye.z - Math.sin(facing) * spec.back;
+  return angleGap(Math.atan2(z - az, x - ax), facing);
 }
 
 /** How many rays are cast round the eye. */
@@ -142,9 +155,9 @@ export function seenAt(eye: P2, facing: number, spec: VisionSpec, rays: Float32A
   if (d < 1e-6) return 1;
   const ang = Math.atan2(dz, dx);
   if (d > sightAlong(rays, ang) + 0.2) return 0;
-  const cone = 1 - smooth(spec.fov / 2 - spec.edge, spec.fov / 2, angleGap(ang, facing));
+  const cone = 1 - smooth(spec.fov / 2 - spec.edge, spec.fov / 2, coneGap(eye, facing, spec, x, z));
   const close = 1 - smooth(spec.near * 0.8, spec.near, d);
-  const far = 1 - smooth(spec.range * 0.7, spec.range, d);
+  const far = 1 - smooth(spec.range * 0.55, spec.range, d);
   return Math.max(cone, close) * far;
 }
 
@@ -194,7 +207,7 @@ export function visibleLights(
   for (const c of candidates) {
     const d = Math.hypot(c.x - eye.x, c.z - eye.z);
     if (d > reach || d < 1e-6) continue;
-    if (angleGap(Math.atan2(c.z - eye.z, c.x - eye.x), facing) > spec.fov / 2) continue;
+    if (coneGap(eye, facing, spec, c.x, c.z) > spec.fov / 2) continue;
     if (!lineOfSight(eye, c, blockers, 0.7)) continue;
     out.push({ ...c, strength: 1 - smooth(reach * 0.85, reach, d) });
   }

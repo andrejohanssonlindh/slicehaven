@@ -48,11 +48,11 @@ describe('vision', () => {
     expect(sightAlong(rays, 0)).toBeCloseTo(13, 1);
   });
 
-  it('a flame in the hand wins back most of what the dark takes, and lights a wider circle round you at night', () => {
+  it('a flame in the hand wins back most of what the dark takes, and lights a little more round you at night', () => {
     const dark = visionOf({ alertness: 10, night: 1 }), lit = visionOf({ alertness: 10, night: 1, light: 1 }), day = visionOf({ alertness: 10 });
     expect(lit.range).toBeGreaterThan(dark.range);
     expect(lit.range).toBeLessThan(day.range);
-    expect(lit.near).toBeGreaterThan(dark.near + 3);
+    expect(lit.near).toBeGreaterThan(dark.near + 2);
     expect(visionOf({ alertness: 10, light: 1 }).near).toBe(day.near); // by day it adds nothing
   });
 
@@ -74,6 +74,20 @@ describe('vision', () => {
     expect(at(15, 0)).toBe(0); // behind the wall
     expect(at(0, 15)).toBe(0);
     expect(at(10, 8)).toBeGreaterThan(0.5); // clear of the wall's ends, inside the cone
+  });
+
+  it('the cone is already wide where you stand and meets a small circle; you do not see behind you', () => {
+    const spec = visionOf({ alertness: 10 });
+    expect(spec.near).toBeLessThan(3);
+    expect(spec.back).toBeGreaterThan(0.5);
+    // The cone's width at the eye is about the circle's: nothing is missing between them.
+    const rays = castSight(eye, spec.range, []);
+    const at = (x: number, z: number) => seenAt(eye, 0, spec, rays, x, z);
+    expect(at(0.5, spec.near * 0.7)).toBeGreaterThan(0.9); // beside you, within the circle
+    expect(at(spec.near + 1.5, spec.near * 0.8)).toBeGreaterThan(0.9); // just ahead, out past the circle: still in the wide cone
+    expect(at(-spec.near * 2, 0)).toBe(0); // behind
+    expect(at(-6, 4)).toBe(0);
+    expect(visionOf({ alertness: 10, night: 1, light: 1 }).near).toBeGreaterThan(spec.near + 2);
   });
 
   it('line of sight and turning', () => {

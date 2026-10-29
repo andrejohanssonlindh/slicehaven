@@ -3,7 +3,7 @@ import { makeWalkSet, viewFor } from '../art/folkWalk';
 import type { Pix } from '../art/pix';
 import { type Furnished, type RoomSet, furnish } from '../content/furnish';
 import {
-  barkTex, doorTex, floorTex, groundChunkTex, leafTex, plasterTex, roofUnderTex, shingleTex, shutterTex, sodTex, stoneTex, thatchTex,
+  barkTex, doorTex, floorTex, groundChunkPainter, leafTex, plasterTex, roofUnderTex, shingleTex, shutterTex, sodTex, stoneTex, thatchTex,
   tileTex, timberTex, windowGlowTex, windowTex,
 } from '../art/textures3d';
 import { PEOPLE } from '../content/village/folk';
@@ -100,6 +100,8 @@ interface LoadedChunk {
   heat: Heat | null;
   /** The chunk's trees, props and torch posts. */
   standing: Standing;
+  /** The ground's painting, while it is still being done in slices (until then a flat green stands in). */
+  painter?: { pix: { data: Uint8ClampedArray }; step(budgetMs: number): boolean };
   /** Unloaded: queued work for it is dropped. */
   dead?: boolean;
 }
@@ -183,6 +185,8 @@ export class SpikeWorld {
   readonly houses: HouseInst[] = [];
   private shells: Shell[] = [];
   private torches: Torch[] = [];
+  /** Dark point lights that stand in for the torches that are not near, so the count of lights never changes (see `update`). */
+  private spares: THREE.PointLight[] = [];
 
   /**
    * Vision (metres from the view's focus): the world greys from `inner` and is black at `outer`; chunks beyond are not
@@ -397,6 +401,12 @@ export class SpikeWorld {
     this.sun.shadow.camera.layers.enable(1);
     this.setShadowMap(settings.shadowMap);
     this.scene.add(this.sun, this.sun.target, this.boltLight, this.rayLight, this.rayLight.target);
+    for (let i = 0; i < 16; i++) {
+      const spare = new THREE.PointLight(0xffffff, 0, 1);
+      spare.visible = false;
+      this.spares.push(spare);
+      this.scene.add(spare);
+    }
 
     // Ground chunks stream in once the view is sized (see `frame`); until then the exact height function stands in.
     this.layout = layout;
@@ -488,28 +498,68 @@ export class SpikeWorld {
     return maps[m]();
   }
 
+  /** A house material: shared, or (for the parts the cut-away fades with a dither) its own, noted in `own` to be let go. */
+  private houseMat(m: HouseMaterial, cut: boolean, own: THREE.Material[]): { mat: THREE.MeshLambertMaterial; opts: LitOpts } {
+    let s = this.houseMats.get(m);
+    if (!s) {
+      // Houses get the see-through oval too: a person behind one shows through it, as behind a tree.
+      const opts: LitOpts = { ...this.houseMatOpts(m), seeThrough: true };
+      s = { mat: lit(opts), opts };
+      this.houseMats.set(m, s);
+      if (m === 'window') this.windowMats.push(s.mat);
+    }
+    if (!cut) return s;
+    const mat = lit(s.opts);
+    mat.alphaHash = true;
+    own.push(mat);
+    if (m === 'window') this.windowMats.push(mat);
+    return { mat, opts: s.opts };
+  }
+
+  /**
+   * Every house look (each material, whole and fading) on a tiny box, so the renderer can build all their shaders
+   * before the first frame: a shader built when a new kind of house first streams in is a stall. Call `compile`
+   * on the result's `group` (it is in the scene), then `done()`.
+   */
+  warmHouses(): { group: THREE.Group; done: () => void } {
+    const group = new THREE.Group(), own: THREE.Material[] = [];
+    const kinds: HouseMaterial[] = ['stone', 'plaster', 'timber', 'roof', 'shingle', 'tile', 'sod', 'roofUnder', 'door', 'window', 'shutter', 'floor'];
+    for (const m of kinds) {
+      for (const cut of [false, true]) {
+        const geo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+        geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3).fill(1), 3));
+        const { mat, opts } = this.houseMat(m, cut, own);
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.receiveShadow = true;
+        mesh.castShadow = !cut;
+        mesh.position.copy(this.focus);
+        group.add(mesh);
+        if (m === 'roof') this.addShells(mesh, opts, { density: 0.5, tint: 1.12, step: 0.06 }, null, []);
+      }
+    }
+    this.scene.add(group);
+    return {
+      group,
+      done: () => {
+        this.scene.remove(group);
+        group.traverse((o) => ((o as THREE.Mesh).geometry as THREE.BufferGeometry | undefined)?.dispose());
+        for (const m of own) m.dispose();
+        for (const m of own) {
+          const i = this.windowMats.indexOf(m as THREE.MeshLambertMaterial);
+          if (i >= 0) this.windowMats.splice(i, 1);
+        }
+        // (The shells the warm-up made are let go too.)
+        this.shells = this.shells.filter((s) => s.mesh.parent !== group);
+      },
+    };
+  }
+
   /** Stand a house up in the world: its model, its furniture cards, its hearth's light. It belongs to the chunk `st`. */
   private standHouse(entry: HouseEntry<Furnished>, st: Standing): void {
     const { built, room } = entry;
     const h = built.place, model = built.model;
     const inst: HouseInst = { built, mats: [], cards: [], hearth: null, hearthAt: null, shells: [], group: new THREE.Group(), furniture: [], cut: [], box: entry.box, floorHeat: null, cutT: 0, open: false };
-    const matFor = (m: HouseMaterial, cut: boolean): { mat: THREE.MeshLambertMaterial; opts: LitOpts } => {
-      let s = this.houseMats.get(m);
-      if (!s) {
-        // Houses get the see-through oval too: a person behind one shows through it, as behind a tree.
-        const opts: LitOpts = { ...this.houseMatOpts(m), seeThrough: true };
-        s = { mat: lit(opts), opts };
-        this.houseMats.set(m, s);
-        if (m === 'window') this.windowMats.push(s.mat);
-      }
-      if (!cut) return s;
-      // Cut parts fade with a dither (alpha hash), so each needs its own material.
-      const mat = lit(s.opts);
-      mat.alphaHash = true;
-      inst.mats.push(mat);
-      if (m === 'window') this.windowMats.push(mat);
-      return { mat, opts: s.opts };
-    };
+    const matFor = (m: HouseMaterial, cut: boolean): { mat: THREE.MeshLambertMaterial; opts: LitOpts } => this.houseMat(m, cut, inst.mats);
     for (const p of model.parts) {
       const geo = geometryOf(p.mesh);
       const { mat, opts } = matFor(p.material, p.cut);
@@ -548,6 +598,7 @@ export class SpikeWorld {
     // The hearth's (or oven's, or forge's) glow, if the room has one.
     if (fire) {
       const hearth = new THREE.PointLight(0xff9a48, 4, 6, 2);
+      hearth.visible = false; // (a light that is switched on counts in every shader: the pool in `update` decides which shine)
       hearth.position.set(fire.x, model.floorY + 0.55, fire.z + 0.2);
       inst.group.add(hearth);
       inst.hearth = { light: hearth, flame: new THREE.Mesh(), base: 4, seed: 3 + Math.round(h.x * 0.37 + h.z * 0.11) % 40 };
@@ -773,12 +824,9 @@ export class SpikeWorld {
   /** Build one chunk's ground mesh, painted texture and grass, and add it to the scene. */
   private loadChunk(i: number, j: number): void {
     const c = this.store.ensure(i, j);
-    const map = pixTexture(groundChunkTex(this.ground, i, j).data, Math.round(CHUNK * TEXELS_PER_M), Math.round(CHUNK * TEXELS_PER_M), { flip: false });
-    map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
-    // Mesh UVs are world metres; this chunk's texture covers x0..x0+CHUNK.
-    map.repeat.set(1 / CHUNK, 1 / CHUNK);
-    map.offset.set(-c.x0 / CHUNK, -c.z0 / CHUNK);
-    const mesh = new THREE.Mesh(geometryOf(c.mesh), lit({ map, ao: true, wettable: true }));
+    // The painting is the slow part (about 100 ms), so it is done a few ms a frame: a flat green stands in until it is finished.
+    this.groundHold ??= pixTexture(new Uint8ClampedArray([62, 92, 42, 255]), 1, 1, { flip: false });
+    const mesh = new THREE.Mesh(geometryOf(c.mesh), lit({ map: this.groundHold, ao: true, wettable: true }));
     mesh.receiveShadow = true;
     this.scene.add(mesh);
     const grass = this.buildGrass(c);
@@ -787,11 +835,63 @@ export class SpikeWorld {
       this.scene.add(grass);
     }
     const standing: Standing = { houses: [], objects: [], shells: [], torches: [] };
-    const lc: LoadedChunk = { id: c, ground: mesh, grass, heat: null, standing };
+    const lc: LoadedChunk = { id: c, ground: mesh, grass, heat: null, standing, painter: groundChunkPainter(this.ground, i, j) };
+    this.paintQueue.push(lc);
     this.chunks.set(chunkKey(i, j), lc);
     this.fillChunk(i, j, lc);
     this.syncHeat(lc);
     this.chunkBuilds++;
+  }
+
+  private forgetT = 3;
+
+  /**
+   * Let go of what is made for ground far from the view: the furnished rooms of houses and the generated trees, props
+   * and posts of chunks. They are made again, the same, if the hero comes back; what is on the screen is untouched.
+   */
+  private forgetFar(): number {
+    const f = this.focus, keep = this.viewRadius() + Math.max(60, this.lightRange);
+    const near = (x: number, z: number, r: number): boolean => Math.hypot(x - f.x, z - f.z) < r;
+    const stood = new Set(this.houses.map((h) => h.built.place));
+    const a = this.houseIndex.forget((p) => stood.has(p) || near(p.x, p.z, keep));
+    const b = this.placed.forget((i, j) => near((i + 0.5) * CHUNK, (j + 0.5) * CHUNK, keep + CHUNK) || this.chunks.has(chunkKey(i, j)));
+    return a + b;
+  }
+
+  /** What is held for far-off ground, for the stats and the tests. */
+  get held(): { furnished: number; generated: number } {
+    return { furnished: this.houseIndex.made, generated: this.placed.generatedChunks };
+  }
+
+  private groundHold: THREE.DataTexture | null = null;
+  private paintQueue: LoadedChunk[] = [];
+
+  /** Paint the grounds of loaded chunks for up to `budgetMs`, the nearest the view's centre first; a finished one gets its texture. */
+  private pumpPaint(budgetMs: number): void {
+    const t0 = performance.now();
+    while (this.paintQueue.length && performance.now() - t0 < budgetMs) {
+      const f = this.focus;
+      let k = 0, best = Infinity;
+      this.paintQueue.forEach((q, n) => {
+        const d = Math.hypot(q.id.x0 + CHUNK / 2 - f.x, q.id.z0 + CHUNK / 2 - f.z);
+        if (d < best) { best = d; k = n; }
+      });
+      const lc = this.paintQueue[k];
+      if (lc.dead || !lc.painter) {
+        this.paintQueue.splice(k, 1);
+        continue;
+      }
+      if (!lc.painter.step(Math.max(0.5, budgetMs - (performance.now() - t0)))) continue;
+      const n = Math.round(CHUNK * TEXELS_PER_M);
+      const map = pixTexture(lc.painter.pix.data, n, n, { flip: false });
+      map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
+      // Mesh UVs are world metres; this chunk's texture covers x0..x0+CHUNK.
+      map.repeat.set(1 / CHUNK, 1 / CHUNK);
+      map.offset.set(-lc.id.x0 / CHUNK, -lc.id.z0 / CHUNK);
+      (lc.ground.material as THREE.MeshLambertMaterial).map = map;
+      lc.painter = undefined;
+      this.paintQueue.splice(k, 1);
+    }
   }
 
   /** Work left to do for chunks that have loaded: one tree, prop or post at a time, spread over frames. */
@@ -839,7 +939,7 @@ export class SpikeWorld {
     this.scene.remove(lc.ground);
     lc.ground.geometry.dispose();
     const mat = lc.ground.material as THREE.MeshLambertMaterial;
-    mat.map?.dispose();
+    if (mat.map !== this.groundHold) mat.map?.dispose();
     mat.dispose();
     if (lc.heat) {
       this.scene.remove(lc.heat.mesh);
@@ -971,6 +1071,7 @@ export class SpikeWorld {
     fx.object.position.set(x, y + 0.02, z);
     this.scene.add(fx.object);
     const light = new THREE.PointLight(0xffa458, 9, 11, 2);
+    light.visible = false; // (the pool in `update` decides which shine: a light that is on counts in every shader)
     light.position.set(x, y + 0.3, z);
     this.scene.add(light);
     const torch: Torch = { light, flame: fx.object, tick: fx.tick, base: 9, seed: this.torchSeed * 7 / 11 + 1 };
@@ -1011,7 +1112,10 @@ export class SpikeWorld {
     const first = !this.framed;
     this.streamChunks(first);
     this.framed = true;
-    if (first) this.pumpFill(Infinity); // the first view is built whole; later chunks fill in a little each frame
+    if (first) {
+      this.pumpPaint(Infinity);
+      this.pumpFill(Infinity);
+    } // the first view is built whole; later chunks fill in a little each frame
   }
 
   private framed = false;
@@ -1534,8 +1638,9 @@ export class SpikeWorld {
       this.castRays();
       this.refreshLights(env.night);
       const sp = this.spec;
-      WORLD.uVision.value.set(this.hero.x, this.hero.z, sp.range * 0.7, sp.range);
+      WORLD.uVision.value.set(this.hero.x, this.hero.z, sp.range * 0.55, sp.range);
       WORLD.uSight.value.set(this.facing, sp.fov / 2, sp.edge, sp.near);
+      WORLD.uSightBack.value = sp.back;
       this.stepExplored();
       // People out of sight are not drawn.
       const out = this.seen(this.walker.mesh.position.x, this.walker.mesh.position.z) < 0.25;
@@ -1558,14 +1663,19 @@ export class SpikeWorld {
     // (Distances are measured once each, not inside the sort: a sort asks for them n log n times, and each ask made a vector.)
     const far = this.vision.outer > 0 ? Math.max(this.vision.outer, this.lightRange) + 8 : Infinity;
     const order = this.torches.map((t) => ({ t, d: t.light.getWorldPosition(this.tmpV).distanceTo(this.focus) })).sort((a, b) => a.d - b.d);
+    let shining = 0;
     order.forEach(({ t, d }, i) => {
       t.light.visible = i < this.settings.lights && d < far;
+      if (t.light.visible) shining++;
       if (d > far) return; // out of sight is out of mind: not animated
       const f = 0.82 + 0.18 * Math.sin(this.time * 11 + t.seed) * Math.sin(this.time * 7.3 + t.seed * 2);
       t.light.intensity = t.base * f * (t.always ? 1 : 0.35 + 0.65 * env.night);
       t.flame.scale.set(1, 0.85 + f * 0.3, 1);
       t.tick?.(this.time, { x: w.windX, z: w.windY });
     });
+    // The number of lights in the scene is part of every shader: when it changes, every material is compiled again (a
+    // stall of a second on a phone). So it never changes: dark spares make up whatever the torches in view do not.
+    this.spares.forEach((l, i) => { l.visible = i < this.settings.lights - shining; });
     for (const m of this.windowMats) m.emissive.setScalar(env.night * 1.4);
 
     // The cut-away fades the roof and the front wall with a dither.
@@ -1593,6 +1703,12 @@ export class SpikeWorld {
     this.updateSee();
     this.streamChunks();
     this.pumpFill(3);
+    this.pumpPaint(4);
+    this.forgetT -= dt;
+    if (this.forgetT <= 0) {
+      this.forgetT = 3;
+      this.forgetFar();
+    }
     // The heat map and the reading follow the weather and the living, twice a second.
     this.heatT -= dt;
     if (this.heatT <= 0) {

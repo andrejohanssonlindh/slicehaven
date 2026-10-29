@@ -209,6 +209,16 @@ export function leafTex(seed: number): Pix {
  * coordinates, so neighbouring chunks continue each other with no seam.
  */
 export function groundChunkTex(g: Ground3D, ci: number, cj: number): Pix {
+  const painter = groundChunkPainter(g, ci, cj);
+  painter.step(Infinity);
+  return painter.pix;
+}
+
+/**
+ * The same painting, in slices: `step(ms)` paints for about that long and says whether the texture is finished, so a
+ * chunk that streams in costs a little of a few frames, not one long one. `pix` is complete once `step` returns true.
+ */
+export function groundChunkPainter(g: Ground3D, ci: number, cj: number): { pix: Pix; step(budgetMs: number): boolean } {
   const n = Math.round(CHUNK * TPM);
   const p = new Pix(n, n);
   const ox = ci * n, oy = cj * n; // world texel of this chunk's corner
@@ -216,10 +226,10 @@ export function groundChunkTex(g: Ground3D, ci: number, cj: number): Pix {
   // Splat on a coarse grid (every 4 texels), interpolated: the noise does the edges.
   const S = 4, gn = Math.ceil(n / S) + 1;
   const grid = new Array(gn * gn);
-  for (let j = 0; j < gn; j++) for (let i = 0; i < gn; i++) grid[j * gn + i] = splatAt(g, x0 + (i * S) / TPM, z0 + (j * S) / TPM);
   const cx = TILE_CENTER.x, cy = TILE_CENTER.y;
   const SH = ['#1e1a16', '#2e2820', '#463c2e', '#5e523e', '#7a6c52'];
-  for (let y = 0; y < n; y++) {
+  let gridRow = 0, row = 0;
+  const paintRow = (y: number): void => {
     const fj = y / S, j = Math.floor(fj), v = fj - j;
     const wy = y + oy;
     for (let x = 0; x < n; x++) {
@@ -238,6 +248,21 @@ export function groundChunkTex(g: Ground3D, ci: number, cj: number): Pix {
       else col = groundColor('grass', wx, wy, cx, cy);
       p.set(x, y, col);
     }
-  }
-  return p;
+  };
+  return {
+    pix: p,
+    step(budgetMs: number): boolean {
+      const t0 = performance.now();
+      while (gridRow < gn) {
+        for (let i = 0; i < gn; i++) grid[gridRow * gn + i] = splatAt(g, x0 + (i * S) / TPM, z0 + (gridRow * S) / TPM);
+        gridRow++;
+        if (performance.now() - t0 >= budgetMs) return false;
+      }
+      while (row < n) {
+        paintRow(row++);
+        if (performance.now() - t0 >= budgetMs) return row >= n;
+      }
+      return true;
+    },
+  };
 }

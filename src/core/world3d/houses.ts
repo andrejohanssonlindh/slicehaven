@@ -116,7 +116,18 @@ export class HouseIndex<R> {
     return this.near(x0, z0, x1, z1).flatMap((e) => e.sources.filter((s) => s.x >= x0 && s.x < x1 && s.z >= z0 && s.z < z1));
   }
 
-  /** Houses made so far (a measure of how much of the city has been walked near). */
+  /** Let go of the furnished rooms (their plans, walls and sources) of houses `keep` says no to; they are made again if asked for. */
+  forget(keep: (place: PlacedHouse) => boolean): number {
+    let n = 0;
+    for (const place of [...this.entries.keys()]) {
+      if (keep(place)) continue;
+      this.entries.delete(place);
+      n++;
+    }
+    return n;
+  }
+
+  /** Houses furnished now (a measure of how much of the city is being held). */
   get made(): number {
     return this.entries.size;
   }
