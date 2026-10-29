@@ -314,7 +314,7 @@ export class SpikeWorld {
       spots.length = 0;
       for (let j = Math.floor((h.z - reach) / CHUNK); j <= Math.floor((h.z + reach) / CHUNK); j++) {
         for (let i = Math.floor((h.x - reach) / CHUNK); i <= Math.floor((h.x + reach) / CHUNK); i++) {
-          for (const [x, z] of this.placed.chunk(i, j).torches) spots.push({ x, z, radius: 6.5 * dayK });
+          for (const p of this.placed.chunk(i, j).props) if (THINGS.get(p.kind).flame) spots.push({ x: p.x, z: p.z, radius: 6.5 * dayK });
         }
       }
       for (const f of this.fires) if (f.kind === 'fire') spots.push({ x: f.x, z: f.z, radius: 6.5 * dayK });
@@ -891,6 +891,7 @@ export class SpikeWorld {
     group.position.set(p.x, this.store.heightAt(p.x, p.z) - (kind.sink ?? 0), p.z);
     this.scene.add(group);
     st.objects.push(group);
+    if (kind.flame) this.placeTorch(p.x, group.position.y + kind.flame.y * (p.size ?? 1), p.z, st);
   }
 
   private grassGeo: THREE.BufferGeometry | null = null;
@@ -1044,7 +1045,6 @@ export class SpikeWorld {
     for (const t of content.trees) this.fillQueue.push({ lc, run: () => this.buildTree(t, st) });
     for (const p of content.props) this.fillQueue.push({ lc, run: () => this.buildProp(p, st) });
     for (const place of this.houseIndex.inChunk(i, j)) this.fillQueue.push({ lc, run: () => this.standHouse(this.houseIndex.entry(place), st) });
-    for (const [x, z] of content.torches) this.fillQueue.push({ lc, run: () => this.placeTorch(x, this.store.heightAt(x, z) + 1.9, z, true, st) });
   }
 
   /** Do queued chunk work for up to `budgetMs`, so a chunk streaming in costs a few frames of a little, not one long one. */
@@ -1066,7 +1066,7 @@ export class SpikeWorld {
       this.scene.remove(o);
       o.traverse((c) => {
         const g = (c as THREE.Mesh).geometry as THREE.BufferGeometry | undefined;
-        if (g && !g.userData.shared && g !== this.postGeo) g.dispose();
+        if (g && !g.userData.shared) g.dispose();
       });
     }
     for (const t of st.torches) this.torches.splice(this.torches.indexOf(t), 1);
@@ -1191,23 +1191,12 @@ export class SpikeWorld {
     const { built } = this.houseIndex.lite(place);
     const d = built.model.door;
     const w = houseToWorld(place, d[0] + 0.95, d[2] + 0.25);
-    this.placeTorch(w.x, groundHeight(this.ground, place.x, place.z) - 0.05 + built.model.floorY + 1.85, w.z, false, null);
+    this.placeTorch(w.x, groundHeight(this.ground, place.x, place.z) - 0.05 + built.model.floorY + 1.85, w.z, null);
     this.fires.push({ x: w.x, z: w.z, kind: 'fire', weight: TORCH_FIRE });
   }
 
-  private postMat: THREE.MeshLambertMaterial | null = null;
-  private postGeo = new THREE.BoxGeometry(0.14, 1.9, 0.14);
-
-  /** A flame on a post (or on a bracket, with no post), with its light; into `st` when it belongs to a chunk. */
-  private placeTorch(x: number, y: number, z: number, post: boolean, st: Standing | null): void {
-    this.postMat ??= lit({ map: tex(timberTex(21)), seeThrough: true });
-    if (post) {
-      const p = new THREE.Mesh(this.postGeo, this.postMat);
-      p.position.set(x, y - 0.95, z);
-      p.castShadow = true;
-      this.scene.add(p);
-      st?.objects.push(p);
-    }
+  /** A flame with its light (on a bracket, or on a thing that carries one); into `st` when it belongs to a chunk. */
+  private placeTorch(x: number, y: number, z: number, st: Standing | null): void {
     const fx = makeFlame(0.42, 10, this.torchSeed);
     fx.object.position.set(x, y + 0.02, z);
     this.scene.add(fx.object);

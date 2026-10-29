@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SPIKE_GROUND, SPIKE_HERO, SPIKE_LAYOUT, SPIKE_TORCHES } from '../src/content/spike3d';
+import { SPIKE_GROUND, SPIKE_HERO, SPIKE_LAYOUT } from '../src/content/spike3d';
 import { buildHouses, houseAt, houseBox, houseOuterBox, houseToLocal, houseToWorld, houseWalls, layoutObstacles } from '../src/core/world3d/layout';
 import { THINGS } from '../src/content/things';
 import { type PlacedProp, buildBoulder, buildCart, buildCrates, buildFence, buildShrub, buildWell, buildWoodpile } from '../src/core/world3d/props';
@@ -46,7 +46,7 @@ describe('layout', () => {
       expect(lakeDist(g, t.x, t.z)).toBeGreaterThan(1.5);
       for (const b of boxes) expect(shapeDist(b, t.x, t.z)).toBeGreaterThan(1.5);
     }
-    for (const [x, z] of SPIKE_TORCHES) for (const b of boxes) expect(shapeDist(b, x, z)).toBeGreaterThan(1);
+    for (const { x, z } of SPIKE_LAYOUT.props.filter((p) => p.kind === 'torchpost')) for (const b of boxes) expect(shapeDist(b, x, z)).toBeGreaterThan(1);
   });
 
   it('the hero can walk in through every door, and each room is its own house', () => {
@@ -69,7 +69,8 @@ describe('layout', () => {
       const id = `${p.kind}@${p.x},${p.z}`;
       // (A bridge is the one thing that stands over water, and its walkway is open.)
       if (p.kind !== 'bridge') expect(lakeDist(g, p.x, p.z), id).toBeGreaterThan(1);
-      for (const r of g.roads) expect(roadDist(r, p.x, p.z), id).toBeGreaterThan(r.width / 2 + 0.3);
+      // (A torch post lines the road: it stands at its edge.)
+      if (p.kind !== 'torchpost') for (const r of g.roads) expect(roadDist(r, p.x, p.z), id).toBeGreaterThan(r.width / 2 + 0.3);
       for (const b of boxes) expect(shapeDist(b, p.x, p.z), id).toBeGreaterThan(0.4);
       // (A way through, an open gate or an archway, is walkable in the middle; its posts are what block.)
       expect(grid.walkable(p.x, p.z), id).toBe(p.kind === 'archway' || p.kind === 'bridge' || (p.kind === 'gate' && !!p.open));

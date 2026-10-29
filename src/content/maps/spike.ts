@@ -37,8 +37,10 @@ export const SPIKE_MAP: MapSpec = {
     { x: 20, z: -10, seed: 19 },
     { x: 29, z: -9.5, seed: 6 },
   ],
-  torches: [[6.5, 6.9], [-12, 7.1]],
   props: [
+    // Torch posts.
+    { kind: 'torchpost', x: 6.5, z: 6.9, seed: 0 },
+    { kind: 'torchpost', x: -12, z: 7.1, seed: 1 },
     // By the road and the doors.
     { kind: 'shrub', x: -4.8, z: 1.5, seed: 2 },
     { kind: 'shrub', x: 4.8, z: -0.2, seed: 5, size: 0.8 },

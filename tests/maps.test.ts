@@ -86,8 +86,9 @@ describe('placing along a road', () => {
       houses: [{ id: 'h', at: { road: 0, t: 0.5, side: 'north' } }],
       torchLines: [{ road: 0, every: 10, side: 'south' }],
     });
-    expect(c.layout.torches.length).toBe(10);
-    for (const [, z] of c.layout.torches) expect(z).toBeGreaterThan(1.5);
+    const posts = c.layout.props.filter((p) => p.kind === 'torchpost');
+    expect(posts.length).toBe(10);
+    for (const { z } of posts) expect(z).toBeGreaterThan(1.5);
     expect(c.ground.mud.length).toBe(1);
     expect(roadLength(base.roads[0])).toBe(100);
     expect(roadPoint(base.roads[0], 25)).toMatchObject({ x: -25, z: 0, tx: 1, tz: 0 });

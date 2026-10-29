@@ -1,4 +1,4 @@
-import { type FSource, type FilamentWorld, type Ground, TORCH_FIRE } from '../core/world3d/filaments3d';
+import type { FSource, FilamentWorld, Ground } from '../core/world3d/filaments3d';
 import { type BuiltHouse, type Layout, houseOuterBox, treeProp } from '../core/world3d/layout';
 import type { PlacedIndex } from '../core/world3d/placed';
 import { THINGS } from './things';
@@ -20,7 +20,6 @@ export const SPIKE_LAYOUT: Layout = SPIKE.layout;
 export const SPIKE_GROUND: Ground3D = SPIKE.ground;
 export const SPIKE_HOUSE = SPIKE_LAYOUT.houses[0];
 export const SPIKE_TREE = SPIKE_LAYOUT.trees[0];
-export const SPIKE_TORCHES = SPIKE_LAYOUT.torches;
 export const SPIKE_WALK = SPIKE.walk;
 /** Where the hero starts: by the first door, on the mud. */
 export const SPIKE_HERO = SPIKE.hero;
@@ -60,7 +59,6 @@ export function filamentWorld(g: Ground3D, layout: Layout, houses: BuiltHouse[] 
     sources: [
       // (Each thing gives off what its kind says: a pine is a pine here too, as in the streaming field.)
       ...layout.trees.flatMap((t) => THINGS.source(treeProp(t)) ?? []),
-      ...layout.torches.map(([x, z]): FSource => ({ x, z, kind: 'fire', weight: TORCH_FIRE })),
       ...layout.props.flatMap((p) => THINGS.source(p) ?? []),
       ...extra,
     ],
@@ -73,7 +71,7 @@ export function filamentWorld(g: Ground3D, layout: Layout, houses: BuiltHouse[] 
  * hand-lit campfires), which `extras` gives afresh each time the field is told its sources changed.
  */
 export function streamingFilamentWorld(g: Ground3D, placed: PlacedIndex, houses: BuiltHouse[] | (HouseBoxes & { sourcesIn?(x0: number, z0: number, x1: number, z1: number): FSource[] }), extras: () => FSource[]): FilamentWorld {
-  const base = filamentWorld(g, { houses: [], trees: [], torches: [], props: [] }, houses, []);
+  const base = filamentWorld(g, { houses: [], trees: [], props: [] }, houses, []);
   let own = extras();
   return {
     ...base,

@@ -76,6 +76,13 @@ describe('kinds of thing', () => {
     expect(() => new Things([{ id: 'a', is: 'thing' }, { id: 'a', is: 'thing' }])).toThrow(/two kinds/);
   });
 
+  it('a torch post is a fire: a post to walk round, a small fire to the field, a flame to the renderer', () => {
+    expect(kindChain('torchpost', LIBRARY.parents)).toEqual(['torchpost', 'fire', 'feature', 'thing']);
+    expect(THINGS.get('torchpost').flame?.y).toBeGreaterThan(1);
+    expect(THINGS.shapes(at('torchpost'))).toHaveLength(1);
+    expect(THINGS.source(at('torchpost'))).toMatchObject({ kind: 'fire' });
+  });
+
   it('a run takes its length from the placement, else its kind', () => {
     const [short] = THINGS.shapes(at('fence', { len: 2 }));
     const [dflt] = THINGS.shapes(at('fence'));

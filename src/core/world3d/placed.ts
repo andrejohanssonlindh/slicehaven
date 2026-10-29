@@ -1,12 +1,12 @@
 import { CHUNK, chunkKey } from './chunks';
-import { type FSource, TORCH_FIRE } from './filaments3d';
-import { POST, type Layout, type PlacedTree, treeProp } from './layout';
+import type { FSource } from './filaments3d';
+import { type Layout, type PlacedTree, treeProp } from './layout';
 import type { PlacedProp } from './props';
-import { type Shape, type ShapeSource, circle } from './space';
+import type { Shape, ShapeSource } from './space';
 import type { Things } from './things';
 
 /**
- * The things placed out in the world (trees, props, torch posts) by chunk, so a
+ * The things placed out in the world (trees and props, torch posts among them) by chunk, so a
  * map of any size is asked only about the ground that is looked at. A chunk's
  * content is the authored things that stand in it plus, for a map that has a
  * generator, what the generator makes for it (the same every time it is asked,
@@ -21,13 +21,12 @@ import type { Things } from './things';
 export interface ChunkContent {
   trees: PlacedTree[];
   props: PlacedProp[];
-  torches: [number, number][];
 }
 
 /** Makes the content of chunk (i, j): deterministic, and independent of the order chunks are asked in. */
 export type ChunkGenerator = (i: number, j: number) => Partial<ChunkContent>;
 
-const EMPTY: ChunkContent = { trees: [], props: [], torches: [] };
+const EMPTY: ChunkContent = { trees: [], props: [] };
 
 /** Radius of the leafy shade a generated tree casts on the ground (the same as authored trees get). */
 export const SHADE_R = 5;
@@ -38,16 +37,15 @@ export class PlacedIndex implements ShapeSource {
   private readonly shapes = new Map<string, Shape[]>();
   private readonly sights = new Map<string, Shape[]>();
 
-  constructor(layout: Pick<Layout, 'trees' | 'props' | 'torches'>, private readonly things: Things, private readonly generator?: ChunkGenerator) {
+  constructor(layout: Pick<Layout, 'trees' | 'props'>, private readonly things: Things, private readonly generator?: ChunkGenerator) {
     const at = (x: number, z: number): ChunkContent => {
       const k = chunkKey(Math.floor(x / CHUNK), Math.floor(z / CHUNK));
       let c = this.authored.get(k);
-      if (!c) this.authored.set(k, (c = { trees: [], props: [], torches: [] }));
+      if (!c) this.authored.set(k, (c = { trees: [], props: [] }));
       return c;
     };
     for (const t of layout.trees) at(t.x, t.z).trees.push(t);
     for (const p of layout.props) at(p.x, p.z).props.push(p);
-    for (const t of layout.torches) at(t[0], t[1]).torches.push(t);
   }
 
   /** What stands in chunk (i, j): authored things first, then generated ones. */
@@ -57,11 +55,11 @@ export class PlacedIndex implements ShapeSource {
     let g = this.made.get(k);
     if (!g && this.generator) {
       const m = this.generator(i, j);
-      this.made.set(k, (g = { trees: m.trees ?? [], props: m.props ?? [], torches: m.torches ?? [] }));
+      this.made.set(k, (g = { trees: m.trees ?? [], props: m.props ?? [] }));
     }
     if (!g) return a ?? EMPTY;
     if (!a) return g;
-    return { trees: [...a.trees, ...g.trees], props: [...a.props, ...g.props], torches: [...a.torches, ...g.torches] };
+    return { trees: [...a.trees, ...g.trees], props: [...a.props, ...g.props] };
   }
 
   /** Chunks the rectangle touches, as [i, j] pairs. */
@@ -78,7 +76,7 @@ export class PlacedIndex implements ShapeSource {
     if (!s) {
       const c = this.chunk(i, j);
       const th = this.things;
-      s = [...c.trees.flatMap((t) => th.shapes(treeProp(t))), ...c.torches.map(([x, z]) => circle(x, z, POST)), ...c.props.flatMap((p) => th.shapes(p))];
+      s = [...c.trees.flatMap((t) => th.shapes(treeProp(t))), ...c.props.flatMap((p) => th.shapes(p))];
       this.shapes.set(k, s);
     }
     return s;
@@ -120,7 +118,6 @@ export class PlacedIndex implements ShapeSource {
         if (s) out.push(s);
       };
       c.trees.forEach((t) => add(treeProp(t)));
-      for (const [x, z] of c.torches) if (inside(x, z)) out.push({ x, z, kind: 'fire', weight: TORCH_FIRE });
       c.props.forEach(add);
     }
     return out;

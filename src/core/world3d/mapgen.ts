@@ -111,8 +111,7 @@ export interface MapSpec {
   /** Things at exact spots. */
   trees?: PlacedTree[];
   props?: PlacedProp[];
-  /** Torch posts: exact spots, or along a road every so many metres. */
-  torches?: [number, number][];
+  /** Torch posts along a road every so many metres (single posts are props of kind `torchpost`). */
   torchLines?: { road: number; every: number; side: 'north' | 'south' | 'east' | 'west'; offset?: number }[];
   /** Where the hero starts: a spot, or in front of a house's door. */
   hero?: [number, number] | { house: string };
@@ -204,7 +203,7 @@ export function wildGenerator(w: WildSpec, ctx: WildContext): ChunkGenerator {
   /** Thickness of the woods at a spot, 0 (open meadow) .. 1 (the thick of it). */
   const wood = (x: number, z: number): number => smoothstep(0.38, 0.62, fbm(x / grain, z / grain, ctx.seed + 41));
   return (i, j): Partial<ChunkContent> => {
-    const out: ChunkContent = { trees: [], props: [], torches: [] };
+    const out: ChunkContent = { trees: [], props: [] };
     const layer = (perK: number, salt: number, make: (x: number, z: number, rng: Rng, wood: number) => void): void => {
       if (perK <= 0) return;
       const n = Math.max(1, Math.round(CHUNK / Math.sqrt(1000 / perK))); // cells along a side
@@ -274,7 +273,6 @@ export function compileMap(spec: MapSpec, things: Things): CompiledMap {
   const layout: Layout = {
     houses,
     trees: [...(spec.trees ?? [])],
-    torches: [...(spec.torches ?? [])],
     props: [...(spec.props ?? [])],
   };
   for (const tl of spec.torchLines ?? []) {
@@ -288,7 +286,7 @@ export function compileMap(spec: MapSpec, things: Things): CompiledMap {
       const p = roadPoint(road, s);
       const [nx, nz] = sideNormal(p.tx, p.tz, tl.side);
       const d = road.width / 2 + (tl.offset ?? 0.9);
-      layout.torches.push([p.x + nx * d, p.z + nz * d]);
+      layout.props.push({ kind: 'torchpost', x: p.x + nx * d, z: p.z + nz * d, seed: layout.props.length });
     }
   }
 
@@ -299,8 +297,7 @@ export function compileMap(spec: MapSpec, things: Things): CompiledMap {
   const KEEP = { tree: 0.9, shrub: 0.5, boulder: 0.8 } as const;
   const placed: { x: number; z: number; r: number }[] = [
     ...layout.trees.map((t) => ({ x: t.x, z: t.z, r: KEEP.tree })),
-    ...layout.props.map((p) => ({ x: p.x, z: p.z, r: p.kind === 'woodpile' ? 1 : KEEP[p.kind === 'boulder' ? 'boulder' : 'shrub'] })),
-    ...layout.torches.map(([x, z]) => ({ x, z, r: 0.4 })),
+    ...layout.props.map((p) => ({ x: p.x, z: p.z, r: p.kind === 'woodpile' ? 1 : p.kind === 'torchpost' ? 0.4 : KEEP[p.kind === 'boulder' ? 'boulder' : 'shrub'] })),
   ];
   const inArea = (a: Area): (() => [number, number]) => {
     if ('circle' in a) return () => {

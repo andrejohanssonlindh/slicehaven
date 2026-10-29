@@ -1,6 +1,6 @@
 import { type House3DSpec, type HouseModel, buildHouse } from './house';
 import type { PlacedProp } from './props';
-import { type Shape, boxOfFootprint, circle, shapeDist } from './space';
+import { type Shape, boxOfFootprint, shapeDist } from './space';
 import type { Things } from './things';
 
 /**
@@ -34,9 +34,7 @@ export const treeProp = (t: PlacedTree): PlacedProp => ({ kind: t.kind ?? 'oak',
 export interface Layout {
   houses: PlacedHouse[];
   trees: PlacedTree[];
-  /** Torches on posts (x, z). */
-  torches: [number, number][];
-  /** Shrubs, boulders, woodpiles. */
+  /** Everything else that stands out of doors: shrubs, boulders, woodpiles, torch posts. */
   props: PlacedProp[];
 }
 
@@ -69,7 +67,6 @@ export function houseToLocal(h: PlacedHouse, x: number, z: number): { x: number;
   return { x: dx * c - dz * s, z: dx * s + dz * c };
 }
 
-export const POST = 0.12;
 /**
  * A house's four thin walls, so the inside can be walked, with a gap at the door (`withDoor` false: whole,
  * for the storeys above the ground). The footprint is the walls plus a little proud (0.1 at the sides, a 0.6
@@ -114,7 +111,6 @@ export function layoutObstacles(l: Layout, houses: BuiltHouse[], things: Things)
   return [
     ...houses.flatMap((b) => levelWalls(b, 0)),
     ...l.trees.flatMap((t) => things.shapes(treeProp(t))),
-    ...l.torches.map(([x, z]) => circle(x, z, POST)),
     ...l.props.flatMap((p) => things.shapes(p)),
   ];
 }

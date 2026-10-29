@@ -69,6 +69,8 @@ export interface ThingDef {
   sink?: number;
   /** It lays a walkable deck this wide along its run, over water too (a bridge); it may stand in water. */
   deck?: number;
+  /** It carries a flame this high above the ground (metres, scaled with it), with its light. */
+  flame?: { y: number };
   /** Its look, built from the placement (meshes by material). Trees use `tree` instead. */
   draw?: (p: Placed) => ThingParts;
   tree?: TreeLook;
