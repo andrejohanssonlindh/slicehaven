@@ -5,7 +5,7 @@ import { addBox, bounds, emptyMesh, vertexCount } from '../src/core/world3d/mesh
 import { cloudDensity, cloudThreshold, skyLight } from '../src/core/world3d/sky';
 import { WATER_Y, buildTerrain, groundHeight, heightAt, lakeDist, splatAt } from '../src/core/world3d/terrain';
 import { TIERS, adjust, pickTier, pixelFactor, viewSpan } from '../src/core/world3d/tiers';
-import { buildTree } from '../src/core/world3d/tree';
+import { TREE_KINDS, buildTree } from '../src/core/world3d/tree';
 
 describe('mesh', () => {
   it('a box has 6 outward faces with matching attribute lengths', () => {
@@ -186,5 +186,17 @@ describe('tree', () => {
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
     expect(a.clumps.length).toBeGreaterThan(4);
     expect(Math.min(...a.clumps.map((c) => c.at[1]))).toBeGreaterThan(2);
+  });
+
+  it('every kind is deterministic; pines are taller and narrower, saplings small, dead trees leafless', () => {
+    for (const k of TREE_KINDS) {
+      expect(JSON.stringify(buildTree(5, 7, k)), k).toBe(JSON.stringify(buildTree(5, 7, k)));
+      expect(buildTree(5, 7, k).wood.indices.length, k).toBeGreaterThan(0);
+    }
+    const oak = buildTree(5), pine = buildTree(5, 7, 'pine'), young = buildTree(5, 7, 'young'), dead = buildTree(5, 7, 'dead');
+    expect(pine.height).toBeGreaterThan(oak.height * 0.9);
+    expect(Math.max(...pine.clumps.map((c) => c.r[0]))).toBeLessThan(Math.max(...oak.clumps.map((c) => c.r[0])));
+    expect(young.height).toBeLessThan(oak.height * 0.7);
+    expect(dead.clumps).toHaveLength(0);
   });
 });

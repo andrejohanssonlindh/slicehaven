@@ -1,6 +1,7 @@
 import { type House3DSpec, type HouseModel, buildHouse } from './house';
 import { type PlacedProp, propShape } from './props';
 import { type Shape, boxOfFootprint, circle, shapeDist } from './space';
+import type { TreeKind } from './tree';
 
 /**
  * A layout is the list of things placed in the world: houses, trees, torch posts.
@@ -23,6 +24,8 @@ export interface PlacedTree {
   x: number;
   z: number;
   seed: number;
+  /** Default: an oak. */
+  kind?: TreeKind;
 }
 
 export interface Layout {

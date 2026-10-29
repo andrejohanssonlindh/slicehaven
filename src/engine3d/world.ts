@@ -363,13 +363,17 @@ export class SpikeWorld {
   private leafOpts: LitOpts | null = null;
 
   private buildTree(place: PlacedTree): void {
-    const t = buildTree(place.seed);
+    const t = buildTree(place.seed, 7, place.kind);
     const group = new THREE.Group();
     // Bark and leaf textures are painted once and shared by every tree.
     this.barkMat ??= lit({ map: tex(barkTex(4)), ao: true, wettable: true, seeThrough: true });
     const wood = new THREE.Mesh(geometryOf(t.wood), this.barkMat);
     wood.castShadow = wood.receiveShadow = true;
     group.add(wood);
+    const gx = place.x, gz = place.z;
+    group.position.set(gx, this.store.heightAt(gx, gz), gz);
+    this.scene.add(group);
+    if (!t.clumps.length) return; // a dead tree has no leaves
     const merged = lumpGeometry(t.clumps, t.height, 2);
     this.leafOpts ??= { map: tex(leafTex(5)), ao: true, sway: { from: 2.5, amount: 0.018 }, seeThrough: true };
     const leafOpts = this.leafOpts;
@@ -377,9 +381,6 @@ export class SpikeWorld {
     const leaves = new THREE.Mesh(merged, this.leafMat);
     leaves.castShadow = leaves.receiveShadow = true;
     group.add(leaves);
-    const gx = place.x, gz = place.z;
-    group.position.set(gx, this.store.heightAt(gx, gz), gz);
-    this.scene.add(group);
     this.addShells(leaves, leafOpts, { density: 0.55, tint: 1.18, step: 0.12 }, null);
   }
 

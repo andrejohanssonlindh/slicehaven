@@ -2,6 +2,7 @@ import { Rng } from '../rng';
 import type { House3DSpec, RoofKind } from './house';
 import { type Layout, type PlacedHouse, type PlacedTree, buildHouses, houseOuterBox, houseToWorld, layoutObstacles, layoutPads, layoutShade } from './layout';
 import { type PlacedProp } from './props';
+import type { TreeKind } from './tree';
 import { NavGrid, type Shape, findPath, shapeDist } from './space';
 import { type Ground3D, type Road, type XZ, lakeDist, roadDist } from './terrain';
 
@@ -61,6 +62,8 @@ export interface Scatter {
   /** Extra space kept clear around each, metres. */
   gap?: number;
   seed?: number;
+  /** Trees only: the kinds to mix (each tree picks one at random; omitted, all are oaks). */
+  mix?: TreeKind[];
 }
 
 export interface MapSpec {
@@ -225,7 +228,11 @@ export function compileMap(spec: MapSpec): CompiledMap {
       if (placed.some((o) => Math.hypot(o.x - x, o.z - z) < r + o.r)) continue;
       placed.push({ x, z, r: KEEP[sc.kind] });
       got++;
-      if (sc.kind === 'tree') layout.trees.push({ x, z, seed: 1 + Math.floor(rng.next() * 60) });
+      if (sc.kind === 'tree') {
+        const seed = 1 + Math.floor(rng.next() * 60);
+        // The kind is drawn only when asked for, so maps without a mix place exactly what they always did.
+        layout.trees.push(sc.mix?.length ? { x, z, seed, kind: sc.mix[Math.floor(rng.next() * sc.mix.length)] } : { x, z, seed });
+      }
       else layout.props.push({ kind: sc.kind === 'boulder' ? 'boulder' : 'shrub', x, z, seed: 1 + Math.floor(rng.next() * 60), size: 0.8 + rng.next() * 0.5 });
     }
     if (got < sc.count) problems.push(`scatter ${sc.kind}: only room for ${got} of ${sc.count}`);

@@ -31,8 +31,8 @@ export const HAMLET_MAP: MapSpec = {
     { id: 'home4', room: 'fisher', size: 'small', roof: 'shingle', at: { road: 0, t: 0.8, side: 'south' } },
   ],
   scatter: [
-    { kind: 'tree', count: 70, area: { ring: [0, 0, 40, 64] } },
-    { kind: 'tree', count: 18, area: { rect: [-50, -30, 50, -8] } },
+    { kind: 'tree', count: 70, area: { ring: [0, 0, 40, 64] }, mix: ['oak', 'oak', 'pine', 'pine', 'pine', 'dead', 'young'] },
+    { kind: 'tree', count: 18, area: { rect: [-50, -30, 50, -8] }, mix: ['oak', 'oak', 'young', 'pine'] },
     { kind: 'shrub', count: 40, area: { rect: [-55, -25, 55, 25] }, gap: 1.2 },
     { kind: 'boulder', count: 12, area: { all: true } },
   ],
