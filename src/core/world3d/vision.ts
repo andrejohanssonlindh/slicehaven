@@ -44,7 +44,7 @@ export function visionOf({ alertness, night = 0, cap = Infinity }: VisionInput):
 }
 
 /** How many rays are cast round the eye. */
-export const RAYS = 512;
+export const RAYS = 2048;
 
 /** Where the ray from (ox, oz) along (dx, dz) enters and leaves a shape; null if it misses or starts inside. */
 export function rayThrough(s: Shape, ox: number, oz: number, dx: number, dz: number): [number, number] | null {

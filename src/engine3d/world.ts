@@ -236,8 +236,8 @@ export class SpikeWorld {
     if (c && c.range === range && c.house === house && Math.hypot(h.x - c.x, h.z - c.z) < 0.02) return;
     castSight({ x: h.x, z: h.z }, range, this.blockers(range, house), this.rays, 0.7);
     this.castAt = { x: h.x, z: h.z, range, house };
-    const data = sightTexture.image.data as Uint8Array;
-    for (let i = 0; i < RAYS; i++) data[i] = Math.min(255, Math.ceil((this.rays[i] / range) * 255));
+    const data = sightTexture.image.data as Uint16Array;
+    for (let i = 0; i < RAYS; i++) data[i] = THREE.DataUtils.toHalfFloat(Math.min(1, this.rays[i] / range));
     sightTexture.needsUpdate = true;
     this.markedAt = null; // what is seen has changed
   }

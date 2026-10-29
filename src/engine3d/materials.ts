@@ -48,10 +48,10 @@ export const exploredTexture = ((): THREE.DataTexture => {
 })();
 WORLD.uExplored.value = exploredTexture;
 
-/** The sight rays (`core/world3d/vision.ts`), one texel each round the circle, 0..255 for 0..range; wraps round. */
+/** The sight rays (`core/world3d/vision.ts`), one texel each round the circle, a half float: the share of the range; wraps round. */
 export const SIGHT_RAYS = RAYS;
 export const sightTexture = ((): THREE.DataTexture => {
-  const t = new THREE.DataTexture(new Uint8Array(SIGHT_RAYS).fill(255), SIGHT_RAYS, 1, THREE.RedFormat);
+  const t = new THREE.DataTexture(new Uint16Array(SIGHT_RAYS).fill(THREE.DataUtils.toHalfFloat(1)), SIGHT_RAYS, 1, THREE.RedFormat, THREE.HalfFloatType);
   t.magFilter = t.minFilter = THREE.LinearFilter;
   t.wrapS = THREE.RepeatWrapping;
   t.wrapT = THREE.ClampToEdgeWrapping;

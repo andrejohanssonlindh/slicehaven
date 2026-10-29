@@ -4,6 +4,7 @@
 
 - The sight rays were recast only after the hero moved 0.3 m, so the edge of what is seen hopped in steps. Now they are recast on every move (0.02 m) and there are 512 rays, not 256.
 - The ray stopped at a house's wall, so the roof overhang on the far side fell outside sight and showed as a dark border. Roofed boxes (more than 2 m through) now count `eave` (0.7 m) past the wall (`castSight(..., eave)`).
+- Follow-up: far edges still breathed in and out while walking (a corner slips between two rays and the ramp between them shifts). Now 2048 rays (6 cm apart at 20 m) and the ray texture is a half float, not 8-bit (9 cm steps). A cast costs about 1.6 ms in node, only on frames where the hero moves; drop `RAYS` to 1024 if a phone struggles.
 
 ## 2026-10-30 — Session 27b: more filaments, torches seen from afar
 
