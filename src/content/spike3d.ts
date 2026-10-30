@@ -21,8 +21,8 @@ export const SPIKE_LAYOUT: Layout = SPIKE.layout;
 export const SPIKE_GROUND: Ground3D = SPIKE.ground;
 export const SPIKE_HOUSE = SPIKE_LAYOUT.houses[0];
 export const SPIKE_TREE = SPIKE_LAYOUT.trees[0];
-/** The villager's beat on the spike. */
-export const SPIKE_WALK = SPIKE.cast.flatMap((c) => ('beat' in c.routine ? c.routine.beat : []));
+/** The villager's beat on the spike (the lane along the road). */
+export const SPIKE_WALK = SPIKE.places.lane?.kind === 'path' ? SPIKE.places.lane.pts : [];
 /** Where the hero starts: by the first door, on the mud. */
 export const SPIKE_HERO = SPIKE.hero;
 

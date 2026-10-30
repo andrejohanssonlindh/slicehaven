@@ -18,6 +18,10 @@ const kinds: PersonKindDef[] = [
     look: { style: 'kerchief', head: 'rust', garment: ['dress', 'shirt'], top: 'bluegrey', legs: 'bluegrey', apron: 'white', sleeves: 'rolled', left: 'basket' },
   },
   {
+    id: 'job-guard',
+    look: { style: 'helm', garment: 'tunic', top: 'wine', legs: 'grey', vest: 'steel', sleeves: 'long', right: 'spear' },
+  },
+  {
     id: 'job-innkeeper',
     look: { garment: 'shirt', top: 'linen', legs: 'brown', apron: 'white', vest: 'wine', sleeves: 'rolled' },
   },

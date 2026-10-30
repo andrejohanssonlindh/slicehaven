@@ -11,7 +11,8 @@ import { mapNamed } from '../content/maps';
 import { PERSON_KINDS } from '../content/people';
 import { HERO_PERSON, streamingFilamentWorld } from '../content/spike3d';
 import type { PersonSpec } from '../core/persons';
-import type { CastMember, CompiledMap } from '../core/world3d/mapgen';
+import type { CastMember, CompiledMap, MapEvent } from '../core/world3d/mapgen';
+import type { Place } from '../core/world3d/behave';
 import type { AspectId, HexFilaments } from '../core/filaments';
 import { type FSource, FilamentField, HEARTH_FIRE, TORCH_FIRE } from '../core/world3d/filaments3d';
 import { CHUNK, type ChunkTerrain, TerrainStore, chunkKey, chunksNear } from '../core/world3d/chunks';
@@ -28,7 +29,9 @@ import { LAUNDRY_HANG, type PlacedProp } from '../core/world3d/props';
 import type { ThingMaterial } from '../core/world3d/things';
 import { THINGS } from '../content/things';
 import { cloudDrift, cloudThreshold } from '../core/world3d/sky';
-import { type Actor, type Beat, type Rounds, Walking, keeperRounds, newActor, stepBeat, stepRounds } from '../core/world3d/actors';
+import { type Actor, Walking, newActor } from '../core/world3d/actors';
+import { type Clock, type Mind, newMind, stepMind } from '../core/world3d/behave';
+import { BEHAVIOURS } from '../content/behaviours';
 import { NavGrid, type P2, type Shape, shapeDist } from '../core/world3d/space';
 import { type Ground3D, groundHeight, lakeDist, splatAt } from '../core/world3d/terrain';
 import { TEXELS_PER_M } from '../core/world3d/tiers';
@@ -95,14 +98,16 @@ interface CutPart {
 const HERO_SPEED = 1.6;
 
 /** Someone who goes from room to room of a house on every storey, by the stairs, and out again (see `core/world3d/actors.ts`). */
-/** Someone from the map's cast, on screen: their card, and the routine they walk (a round waits for its house to stand). */
+/** Someone from the map's cast, on screen: their card, and their mind (where they are, what they are doing). */
 interface CastCard {
   who: CastMember;
   card: WalkCard;
   blob: THREE.Mesh;
-  beat: Beat | null;
-  rounds: Rounds | null;
+  mind: Mind;
 }
+
+/** People farther than this from both the view and the hero wait (a big map does not run everyone), metres. */
+const MIND_REACH = 140;
 
 const byDistance = (a: { d: number }, b: { d: number }): number => a.d - b.d;
 
@@ -440,8 +445,12 @@ export class SpikeWorld {
    * between them and the camera; leave it off for someone who should stay hidden.
    */
   readonly people: Person[] = [];
-  /** The map's people, each walking their routine (see `stepCast`). */
+  /** The map's people, each following their schedule (see `stepCast`). */
   private cast: CastCard[] = [];
+  private places: Record<string, Place> = {};
+  private mapEvents: MapEvent[] = [];
+  /** Events started (true) or stopped (false) by hand, over what the map's hours say. */
+  private eventsByHand = new Map<string, boolean>();
   private sprites: SpriteCard[] = [];
   /** The invisible navigation grid the hero walks on. */
   readonly nav: NavGrid;
@@ -488,7 +497,7 @@ export class SpikeWorld {
   private cloudOff = new THREE.Vector2();
   settings: WorldSettings;
 
-  constructor(settings: WorldSettings, grassCount: number, map: Pick<CompiledMap, 'ground' | 'layout' | 'hero' | 'cast'> & Partial<Pick<CompiledMap, 'placed'>> = mapNamed('spike')) {
+  constructor(settings: WorldSettings, grassCount: number, map: Pick<CompiledMap, 'ground' | 'layout' | 'hero' | 'cast' | 'places' | 'events'> & Partial<Pick<CompiledMap, 'placed'>> = mapNamed('spike')) {
     this.settings = settings;
     const { ground, layout } = map;
     const g = ground;
@@ -565,11 +574,13 @@ export class SpikeWorld {
     this.scene.add(this.rain.splashes);
     this.scene.add(this.leaves.mesh);
 
-    // The map's people. Those who go the rounds of a house start when it first stands (see `stepCast`).
+    // The map's people, each with a mind that follows their schedule (see `stepCast`).
+    this.places = map.places;
+    this.mapEvents = map.events;
     for (const who of map.cast) {
       const card = personCard(who), blob = blobShadow(0.32);
-      const r = who.routine;
-      this.cast.push({ who, card, blob, beat: 'beat' in r ? { pts: r.beat, s: 0 } : null, rounds: null });
+      card.mesh.visible = blob.visible = false;
+      this.cast.push({ who, card, blob, mind: newMind(who.id, who.start[0], who.start[1], who.seed ?? 1, who.slot, who.home) });
       this.people.push({ id: who.id, card, reveals: true });
       this.scene.add(card.mesh, blob);
       this.sprites.push(card);
@@ -1024,7 +1035,7 @@ export class SpikeWorld {
     const near = (x: number, z: number, r: number): boolean => Math.hypot(x - f.x, z - f.z) < r;
     const stood = new Set(this.houses.map((h) => h.built.place));
     // (Whoever walks keeps the ground round them: the hero, and the people going their rounds.)
-    const walkers = [this.hero, ...this.cast.flatMap((c) => (c.rounds ? [c.rounds.actor] : []))];
+    const walkers = [this.hero, ...this.cast.map((c) => c.mind.actor)];
     const held = (x: number, z: number, r: number): boolean => near(x, z, r) || walkers.some((a) => Math.hypot(x - a.x, z - a.z) < r);
     const a = this.houseIndex.forget((p) => stood.has(p) || held(p.x, p.z, keep));
     const b = this.placed.forget((i, j) => near((i + 0.5) * CHUNK, (j + 0.5) * CHUNK, keep + CHUNK) || this.chunks.has(chunkKey(i, j)));
@@ -1197,7 +1208,7 @@ export class SpikeWorld {
     this.field.setConditions({ env: this.weather.env(), isClouded: (x, z) => env.cloudShadow(x, z) > 0.5, sunDir: env.sunDir, cloudKey });
     this.field.setMovers([
       { x: this.hero.x, z: this.hero.z, kind: 'friend' },
-      ...this.cast.filter((c) => c.beat || c.rounds).map((c) => ({ x: c.card.mesh.position.x, z: c.card.mesh.position.z, kind: 'friend' as const })),
+      ...this.cast.map((c) => ({ x: c.mind.actor.x, z: c.mind.actor.z, kind: 'friend' as const })),
       ...this.magicLightSources(),
     ]);
   }
@@ -2043,45 +2054,68 @@ export class SpikeWorld {
     if (this.water) this.water.light(this.sun.color, this.sun.intensity, lin(this.tmpC1, env.skyHorizon), this.tmpC2.copy(this.hemi.color).multiplyScalar(env.ambient * 0.5), env.night);
   }
 
+  /** What time it is and what is going on, for people's schedules: the map's events by the hour, and those started or stopped by hand. */
+  get clock(): Clock {
+    const w = this.weather;
+    const hour = w.hour ?? (w.time === 'night' ? 0 : w.time === 'dusk' ? 18.5 : 12);
+    const events = new Set<string>();
+    for (const e of this.mapEvents) {
+      if (!e.hours) continue;
+      const [a, b] = e.hours;
+      if (a <= b ? hour >= a && hour < b : hour >= a || hour < b) events.add(e.id);
+    }
+    for (const [id, on] of this.eventsByHand) {
+      if (on) events.add(id);
+      else events.delete(id);
+    }
+    return { hour, events };
+  }
+
+  /** Start an event by hand (a script, a test): everyone whose schedule asks for it reacts. It runs until `endEvent`. */
+  startEvent(id: string): void {
+    this.eventsByHand.set(id, true);
+  }
+
+  /** Stop an event by hand (even inside its hours); `clearEvent` gives it back to the map's hours. */
+  endEvent(id: string): void {
+    this.eventsByHand.set(id, false);
+  }
+
+  clearEvent(id: string): void {
+    this.eventsByHand.delete(id);
+  }
+
+  /** What each of the map's people is doing now (for tests and the debug hook): their schedule line and where they are. */
+  get minds(): { id: string; doing: string | null; x: number; z: number; house: string | null; shown: boolean }[] {
+    return this.cast.map((c) => ({
+      id: c.who.id, doing: c.mind.entry >= 0 ? c.who.does[c.mind.entry].do : null,
+      x: c.mind.actor.x, z: c.mind.actor.z, house: c.mind.actor.house, shown: c.card.mesh.visible,
+    }));
+  }
+
   /**
-   * The map's people walk their routines (`core/world3d/actors.ts`): a beat along the road, there and back, or the
-   * rounds of a house (the middle of each storey's last room, up to the top, back down and out to the door). Someone
-   * is drawn only when the hero could see them: outdoors by sight, or in the same house on the same storey. A round
-   * waits while its house is not standing.
+   * The map's people follow their schedules (`core/world3d/behave.ts`): the line whose `when` holds is what they do,
+   * by a behaviour from `content/behaviours`. Someone far from both the view and the hero waits. Someone is drawn only
+   * when the hero could see them: outdoors by sight, indoors when the hero is in the same house on the same storey.
    */
   private stepCast(dt: number): void {
     const sees = (x: number, z: number): boolean => this.vision.outer <= 0 || this.seen(x, z) >= 0.25;
+    const ctx = { walking: this.moves, places: this.places, clock: this.clock };
     for (const c of this.cast) {
-      let x: number, y: number, z: number, shown: boolean;
-      if (c.beat) {
-        const at = stepBeat(c.beat, dt);
-        if (!at) continue;
-        ({ x, z } = at);
-        y = this.store.heightAt(x, z);
-        this.faceWalker(c.card, at.dx, at.dz, true, 1.1);
-        shown = sees(x, z);
-      } else {
-        const id = (c.who.routine as { rounds: string }).rounds;
-        const hs = this.standingOf(id);
-        if (hs && !c.rounds) {
-          const place = this.houseIndex.byId(id);
-          if (place) c.rounds = keeperRounds(this.houseIndex.lite(place).built);
-        }
-        if (!hs || !c.rounds) {
-          c.card.mesh.visible = c.blob.visible = false;
-          continue;
-        }
-        const r = c.rounds, a = r.actor;
-        const pose = stepRounds(this.moves, r, dt);
-        x = a.x;
-        z = a.z;
-        y = this.footY(a);
-        this.faceWalker(c.card, pose.dx, pose.dz, pose.moving, 1.1);
-        // (Indoors the roof is lifted only while the hero is in there, on the storey they look at.)
-        shown = a.house === r.house ? hs.open && hs.view === a.level : sees(x, z);
+      const a = c.mind.actor;
+      const far = Math.hypot(a.x - this.focus.x, a.z - this.focus.z) > MIND_REACH && Math.hypot(a.x - this.hero.x, a.z - this.hero.z) > MIND_REACH;
+      if (far) {
+        c.card.mesh.visible = c.blob.visible = false;
+        continue;
       }
-      c.card.mesh.position.set(x, y, z);
-      c.blob.position.set(x, y + 0.03, z);
+      const pose = stepMind(c.mind, c.who.does, BEHAVIOURS, ctx, dt);
+      const y = this.footY(a);
+      this.faceWalker(c.card, pose.dx, pose.dz, pose.moving, 1.1);
+      c.card.mesh.position.set(a.x, y, a.z);
+      c.blob.position.set(a.x, y + 0.03, a.z);
+      // (Indoors the roof is lifted only while the hero is in there, on the storey they look at.)
+      const hs = a.house ? this.standingOf(a.house) : null;
+      const shown = a.house ? !!hs && hs.open && hs.view === a.level : sees(a.x, a.z);
       c.card.mesh.visible = c.blob.visible = shown;
     }
   }

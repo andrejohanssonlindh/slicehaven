@@ -70,7 +70,10 @@
     { "kind": "bridge", "x": 8, "z": -17.5, "rot": -1.35, "len": 5, "seed": 47 }
   ],
   "hero": [2.4, 1.2],
+  "places": {
+    "lane": { "path": [[-12, 5.6], [-3, 5.0], [6, 5.8], [12, 4.8]] }
+  },
   "people": [
-    { "id": "villager", "is": ["human", "job-miller"], "seed": 2, "routine": { "beat": [[-12, 5.6], [-3, 5.0], [6, 5.8], [12, 4.8]] } }
+    { "id": "villager", "is": ["human", "job-miller"], "seed": 2, "does": [{ "do": "beat", "path": "lane" }] }
   ]
 }

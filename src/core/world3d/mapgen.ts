@@ -7,6 +7,7 @@ import { type BuiltHouse, type Layout, type PlacedHouse, type PlacedTree, buildH
 import { type ChunkContent, type ChunkGenerator, PlacedIndex } from './placed';
 import { type PlacedProp } from './props';
 import type { PersonKinds, PersonSpec } from '../persons';
+import { type BehaviourLibrary, type DoEntry, type Place, scheduleProblems } from './behave';
 import type { Things } from './things';
 import { NavGrid, type Shape, ShapeIndex, type ShapeSource, findPath, shapeDist } from './space';
 import { type Ground3D, type Road, type XZ, lakeDist, roadDist } from './terrain';
@@ -63,17 +64,41 @@ export interface MapHouse {
   at: HouseAt;
 }
 
-/** Someone who lives in the map: what kinds of person they are (`core/persons.ts`), and what they do all day. */
+/**
+ * Someone who lives in the map: what kinds of person they are (`core/persons.ts`), their home, and what they do: a
+ * schedule (`core/world3d/behave.ts`), the first line whose `when` holds is what they do now.
+ */
 export interface MapPerson extends PersonSpec {
   id: string;
-  /** Walk a line there and back (points, or a stretch of a road in metres from its start, default 20% to 80% of it), or go the rounds of a house. */
-  routine: { beat: XZ[] | { road: number; from?: number; to?: number } } | { rounds: string };
+  /** Their house (an id); `home` in a schedule means it. */
+  home?: string;
+  /** Where they start: a place's name, or a spot (default: outside their home's door, else the first place their schedule names). */
+  at?: string | XZ;
+  does: DoEntry[];
 }
 
-/** A person as the world gets them: a beat is points by now. */
-export interface CastMember extends PersonSpec {
+/** A person as the world gets them: where they start, and their number among those sharing a schedule. */
+export interface CastMember extends Omit<MapPerson, 'at'> {
+  start: XZ;
+  slot: number;
+}
+
+/**
+ * A place a map names, for schedules to use: a spot, an area, a path (a loop if `loop`), a stretch of a road (a path a
+ * little off its middle, in metres from its start, default 20% to 80% of it), or a loop `around` an area (`margin`
+ * metres outside it: a guard's round of a camp).
+ */
+export type PlaceSpec =
+  | { at: XZ; face?: number }
+  | { area: Area }
+  | { path: XZ[]; loop?: boolean }
+  | { road: number; from?: number; to?: number }
+  | { around: Area; margin?: number };
+
+/** Something that happens: every day between two hours, or (without `hours`) only when a script starts it. */
+export interface MapEvent {
   id: string;
-  routine: { beat: XZ[] } | { rounds: string };
+  hours?: [number, number];
 }
 
 export type Area =
@@ -82,6 +107,14 @@ export type Area =
   | { ring: [x: number, z: number, rInner: number, rOuter: number] }
   /** The whole map, minus a margin at its edge. */
   | { all: true };
+
+/** The middle of an area (the map's middle for `all`). */
+export function placeCentreXZ(a: Area): XZ {
+  if ('circle' in a) return [a.circle[0], a.circle[1]];
+  if ('ring' in a) return [a.ring[0], a.ring[1]];
+  if ('rect' in a) return [(a.rect[0] + a.rect[2]) / 2, (a.rect[1] + a.rect[3]) / 2];
+  return [0, 0];
+}
 
 /** Is (x, z) in an area? (`all` is the map less its edge, `half - edge` from the middle.) */
 export function inArea(a: Area, x: number, z: number, inner: number): boolean {
@@ -176,8 +209,12 @@ export interface MapSpec {
   props?: PlacedProp[];
   /** Where the hero starts: a spot, or in front of a house's door. */
   hero?: [number, number] | { house: string };
-  /** The people who live here. */
+  /** The people who live here (more can come from rules, like `crowd`). */
   people?: MapPerson[];
+  /** Places by name, for schedules (`MapPerson.does`). */
+  places?: Record<string, PlaceSpec>;
+  /** What happens here, and when (schedules ask with `{ "when": { "event": "<id>" } }`). */
+  events?: MapEvent[];
 }
 
 export interface CompiledMap {
@@ -188,6 +225,8 @@ export interface CompiledMap {
   placed: PlacedIndex;
   hero: [number, number];
   cast: CastMember[];
+  places: Record<string, Place>;
+  events: MapEvent[];
   /** Everything that did not work out: a thing that would not fit, a house in the lake, an unreachable door. Empty for a good map. */
   problems: string[];
 }
@@ -307,16 +346,48 @@ export interface CompileOptions {
   pieces?: (b: BuiltHouse) => string[];
   /** The map rules there are, by name (`content/maps/rules/`). */
   rules?: Record<string, MapRule>;
+  /** What people can do and ask (`content/behaviours`), to check schedules by. */
+  behaviours?: BehaviourLibrary;
 }
 
 /** The keys each part of a map may have: anything else is a typo, and is reported. */
 const KEYS = {
-  map: ['name', 'about', 'seed', 'size', 'roads', 'lake', 'rivers', 'mud', 'doorMud', 'houses', 'rules', 'wild', 'trees', 'props', 'hero', 'people'],
+  map: ['name', 'about', 'seed', 'size', 'roads', 'lake', 'rivers', 'mud', 'doorMud', 'houses', 'rules', 'wild', 'trees', 'props', 'hero', 'people', 'places', 'events'],
   house: ['id', 'room', 'size', 'roof', 'walls', 'wallH', 'seed', 'plan', 'torch', 'at'],
   at: ['x', 'z', 'rot', 'road', 'm', 't', 'side', 'gap'],
   wild: ['trees', 'mix', 'shrubs', 'boulders', 'grain', 'area'],
-  person: ['id', 'is', 'seed', 'look', 'routine'],
+  person: ['id', 'is', 'seed', 'look', 'home', 'at', 'does'],
+  place: ['at', 'face', 'area', 'path', 'loop', 'road', 'from', 'to', 'around', 'margin'],
+  event: ['id', 'hours'],
 };
+
+/** A place worked out from what the map says. */
+function placeOf(p: PlaceSpec, roads: Road[]): Place | string {
+  if ('at' in p) return { kind: 'spot', x: p.at[0], z: p.at[1], ...(p.face !== undefined ? { face: p.face } : {}) };
+  if ('area' in p) return { kind: 'area', area: p.area };
+  if ('path' in p) return p.path.length ? { kind: 'path', pts: p.path, loop: !!p.loop } : 'a path needs points';
+  if ('road' in p) {
+    const road = roads[p.road];
+    if (!road) return `no road ${p.road}`;
+    const len = roadLength(road), from = p.from ?? len * 0.2, to = p.to ?? len * 0.8;
+    const pts = [0, 1, 2, 3].map((k): XZ => {
+      const q = roadPoint(road, from + ((to - from) * k) / 3);
+      return [q.x + q.tz * 0.6, q.z - q.tx * 0.6];
+    });
+    return { kind: 'path', pts, loop: false };
+  }
+  // Round the outside of an area: a circle (or ring) as twelve points, a box by its corners.
+  const a = p.around, m = p.margin ?? 2;
+  if ('circle' in a || 'ring' in a) {
+    const [cx, cz, r] = 'circle' in a ? a.circle : [a.ring[0], a.ring[1], a.ring[3]];
+    return { kind: 'path', loop: true, pts: Array.from({ length: 12 }, (_, k): XZ => [cx + Math.cos((k / 12) * Math.PI * 2) * (r + m), cz + Math.sin((k / 12) * Math.PI * 2) * (r + m)]) };
+  }
+  if ('rect' in a) {
+    const [x0, z0, x1, z1] = a.rect;
+    return { kind: 'path', loop: true, pts: [[x0 - m, z0 - m], [x1 + m, z0 - m], [x1 + m, z1 + m], [x0 - m, z1 + m]] };
+  }
+  return 'cannot go around the whole map';
+}
 
 /** Report the keys of `o` that are not in `allowed`. */
 export function strayKeys(o: object, allowed: readonly string[], where: string, problem: (s: string) => void): void {
@@ -445,30 +516,44 @@ export function compileMap(spec: MapSpec, things: Things, opts: CompileOptions =
     hero = [p.x, p.z];
   }
 
-  // The people: a beat along a road becomes points just off its middle, and every person must be one the kinds know.
+  // Places and events, by name.
+  const places: Record<string, Place> = {};
+  for (const [name, p] of Object.entries(spec.places ?? {})) {
+    strayKeys(p, KEYS.place, `place ${name}`, problem);
+    const got = placeOf(p, spec.roads);
+    if (typeof got === 'string') problem(`place ${name}: ${got}`);
+    else places[name] = got;
+  }
+  const events = spec.events ?? [];
+  for (const e of events) strayKeys(e, KEYS.event, `event ${e.id}`, problem);
+  if (new Set(events.map((e) => e.id)).size !== events.length) problem('two events share an id');
+
+  // The people: every one a person the kinds know, with a schedule that names only what there is, and a place to start.
   const cast: CastMember[] = [];
+  const houseIds = new Set(ctx.houses.map((h) => h.id));
+  const centre = (p: Place): XZ => (p.kind === 'spot' ? [p.x, p.z] : p.kind === 'path' ? p.pts[0] : placeCentreXZ(p.area));
+  const slots = new Map<DoEntry[], number>();
   for (const p of ctx.people) {
     const bad = persons?.problem(p);
     if (bad) problems.push(`person ${p.id}: ${bad}`);
     if (cast.some((c) => c.id === p.id)) problems.push(`two people are called ${p.id}`);
-    const r = p.routine;
-    if ('rounds' in r) {
-      if (!ctx.houses.some((h) => h.id === r.rounds)) problems.push(`person ${p.id}: no house ${r.rounds} to go the rounds of`);
-      cast.push({ ...p, routine: r });
-    } else if (Array.isArray(r.beat)) cast.push({ ...p, routine: { beat: r.beat } });
-    else {
-      const road = spec.roads[r.beat.road];
-      if (!road) {
-        problems.push(`person ${p.id}: no road ${r.beat.road}`);
-        continue;
-      }
-      const len = roadLength(road), from = r.beat.from ?? len * 0.2, to = r.beat.to ?? len * 0.8;
-      const beat = [0, 1, 2, 3].map((k) => {
-        const q = roadPoint(road, from + ((to - from) * k) / 3);
-        return [q.x + q.tz * 0.6, q.z - q.tx * 0.6] as XZ;
-      });
-      cast.push({ ...p, routine: { beat } });
+    if (p.home && !houseIds.has(p.home)) problems.push(`person ${p.id}: no house ${p.home} to live in`);
+    if (opts.behaviours) for (const s of scheduleProblems(p.does ?? [], opts.behaviours, places, houseIds)) problems.push(`person ${p.id}: ${s}`);
+    // Where they start: where the map says, else outside their door, else the first place their schedule names.
+    let start: XZ | null = null;
+    if (Array.isArray(p.at)) start = p.at;
+    else if (typeof p.at === 'string') start = places[p.at] ? centre(places[p.at]) : (problems.push(`person ${p.id}: no place called ${p.at}`), null);
+    const home = p.home ? built.find((b) => b.place.id === p.home) : undefined;
+    if (!start && home) {
+      const d = home.model.door, q = houseToWorld(home.place, d[0] + 1.2, d[2] + 1.6);
+      start = [q.x, q.z];
     }
+    if (!start) for (const e of p.does ?? []) for (const v of Object.values(e)) if (!start && typeof v === 'string' && places[v]) start = centre(places[v]);
+    // (A shared schedule numbers its people, so a crowd spreads out.)
+    const slot = slots.get(p.does) ?? 0;
+    slots.set(p.does, slot + 1);
+    const { at: _at, ...rest } = p;
+    cast.push({ ...rest, does: p.does ?? [], start: start ?? hero, slot });
   }
 
   // The wilderness: made per chunk, kept off roads, water, houses and the hero's feet.
@@ -491,7 +576,7 @@ export function compileMap(spec: MapSpec, things: Things, opts: CompileOptions =
   const index = new PlacedIndex(layout, things, generator);
   if (generator) ground.extraShade = (x, z) => index.shadeAt(x, z);
 
-  const compiled: CompiledMap = { name: spec.name, ground, layout, placed: index, hero, cast, problems };
+  const compiled: CompiledMap = { name: spec.name, ground, layout, placed: index, hero, cast, places, events, problems };
   problems.push(...validate(ctx.houses, compiled, things, built.map((b, i) => ({ id: b.place.id, box: boxes[i], door: houseToWorld(b.place, b.model.door[0], b.model.door[2] - 0.9) }))));
   return compiled;
 }

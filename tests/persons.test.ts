@@ -4,7 +4,6 @@ import { mapNamed } from '../src/content/maps';
 import { FACETS, PERSON_KINDS } from '../src/content/people';
 import { THINGS } from '../src/content/things';
 import { PersonKinds } from '../src/core/persons';
-import { stepBeat } from '../src/core/world3d/actors';
 import { compileMap } from '../src/core/world3d/mapgen';
 
 /** Kinds of person (`content/people/kinds/`): a person is a kind of their people and of their calling at once. */
@@ -79,50 +78,36 @@ describe('kinds of person', () => {
 describe('the cast of a map', () => {
   const base = { name: 't', seed: 1, size: 60, roads: [{ pts: [[-30, 0], [30, 0]] as [number, number][], width: 3 }], houses: [{ id: 'inn', at: { x: 0, z: -10 } }], hero: [0, 4] as [number, number] };
 
-  it('comes from the map: a beat along a road is points off its middle, and a round names its house', () => {
+  it('comes from the map, each person a kind of person', () => {
     const c = compileMap({
       ...base,
       people: [
-        { id: 'walker', is: ['human', 'job-miller'], routine: { beat: { road: 0 } } },
-        { id: 'keeper', is: ['dwarf', 'job-innkeeper'], routine: { rounds: 'inn' } },
+        { id: 'walker', is: ['human', 'job-miller'], does: [] },
+        { id: 'keeper', is: ['dwarf', 'job-innkeeper'], home: 'inn', does: [] },
       ],
     }, THINGS, { persons: PERSON_KINDS });
     expect(c.problems).toEqual([]);
     expect(c.cast.map((p) => p.id)).toEqual(['walker', 'keeper']);
-    const beat = (c.cast[0].routine as { beat: [number, number][] }).beat;
-    expect(beat.length).toBe(4);
-    expect(beat[0][0]).toBeCloseTo(-18, 0);
-    expect(beat[3][0]).toBeCloseTo(18, 0);
-    expect(c.cast[1].routine).toEqual({ rounds: 'inn' });
   });
 
-  it('reports a person nobody can be, a round of no house, and two of one name', () => {
+  it('reports a person nobody can be, a home that is not there, and two of one name', () => {
     const c = compileMap({
       ...base,
       people: [
-        { id: 'x', is: ['dwarf', 'elf'], routine: { beat: [[0, 0], [1, 0]] } },
-        { id: 'x', is: ['human'], routine: { rounds: 'castle' } },
+        { id: 'x', is: ['dwarf', 'elf'], does: [] },
+        { id: 'x', is: ['human'], home: 'castle', does: [] },
       ],
     }, THINGS, { persons: PERSON_KINDS });
     expect(c.problems).toEqual(expect.arrayContaining([
       expect.stringMatching(/person x: a person can't be both dwarf and elf/),
-      'person x: no house castle to go the rounds of',
+      'person x: no house castle to live in',
       'two people are called x',
     ]));
   });
 
-  it('the hamlet has its villager and an innkeeper going the rounds of the inn', () => {
-    expect(mapNamed('hamlet').cast.map((p) => [p.id, p.routine])).toEqual([
-      ['villager', { beat: expect.any(Array) }],
-      ['keeper', { rounds: 'inn' }],
-    ]);
-  });
-
-  it('a beat goes there and back', () => {
-    const b = { pts: [[0, 0], [10, 0]] as [number, number][], s: 0 };
-    expect(stepBeat(b, 5, 1)).toMatchObject({ x: 5, z: 0, dx: 10 });
-    expect(stepBeat(b, 10, 1)).toMatchObject({ x: 5, dx: -10 });
-    expect(stepBeat({ pts: [[0, 0]], s: 0 }, 1)).toBeNull();
+  it('the hamlet has its villager, its innkeeper, a guard and a crowd of townsfolk', () => {
+    const ids = mapNamed('hamlet').cast.map((p) => p.id);
+    expect(ids).toEqual(expect.arrayContaining(['villager', 'keeper', 'guard', 'towns0', 'towns9']));
   });
 });
 

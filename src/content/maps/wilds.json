@@ -43,7 +43,10 @@
   ],
   "wild": { "trees": 22, "mix": ["oak", "oak", "pine", "pine", "pine", "dead", "young"], "shrubs": 7, "boulders": 1.2, "grain": 120 },
   "hero": { "house": "inn" },
+  "places": {
+    "hamlet road": { "road": 0, "from": 4150, "to": 4420 }
+  },
   "people": [
-    { "id": "villager", "is": ["human", "job-miller"], "seed": 2, "routine": { "beat": { "road": 0, "from": 4150, "to": 4420 } } }
+    { "id": "villager", "is": ["human", "job-miller"], "seed": 2, "does": [{ "do": "beat", "path": "hamlet road" }] }
   ]
 }

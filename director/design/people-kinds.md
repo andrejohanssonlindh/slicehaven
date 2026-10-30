@@ -24,7 +24,7 @@ How it inherits: parents first, left to right. The people sets the body (build, 
 ## What is built
 - Rules: `src/core/persons.ts` (`PersonKinds`: resolve a person to their chain, their facet per dimension and their look; tested in `tests/persons.test.ts`).
 - Kinds: the bodies of the five peoples (`kinds/peoples.ts`) and three callings so far, farmer, miller and innkeeper (`kinds/callings.ts`). Dwarves, elves, tirak and misslor are rough stand-ins in the human art (stout, lean, child-sized); their real look waits for the art style.
-- **The cast comes from the map** (review item 9): `MapSpec.people`, each with a routine, a **beat** (points, or a stretch of a road) or the **rounds** of a house. The map compiler reports unknown kinds, clashes, missing houses and doubled names. The renderer draws whoever the map lists; nothing about the hamlet's people is hard-wired any more.
+- **The cast comes from the map** (review item 9): `MapSpec.people` (and the `crowd` rule), each with a home and a **schedule** of behaviours (see [what people do](behaviours.md)). The map compiler reports unknown kinds, clashes, missing houses and doubled names. The renderer draws whoever the map lists; nothing about the hamlet's people is hard-wired any more.
 - The hero is a person too (`HERO_PERSON` in `content/spike3d.ts`), until they are the player's own character from the creator.
 
 ## What the director has said about sheets (to build on later)

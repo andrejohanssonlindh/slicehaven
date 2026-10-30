@@ -316,28 +316,6 @@ export class Walking {
   }
 }
 
-/** A beat: there and back along a line of world points, again and again (someone walking the road). `s` is metres walked. */
-export interface Beat {
-  pts: [number, number][];
-  s: number;
-}
-
-/** Walk a beat on for `dt` seconds: where they are now and the way they go. Null for a beat of less than two points. */
-export function stepBeat(b: Beat, dt: number, speed = 1.1): { x: number; z: number; dx: number; dz: number } | null {
-  const pts = b.pts;
-  if (pts.length < 2) return null;
-  const lens = pts.slice(1).map((p, i) => Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]));
-  const total = lens.reduce((a, c) => a + c, 0);
-  b.s = (b.s + dt * speed) % (total * 2);
-  const back = b.s > total;
-  let s = back ? total * 2 - b.s : b.s;
-  let i = 0;
-  while (i < lens.length - 1 && s > lens[i]) s -= lens[i++];
-  const p = pts[i], q = pts[i + 1], k = s / lens[i];
-  const sign = back ? -1 : 1;
-  return { x: p[0] + (q[0] - p[0]) * k, z: p[1] + (q[1] - p[1]) * k, dx: (q[0] - p[0]) * sign, dz: (q[1] - p[1]) * sign };
-}
-
 /** A round of stops (house-local points on a storey) that someone walks again and again, pausing at each. */
 export interface Rounds {
   actor: Actor;

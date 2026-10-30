@@ -1,5 +1,13 @@
 # Devlog
 
+## 2026-10-31 — What people do: schedules, behaviours, places, events, crowds
+
+- **The director's ask:** behaviour rules to apply to different people as needed (a plaza full at a time of day, a crowd at a beheading, a guard round a camp), flexible enough for NPCs and enemies. [What people do](design/behaviours.md).
+- **Built:** a person has a schedule of "when → do" lines, the first that holds wins (`core/world3d/behave.ts`). Behaviours are files in `content/behaviours/does/` (`stay`, `beat`, `patrol`, `wander`, `attend`, `home`, `rounds`); conditions in `when/` (`hours`, `event`, `notEvent`). Maps name places (spot, area, path, stretch of road, loop `around` an area) and events (daily hours, or started by a script: `world.startEvent`). The `crowd` map rule makes many people on one schedule. Everyone walks the real walking grid; a mind is plain JSON.
+- **The compiler checks schedules:** an unknown behaviour, condition, place or house, a stray key, a missing one: each is a problem.
+- **Hamlet demo:** ten townsfolk wander the green by day, ring round the speaker at noon, go home at night; a guard patrols round the green. Checked in Chrome: the ring forms, all ten get home.
+- The old fixed `routine` (beat or rounds) and `stepBeat` are gone: a beat and the innkeeper's rounds are behaviours like the rest.
+
 ## 2026-10-31 — Maps are files, map rules are files
 
 - **Maps as files (plan step 4) ✅:** every map is `content/maps/<name>.json`, found without a list; a map says what it is in `about`. Spike and hamlet compile byte for byte as before (checked with a fingerprint of every house, tree, prop, chunk, start and person).
