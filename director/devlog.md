@@ -9,6 +9,7 @@
 - **A map can't turn beds and horses the wrong way by accident (review item 10) ✅:** the bed and the horse are painted as seen from the room's front (`facesView`), and the map compiler now reports a house that faces away from the view and holds one. Every current map passes; a stable on the south side of a road would not.
 - **Less garbage each frame (review item 11) ✅:** the light colours, the torch order and the see-through list reuse what they had instead of making new ones 60 times a second.
 - **No hitch on a tap that can't be reached (review item 12) ✅:** the path search stops once it has worked out more new ground than the distance calls for (a shut pen 6 m away: 120 blocks before, about 24 now). Long walks are unaffected.
+- **Lightning is seeded (review item 13) ✅:** where it falls comes from a seeded generator (its scorch is read by the filament field, so it is rule state), and a bolt's material is let go when it fades.
 
 ## 2026-10-30 — Kinds of person: their people and their calling at once
 

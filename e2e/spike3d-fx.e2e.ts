@@ -126,4 +126,17 @@ describe('spike3d lightning and fires', () => {
     await page.screenshot({ path: `${OUT}spike3d-scorch.png` });
     expect(errors).toEqual([]);
   });
+
+  it('lightning is seeded: it falls in the same places on every visit (its scorch feeds the filament field) (review item 13)', async () => {
+    const strikes: unknown[] = [];
+    for (let visit = 0; visit < 2; visit++) {
+      const { page, errors } = await openPage(env, '/spike3d/?nogov');
+      await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 30_000 });
+      const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; return ${fn}; })()`);
+      strikes.push(await w('(w.autoBolts = false, w.focus.x = 0, w.focus.z = 0, [w.strike(), w.strike()])'));
+      expect(errors).toEqual([]);
+      await page.close();
+    }
+    expect(strikes[1]).toEqual(strikes[0]);
+  });
 });

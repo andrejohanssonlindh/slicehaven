@@ -251,6 +251,11 @@ export class SpikeWorld {
   lightRange = 0;
   private castAt: { x: number; z: number; range: number; house: string | null; level: number } | null = null;
   private tmpV = new THREE.Vector3();
+  /**
+   * Where and when lightning falls. Seeded (by the map), since a strike leaves a scorch that the filament field reads:
+   * rule state never comes from `Math.random`. Its state is a plain number, so it can go into a save.
+   */
+  readonly skyRng: Rng;
   private tmpC1 = new THREE.Color();
   private tmpC2 = new THREE.Color();
   private bgColor = new THREE.Color();
@@ -488,6 +493,7 @@ export class SpikeWorld {
     const { ground, layout } = map;
     const g = ground;
     this.ground = ground;
+    this.skyRng = Rng.fromSeed(`sky ${ground.seed}`);
     this.hero.x = map.hero[0];
     this.hero.z = map.hero[1];
     this.focus.set(map.hero[0], 0.5, map.hero[1]);
@@ -1612,7 +1618,7 @@ export class SpikeWorld {
    * A lightning bolt: a jagged streak from the sky to the ground (near the view unless a spot is given), the sky
    * flashing twice, and a hard white light where it lands. Works in any weather, so it can be tested on a clear day.
    */
-  strike(at?: { x: number; z: number }, rnd: () => number = Math.random): { x: number; z: number } {
+  strike(at?: { x: number; z: number }, rnd: () => number = () => this.skyRng.next()): { x: number; z: number } {
     this.clearBolt();
     const a = rnd() * Math.PI * 2, r = 4 + rnd() * 9;
     const x = at?.x ?? this.focus.x + Math.cos(a) * r, z = at?.z ?? this.focus.z + Math.sin(a) * r;
@@ -1677,6 +1683,8 @@ export class SpikeWorld {
     if (!this.bolt) return;
     this.scene.remove(this.bolt.group);
     this.bolt.group.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
+    // (Every segment shares the one material.)
+    ((this.bolt.group.children[0] as THREE.Mesh | undefined)?.material as THREE.Material | undefined)?.dispose();
     this.bolt = null;
     this.boltLight.intensity = 0;
   }
@@ -1857,7 +1865,7 @@ export class SpikeWorld {
     const w = this.weather;
     if (this.dayMinutes > 0) w.advance((dt * 24) / (this.dayMinutes * 60));
     w.update(dtMs);
-    if (this.autoBolts && w.sky === 'storm' && Math.random() < dt / 5) this.strike();
+    if (this.autoBolts && w.sky === 'storm' && this.skyRng.next() < dt / 5) this.strike();
     this.stepBolt(dt);
     this.stepMagicLights();
     // The clouds drift downwind; the offset is part of the environment so the rules can ask the same field.
