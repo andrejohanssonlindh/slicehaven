@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { RECIPES } from '../src/content/furnish';
 import { LIBRARY } from '../src/content/skillweb';
 import { KIND_PARENTS } from '../src/content/skillweb/kinds';
 import { THINGS } from '../src/content/things';
@@ -52,7 +53,7 @@ describe('kinds of thing', () => {
   it('every kind that can be placed has a look and something to say when looked at', () => {
     for (const id of THINGS.placeable) {
       const t = THINGS.get(id);
-      expect(!!(t.draw || t.tree), id).toBe(true);
+      expect(!!(t.draw || t.tree || t.furniture), id).toBe(true);
       expect(t.look, id).toBeTruthy();
     }
   });
@@ -81,6 +82,14 @@ describe('kinds of thing', () => {
     expect(THINGS.get('torchpost').flame?.y).toBeGreaterThan(1);
     expect(THINGS.shapes(at('torchpost'))).toHaveLength(1);
     expect(THINGS.source(at('torchpost'))).toMatchObject({ kind: 'fire' });
+  });
+
+  it('every piece the room recipes call for is a kind of furniture, and furniture is an item', () => {
+    for (const [set, lines] of Object.entries(RECIPES)) for (const l of lines) expect(THINGS.get(l.piece).furniture, `${set}: ${l.piece}`).toBeTruthy();
+    expect(THINGS.get('bed').chain).toEqual(['bed', 'furniture', 'item']);
+    expect(THINGS.get('hearth').chain).toContain('fire');
+    expect(THINGS.get('footlocker').chain).toContain('container');
+    expect(THINGS.get('loom').filament).toMatchObject({ kind: 'art' });
   });
 
   it('a run takes its length from the placement, else its kind', () => {

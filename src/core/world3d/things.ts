@@ -70,7 +70,24 @@ export interface ThingDef {
   /** It lays a walkable deck this wide along its run, over water too (a bridge); it may stand in water. */
   deck?: number;
   /** It carries a flame this high above the ground (metres, scaled with it), with its light. */
-  flame?: { y: number };
+  flame?: {
+    y: number;
+    /** 1 = a campfire's flame; the default, 0.42, is a torch's. */
+    size?: number;
+    /** How many bits of flame (default 10). */
+    count?: number;
+    /** How hard its light shines (default 9). */
+    power?: number;
+    /** The light's height above the flame's foot (default 0.3). */
+    lightY?: number;
+  };
+  /**
+   * A piece of furniture: how it sits in a room (on the floor, hung on a wall, or flat like a rug) and how big it is.
+   * It is drawn as a painted card, not meshes (`content/things/kinds/furniture.ts`).
+   */
+  furniture?: { mount: 'floor' | 'hung' | 'flat'; d?: number; maxW?: number };
+  /** It sends up a column of smoke from this high above the ground. */
+  smoke?: { y: number };
   /** Its look, built from the placement (meshes by material). Trees use `tree` instead. */
   draw?: (p: Placed) => ThingParts;
   tree?: TreeLook;

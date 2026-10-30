@@ -319,7 +319,7 @@ export class SpikeWorld {
       }
       for (const f of this.fires) if (f.kind === 'fire') spots.push({ x: f.x, z: f.z, radius: 6.5 * dayK });
       for (const hs of this.houses) if (hs.hearthAt) spots.push({ x: hs.hearthAt.x, z: hs.hearthAt.z, radius: 6.5 * dayK });
-      for (const k of this.camps) spots.push({ x: k.x, z: k.z, radius: 9 * dayK });
+      for (const k of this.camps) spots.push({ x: k.p.x, z: k.p.z, radius: 9 * dayK });
     }
     const blockers = this.blockers(reach);
     this.sightLights = visibleLights(h, this.facing, this.spec, night, spots, blockers, 6);
@@ -381,7 +381,7 @@ export class SpikeWorld {
   /** Where lightning has struck: the burnt ground it left (kept to a few; the oldest is cleared). */
   private scorches: { x: number; z: number; mesh: THREE.Mesh }[] = [];
   private bolt: { group: THREE.Group; age: number; repeats: number[] } | null = null;
-  private camps: { x: number; z: number; group: THREE.Group; torch: Torch; smoke: Chimney }[] = [];
+  private camps: { p: PlacedProp; st: Standing; smoke: Chimney }[] = [];
   private windowMats: THREE.MeshLambertMaterial[] = [];
   private water: Water | null;
   private rain = new Rain(1400);
@@ -573,7 +573,7 @@ export class SpikeWorld {
   private fieldExtras(): FSource[] {
     return [
       ...this.fires,
-      ...this.camps.map((c): FSource => ({ x: c.x, z: c.z, kind: 'fire', weight: 1 })),
+      ...this.camps.flatMap((c) => THINGS.source(c.p) ?? []),
       ...this.scorches.map((c): FSource => ({ x: c.x, z: c.z, kind: 'burnt' })),
     ];
   }
@@ -870,7 +870,7 @@ export class SpikeWorld {
   }
 
   /** A placed thing, drawn as its kind says (`content/things/kinds/`), standing on the ground where it is placed. */
-  private buildProp(p: PlacedProp, st: Standing): void {
+  private buildProp(p: PlacedProp, st: Standing, y = this.store.heightAt(p.x, p.z)): void {
     const group = new THREE.Group();
     const kind = THINGS.get(p.kind), parts = THINGS.parts(p);
     for (const part of parts.meshes) {
@@ -888,10 +888,10 @@ export class SpikeWorld {
     }
     group.scale.setScalar(p.size ?? 1);
     group.rotation.y = p.rot ?? 0;
-    group.position.set(p.x, this.store.heightAt(p.x, p.z) - (kind.sink ?? 0), p.z);
+    group.position.set(p.x, y - (kind.sink ?? 0), p.z);
     this.scene.add(group);
     st.objects.push(group);
-    if (kind.flame) this.placeTorch(p.x, group.position.y + kind.flame.y * (p.size ?? 1), p.z, st);
+    if (kind.flame) this.placeTorch(p.x, y + kind.flame.y * (p.size ?? 1), p.z, st, kind.flame);
   }
 
   private grassGeo: THREE.BufferGeometry | null = null;
@@ -1196,15 +1196,16 @@ export class SpikeWorld {
   }
 
   /** A flame with its light (on a bracket, or on a thing that carries one); into `st` when it belongs to a chunk. */
-  private placeTorch(x: number, y: number, z: number, st: Standing | null): void {
-    const fx = makeFlame(0.42, 10, this.torchSeed);
+  private placeTorch(x: number, y: number, z: number, st: Standing | null, look: { size?: number; count?: number; power?: number; lightY?: number } = {}): void {
+    const power = look.power ?? 9;
+    const fx = makeFlame(look.size ?? 0.42, look.count ?? 10, this.torchSeed);
     fx.object.position.set(x, y + 0.02, z);
     this.scene.add(fx.object);
-    const light = new THREE.PointLight(0xffa458, 9, 11, 2);
+    const light = new THREE.PointLight(0xffa458, power, 11, 2);
     light.visible = false; // (the pool in `update` decides which shine: a light that is on counts in every shader)
-    light.position.set(x, y + 0.3, z);
+    light.position.set(x, y + (look.lightY ?? 0.3), z);
     this.scene.add(light);
-    const torch: Torch = { light, flame: fx.object, tick: fx.tick, base: 9, seed: this.torchSeed * 7 / 11 + 1 };
+    const torch: Torch = { light, flame: fx.object, tick: fx.tick, base: power, seed: this.torchSeed * 7 / 11 + 1 };
     this.torchSeed++;
     this.torches.push(torch);
     if (st) {
@@ -1671,40 +1672,20 @@ export class SpikeWorld {
   /** Light a campfire beside the hero (it is a fire for the filament field too). Returns false when there are too many. */
   lightFire(): boolean {
     if (this.camps.length >= 6) return false;
-    const x = this.hero.x + 0.9, z = this.hero.z + 0.2;
+    // A placed thing of the kind `campfire`, built like any other, at the hero's height (they may be upstairs).
+    const p: PlacedProp = { kind: 'campfire', x: this.hero.x + 0.9, z: this.hero.z + 0.2, seed: this.camps.length };
     const y = this.heroCard.mesh.position.y;
-    const group = new THREE.Group();
-    group.position.set(x, y, z);
-    const wood = new THREE.MeshBasicMaterial({ color: 0x4a2e1a });
-    for (const rot of [0.5, 2.1, 3.6]) {
-      const log = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.1, 0.1), wood);
-      log.position.y = 0.06;
-      log.rotation.y = rot;
-      group.add(log);
-    }
-    const fx = makeFlame(1, 20, this.camps.length * 13);
-    group.add(fx.object);
-    const light = new THREE.PointLight(0xff9a48, 10, 12, 2);
-    light.position.set(0, 0.7, 0);
-    group.add(light);
-    this.scene.add(group);
-    const torch: Torch = { light, flame: fx.object, tick: fx.tick, base: 10, seed: 17 + this.camps.length * 5 };
-    this.torches.push(torch);
-    this.camps.push({ x, z, group, torch, smoke: { x, y: y + 0.9, z, seed: 40 + this.camps.length * 11 } });
+    const st: Standing = { houses: [], objects: [], shells: [], torches: [] };
+    this.buildProp(p, st, y);
+    const smoke = THINGS.get(p.kind).smoke;
+    this.camps.push({ p, st, smoke: { x: p.x, y: y + (smoke?.y ?? 0.9), z: p.z, seed: 40 + this.camps.length * 11 } });
     this.syncFires();
     return true;
   }
 
   /** Put out every campfire that was lit by hand. */
   douseFires(): void {
-    for (const c of this.camps) {
-      this.scene.remove(c.group);
-      this.torches.splice(this.torches.indexOf(c.torch), 1);
-      c.group.traverse((o) => {
-        const m = o as THREE.Mesh;
-        m.geometry?.dispose();
-      });
-    }
+    for (const c of this.camps) this.emptyChunk(c.st);
     this.camps = [];
     this.syncFires();
   }
@@ -2010,7 +1991,7 @@ export class SpikeWorld {
       sm.push({ c, d });
     }
     // A campfire smokes too (the hero lit it, so it is in view); doused, its smoke thins away rather than cutting off.
-    for (const k of this.camps) sm.push({ c: k.smoke, d: Math.hypot(k.x - this.focus.x, k.z - this.focus.z) });
+    for (const k of this.camps) sm.push({ c: k.smoke, d: Math.hypot(k.p.x - this.focus.x, k.p.z - this.focus.z) });
     sm.sort((a, b) => a.d - b.d);
     this.smoke.update(this.time, sm.map((s) => s.c), { x: wx, z: wz }, 1 - env.night * 0.8, 1 - Math.min(1, w.rain) * 0.5);
     if (this.water) {

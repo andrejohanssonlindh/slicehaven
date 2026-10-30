@@ -1,16 +1,11 @@
-import {
-  makeBasket, makeBucketBroom, makeCloakPegs, makeClutter, makeCookhearth, makeFootlocker, makeHanging, makeKeg, makeKindling, makePallet,
-  makeRagRug, makeRoughShelf, makeSacks, makeStool3, makeStrawBits, makeTrestleTable,
-} from '../art/humble';
 import { makeGuestBed } from '../art/guest';
 import { smithyItems } from '../art/interior';
-import { makeHayBale, makeHayRack, makeHorse } from '../art/stable';
+import { makeHorse } from '../art/stable';
 import type { Prop } from '../art/grit';
-import {
-  makeAleKegs, makeBakeOven, makeCounter, makeCrateStack, makeFishRack, makeFishTubs, makeHerbRack, makeHooks, makeHungNet, makeInnBench,
-  makeKneadTrough, makeLongTable, makeLoom, makeMortarBench, makeNetHeap, makeWallShelves,
-} from '../art/shopItems';
+import { makeCounter, makeWallShelves } from '../art/shopItems';
 import type { CounterKind, ShelfKind } from '../art/shopItems';
+import { THINGS } from './things';
+import { PIECE_ART } from './things/kinds/furniture';
 import type { HouseModel, LevelRoom } from '../core/world3d/house';
 import { type PieceIn, type PlanOpts, type RoomPlan, type RoomRect, type Rule, planRoom } from '../core/world3d/roomplan';
 import type { SourceKind } from '../core/world3d/filaments3d';
@@ -28,67 +23,23 @@ export type RoomSet =
   // Rooms upstairs and in the stable (see `roleSet`).
   | 'guestroom' | 'landing' | 'attic' | 'upstairs' | 'stall' | 'aisle';
 
-interface PieceDef {
-  make: () => Prop;
-  kind: PieceIn['kind'];
-  /** Depth override, metres (the default is about half the width). */
-  d?: number;
-  /** Cap on the width, metres, for sprites that are drawn much wider than the thing is. */
-  maxW?: number;
-}
+/**
+ * A piece is a kind of thing (`content/things/kinds/furniture.ts`): what it is, how it sits (`furniture`) and what it
+ * gives the filament field (`filament`) are asked of the kind. A recipe line names the kind.
+ */
+export type PieceKey = string;
 
-const floor = (make: () => Prop, d?: number, maxW?: number): PieceDef => ({ make, kind: 'floor', d, maxW });
-const hung = (make: () => Prop, maxW = 1.5): PieceDef => ({ make, kind: 'hung', maxW });
-const flat = (make: () => Prop): PieceDef => ({ make, kind: 'flat' });
+/** How a piece sits in a room, from its kind. */
+const sitting = (key: PieceKey): { kind: PieceIn['kind']; d?: number; maxW?: number } => {
+  const f = THINGS.get(key).furniture;
+  if (!f) throw new Error(`${key} is not a piece of furniture`);
+  return { kind: f.mount, d: f.d, maxW: f.maxW };
+};
 
-/** Every piece a room can hold. The key is what recipes call it. */
-export const PIECES = {
-  hearth: floor(() => makeCookhearth(), 0.7),
-  oven: floor(() => makeBakeOven(2), 0.9),
-  pallet: floor(() => makePallet(), 0.9, 1.5),
-  footlocker: floor(() => makeFootlocker()),
-  table: floor(() => makeTrestleTable(), 0.8),
-  stool: floor(() => makeStool3(), 0.4),
-  broom: floor(() => makeBucketBroom(), 0.35),
-  keg: floor(() => makeKeg(), 0.5),
-  sacks: floor(() => makeSacks(), 0.6, 0.9),
-  basket: floor(() => makeBasket(), 0.4),
-  kindling: floor(() => makeKindling(), 0.5),
-  trough: floor(() => makeKneadTrough(4), 0.6, 1.2),
-  loom: floor(() => makeLoom(45), 0.9, 1.4),
-  mortarBench: floor(() => makeMortarBench(17), 0.6, 1.3),
-  longTable: floor(() => makeLongTable(5), 0.8, 2.4),
-  bench: floor(() => makeInnBench(4), 0.4, 2.0),
-  aleKegs: floor(() => makeAleKegs(2), 0.6, 1.1),
-  crates: floor(() => makeCrateStack(34), 0.7, 1.0),
-  fishRack: floor(() => makeFishRack(26), 0.7, 1.2),
-  fishTubs: floor(() => makeFishTubs(28), 0.7, 1.1),
-  nets: floor(() => makeNetHeap(3), 0.6, 1.0),
-  counter: floor(() => makeCounter('general', 38), 0.6, 1.7),
-  shelf: hung(() => makeRoughShelf()),
-  pegs: hung(() => makeCloakPegs()),
-  hanging: hung(() => makeHanging()),
-  hooks: hung(() => makeHooks(24)),
-  herbs: hung(() => makeHerbRack(14)),
-  hungNet: hung(() => makeHungNet(5)),
-  rug: flat(() => makeRagRug()),
-  straw: flat(() => makeStrawBits()),
-  litter: flat(() => makeClutter()),
-  // A guest's bed is the old, handsome one (a frame, a tick, a blanket); the village's own is the pallet.
-  bed: floor(() => makeGuestBed(), 1.25, 2.0),
-  horse: floor(() => makeHorse(), 2.6, 0.8),
-  hay: floor(() => makeHayBale(), 0.7, 1.0),
-  hayRack: hung(() => makeHayRack(), 1.2),
-} satisfies Record<string, PieceDef>;
-
-export type PieceKey = keyof typeof PIECES;
-
-/** What a kind of piece gives off to the filament field, when it stands in a room (a fire is the line's own `fire` flag). */
-export const PIECE_SOURCES: Partial<Record<PieceKey, { kind: SourceKind; weight: number }>> = {
-  hanging: { kind: 'art', weight: 0.7 },
-  rug: { kind: 'art', weight: 0.5 },
-  loom: { kind: 'art', weight: 1 },
-  fishTubs: { kind: 'water', weight: 0.5 },
+/** What a kind of piece gives off to the filament field when it stands in a room (a fire is the line's own `fire` flag). */
+const givenBy = (key: PieceKey): { kind: SourceKind; weight: number } | undefined => {
+  const f = THINGS.get(key).filament;
+  return f ? { kind: f.kind, weight: f.weight ?? 1 } : undefined;
 };
 
 /** What a recipe line can say about a piece. */
@@ -147,8 +98,8 @@ export const RECIPES: Record<Exclude<RoomSet, 'smithy'>, Line[]> = {
     { piece: 'shelf', variant: 'tankards', seed: 41, rule: back(0.3), lift: 26 },
     { piece: 'pegs', rule: back(0.02), lift: 4 },
     { piece: 'longTable', rule: center(0.2, 0.1) },
-    { piece: 'bench', rule: { at: 'around', of: 'longTable', side: 'front' } },
-    { piece: 'bench', seed: 1, rule: { at: 'around', of: 'longTable', side: 'back' } },
+    { piece: 'innbench', rule: { at: 'around', of: 'longTable', side: 'front' } },
+    { piece: 'innbench', seed: 1, rule: { at: 'around', of: 'longTable', side: 'back' } },
     { piece: 'table', rule: side('left', 0.6) },
     { piece: 'stool', rule: { at: 'around', of: 'table' } },
     { piece: 'keg', rule: side('right', 0.5) },
@@ -156,12 +107,12 @@ export const RECIPES: Record<Exclude<RoomSet, 'smithy'>, Line[]> = {
     { piece: 'rug', rule: center(0.2, 0.1) },
     // A big common room has a second long table, and more to sit at.
     { piece: 'longTable', tag: 'b', seed: 5, rule: center(-2.6, 0.3) },
-    { piece: 'bench', tag: 'b1', seed: 2, rule: { at: 'around', of: 'longTable@b', side: 'front' } },
-    { piece: 'bench', tag: 'b2', seed: 3, rule: { at: 'around', of: 'longTable@b', side: 'back' } },
+    { piece: 'innbench', tag: 'b1', seed: 2, rule: { at: 'around', of: 'longTable@b', side: 'front' } },
+    { piece: 'innbench', tag: 'b2', seed: 3, rule: { at: 'around', of: 'longTable@b', side: 'back' } },
     { piece: 'table', tag: 'c', rule: side('right', 0.2) },
     { piece: 'stool', tag: 'c', rule: { at: 'around', of: 'table@c' } },
     { piece: 'keg', tag: 'b', rule: corner('frontRight') },
-    { piece: 'crates', rule: side('left', 0.15) },
+    { piece: 'cratestack', rule: side('left', 0.15) },
     { piece: 'hanging', rule: back(0.75), lift: 30 },
     { piece: 'basket', rule: free },
   ],
@@ -178,7 +129,7 @@ export const RECIPES: Record<Exclude<RoomSet, 'smithy'>, Line[]> = {
   ],
   // The corridor upstairs: not much, but not bare.
   landing: [
-    { piece: 'bench', rule: back(0.75) },
+    { piece: 'innbench', rule: back(0.75) },
     { piece: 'footlocker', rule: back(0.95) },
     { piece: 'hanging', rule: back(0.55), lift: 24 },
     { piece: 'pegs', rule: back(0.3), lift: 6 },
@@ -191,7 +142,7 @@ export const RECIPES: Record<Exclude<RoomSet, 'smithy'>, Line[]> = {
     { piece: 'footlocker', n: 2, rule: side('left', 0.6) },
     { piece: 'sacks', rule: corner('frontRight') },
     { piece: 'keg', rule: corner('backLeft') },
-    { piece: 'crates', rule: free },
+    { piece: 'cratestack', rule: free },
     { piece: 'rug', rule: center(0, 0.1) },
     { piece: 'pegs', rule: back(0.9), lift: 4 },
     { piece: 'basket', rule: free },
@@ -220,7 +171,7 @@ export const RECIPES: Record<Exclude<RoomSet, 'smithy'>, Line[]> = {
   ],
   // The aisle: hay, tack, a water barrel, a chest of gear.
   aisle: [
-    { piece: 'hay', n: 2, rule: side('right', 0.95) },
+    { piece: 'haybale', n: 2, rule: side('right', 0.95) },
     { piece: 'hooks', rule: back(0.25), lift: 30 },
     { piece: 'pegs', rule: back(0.7), lift: 10 },
     { piece: 'footlocker', rule: side('left', 0.95) },
@@ -232,7 +183,7 @@ export const RECIPES: Record<Exclude<RoomSet, 'smithy'>, Line[]> = {
   ],
   bakery: [
     { piece: 'oven', rule: corner('backRight'), fire: true },
-    { piece: 'trough', rule: corner('backLeft') },
+    { piece: 'kneadtrough', rule: corner('backLeft') },
     { piece: 'shelf', variant: 'loaves', seed: 3, rule: back(0.35), lift: 22 },
     { piece: 'counter', variant: 'bread', seed: 7, rule: center(0, 0.6) },
     { piece: 'sacks', rule: side('left', 0.5) },
@@ -267,7 +218,7 @@ export const RECIPES: Record<Exclude<RoomSet, 'smithy'>, Line[]> = {
   general: [
     { piece: 'shelf', variant: 'wares', seed: 32, rule: back(0.3), lift: 22, books: 1 },
     { piece: 'hooks', rule: back(0.72), lift: 8 },
-    { piece: 'crates', rule: corner('backLeft') },
+    { piece: 'cratestack', rule: corner('backLeft') },
     { piece: 'sacks', rule: side('right', 0.6) },
     { piece: 'keg', rule: side('right', 0.3) },
     { piece: 'footlocker', rule: side('left', 0.5) },
@@ -330,7 +281,7 @@ const makePiece = (key: PieceKey, line: Line): Prop => {
     else if (key === 'shelf' && line.variant) p = makeWallShelves(line.variant as ShelfKind, line.seed ?? 23);
     else if (key === 'horse') p = makeHorse(line.seed ?? 1);
     else if (key === 'bed') p = makeGuestBed(1 + (line.seed ?? 0) % 5);
-    else p = PIECES[key].make();
+    else p = PIECE_ART[key]();
     artCache.set(id, p);
   }
   return p;
@@ -379,8 +330,8 @@ export function furnish(set: RoomSet, room: RoomRect, doorX: number, seed = 0, o
         const id = (line.n ?? 1) > 1 ? `${line.piece}#${i}` : line.piece;
         const unique = `${id}${line.variant ? `:${line.variant}` : ''}${line.tag ? `@${line.tag}` : ''}`;
         const rule = line.rule.at === 'around' ? { ...line.rule, of: line.rule.of } : line.rule;
-        add(unique, makePiece(line.piece, { ...line, seed: (line.seed ?? 0) + i + (line.vary ? opts.art ?? 0 : 0) }), PIECES[line.piece], { rule, lift: line.lift, fire: line.fire },
-          line.books ? { kind: 'book', weight: line.books } : PIECE_SOURCES[line.piece]);
+        add(unique, makePiece(line.piece, { ...line, seed: (line.seed ?? 0) + i + (line.vary ? opts.art ?? 0 : 0) }), sitting(line.piece), { rule, lift: line.lift, fire: line.fire },
+          line.books ? { kind: 'book', weight: line.books } : givenBy(line.piece));
       }
     }
   }

@@ -6,7 +6,10 @@
 - The separate `torches` lists are gone from the layout, the placed index and the map compiler: torch posts are props like the rest, and `torchLines` just places them. The spike map's two posts are now `torchpost` props.
 - Gotcha: a vitest run can miss a brand-new kind file (stale glob in `content/things/index.ts`); editing that file once clears it.
 - **The failing torch e2e is fixed** (`e2e/spike3d-vision.e2e.ts`): the test stood 42 m out in line with the door, which since the palisade went in lies behind it; the engine was right. It now looks from the line through the open gate.
-- **Next in step 2:** campfires (hand-lit ones in the renderer) as the same kind, furniture as kinds, then kinds of building.
+- **Campfire is a kind** (`fire.ts`): the hand-lit fire is now a placed `campfire` built by the same `buildProp` as everything else (flame, light and smoke are kind properties: `flame {size, count, power, lightY}`, `smoke {y}`). The hand-built meshes in `lightFire` are gone, and dousing takes the fire down through `emptyChunk`, so its geometry is disposed (part of review bug 3).
+- **Furniture is kinds** (`kinds/furniture.ts`): all 37 room pieces are kinds of a `furniture` family under `item` (the hearth is a `fire`, footlocker, kegs, sacks, basket and crates are `container`s). A kind says how it sits (`furniture {mount, d, maxW}`) and what it gives the field (`filament`); the painted card stays in `PIECE_ART`. `furnish.ts` asks the kind; recipes name kinds. Four names changed to stay unique against the outdoor kinds: `innbench`, `cratestack`, `kneadtrough`, `haybale`.
+- **Still special-cased:** the door torch on a bracket (it belongs to the house, so it goes with kinds of building) and the smithy's own art.
+- **Next in step 2:** kinds of building (review item 8, plans as data).
 
 ## 2026-10-29 — Kinds of thing: everything in the world is an object in a tree
 

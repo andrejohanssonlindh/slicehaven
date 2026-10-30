@@ -1,5 +1,5 @@
 import { TORCH_FIRE } from '../../../core/world3d/filaments3d';
-import { addBox, emptyMesh } from '../../../core/world3d/mesh';
+import { addBox, addOrientedBox, emptyMesh } from '../../../core/world3d/mesh';
 import type { ThingDef } from '../../../core/world3d/things';
 import { solid } from '../parts';
 
@@ -19,6 +19,24 @@ const things: ThingDef[] = [
       const m = emptyMesh();
       addBox(m, [-0.07, 0, -0.07], [0.07, POST_HEIGHT, 0.07]);
       return solid('plank', m);
+    },
+  },
+  {
+    id: 'campfire',
+    is: 'fire',
+    look: 'A campfire of three logs, burning.',
+    foot: [{ circle: 0.4 }],
+    // A full fire: it lifts the field's fire reading by itself.
+    filament: { kind: 'fire', weight: 1 },
+    flame: { y: 0, size: 1, count: 20, power: 10, lightY: 0.7 },
+    smoke: { y: 0.9 },
+    draw: () => {
+      const m = emptyMesh();
+      for (const rot of [0.5, 2.1, 3.6]) {
+        const c = Math.cos(rot), s = Math.sin(rot);
+        addOrientedBox(m, [0, 0.06, 0], [c, 0, -s], [0, 1, 0], [s, 0, c], [0.35, 0.05, 0.05]);
+      }
+      return solid('bark', m);
     },
   },
 ];
