@@ -158,6 +158,36 @@ export class FilamentField {
     return v;
   }
 
+  /**
+   * Let go of what was read of far-off ground (its ground, indoors and fixed sources), cell by cell, where `keep` says
+   * no to the cell's middle. It is read again if asked. Returns how many cells went.
+   */
+  forget(keep: (x: number, z: number) => boolean): number {
+    const at = (k: number): { x: number; z: number } => this.centre((k % WIDE) - OFF, Math.floor(k / WIDE) - OFF);
+    let n = 0;
+    const drop = <V>(m: Map<number, V> | Set<number>): void => {
+      for (const k of [...m.keys()]) {
+        const c = at(k);
+        if (keep(c.x, c.z)) continue;
+        m.delete(k);
+        n++;
+      }
+    };
+    drop(this.groundCache);
+    drop(this.indoorCache);
+    // (A cell's fixed sources go only with its "asked": else it would be taken for a cell with none.)
+    if (this.world.sourcesIn) {
+      for (const k of [...this.staticAsked]) {
+        const c = at(k);
+        if (keep(c.x, c.z)) continue;
+        this.staticAsked.delete(k);
+        this.staticCells.delete(k);
+      }
+    }
+    drop(this.cache);
+    return n;
+  }
+
   /** New weather or time: everything is re-read on demand. */
   setConditions(c: Conditions): void {
     this.cond = c;

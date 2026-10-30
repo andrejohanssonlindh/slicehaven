@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { mapNamed } from '../src/content/maps';
+import { spikeFilamentWorld } from '../src/content/spike3d';
+import { THINGS } from '../src/content/things';
+import { buildHouses } from '../src/core/world3d/layout';
 import { CHUNK } from '../src/core/world3d/chunks';
 import { FilamentField, type FilamentWorld } from '../src/core/world3d/filaments3d';
 import { NavGrid, ShapeIndex, circle, findPath, shapeDist } from '../src/core/world3d/space';
@@ -110,5 +113,25 @@ describe('forgetting far ground', () => {
     expect(map.placed.generatedChunks).toBe(3);
     expect(map.placed.forget((i) => i > 0)).toBe(2);
     expect(map.placed.generatedChunks).toBe(1);
+  });
+
+  it('the walking grid lets go of far blocks and works them out again the same (review item 6)', () => {
+    const grid = new NavGrid(400, [circle(100, 100, 2)], { radius: 0.2 });
+    const probe = (): boolean[] => [[100, 100], [101.9, 100], [-150, -150], [150, -150]].map(([x, z]) => grid.walkable(x, z));
+    const before = probe();
+    expect(grid.blocksBuilt).toBe(3); // (the first two points share a block)
+    expect(grid.forget((x) => x > 0)).toBe(1);
+    expect(grid.blocksBuilt).toBe(2);
+    expect(probe()).toEqual(before);
+  });
+
+  it('the filament field lets go of far cells and reads them again the same (review item 6)', () => {
+    const map = mapNamed('spike');
+    const field = new FilamentField(spikeFilamentWorld(map.ground, buildHouses(map.layout, THINGS)));
+    const read = (): string => JSON.stringify([field.readAt(0, 0), field.readAt(-20, 20), field.readAt(25, -25)]);
+    const before = read();
+    expect(field.forget(() => false)).toBeGreaterThan(0);
+    expect(read()).toBe(before);
+    expect(field.forget(() => true)).toBe(0);
   });
 });

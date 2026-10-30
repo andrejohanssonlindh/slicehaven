@@ -124,7 +124,10 @@ export class HouseIndex<R> {
     return this.near(x0, z0, x1, z1).flatMap((e) => e.sources.filter((s) => s.x >= x0 && s.x < x1 && s.z >= z0 && s.z < z1));
   }
 
-  /** Let go of the furnished rooms (their plans, walls and sources) of houses `keep` says no to; they are made again if asked for. */
+  /**
+   * Let go of the furnished rooms (their plans, walls and sources) and the models of houses `keep` says no to; they
+   * are made again, the same, if asked for. Returns how many furnished rooms went.
+   */
   forget(keep: (place: PlacedHouse) => boolean): number {
     let n = 0;
     for (const place of [...this.entries.keys()]) {
@@ -132,11 +135,17 @@ export class HouseIndex<R> {
       this.entries.delete(place);
       n++;
     }
+    for (const place of [...this.lites.keys()]) if (!keep(place)) this.lites.delete(place);
     return n;
   }
 
   /** Houses furnished now (a measure of how much of the city is being held). */
   get made(): number {
     return this.entries.size;
+  }
+
+  /** Houses whose model is held now. */
+  get modelled(): number {
+    return this.lites.size;
   }
 }

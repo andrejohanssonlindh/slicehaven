@@ -43,14 +43,24 @@ export interface BuiltHouse {
   model: HouseModel;
 }
 
-/** A house's model, made once for each look (the same spec always gives the same model, and nothing changes it). */
+/**
+ * A house's model, made once for each look (the same spec always gives the same model, and nothing changes it). The
+ * cache holds the looks used most lately, so a city walked end to end does not keep every house it passed.
+ */
+export const MODEL_CACHE = 160;
 const models = new Map<string, HouseModel>();
 const modelOf = (spec: House3DSpec, things: Things): HouseModel => {
   const k = `${spec.seed}|${spec.width}|${spec.depth}|${spec.wallH}|${spec.roof}|${spec.walls}|${spec.plan}`;
   let m = models.get(k);
-  if (!m) models.set(k, (m = buildHouse(spec, things.building(spec.plan))));
+  if (m) models.delete(k); // (to the back of the line: used just now)
+  else m = buildHouse(spec, things.building(spec.plan));
+  models.set(k, m);
+  if (models.size > MODEL_CACHE) models.delete(models.keys().next().value!);
   return m;
 };
+
+/** How many house models are held (for the tests). */
+export const modelsHeld = (): number => models.size;
 
 /** The houses of a layout, built to their kind of building (asked of the kinds of thing). */
 export const buildHouses = (l: Pick<Layout, 'houses'>, things: Things): BuiltHouse[] => l.houses.map((place) => ({ place, model: modelOf(place.spec, things) }));

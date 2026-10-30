@@ -154,6 +154,19 @@ export class NavGrid {
     return this.blocks.size;
   }
 
+  /** Let go of the blocks whose middle `keep` says no to (far from anyone): they are worked out again if asked. Returns how many went. */
+  forget(keep: (x: number, z: number) => boolean): number {
+    let n = 0;
+    const span = BLOCK * this.cell;
+    for (const key of [...this.blocks.keys()]) {
+      const bi = key % this.bw, bj = Math.floor(key / this.bw);
+      if (keep(this.x0 + (bi + 0.5) * span, this.z0 + (bj + 0.5) * span)) continue;
+      this.blocks.delete(key);
+      n++;
+    }
+    return n;
+  }
+
   /** Something changed in this rectangle of the ground: forget what was worked out there. */
   invalidate(x0: number, z0: number, x1: number, z1: number): void {
     const a = this.cellOf(x0 - this.radius, z0 - this.radius), b = this.cellOf(x1 + this.radius, z1 + this.radius);

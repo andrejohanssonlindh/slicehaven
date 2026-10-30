@@ -1005,8 +1005,13 @@ export class SpikeWorld {
     const f = this.focus, keep = this.viewRadius() + Math.max(60, this.lightRange);
     const near = (x: number, z: number, r: number): boolean => Math.hypot(x - f.x, z - f.z) < r;
     const stood = new Set(this.houses.map((h) => h.built.place));
-    const a = this.houseIndex.forget((p) => stood.has(p) || near(p.x, p.z, keep));
+    // (Whoever walks keeps the ground round them: the hero, and the people going their rounds.)
+    const walkers = [this.hero, ...this.cast.flatMap((c) => (c.rounds ? [c.rounds.actor] : []))];
+    const held = (x: number, z: number, r: number): boolean => near(x, z, r) || walkers.some((a) => Math.hypot(x - a.x, z - a.z) < r);
+    const a = this.houseIndex.forget((p) => stood.has(p) || held(p.x, p.z, keep));
     const b = this.placed.forget((i, j) => near((i + 0.5) * CHUNK, (j + 0.5) * CHUNK, keep + CHUNK) || this.chunks.has(chunkKey(i, j)));
+    this.nav.forget((x, z) => held(x, z, keep));
+    this.field.forget((x, z) => held(x, z, keep));
     return a + b;
   }
 

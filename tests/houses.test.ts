@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { THINGS } from '../src/content/things';
 import { HouseIndex } from '../src/core/world3d/houses';
-import type { PlacedHouse } from '../src/core/world3d/layout';
+import { MODEL_CACHE, type PlacedHouse, buildHouses, modelsHeld } from '../src/core/world3d/layout';
 
 /** A street of houses along x, every 20 m, north and south of it. */
 const street = (n: number): PlacedHouse[] =>
@@ -51,5 +51,19 @@ describe('the house index', () => {
     const again = idx.near(0, -20, 200, 20);
     expect(idx.made).toBe(first);
     expect(again.map((e) => e.room)).toContain('h0');
+  });
+
+  it('forgets the models of far houses too, and builds them again the same (review item 6)', () => {
+    const idx = new HouseIndex(street(30), (b) => ({ room: b.place.id, shapes: [], sources: [] }), THINGS);
+    const before = JSON.stringify(idx.liteNear(0, -20, 600, 20).map((l) => l.built.model.parts.length));
+    expect(idx.modelled).toBe(30);
+    idx.forget((p) => p.x < 60);
+    expect(idx.modelled).toBeLessThan(5);
+    expect(JSON.stringify(idx.liteNear(0, -20, 600, 20).map((l) => l.built.model.parts.length))).toBe(before);
+  });
+
+  it('holds a bounded number of house models however many houses are built', () => {
+    buildHouses({ houses: street(MODEL_CACHE + 50).map((h, i) => ({ ...h, spec: { ...h.spec, seed: 5000 + i } })) }, THINGS);
+    expect(modelsHeld()).toBeLessThanOrEqual(MODEL_CACHE);
   });
 });
