@@ -4,6 +4,9 @@ Newest on top. Answer in chat (just reference the number, e.g. "Q11: option B").
 
 ---
 
+### Q26 — How much character does a passer-by get? *(open; I'm proceeding with my lean)*
+Design: [kinds of person](design/people-kinds.md). Every person points at a character, race to skills. For the hero it is the creator's save. For everyone else I would **make the full sheet from their kind, the map's seed and their id, only when someone looks at, talks to or rolls against them**: always the same person, nothing stored, cheap for a crowd. A story character who must be exactly so can carry their own saved sheet instead. Alternatives: (a) full sheets for named people only and a short card (people, calling, three skills) for the crowd; (b) every person pre-made when the map loads. Say if you want (a) or (b); otherwise I build the on-demand version.
+
 ### Q25 — How do maps join up? *(open, no rush: needed before step 6 of [the world structure](design/world-structure.md))*
 Today one map is loaded per page (`?map=hamlet`). Once maps are files, the game needs to know how you get from one to another. Options, any mix:
 - **Exits at the edge**: walk off the end of the road and arrive at the start of the next map's road (a forest, the next village). Simple; every map is a room.

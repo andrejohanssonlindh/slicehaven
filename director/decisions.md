@@ -4,6 +4,7 @@ Only decisions that still stand. Ones that were replaced are removed (git histor
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-10-30 | **A kind of person points at that person's character, race to skills** (the creator's `CharState` and `derive()`); facets, look and name come from the character, not from separate hand-written tags | Director: step 3 of the world structure must reference the person's character. Design: [kinds of person](design/people-kinds.md). |
 | 2026-10-30 | **Filaments: add the sixteen that have a source** (heat, cold, sun, stars, moon with phases, void, symbols, meanings); primal and soul aspects wait. At night, cloud works the other way on darkness (it hides moon and stars). Books give a slight symbol and meaning bonus | Director (Q24). Necrotropy base is normal, a little weaker under living trees (the book gives no ambient figure). |
 | 2026-10-30 | **Torches and fires are seen from far beyond plain sight, with the ground round them** (farther at night, only ahead of you and in the clear) | Director: walking through a forest and seeing a torch much further away than your vision. |
 | 2026-10-28 | **M0 passed: build the 3D world on the spike's pipeline** (no voxel fallback) | Director (Q23): the look is "nearly exactly what I want", never under 60 fps on the phone. |

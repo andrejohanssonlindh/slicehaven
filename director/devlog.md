@@ -1,5 +1,9 @@
 # Devlog
 
+## 2026-10-30 — Step 3 designed: kinds of person, with their characters
+
+- [Kinds of person](design/people-kinds.md): three layers (kind of person, the person in a map, their character). The character is the creator's `CharState` + `derive()`, so facets, look and name come from it rather than from separate tags. Most people's characters are made headlessly from kind + seed + id and only when looked at; the hero's is the creator's save. Build order in the page; decision logged, Q26 asked (default proceeds).
+
 ## 2026-10-29 — Plan step 2 begins: the torch post is a kind of fire
 
 - **`torchpost`** (`content/things/kinds/fire.ts`, a kind of `fire`, which the skill library already had): a post you walk round, a small fire to the field, and a flame with its light. The flame is a new property any kind can have (`flame: { y }`), so a campfire or a brazier is one more line later.
