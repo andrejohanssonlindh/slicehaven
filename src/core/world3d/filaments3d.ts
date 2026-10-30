@@ -72,7 +72,15 @@ export interface Conditions {
   isClouded?: (x: number, z: number) => boolean;
   /** Direction toward the sun (or moon), for object shadows. */
   sunDir?: [number, number, number];
+  /**
+   * Where the clouds are, as a key that changes only when they have moved enough to matter (the world rounds their
+   * drift). Same weather, same key, nearly the same sun: the readings are kept. Without it, any new conditions clear them.
+   */
+  cloudKey?: string;
 }
+
+/** The sun is taken to have moved once its direction turns this much (about 2°). */
+const SUN_STEP = 0.035;
 
 type Gathered = { total: number; here: boolean; near: number; cap: number };
 
@@ -188,20 +196,48 @@ export class FilamentField {
     return n;
   }
 
-  /** New weather or time: everything is re-read on demand. */
+  /** New weather or time: everything is re-read on demand, unless nothing that matters changed (see `cloudKey`). */
   setConditions(c: Conditions): void {
+    const was = this.cond;
     this.cond = c;
+    const same = c.cloudKey !== undefined && c.cloudKey === was.cloudKey && JSON.stringify(c.env) === JSON.stringify(was.env)
+      && !!c.sunDir === !!was.sunDir && (!c.sunDir || c.sunDir.every((v, k) => Math.abs(v - was.sunDir![k]) < SUN_STEP));
+    if (same) {
+      this.cond = { ...c, sunDir: was.sunDir }; // (the sun the readings were made with, so it can creep without a clear)
+      return;
+    }
     this.cache.clear();
     this.emCache.clear();
+    this.clears++;
   }
 
-  /** The things that move (the living): replaced as a whole. */
+  /** How many times every reading was thrown away (for the tests). */
+  clears = 0;
+
+  /**
+   * The things that move (the living): replaced as a whole. A mover counts by the cell it stands in, so only the
+   * readings within reach of a cell that gained or lost someone are thrown away.
+   */
   setMovers(m: readonly FSource[]): void {
+    const sig = (list: readonly FSource[]): Map<number, string> => {
+      const out = new Map<number, string>();
+      for (const s of list) {
+        const { i, j } = this.cellOf(s.x, s.z);
+        const k = keyOf(i, j);
+        out.set(k, `${out.get(k) ?? ''}${s.kind}:${s.weight ?? 1};`);
+      }
+      return out;
+    };
+    const before = sig(this.movers), after = sig(m);
+    for (const s of this.movers) this.emCache.delete(s);
     this.movers = [...m];
     this.moverCells.clear();
     for (const s of this.movers) this.put(this.moverCells, s);
-    this.cache.clear();
-    this.emCache.clear();
+    for (const k of new Set([...before.keys(), ...after.keys()])) {
+      if (before.get(k) === after.get(k)) continue;
+      const i = (k % WIDE) - OFF, j = Math.floor(k / WIDE) - OFF;
+      for (let dj = -R; dj <= R; dj++) for (let di = -R; di <= R; di++) this.cache.delete(keyOf(i + di, j + dj));
+    }
   }
 
   /** Fixed sources changed (a fire lit, a tree felled, a chunk streamed in or out). */

@@ -242,3 +242,47 @@ describe('filaments on the spike', () => {
     expect(f.readAt(SPIKE_HERO[0], SPIKE_HERO[1]).hydro.level).toBeLessThanOrEqual(0);
   });
 });
+
+describe('what the field throws away (review item 7)', () => {
+  const pts = [[-20, -20], [0, 0], [3, 2], [20, 18], [-25, 10]] as const;
+  const read = (f: FilamentField): string => JSON.stringify(pts.map(([x, z]) => f.readAt(x, z)));
+  const fire: FSource = { x: 10, z: 10, kind: 'fire', weight: 1 };
+
+  it('readings stay right as the living move: the same as a field made afresh', () => {
+    const f = new FilamentField(meadow([fire]));
+    f.setConditions({ env: NIGHT, cloudKey: '0,0' });
+    for (const [hx, hz] of [[0, 0], [0.4, 0.3], [6, 1], [-20, -19], [-20, -19]]) {
+      f.setMovers([{ x: hx, z: hz, kind: 'friend' }, { x: 3, z: 2, kind: 'beast' }]);
+      read(f);
+      const fresh = new FilamentField(meadow([fire]));
+      fresh.setConditions({ env: NIGHT });
+      fresh.setMovers([{ x: hx, z: hz, kind: 'friend' }, { x: 3, z: 2, kind: 'beast' }]);
+      expect(read(f)).toBe(read(fresh));
+    }
+  });
+
+  it('a step by someone keeps the readings far from them', () => {
+    const f = new FilamentField(meadow([fire]));
+    f.setConditions({ env: NIGHT });
+    f.setMovers([{ x: 0, z: 0, kind: 'friend' }]);
+    const far = f.readAt(-25, 25);
+    f.setMovers([{ x: 2, z: 0, kind: 'friend' }]);
+    expect(f.readAt(-25, 25)).toBe(far); // the very same reading: not worked out again
+    expect(f.readAt(2, 0)).not.toBe(far);
+  });
+
+  it('the same weather, clouds and (nearly) sun keep every reading; a real change throws them away', () => {
+    const f = new FilamentField(meadow([fire]));
+    f.setConditions({ env: DAY, cloudKey: '0,0', sunDir: [0.5, 0.8, 0.3] });
+    const n = f.clears, r = f.readAt(5, 5);
+    f.setConditions({ env: { ...DAY }, cloudKey: '0,0', sunDir: [0.51, 0.8, 0.3] });
+    expect(f.clears).toBe(n);
+    expect(f.readAt(5, 5)).toBe(r);
+    f.setConditions({ env: DAY, cloudKey: '1,0', sunDir: [0.5, 0.8, 0.3] });
+    expect(f.clears).toBe(n + 1);
+    f.setConditions({ env: { ...DAY, sky: 'rain' }, cloudKey: '1,0', sunDir: [0.5, 0.8, 0.3] });
+    expect(f.clears).toBe(n + 2);
+    f.setConditions({ env: { ...DAY, sky: 'rain' } }); // (no key: always new)
+    expect(f.clears).toBe(n + 3);
+  });
+});

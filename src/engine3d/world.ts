@@ -1174,7 +1174,9 @@ export class SpikeWorld {
   /** Tell the field what the weather and the living are doing now. */
   private feedField(): void {
     const env = this.env;
-    this.field.setConditions({ env: this.weather.env(), isClouded: (x, z) => env.cloudShadow(x, z) > 0.5, sunDir: env.sunDir });
+    // (The clouds count as moved once they have drifted a couple of metres: until then the readings are kept.)
+    const cloudKey = `${Math.round(this.cloudOff.x / 2)},${Math.round(this.cloudOff.y / 2)}`;
+    this.field.setConditions({ env: this.weather.env(), isClouded: (x, z) => env.cloudShadow(x, z) > 0.5, sunDir: env.sunDir, cloudKey });
     this.field.setMovers([
       { x: this.hero.x, z: this.hero.z, kind: 'friend' },
       ...this.cast.filter((c) => c.beat || c.rounds).map((c) => ({ x: c.card.mesh.position.x, z: c.card.mesh.position.z, kind: 'friend' as const })),
