@@ -104,6 +104,8 @@ interface CastCard {
   rounds: Rounds | null;
 }
 
+const byDistance = (a: { d: number }, b: { d: number }): number => a.d - b.d;
+
 /** A person's walking card, drawn from their kinds. */
 const personCard = (p: PersonSpec): WalkCard => walkCard(makeWalkSet(folkOf(PERSON_KINDS.resolve(p).look, p.seed ?? 1)), PITCH);
 /** How far the ray of light reaches, metres. */
@@ -249,6 +251,15 @@ export class SpikeWorld {
   lightRange = 0;
   private castAt: { x: number; z: number; range: number; house: string | null; level: number } | null = null;
   private tmpV = new THREE.Vector3();
+  private tmpC1 = new THREE.Color();
+  private tmpC2 = new THREE.Color();
+  private bgColor = new THREE.Color();
+  private windNow = { x: 0, z: 0 };
+  /** The torches nearest the view first, kept between frames (see `update`). */
+  private torchOrder: { t: Torch; d: number }[] = [];
+  /** The people who reveal themselves, nearest the view first, kept between frames (see `updateSee`). */
+  private seeOrder: Person[] = [];
+  private seeV = new THREE.Vector3();
   /** Where the hero has been (seen within the vision radius): drawn grey where it is out of sight now. */
   readonly explored = new Explored();
   private markedAt: { x: number; z: number; f: number; t: number } | null = null;
@@ -1577,23 +1588,24 @@ export class SpikeWorld {
   private updateSee(): void {
     const slots = WORLD.uSee.value;
     const f = this.focus;
-    const near = this.people
-      .filter((p) => p.reveals)
-      .sort((a, b) => Math.hypot(a.card.mesh.position.x - f.x, a.card.mesh.position.z - f.z) - Math.hypot(b.card.mesh.position.x - f.x, b.card.mesh.position.z - f.z))
-      .slice(0, SEE_SLOTS);
-    const v = new THREE.Vector3();
-    slots.forEach((s, i) => {
-      const p = near[i];
+    const near = this.seeOrder;
+    near.length = 0;
+    for (const p of this.people) if (p.reveals) near.push(p);
+    const d = (p: Person): number => Math.hypot(p.card.mesh.position.x - f.x, p.card.mesh.position.z - f.z);
+    if (near.length > SEE_SLOTS) near.sort((a, b) => d(a) - d(b));
+    const v = this.seeV;
+    for (let i = 0; i < slots.length; i++) {
+      const s = slots[i], p = i < SEE_SLOTS ? near[i] : undefined;
       if (!p) {
         s.set(0, 0, 0, 0);
-        return;
+        continue;
       }
       // The oval is centred on the chest.
       v.copy(p.card.mesh.position);
       v.y += 0.9;
       v.applyMatrix4(this.camera.matrixWorldInverse);
       s.set(v.x, v.y, -v.z, 1);
-    });
+    }
   }
 
   /**
@@ -1854,16 +1866,16 @@ export class SpikeWorld {
     this.cloudOff.y += w.wy * drift * dt;
     const env = environment(w, { x: this.cloudOff.x, z: this.cloudOff.y });
     this.env = env;
-    const lin = (c: number[]): THREE.Color => new THREE.Color().setRGB(c[0], c[1], c[2], THREE.SRGBColorSpace);
+    // (Colours are written into ones kept for it: nothing new is made each frame, which a phone feels as collection pauses.)
+    const lin = (out: THREE.Color, c: number[]): THREE.Color => out.setRGB(c[0], c[1], c[2], THREE.SRGBColorSpace);
 
     this.sunDir.set(...env.sunDir);
-    this.sun.color.copy(lin(env.sunColor));
+    lin(this.sun.color, env.sunColor);
     this.sun.intensity = env.sunIntensity;
-    this.hemi.color.copy(lin(env.skyTop));
-    this.hemi.groundColor.copy(lin(env.groundBounce));
+    lin(this.hemi.color, env.skyTop);
+    lin(this.hemi.groundColor, env.groundBounce);
     this.hemi.intensity = env.ambient;
-    const fogC = lin(env.fog);
-    this.fog.color.copy(fogC);
+    lin(this.fog.color, env.fog);
     // Mist: what is asked for (`setMist`, for magic and scenes) or what the weather gives by itself (rain), whichever is thicker,
     // eased so it rolls in and out. It thickens the distance fog and lies low on the ground.
     // The wind as the world feels it: as set up to a stiff breeze (force 3), then it climbs fast, so force 6 is a gale.
@@ -1886,7 +1898,7 @@ export class SpikeWorld {
     WORLD.uMistAt.value.set(this.focus.x, this.focus.z);
     if (this.mistTint) WORLD.uMistColor.value.set(this.mistTint.r, this.mistTint.g, this.mistTint.b);
     // With vision on, what lies past it is black, not sky.
-    this.scene.background = this.vision.outer > 0 ? fogC.clone().multiplyScalar(0.05) : fogC;
+    this.scene.background = this.bgColor.copy(this.fog.color).multiplyScalar(this.vision.outer > 0 ? 0.05 : 1);
     // Sight is the hero's, not the camera's: a cone ahead, a circle round, the dark shortening it, solid things in the way.
     if (this.vision.outer > 0) {
       this.facing = turnToward(this.facing, Math.atan2(this.heroDir.z, this.heroDir.x), 7 * dt);
@@ -1919,17 +1931,28 @@ export class SpikeWorld {
     // Torches flicker; real point lights only for the nearest few.
     // (Distances are measured once each, not inside the sort: a sort asks for them n log n times, and each ask made a vector.)
     const far = this.vision.outer > 0 ? Math.max(this.vision.outer, this.lightRange) + 8 : Infinity;
-    const order = this.torches.map((t) => ({ t, d: t.light.getWorldPosition(this.tmpV).distanceTo(this.focus) })).sort((a, b) => a.d - b.d);
+    // (The order is kept between frames and sorted in place; a torch's distance is written into its own slot.)
+    const order = this.torchOrder;
+    while (order.length < this.torches.length) order.push({ t: this.torches[0], d: 0 });
+    order.length = this.torches.length;
+    this.torches.forEach((t, i) => {
+      order[i].t = t;
+      order[i].d = t.light.getWorldPosition(this.tmpV).distanceTo(this.focus);
+    });
+    order.sort(byDistance);
     let shining = 0;
-    order.forEach(({ t, d }, i) => {
+    this.windNow.x = wx;
+    this.windNow.z = wz;
+    for (let i = 0; i < order.length; i++) {
+      const { t, d } = order[i];
       t.light.visible = i < this.settings.lights && d < far;
       if (t.light.visible) shining++;
-      if (d > far) return; // out of sight is out of mind: not animated
+      if (d > far) continue; // out of sight is out of mind: not animated
       const f = 0.82 + 0.18 * Math.sin(this.time * 11 + t.seed) * Math.sin(this.time * 7.3 + t.seed * 2);
       t.light.intensity = t.base * f * (t.always ? 1 : 0.35 + 0.65 * env.night);
       t.flame.scale.set(1, 0.85 + f * 0.3, 1);
-      t.tick?.(this.time, { x: wx, z: wz });
-    });
+      t.tick?.(this.time, this.windNow);
+    }
     // The number of lights in the scene is part of every shader: when it changes, every material is compiled again (a
     // stall of a second on a phone). So it never changes: dark spares make up whatever the torches in view do not.
     this.spares.forEach((l, i) => { l.visible = i < this.settings.lights - shining; });
@@ -2009,7 +2032,7 @@ export class SpikeWorld {
       const b = this.water.bounds;
       this.water.mesh.visible = this.vision.outer <= 0 || Math.hypot(this.focus.x - b.x, this.focus.z - b.z) < b.r + this.vision.outer;
     }
-    if (this.water) this.water.light(this.sun.color, this.sun.intensity, lin(env.skyHorizon), this.hemi.color.clone().multiplyScalar(env.ambient * 0.5), env.night);
+    if (this.water) this.water.light(this.sun.color, this.sun.intensity, lin(this.tmpC1, env.skyHorizon), this.tmpC2.copy(this.hemi.color).multiplyScalar(env.ambient * 0.5), env.night);
   }
 
   /**
