@@ -18,8 +18,7 @@ describe('spike3d storeys', () => {
     const done = () => page.waitForFunction(() => !(window as any).spike.world.walking, undefined, { timeout: 90_000 });
     const standing = 'w.houses.some((h) => h.built.place.id === "inn")';
     await w('(w.speedMul = 3, 0)');
-    const inn = (await w('w.houses.findIndex((h) => h.built.place.id === "inn")')) as number;
-    expect(await w(`w.walkIn(${inn})`)).not.toBeNull();
+    expect(await w('w.walkIn("inn")')).not.toBeNull();
     await done();
     expect(await w('w.climb(1)')).not.toBeNull();
     await done();

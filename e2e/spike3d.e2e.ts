@@ -205,10 +205,10 @@ describe('spike3d layout', () => {
       await page.screenshot({ path: `${OUT}spike3d-layout-${name}.png` });
     }
     expect(await w('w.houses.length')).toBe(4);
-    expect(await w('w.walkIn(2)')).not.toBeNull();
+    expect(await w('w.walkIn("east")')).not.toBeNull();
     await page.waitForFunction(() => !(window as any).spike.world.walking, undefined, { timeout: 60_000 });
-    expect(await w('w.heroHouse()')).toBe(2);
-    expect(await w('w.houses.map((h) => h.open)')).toEqual([false, false, true, false]);
+    expect(await w('w.heroHouse()')).toBe('east');
+    expect(await w('w.houses.filter((h) => h.open).map((h) => h.built.place.id)')).toEqual(['east']);
     expect(errors).toEqual([]);
   });
 });

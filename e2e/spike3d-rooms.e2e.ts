@@ -19,7 +19,7 @@ describe('spike3d rooms', () => {
     for (let i = 0; i < 3; i++) await page.click('#zoom button[data-zoom="1"]');
     const ids = (await w('w.houses.map((h) => h.built.place.id)')) as string[];
     for (const [i, id] of ids.entries()) {
-      await w(`(w.inside = false, w.toggleRoof(${i}), w.focus.x = w.houses[${i}].built.place.x, w.focus.z = w.houses[${i}].built.place.z, 0)`);
+      await w(`(w.inside = false, w.toggleRoof(${JSON.stringify(id)}), w.focus.x = w.houses[${i}].built.place.x, w.focus.z = w.houses[${i}].built.place.z, 0)`);
       await page.waitForTimeout(1800);
       expect(await w(`w.houses[${i}].furniture.every((f, k) => f.visible === (w.houses[${i}].furnLevel[k] === w.houses[${i}].view))`)).toBe(true);
       await page.screenshot({ path: `${OUT}spike3d-room-${id}.png` });

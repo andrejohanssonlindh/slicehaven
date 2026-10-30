@@ -24,10 +24,11 @@ describe('spike3d maps', () => {
     await w('(w.focus.x = 0, w.focus.z = -2, 0)');
     await page.waitForTimeout(2500);
     await page.screenshot({ path: `${OUT}hamlet-street.png` });
-    const inn = (await w('w.houses.findIndex((h) => h.built.place.id === "inn")')) as number;
-    expect(await w(`w.walkIn(${inn})`)).not.toBeNull();
+    // Houses are named by their map id, which streaming never changes (an index into what stands did).
+    expect(await w('w.walkIn("no-such-house")')).toBeNull();
+    expect(await w('w.walkIn("inn")')).not.toBeNull();
     await page.waitForFunction(() => !(window as any).spike.world.walking, undefined, { timeout: 90_000 });
-    expect(await w('w.heroHouse()')).toBe(inn);
+    expect(await w('w.heroHouse()')).toBe('inn');
     await page.waitForTimeout(1500);
     await page.screenshot({ path: `${OUT}hamlet-inn.png` });
     expect(errors).toEqual([]);

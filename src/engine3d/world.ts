@@ -1266,44 +1266,46 @@ export class SpikeWorld {
     this.focus.z = Math.max(-lim, Math.min(lim, this.focus.z));
   }
 
-  /** The index of the house under the pointer, if any (nearest hit). */
-  pick(ndcX: number, ndcY: number): number | null {
+  // (Houses go in and out of the API by their map id: `houses` is only what stands now, and its order changes as chunks stream.)
+
+  /** The id of the house under the pointer, if any (nearest hit). */
+  pick(ndcX: number, ndcY: number): string | null {
     const ray = new THREE.Raycaster();
     ray.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
-    let best: number | null = null, bestD = Infinity;
-    this.houses.forEach((hs, i) => {
+    let best: string | null = null, bestD = Infinity;
+    for (const hs of this.houses) {
       const hit = ray.intersectObject(hs.group, true)[0];
       if (hit && hit.distance < bestD) {
         bestD = hit.distance;
-        best = i;
+        best = hs.built.place.id;
       }
-    });
+    }
     return best;
   }
 
   /**
-   * The house a tap on the ground means: the one whose footprint (porch included) the tapped ground point lies in.
-   * A roof that only covers ground behind the house does not count, so the hero can walk round the back.
+   * The house a tap on the ground means (its id): the one whose footprint (porch included) the tapped ground point lies
+   * in. A roof that only covers ground behind the house does not count, so the hero can walk round the back.
    */
-  houseTapped(ndcX: number, ndcY: number): number | null {
+  houseTapped(ndcX: number, ndcY: number): string | null {
     const g = this.groundAt(ndcX, ndcY);
     if (!g) return null;
     const i = houseAt(this.houses.map((h) => h.built), this.houses.map((h) => houseOuterBox(h.built)), g.x, g.z, 0);
-    return i >= 0 ? i : null;
+    return i >= 0 ? this.houses[i].built.place.id : null;
   }
 
-  /** The house the hero is in, else the one nearest the view's focus. */
-  private activeHouse(): number {
+  /** The house the hero is in, else the standing one nearest the view's focus. */
+  private activeHouse(): HouseInst | null {
     const h = this.heroHouse();
-    if (h >= 0) return h;
-    let best = 0, bestD = Infinity;
-    this.houses.forEach((hs, i) => {
+    if (h) return this.standingOf(h);
+    let best: HouseInst | null = null, bestD = Infinity;
+    for (const hs of this.houses) {
       const d = Math.hypot(hs.built.place.x - this.focus.x, hs.built.place.z - this.focus.z);
       if (d < bestD) {
         bestD = d;
-        best = i;
+        best = hs;
       }
-    });
+    }
     return best;
   }
 
@@ -1314,12 +1316,15 @@ export class SpikeWorld {
 
   set inside(on: boolean) {
     if (!on) for (const h of this.houses) h.open = false;
-    else if (this.houses.length) this.houses[this.activeHouse()].open = true;
+    else {
+      const h = this.activeHouse();
+      if (h) h.open = true;
+    }
   }
 
-  /** Lift or lower one house's roof by hand (dev). */
-  toggleRoof(i: number): void {
-    const h = this.houses[i];
+  /** Lift or lower one house's roof by hand (dev), if it is standing. */
+  toggleRoof(id: string): void {
+    const h = this.standingOf(id);
     if (h) h.open = !h.open;
   }
 
@@ -1442,23 +1447,23 @@ export class SpikeWorld {
     this.heroBlob.position.set(this.hero.x, y + 0.03, this.hero.z);
   }
 
-  /** Index of the house the hero is inside, or -1. */
-  heroHouse(): number {
-    return houseAt(this.houses.map((h) => h.built), this.houses.map((h) => h.box), this.hero.x, this.hero.z, -0.1);
+  /** The id of the house the hero is inside (standing or not), or null. */
+  heroHouse(): string | null {
+    return this.houseIndex.houseContaining(this.hero.x, this.hero.z, -0.1)?.built.place.id ?? null;
   }
 
   get heroIndoors(): boolean {
-    return this.heroHouse() >= 0;
+    return this.heroHouse() !== null;
   }
 
   private wasIn: HouseInst | null = null;
 
-  /** Walk to the middle of a house's doorway, just inside (the first house by default). */
-  walkIn(i = 0): number | null {
-    const hs = this.houses[i];
-    if (!hs) return null;
-    const m = hs.built.model;
-    const p = houseToWorld(hs.built.place, m.door[0], m.door[2] - 0.9);
+  /** Walk to the middle of a house's doorway, just inside (the map's first house by default). Null if there is no such house or no way there. */
+  walkIn(id = this.layout.houses[0]?.id): number | null {
+    const place = id === undefined ? undefined : this.houseIndex.byId(id);
+    if (!place) return null;
+    const b = this.houseIndex.lite(place).built;
+    const p = houseToWorld(b.place, b.model.door[0], b.model.door[2] - 0.9);
     return this.walkTo(p.x, p.z);
   }
 

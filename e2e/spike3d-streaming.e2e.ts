@@ -45,10 +45,10 @@ describe('spike3d houses streaming', () => {
     await page.screenshot({ path: `${OUT}streaming-eastgate.png` });
 
     // The house that stands nearest can be walked into: its walls and furniture are known to the walking grid.
-    const near = (await w(`(() => { let best = -1, bd = 1e9; w.houses.forEach((h, i) => { const d = Math.hypot(h.built.place.x - w.hero.x, h.built.place.z - w.hero.z); if (d < bd) { bd = d; best = i; } }); return best; })()`)) as number;
-    expect(near).toBeGreaterThanOrEqual(0);
+    const near = (await w(`(() => { let best = null, bd = 1e9; for (const h of w.houses) { const d = Math.hypot(h.built.place.x - w.hero.x, h.built.place.z - w.hero.z); if (d < bd) { bd = d; best = h.built.place.id; } } return best; })()`)) as string | null;
+    expect(near).not.toBeNull();
     lap('town ok');
-    expect(await w(`w.walkIn(${near})`)).not.toBeNull();
+    expect(await w(`w.walkIn(${JSON.stringify(near)})`)).not.toBeNull();
     await page.waitForFunction(() => !(window as any).spike.world.walking, undefined, { timeout: 60_000 });
     lap('walked');
     expect(await w('w.heroIndoors')).toBe(true);

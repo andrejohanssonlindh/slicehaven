@@ -3,6 +3,7 @@
 ## 2026-10-30 — Review fixes, and maps as files
 
 - **Leaks (review bug 3) ✅:** every house's shadow twins share one material instead of a new one each; torch flames are let go when their chunk leaves, and so are the hand torch, the orb and the ray when put away (`Flame.dispose`). A browser test lights and puts them away four times and checks the GPU holds no more than before (it fails on the old code: 12 geometries kept).
+- **House numbers out of the API (review item 5) ✅:** the page and the tests name houses by their map id (`walkIn("inn")`, `heroHouse() === "inn"`), never by their place among the houses standing, which changes as you walk.
 
 ## 2026-10-30 — Kinds of person: their people and their calling at once
 
