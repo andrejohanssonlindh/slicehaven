@@ -4,47 +4,14 @@ Newest on top. Answer in chat (just reference the number, e.g. "Q11: option B").
 
 ---
 
-### Q26 — Templates for sheets: three small choices *(open; defaults below let me start; the big one is answered: authored, not rolled)*
-Design: [kinds of person](design/people-kinds.md). Answered by the director: sheets are **authored and composed** (an innkeeper skill set, a guard skill set, the same for enemies), never random unless a person is marked `vary`. What is left, with my defaults:
-1. **Grades.** One template at `apprentice` / `journeyman` / `master` (a fixed step on its few *core* skills) also serves as enemy tiers. OK, or do you want a finer scale, or each tier written out by hand?
-2. **Starting from the creator's 100 callings.** A helper drafts a template from a background's skill grants (Innkeeper: Cooking 4, Well-fed 4, Welcoming smile 4), and I then edit the files by hand, adding what our world needs. OK, or should templates be written from scratch only?
-3. **Crowds.** For market-day passers-by only, `vary` gives names, looks and ±1 on non-core skills from a hash of their id (the same every time). OK, or no variation at all?
-
-### Q25 — How do maps join up? *(open, no rush: needed before step 6 of [the world structure](design/world-structure.md))*
-Today one map is loaded per page (`?map=hamlet`). Once maps are files, the game needs to know how you get from one to another. Options, any mix:
-- **Exits at the edge**: walk off the end of the road and arrive at the start of the next map's road (a forest, the next village). Simple; every map is a room.
+### Q25 — How do maps join up? *(open, not decided; no rush: needed before step 6 of [the world structure](design/world-structure.md))*
+Today one map is loaded per page (`?map=hamlet`). Once maps are files, the game needs to know how you get from one to another. The director's likely handle: **walk to the end of the map and arrive on an overworld.** Not decided yet. Other options, any mix:
+- **Exits at the edge** into the next map directly (a forest, the next village).
 - **Doors that are maps**: a cave mouth, a manor's cellar or a castle's inside is its own map, entered by a door.
-- **One big world** that streams forever (the engine can already do kilometres), with maps as regions of it.
-- **A travel map** between places (days on the road happen off-screen, with events).
+- **One big world** that streams forever, with maps as regions of it.
+- **An overworld / travel map** between places (days on the road happen off-screen, with events). *This is the director's likely direction.*
 
-Also: does a map carry its own weather and hour, or does the world's clock run on across maps? My lean: **exits plus doors-as-maps, and one clock for the whole world**. Say which you want, or "later".
-
-### Q24 — "Add all filaments": how far? *(answered: do the reasonable ones; see [decisions](decisions.md))*
-The book names 22 aspects; the field has the 8 that come from the ground, the weather and the living. The rest need a source in the world before a number means anything. My proposal, by group (say which, or "all"):
-
-- **Grundkrafter: heat and cold** (Termotropi, Kryotropi): from fire, sun, season, snow, water. Cheap, and they tie into the clock (warm noon, cold night). *I'd do these first.*
-- **Himlakrafter: sun, stars, moon** (Heliotropi, Astrotropi, Selenotropi, Kosmotropi): all read the clock and the sky (sun up, clear night sky, the moon's phase). Cheap now that there is a 24 h clock.
-- **Symbols** (Ikonotropi, Semotropi): need things to read (signs, carvings, shrines). Wait for placed things that carry meaning.
-- **Primal** (Ataxotropi chaos, Nomotropi order, Kronotropi time, Topotropi space): abstract; I'd start them flat at "normal" and let storms, lightning, ruins and the like push them later.
-- **Souls** (Psykotropi, Daimotropi, Teotropi, Oneirotropi): the book says ordinary mages cannot work these, so they would exist as a reading but not a spell source. Flat "normal" for now.
-
-Also: **I changed necrotropy** (normal everywhere, a little weaker under living trees; see the devlog). Tell me if you would rather forests were *exactly* normal.
-
----
-
-### Q23 — The 3D spike (M0): does the look work, and is it fast enough on your phone? *(answered: yes, "nearly exactly what I want", never under 60 fps → go; see [decisions](decisions.md))*
-Open **[the spike](https://andrejohanssonlindh.github.io/slicehaven/spike3d/)** on the phone. What it shows and every button is in [the M0 page](design/world3d-m0.md). What I need:
-
-- **The look.** Does it feel like our game? Compare **Shells 0 and 2** close up (zoom +, the roof's eave and the tree), **Outline** on and off, **Palette** 0 / 30 / 100 %. Which do you keep?
-- **The numbers.** The box at top left: fps and ms at the default tier, by day, at night, in the storm, and after two or three minutes (does the phone get hot or slow down?). A screenshot is enough.
-- **Pixel size.** The default is one art pixel per CSS pixel (×3 on most phones). Try **Pixel** ×2 and ×6: crisper or chunkier?
-- **The camera.** Pitch 39° (like the old hex art) and turned 24° so you see the front and the right side. Right, or steeper/flatter?
-- **Go or fallback.** If it is right, I start M1 (the core: chunked terrain, tiers, the atlas). If not, say what is wrong; the fallback is baked voxel sprites.
-
----
-
-### Q22 — Fights without hexes *(answered: measurements (metres), in the engine too; filaments as a cell map, see [decisions](decisions.md))*
-The 3D world has no hexes. How should fights and ranges work there? **A)** Distances in metres, moves and ranges as circles (shown only in a fight); **B)** zones (near / close / far) like a tabletop theatre of the mind; **C)** a hex or square grid that appears only when a fight starts, laid over the free world. The sandbox and the gate scene keep their hexes until you decide. Not urgent: it does not block the 3D work.
+Still to settle when it comes up: does a map carry its own weather and hour, or does one clock run across them?
 
 ---
 

@@ -2,7 +2,7 @@
 
 ## 2026-10-30 — Step 3 designed: kinds of person, with their characters
 
-- [Kinds of person](design/people-kinds.md): three layers (kind of person, the person in a map, their sheet). **Revised after the director's correction: sheets are authored and composed, not generated.** Reusable templates (innkeeper, guard, bandit, wolf) inherit down a tree; a sheet is people + template chain + grade + the person's own changes, with no dice; variation is opt-in per person. Enemies use the same pipeline (grade = threat). The creator's 100 callings give first drafts of templates. Facets, look and name come from the sheet. Decision logged; Q26 holds three small choices with defaults.
+- Step 3 (kinds of person) **paused** at the director's request. My two drafts of a character-sheet design guessed at skills and levels and went too far, so [the page](design/people-kinds.md) now holds only what the director said: kinds of person inherit, a person is a named customisation of a kind, a sheet is something a kind has and is not populated yet; every living humanoid will be a real person with real skills; prefab kinds are not static (skills flagged higher or lower, some randomness, about five steps, unfixed). Binding sheets needs its own planning, later. Questions cleaned: Q22, Q23, Q24 and Q26 removed (answered, or recorded in the decisions); Q25 now notes the likely overworld.
 
 ## 2026-10-29 — Plan step 2 begins: the torch post is a kind of fire
 
