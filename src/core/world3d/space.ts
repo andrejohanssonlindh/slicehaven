@@ -316,8 +316,15 @@ export function findPath(grid: NavGrid, from: P2, to: P2): P2[] | null {
   };
   cost.set(id(s.i, s.j), 0);
   open.push(hf(s.i, s.j), id(s.i, s.j));
+  // A goal that cannot be reached floods the whole box, and on fresh ground every block it touches is worked out at
+  // once (a hitch). So the search may work out only so many new blocks: a few, plus eight for each block's length
+  // between the ends (a walk through woods needs about five; a long walk down a road still gets what it needs).
+  const span = BLOCK * grid.cell;
+  const budget = 16 + 8 * Math.ceil(Math.hypot(goalP.x - start.x, goalP.z - start.z) / span);
+  const blocks0 = grid.blocksBuilt;
   let found = false;
   while (open.size) {
+    if (grid.blocksBuilt - blocks0 > budget) return null;
     const cur = open.pop();
     if (closed.has(cur)) continue;
     closed.add(cur);

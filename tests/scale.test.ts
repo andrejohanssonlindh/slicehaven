@@ -89,6 +89,19 @@ describe('the wilds, eight kilometres across', () => {
     expect(performance.now() - t).toBeLessThan(500);
   });
 
+  it('a tap on ground that cannot be reached works out only a few new blocks, not the whole box (review item 12)', () => {
+    // A walled pen 6 m out on fresh ground: its middle is free but shut in.
+    const pen = [-3, 3].flatMap((d) => [{ kind: 'box', x: 6 + d, z: 0, hw: 0.3, hd: 3.3, rot: 0 } as const, { kind: 'box', x: 6, z: d, hw: 3.3, hd: 0.3, rot: 0 } as const]);
+    const grid = new NavGrid(2000, pen, { radius: 0.2 });
+    expect(grid.walkable(6, 0)).toBe(true);
+    const before = grid.blocksBuilt;
+    expect(findPath(grid, { x: 0, z: 0 }, { x: 6, z: 0 })).toBeNull();
+    expect(grid.blocksBuilt - before).toBeLessThanOrEqual(25); // (it was 120)
+    // A long walk on fresh, open ground is still found.
+    const open = new NavGrid(2000, [], { radius: 0.2 });
+    expect(findPath(open, { x: 0, z: 0 }, { x: 600, z: 40 })).not.toBeNull();
+  });
+
   it('the shape index finds what is near and forgets what is removed', () => {
     const ix = new ShapeIndex([], 8);
     const a = circle(100, 100, 1), b = circle(900, 900, 1);
