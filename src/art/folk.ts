@@ -1,3 +1,4 @@
+import type { Look } from '../core/persons';
 import { Rng } from '../core/rng';
 import { type Prop, capsule, column, pick, polyFill, selOutline, white } from './grit';
 import { Pix } from './pix';
@@ -444,3 +445,45 @@ export const FOLK: Record<string, FolkSpec> = {
     garment: 'tunic', top: CLOTH.grey, legs: CLOTH.brown, cloak: CLOTH.grey, right: 'staff',
   },
 };
+
+const BUILDS = ['lean', 'avg', 'stout', 'child'] as const;
+const STYLES: readonly HairStyle[] = ['short', 'long', 'bald', 'bun', 'kerchief', 'hat', 'helm', 'hood'];
+const GARMENTS: readonly Garment[] = ['shirt', 'tunic', 'dress', 'robe'];
+const HELD: readonly Held[] = ['hoe', 'staff', 'spear', 'hammer', 'basket', 'bucket', 'stick', 'none'];
+
+/** A person's look (`core/persons.ts`, names of ramps and parts) as a spec to draw. Throws for a name the art doesn't have. */
+export function folkOf(look: Look, seed: number): FolkSpec {
+  const ramp = (table: Record<string, Ramp>, name: string | undefined, what: string): Ramp | undefined => {
+    if (name === undefined) return undefined;
+    const r = table[name];
+    if (!r) throw new Error(`no ${what} called ${name}`);
+    return r;
+  };
+  const one = <T extends string>(list: readonly T[], name: string | undefined, what: string): T | undefined => {
+    if (name === undefined) return undefined;
+    if (!list.includes(name as T)) throw new Error(`no ${what} called ${name}`);
+    return name as T;
+  };
+  const beard = one(['full', 'stubble'] as const, look.beard, 'beard');
+  const sleeves = one(['long', 'rolled', 'short'] as const, look.sleeves, 'sleeves');
+  return {
+    seed,
+    build: one(BUILDS, look.build, 'build') ?? 'avg',
+    skin: ramp(SKIN, look.skin ?? 'fair', 'skin')!,
+    hair: ramp(HAIR, look.hair ?? 'brown', 'hair')!,
+    style: one(STYLES, look.style, 'hair style') ?? 'short',
+    garment: one(GARMENTS, look.garment, 'garment') ?? 'shirt',
+    top: ramp(CLOTH, look.top ?? 'linen', 'cloth')!,
+    legs: ramp(CLOTH, look.legs ?? 'brown', 'cloth')!,
+    ...(beard ? { beard } : {}),
+    ...(sleeves ? { sleeves } : {}),
+    ...(look.boots ? { boots: ramp(CLOTH, look.boots, 'cloth') } : {}),
+    ...(look.head ? { head: ramp(CLOTH, look.head, 'cloth') } : {}),
+    ...(look.apron ? { apron: ramp(CLOTH, look.apron, 'cloth') } : {}),
+    ...(look.vest ? { vest: ramp(CLOTH, look.vest, 'cloth') } : {}),
+    ...(look.cloak ? { cloak: ramp(CLOTH, look.cloak, 'cloth') } : {}),
+    ...(look.belt ? { belt: true } : {}),
+    ...(look.right ? { right: one(HELD, look.right, 'held thing') } : {}),
+    ...(look.left ? { left: one(HELD, look.left, 'held thing') } : {}),
+  };
+}

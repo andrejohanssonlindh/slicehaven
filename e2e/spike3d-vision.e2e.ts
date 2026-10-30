@@ -50,7 +50,7 @@ describe('spike3d vision and the explored map', () => {
     const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; return ${fn}; })()`);
     await w('(w.weather.setHour(0), w.weather.set("clear"), w.dayMinutes = 0, 0)');
     // Stand 42 m out in front of the door torch, facing it (the house is behind the torch, not in the way).
-    const torch = (await w('({ x: w.fires.find((f) => f.kind === "fire").x, z: w.fires.find((f) => f.kind === "fire").z })')) as { x: number; z: number };
+    const torch = (await w('(({ x, z }) => ({ x, z }))(w.layout.props.find((p) => p.kind === "walltorch"))')) as { x: number; z: number };
     // (The palisade across the village at z = 18 has one opening, the open gate at x = 4: look through it.)
     const gate = { x: 4, z: 18 };
     const gl = Math.hypot(gate.x - torch.x, gate.z - torch.z);

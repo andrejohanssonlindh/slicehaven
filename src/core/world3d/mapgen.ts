@@ -5,6 +5,7 @@ import type { House3DSpec, HousePlan, RoofKind, WallKind } from './house';
 import { type Layout, type PlacedHouse, type PlacedTree, buildHouses, houseOuterBox, houseToWorld, layoutObstacles, layoutPads, layoutShade } from './layout';
 import { type ChunkContent, type ChunkGenerator, PlacedIndex } from './placed';
 import { type PlacedProp } from './props';
+import type { PersonKinds, PersonSpec } from '../persons';
 import type { Things } from './things';
 import { NavGrid, type Shape, ShapeIndex, type ShapeSource, findPath, shapeDist } from './space';
 import { type Ground3D, type Road, type XZ, lakeDist, roadDist } from './terrain';
@@ -52,7 +53,22 @@ export interface MapHouse {
   seed?: number;
   /** A bigger building: the inn, the shop or the stable (they have their own size, and `size` is ignored). */
   plan?: HousePlan;
+  /** A torch on a bracket beside the door (a `walltorch`). */
+  torch?: boolean;
   at: HouseAt;
+}
+
+/** Someone who lives in the map: what kinds of person they are (`core/persons.ts`), and what they do all day. */
+export interface MapPerson extends PersonSpec {
+  id: string;
+  /** Walk a line there and back (points, or a stretch of a road, 0 to 1 along it, default 0.2 to 0.8), or go the rounds of a house. */
+  routine: { beat: XZ[] | { road: number; from?: number; to?: number } } | { rounds: string };
+}
+
+/** A person as the world gets them: a beat is points by now. */
+export interface CastMember extends PersonSpec {
+  id: string;
+  routine: { beat: XZ[] } | { rounds: string };
 }
 
 export type Area =
@@ -115,8 +131,8 @@ export interface MapSpec {
   torchLines?: { road: number; every: number; side: 'north' | 'south' | 'east' | 'west'; offset?: number }[];
   /** Where the hero starts: a spot, or in front of a house's door. */
   hero?: [number, number] | { house: string };
-  /** The villager's beat; by default along the first road. */
-  walk?: XZ[];
+  /** The people who live here. */
+  people?: MapPerson[];
 }
 
 export interface CompiledMap {
@@ -126,7 +142,7 @@ export interface CompiledMap {
   /** Trees, props and torch posts by chunk: the authored ones in `layout` plus whatever the map's `wild` makes. */
   placed: PlacedIndex;
   hero: [number, number];
-  walk: XZ[];
+  cast: CastMember[];
   /** Everything that did not work out: a thing that would not fit, a house in the lake, an unreachable door. Empty for a good map. */
   problems: string[];
 }
@@ -238,8 +254,11 @@ export function wildGenerator(w: WildSpec, ctx: WildContext): ChunkGenerator {
 
 // --- compiling -------------------------------------------------------------
 
-/** Compile a map. `things` is the kinds of thing (`content/things`): what every placed thing is. */
-export function compileMap(spec: MapSpec, things: Things): CompiledMap {
+/**
+ * Compile a map. `things` is the kinds of thing (`content/things`): what every placed thing is; `persons` the kinds of
+ * person (`content/people`), to check the cast by (without it the cast is taken as written).
+ */
+export function compileMap(spec: MapSpec, things: Things, persons?: PersonKinds): CompiledMap {
   const problems: string[] = [];
   const rng = Rng.fromSeed(spec.seed);
   const half = spec.size / 2;
@@ -338,6 +357,14 @@ export function compileMap(spec: MapSpec, things: Things): CompiledMap {
     if (got < sc.count) problems.push(`scatter ${sc.kind}: only room for ${got} of ${sc.count}`);
   }
 
+  // Torches beside doors (after the scatter, which keeps clear of the houses anyway).
+  spec.houses.forEach((h, i) => {
+    if (!h.torch) return;
+    const b = built[i], d = b.model.door;
+    const w = houseToWorld(b.place, d[0] + 0.95, d[2] + 0.25);
+    layout.props.push({ kind: 'walltorch', x: w.x, z: w.z, rot: b.place.rot, seed: layout.props.length });
+  });
+
   // Ground.
   const mud = [...(spec.mud ?? [])];
   if (spec.doorMud) {
@@ -367,14 +394,30 @@ export function compileMap(spec: MapSpec, things: Things): CompiledMap {
     hero = [p.x, p.z];
   }
 
-  // The villager's beat.
-  let walk: XZ[] = spec.walk ?? [];
-  if (!walk.length && spec.roads[0]) {
-    const r = spec.roads[0], len = roadLength(r);
-    walk = [0.2, 0.4, 0.6, 0.8].map((t) => {
-      const p = roadPoint(r, len * t);
-      return [p.x + p.tz * 0.6, p.z - p.tx * 0.6] as XZ;
-    });
+  // The people: a beat along a road becomes points just off its middle, and every person must be one the kinds know.
+  const cast: CastMember[] = [];
+  for (const p of spec.people ?? []) {
+    const bad = persons?.problem(p);
+    if (bad) problems.push(`person ${p.id}: ${bad}`);
+    if (cast.some((c) => c.id === p.id)) problems.push(`two people are called ${p.id}`);
+    const r = p.routine;
+    if ('rounds' in r) {
+      if (!spec.houses.some((h) => h.id === r.rounds)) problems.push(`person ${p.id}: no house ${r.rounds} to go the rounds of`);
+      cast.push({ ...p, routine: r });
+    } else if (Array.isArray(r.beat)) cast.push({ ...p, routine: { beat: r.beat } });
+    else {
+      const road = spec.roads[r.beat.road];
+      if (!road) {
+        problems.push(`person ${p.id}: no road ${r.beat.road}`);
+        continue;
+      }
+      const len = roadLength(road), from = r.beat.from ?? 0.2, to = r.beat.to ?? 0.8;
+      const beat = [0, 1, 2, 3].map((k) => {
+        const q = roadPoint(road, len * (from + ((to - from) * k) / 3));
+        return [q.x + q.tz * 0.6, q.z - q.tx * 0.6] as XZ;
+      });
+      cast.push({ ...p, routine: { beat } });
+    }
   }
 
   // The wilderness: made per chunk, kept off roads, water, houses and the hero's feet.
@@ -398,7 +441,7 @@ export function compileMap(spec: MapSpec, things: Things): CompiledMap {
   const index = new PlacedIndex(layout, things, generator);
   if (generator) ground.extraShade = (x, z) => index.shadeAt(x, z);
 
-  const compiled: CompiledMap = { name: spec.name, ground, layout, placed: index, hero, walk, problems };
+  const compiled: CompiledMap = { name: spec.name, ground, layout, placed: index, hero, cast, problems };
   problems.push(...validate(spec, compiled, things, built.map((b, i) => ({ id: b.place.id, box: boxes[i], door: houseToWorld(b.place, b.model.door[0], b.model.door[2] - 0.9) }))));
   return compiled;
 }

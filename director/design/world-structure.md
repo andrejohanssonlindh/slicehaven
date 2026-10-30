@@ -36,6 +36,7 @@ thing
 | The registry everything reads | `THINGS` in `src/content/things/index.ts` |
 | How the pieces are drawn (meshes, art) | Still shared builders: `core/world3d/props.ts`, `propsMore.ts`, `tree.ts`, and `art/`. A kind *points at* a builder; it never copies one. |
 | Tests every kind must pass | `tests/thing-kinds.test.ts` |
+| Kinds of person (people, callings), one file each; the rules | `src/content/people/kinds/*.ts`; `src/core/persons.ts` ([kinds of person](people-kinds.md)) |
 
 A kind is one object. The well, whole:
 ```ts
@@ -55,8 +56,8 @@ const well: ThingDef = {
 
 ## The plan, in order
 1. **Kinds of thing** for everything outdoors. ✅ *Done 2026-10-29*: all 25 props and the four trees, with inheritance, linked into the skill tree; the renderer, feet, sight, filaments and the map compiler all ask the kind (no more `if (kind === 'well')` anywhere). Maps that place a kind nobody defined are told so.
-2. **The rest of the world's things as kinds** (*✅ torch posts, campfires, all room furniture and the kinds of building are kinds as of 2026-10-30; only the door torch is left, with the cast, in step 3*): torch posts and campfires (a `fire` family), furniture (the room recipes keep their rules, the pieces become kinds: a bed, a hearth, a bookshelf that gives off meaning), and **kinds of building** (a house kind is a thing with storeys and rooms; this is review item 8, "plans as data").
-3. **Kinds of person**: a look, a routine (`Rounds` and its siblings), the people-library facets they carry, **and a place for a character sheet** (every living humanoid is a real person with real skills, enemies too; filling sheets is a larger item for later and needs planning, so step 3 builds only the basis). The cast of a map comes from its file (review item 9). Designed in [kinds of person](people-kinds.md).
+2. **The rest of the world's things as kinds** (*✅ done 2026-10-30: torch posts, campfires, all room furniture, the kinds of building, and the door torch (`walltorch`, put beside the door of a map house with `torch: true`)*): torch posts and campfires (a `fire` family), furniture (the room recipes keep their rules, the pieces become kinds: a bed, a hearth, a bookshelf that gives off meaning), and **kinds of building** (a house kind is a thing with storeys and rooms; this is review item 8, "plans as data").
+3. **Kinds of person** (*✅ basis built 2026-10-30: a person is a kind of their people and their calling at once (more dimensions later), the cast comes from the map; sheets are an empty slot*): a look, a routine (`Rounds` and its siblings), the people-library facets they carry, **and a place for a character sheet** (every living humanoid is a real person with real skills, enemies too; filling sheets is a larger item for later and needs planning, so step 3 builds only the basis). The cast of a map comes from its file (review item 9). Designed in [kinds of person](people-kinds.md).
 4. **Maps as files**: a map is a data file (JSON) that names kinds and places them; files dropped in the maps folder are found without a list to edit. The things that are code in maps today (Eastgate's loop, the wild map's "where") become rules the format understands ("a row of houses along road 0 from here to there, every 20 m").
 5. **Doing things to things**: tap a thing, see its look, use a skill on it. The kind (and its chain) says which hooks apply; the old gate scene's checks and outcomes come back here, without hexes.
 6. **Locations**: how maps join (exits, arrivals, a map's own weather and hour). A design question first: see `questions.md`.

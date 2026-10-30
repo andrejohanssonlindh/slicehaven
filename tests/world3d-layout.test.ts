@@ -65,7 +65,8 @@ describe('layout', () => {
   it('props stand on dry ground, off the road, clear of houses, and block feet', () => {
     const boxes = houses.map(houseOuterBox);
     const grid = new NavGrid(g.size, layoutObstacles(SPIKE_LAYOUT, houses, THINGS), { radius: 0.2 });
-    for (const p of SPIKE_LAYOUT.props) {
+    // (A thing with no footing hangs on something else, a torch on a house wall: it stands nowhere of its own.)
+    for (const p of SPIKE_LAYOUT.props.filter((q) => THINGS.get(q.kind).foot)) {
       const id = `${p.kind}@${p.x},${p.z}`;
       // (A bridge is the one thing that stands over water, and its walkway is open.)
       if (p.kind !== 'bridge') expect(lakeDist(g, p.x, p.z), id).toBeGreaterThan(1);
@@ -113,13 +114,13 @@ describe('layout', () => {
 describe('settlement props', () => {
   const at = (kind: string, extra: object = {}) => ({ kind, x: 5, z: 5, seed: 3, ...extra }) as PlacedProp;
 
-  it('every kind that draws builds the same twice, has geometry, and blocks feet', () => {
+  it('every kind that draws builds the same twice, has geometry, and blocks feet (unless it hangs on something)', () => {
     for (const k of THINGS.placeable.filter((k) => THINGS.get(k).draw)) {
       const a = THINGS.parts(at(k)), b = THINGS.parts(at(k));
       expect(JSON.stringify(a), k).toBe(JSON.stringify(b));
       expect(a.meshes.length + (a.lumps ? 1 : 0), k).toBeGreaterThan(0);
       for (const m of a.meshes) expect(m.mesh.indices.length, k).toBeGreaterThan(0);
-      expect(THINGS.shapes(at(k)).length, k).toBeGreaterThan(0);
+      if (THINGS.get(k).foot) expect(THINGS.shapes(at(k)).length, k).toBeGreaterThan(0);
     }
   });
 

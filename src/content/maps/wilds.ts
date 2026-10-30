@@ -6,7 +6,7 @@ import type { MapHouse, MapSpec } from '../../core/world3d/mapgen';
  * `/spike3d/?map=wilds`, set Walk ×3, and tap far down the road.
  */
 const HAMLET_ROOMS: Omit<MapHouse, 'at'>[] = [
-  { id: 'inn', room: 'inn', size: 'large', roof: 'tile' },
+  { id: 'inn', room: 'inn', size: 'large', roof: 'tile', torch: true },
   { id: 'bakery', room: 'bakery', size: 'medium', roof: 'shingle' },
   { id: 'smithy', room: 'smithy', size: 'medium', roof: 'shingle', walls: 'stone' },
   { id: 'store', room: 'general', size: 'medium', roof: 'thatch' },
@@ -74,4 +74,6 @@ export const WILDS_MAP: MapSpec = {
   // A few torch posts by the inn.
   torchLines: [],
   hero: { house: 'inn' },
+  // A villager walks the hamlet's stretch of the road.
+  people: [{ id: 'villager', is: ['human', 'job-miller'], seed: 2, routine: { beat: { road: 0, from: along(4150), to: along(4420) } } }],
 };

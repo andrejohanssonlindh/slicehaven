@@ -1,5 +1,13 @@
 # Devlog
 
+## 2026-10-30 — Kinds of person: their people and their calling at once
+
+- **The director's steer:** people are kinds of both their race and what they do, maybe more. So a person carries one line in each of the people library's trees, which come from the character creator: people (human › asharier), calling (merchant › job-innkeeper), faith, realm. `is: ['dwarf', 'job-innkeeper']` is a dwarf innkeeper; a dwarf *and* an elf is an error; no people given means human. [Kinds of person](design/people-kinds.md).
+- **Built:** `core/persons.ts` (`PersonKinds`), kinds in `content/people/kinds/` (bodies of the five peoples; farmer, miller, innkeeper clothes), `folkOf` turns a look into the folk art's spec. A kind's look can list choices; the person's seed picks.
+- **The cast comes from the map** (review item 9 ✅): `MapSpec.people` with a beat (points or a stretch of road) or the rounds of a house. The hamlet has its villager and an innkeeper on the inn's rounds; the wilds' villager now walks the hamlet's stretch, not 5 km of road. The walking line moved to core (`Beat`, `stepBeat`).
+- **The door torch is a kind** (`walltorch`, a fire on a bracket): a map house asks for one with `torch: true`, and it streams with its chunk like other props. Step 2 is done.
+- Sheets stay an empty slot, as asked. Not done: other people steering, routines beyond the two.
+
 ## 2026-10-30 — Step 3 designed: kinds of person, with their characters
 
 - Step 3 (kinds of person) **paused** at the director's request. My two drafts of a character-sheet design guessed at skills and levels and went too far, so [the page](design/people-kinds.md) now holds only what the director said: kinds of person inherit, a person is a named customisation of a kind, a sheet is something a kind has and is not populated yet; every living humanoid will be a real person with real skills; prefab kinds are not static (skills flagged higher or lower, some randomness, about five steps, unfixed). Binding sheets needs its own planning, later. Questions cleaned: Q22, Q23, Q24 and Q26 removed (answered, or recorded in the decisions); Q25 now notes the likely overworld.

@@ -6,10 +6,12 @@ import {
   barkTex, doorTex, floorTex, groundChunkPainter, leafTex, plasterTex, roofUnderTex, shingleTex, shutterTex, sodTex, stoneTex, thatchTex,
   tileTex, timberTex, windowGlowTex, windowTex,
 } from '../art/textures3d';
-import { PEOPLE } from '../content/village/folk';
+import { folkOf } from '../art/folk';
 import { mapNamed } from '../content/maps';
-import { streamingFilamentWorld } from '../content/spike3d';
-import type { CompiledMap } from '../core/world3d/mapgen';
+import { PERSON_KINDS } from '../content/people';
+import { HERO_PERSON, streamingFilamentWorld } from '../content/spike3d';
+import type { PersonSpec } from '../core/persons';
+import type { CastMember, CompiledMap } from '../core/world3d/mapgen';
 import type { AspectId, HexFilaments } from '../core/filaments';
 import { type FSource, FilamentField, HEARTH_FIRE, TORCH_FIRE } from '../core/world3d/filaments3d';
 import { CHUNK, type ChunkTerrain, TerrainStore, chunkKey, chunksNear } from '../core/world3d/chunks';
@@ -26,7 +28,7 @@ import { LAUNDRY_HANG, type PlacedProp } from '../core/world3d/props';
 import type { ThingMaterial } from '../core/world3d/things';
 import { THINGS } from '../content/things';
 import { cloudDrift, cloudThreshold } from '../core/world3d/sky';
-import { type Actor, type Rounds, Walking, keeperRounds, newActor, stepRounds } from '../core/world3d/actors';
+import { type Actor, type Beat, type Rounds, Walking, keeperRounds, newActor, stepBeat, stepRounds } from '../core/world3d/actors';
 import { NavGrid, type P2, type Shape, shapeDist } from '../core/world3d/space';
 import { type Ground3D, groundHeight, lakeDist, splatAt } from '../core/world3d/terrain';
 import { TEXELS_PER_M } from '../core/world3d/tiers';
@@ -92,11 +94,17 @@ interface CutPart {
 const HERO_SPEED = 1.6;
 
 /** Someone who goes from room to room of a house on every storey, by the stairs, and out again (see `core/world3d/actors.ts`). */
-interface Keeper {
-  rounds: Rounds;
+/** Someone from the map's cast, on screen: their card, and the routine they walk (a round waits for its house to stand). */
+interface CastCard {
+  who: CastMember;
   card: WalkCard;
   blob: THREE.Mesh;
+  beat: Beat | null;
+  rounds: Rounds | null;
 }
+
+/** A person's walking card, drawn from their kinds. */
+const personCard = (p: PersonSpec): WalkCard => walkCard(makeWalkSet(folkOf(PERSON_KINDS.resolve(p).look, p.seed ?? 1)), PITCH);
 /** How far the ray of light reaches, metres. */
 const RAY_LENGTH = 9;
 
@@ -413,18 +421,13 @@ export class SpikeWorld {
    * between them and the camera; leave it off for someone who should stay hidden.
    */
   readonly people: Person[] = [];
-  private walker: WalkCard;
-  private walkerBlob: THREE.Mesh;
-  /** The innkeeper: goes about the inn's floors by the stairs (see `stepKeeper`). */
-  private keeper: Keeper | null = null;
-  private walkS = 0;
+  /** The map's people, each walking their routine (see `stepCast`). */
+  private cast: CastCard[] = [];
   private sprites: SpriteCard[] = [];
   /** The invisible navigation grid the hero walks on. */
   readonly nav: NavGrid;
   /** The hero: where they stand (metres), the house and storey they are on, the walk in hand. */
   readonly hero: Actor = newActor(0, 0);
-  /** The villager's beat (metres), there and back. */
-  private walkPts: [number, number][] = [];
   readonly heroCard!: WalkCard;
   private heroBlob!: THREE.Mesh;
   /** The keys: how far right and how far up the screen the hero is being steered (-1..1 each). Set by the page. */
@@ -466,14 +469,13 @@ export class SpikeWorld {
   private cloudOff = new THREE.Vector2();
   settings: WorldSettings;
 
-  constructor(settings: WorldSettings, grassCount: number, map: Pick<CompiledMap, 'ground' | 'layout' | 'hero' | 'walk'> & Partial<Pick<CompiledMap, 'placed'>> = mapNamed('spike')) {
+  constructor(settings: WorldSettings, grassCount: number, map: Pick<CompiledMap, 'ground' | 'layout' | 'hero' | 'cast'> & Partial<Pick<CompiledMap, 'placed'>> = mapNamed('spike')) {
     this.settings = settings;
     const { ground, layout } = map;
     const g = ground;
     this.ground = ground;
     this.hero.x = map.hero[0];
     this.hero.z = map.hero[1];
-    this.walkPts = map.walk;
     this.focus.set(map.hero[0], 0.5, map.hero[1]);
     this.store = new TerrainStore(ground, 0.5);
     this.grassCount = grassCount;
@@ -538,19 +540,22 @@ export class SpikeWorld {
     // Water and torches; trees, props and torch posts stand up as their chunk streams in (see `fillChunk`).
     this.water = makeWater(g);
     if (this.water) this.scene.add(this.water.mesh);
-    this.buildTorches();
     this.scene.add(this.rain.lines);
     this.scene.add(this.smoke.mesh);
     this.scene.add(this.rain.splashes);
     this.scene.add(this.leaves.mesh);
 
-    this.walker = walkCard(makeWalkSet(PEOPLE.baker), PITCH);
-    this.people.push({ id: 'villager', card: this.walker, reveals: true });
-    this.walkerBlob = blobShadow(0.32);
-    this.scene.add(this.walker.mesh, this.walkerBlob);
-    this.sprites.push(this.walker);
-    // The hero: the farmer by the door. Tap the ground and they walk there.
-    this.heroCard = walkCard(makeWalkSet(PEOPLE.farmer), PITCH);
+    // The map's people. Those who go the rounds of a house start when it first stands (see `stepCast`).
+    for (const who of map.cast) {
+      const card = personCard(who), blob = blobShadow(0.32);
+      const r = who.routine;
+      this.cast.push({ who, card, blob, beat: 'beat' in r ? { pts: r.beat, s: 0 } : null, rounds: null });
+      this.people.push({ id: who.id, card, reveals: true });
+      this.scene.add(card.mesh, blob);
+      this.sprites.push(card);
+    }
+    // The hero. Tap the ground and they walk there.
+    this.heroCard = personCard(HERO_PERSON);
     this.people.push({ id: 'hero', card: this.heroCard, reveals: true });
     this.heroBlob = blobShadow(0.32);
     this.heroCard.mesh.rotation.y = YAW;
@@ -1159,7 +1164,7 @@ export class SpikeWorld {
     this.field.setConditions({ env: this.weather.env(), isClouded: (x, z) => env.cloudShadow(x, z) > 0.5, sunDir: env.sunDir });
     this.field.setMovers([
       { x: this.hero.x, z: this.hero.z, kind: 'friend' },
-      { x: this.walker.mesh.position.x, z: this.walker.mesh.position.z, kind: 'friend' },
+      ...this.cast.filter((c) => c.beat || c.rounds).map((c) => ({ x: c.card.mesh.position.x, z: c.card.mesh.position.z, kind: 'friend' as const })),
       ...this.magicLightSources(),
     ]);
   }
@@ -1183,17 +1188,6 @@ export class SpikeWorld {
   }
 
   private grassShare = 1;
-
-  private buildTorches(): void {
-    // On a bracket beside the first house's door.
-    const place = this.layout.houses[0];
-    if (!place) return;
-    const { built } = this.houseIndex.lite(place);
-    const d = built.model.door;
-    const w = houseToWorld(place, d[0] + 0.95, d[2] + 0.25);
-    this.placeTorch(w.x, groundHeight(this.ground, place.x, place.z) - 0.05 + built.model.floorY + 1.85, w.z, null);
-    this.fires.push({ x: w.x, z: w.z, kind: 'fire', weight: TORCH_FIRE });
-  }
 
   /** A flame with its light (on a bracket, or on a thing that carries one); into `st` when it belongs to a chunk. */
   private placeTorch(x: number, y: number, z: number, st: Standing | null, look: { size?: number; count?: number; power?: number; lightY?: number } = {}): void {
@@ -1879,14 +1873,8 @@ export class SpikeWorld {
       WORLD.uSight.value.set(this.facing, sp.fov / 2, sp.edge, sp.near);
       WORLD.uSightBack.value = sp.back;
       this.stepExplored();
-      // People out of sight are not drawn.
-      const out = this.seen(this.walker.mesh.position.x, this.walker.mesh.position.z) < 0.25;
-      this.walker.mesh.visible = !out;
-      this.walkerBlob.visible = !out;
     } else {
       WORLD.uVision.value.set(0, 0, 0, 0);
-      this.walker.mesh.visible = true;
-      this.walkerBlob.visible = true;
     }
 
     // World uniforms: time, clouds, wetness, wind.
@@ -1939,9 +1927,7 @@ export class SpikeWorld {
     }
     for (const s of this.shells) s.mesh.visible = s.layer <= this.settings.shells && (!s.cutOf || s.cutOf.cutT < 0.3);
 
-    // The villager walks the road, there and back.
-    this.walkVillager(dt);
-    this.stepKeeper(dt);
+    this.stepCast(dt);
     this.stepHero(dt);
     this.focus.y = 0.5 + this.focusLift;
     if (this.follow) {
@@ -2002,57 +1988,46 @@ export class SpikeWorld {
   }
 
   /**
-   * The innkeeper: the first house with a stair. They go to the middle of each storey's last room, up to the top, and
-   * back down and out to the door, and again. Only seen when the hero could see them: outdoors, or in the same house
-   * on the same storey.
+   * The map's people walk their routines (`core/world3d/actors.ts`): a beat along the road, there and back, or the
+   * rounds of a house (the middle of each storey's last room, up to the top, back down and out to the door). Someone
+   * is drawn only when the hero could see them: outdoors by sight, or in the same house on the same storey. A round
+   * waits while its house is not standing.
    */
-  private stepKeeper(dt: number): void {
-    if (!this.keeper) {
-      const place = this.layout.houses.find((h) => this.houseIndex.lite(h).built.model.stairs.length > 0);
-      if (!place) return;
-      const card = walkCard(makeWalkSet(PEOPLE.wife), PITCH);
-      const blob = blobShadow(0.32);
-      this.scene.add(card.mesh, blob);
-      this.sprites.push(card);
-      this.keeper = { rounds: keeperRounds(this.houseIndex.lite(place).built), card, blob };
+  private stepCast(dt: number): void {
+    const sees = (x: number, z: number): boolean => this.vision.outer <= 0 || this.seen(x, z) >= 0.25;
+    for (const c of this.cast) {
+      let x: number, y: number, z: number, shown: boolean;
+      if (c.beat) {
+        const at = stepBeat(c.beat, dt);
+        if (!at) continue;
+        ({ x, z } = at);
+        y = this.store.heightAt(x, z);
+        this.faceWalker(c.card, at.dx, at.dz, true, 1.1);
+        shown = sees(x, z);
+      } else {
+        const id = (c.who.routine as { rounds: string }).rounds;
+        const hs = this.standingOf(id);
+        if (hs && !c.rounds) {
+          const place = this.houseIndex.byId(id);
+          if (place) c.rounds = keeperRounds(this.houseIndex.lite(place).built);
+        }
+        if (!hs || !c.rounds) {
+          c.card.mesh.visible = c.blob.visible = false;
+          continue;
+        }
+        const r = c.rounds, a = r.actor;
+        const pose = stepRounds(this.moves, r, dt);
+        x = a.x;
+        z = a.z;
+        y = this.footY(a);
+        this.faceWalker(c.card, pose.dx, pose.dz, pose.moving, 1.1);
+        // (Indoors the roof is lifted only while the hero is in there, on the storey they look at.)
+        shown = a.house === r.house ? hs.open && hs.view === a.level : sees(x, z);
+      }
+      c.card.mesh.position.set(x, y, z);
+      c.blob.position.set(x, y + 0.03, z);
+      c.card.mesh.visible = c.blob.visible = shown;
     }
-    const k = this.keeper, r = k.rounds, a = r.actor;
-    const hs = this.standingOf(r.house);
-    // Out of sight is out of mind: the house is not standing, so the keeper waits.
-    if (!hs) {
-      k.card.mesh.visible = false;
-      k.blob.visible = false;
-      return;
-    }
-    const pose = stepRounds(this.moves, r, dt);
-    const y = this.footY(a);
-    k.card.mesh.position.set(a.x, y, a.z);
-    k.blob.position.set(a.x, y + 0.03, a.z);
-    this.faceWalker(k.card, pose.dx, pose.dz, pose.moving, 1.1);
-    // Seen outdoors (by sight), or when the hero is in the same house on the same storey (the roof is lifted there).
-    const shown = a.house === r.house ? hs.open && hs.view === a.level : this.seen(a.x, a.z) >= 0.25;
-    k.card.mesh.visible = shown;
-    k.blob.visible = shown;
-  }
-
-  private walkVillager(dt: number): void {
-    const pts = this.walkPts;
-    if (pts.length < 2) return;
-    const lens = pts.slice(1).map((p, i) => Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]));
-    const total = lens.reduce((a, b) => a + b, 0);
-    this.walkS = (this.walkS + dt * 1.1) % (total * 2);
-    const back = this.walkS > total;
-    let s = back ? total * 2 - this.walkS : this.walkS;
-    let i = 0;
-    while (i < lens.length - 1 && s > lens[i]) s -= lens[i++];
-    const a = pts[i], b = pts[i + 1], k = s / lens[i];
-    const x = a[0] + (b[0] - a[0]) * k, z = a[1] + (b[1] - a[1]) * k;
-    const y = this.store.heightAt(x, z);
-    const m = this.walker.mesh;
-    m.position.set(x, y, z);
-    const dirX = (b[0] - a[0]) * (back ? -1 : 1), dirZ = (b[1] - a[1]) * (back ? -1 : 1);
-    this.faceWalker(this.walker, dirX, dirZ, true, 1.1);
-    this.walkerBlob.position.set(x, y + 0.03, z);
   }
 }
 

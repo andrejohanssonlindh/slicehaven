@@ -1,3 +1,4 @@
+import type { PersonSpec } from '../core/persons';
 import type { FSource, FilamentWorld, Ground } from '../core/world3d/filaments3d';
 import { type BuiltHouse, type Layout, houseOuterBox, treeProp } from '../core/world3d/layout';
 import type { PlacedIndex } from '../core/world3d/placed';
@@ -20,9 +21,13 @@ export const SPIKE_LAYOUT: Layout = SPIKE.layout;
 export const SPIKE_GROUND: Ground3D = SPIKE.ground;
 export const SPIKE_HOUSE = SPIKE_LAYOUT.houses[0];
 export const SPIKE_TREE = SPIKE_LAYOUT.trees[0];
-export const SPIKE_WALK = SPIKE.walk;
+/** The villager's beat on the spike. */
+export const SPIKE_WALK = SPIKE.cast.flatMap((c) => ('beat' in c.routine ? c.routine.beat : []));
 /** Where the hero starts: by the first door, on the mud. */
 export const SPIKE_HERO = SPIKE.hero;
+
+/** Who the hero is, until they are the player's own character from the creator: a farmer, as the spike always had. */
+export const HERO_PERSON: PersonSpec = { is: ['human', 'job-farmer'], seed: 1, look: { build: 'avg', skin: 'tan', hair: 'brown', beard: 'stubble' } };
 
 /** How near a house a place is still among homes, metres. */
 const SETTLED = 8;

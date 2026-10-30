@@ -18,7 +18,7 @@ export const HAMLET_MAP: MapSpec = {
   lake: { x: -38, z: 36, r: 15 },
   doorMud: true,
   houses: [
-    { id: 'inn', room: 'inn', plan: 'inn', roof: 'tile', at: { road: 0, t: 0.5, side: 'north' } },
+    { id: 'inn', room: 'inn', plan: 'inn', roof: 'tile', torch: true, at: { road: 0, t: 0.5, side: 'north' } },
     { id: 'bakery', room: 'bakery', size: 'medium', roof: 'shingle', at: { road: 0, t: 0.38, side: 'north' } },
     { id: 'smithy', room: 'smithy', size: 'medium', roof: 'shingle', walls: 'stone', at: { road: 0, t: 0.63, side: 'north' } },
     { id: 'store', room: 'general', plan: 'shop', roof: 'shingle', at: { road: 0, t: 0.27, side: 'north' } },
@@ -39,4 +39,8 @@ export const HAMLET_MAP: MapSpec = {
   ],
   torchLines: [{ road: 0, every: 14, side: 'south', offset: 1.1 }],
   hero: { house: 'inn' },
+  people: [
+    { id: 'villager', is: ['human', 'job-miller'], seed: 2, routine: { beat: { road: 0 } } },
+    { id: 'keeper', is: ['human', 'job-innkeeper'], seed: 6, routine: { rounds: 'inn' } },
+  ],
 };

@@ -35,6 +35,7 @@ Read only the handover for the area you're asked about; don't read the whole `di
 | Character creator | `/chargen/` | `director/design/character-creator.md` | `src/core/chargen`, `src/content/chargen`, `src/chargen` |
 | Gate scene rules (data for the skill map; its hex page is gone) | | `director/archive/exploration-scenes.md` | `src/core/scene.ts`, `src/content/scenes` |
 | **3D world (current focus, three.js)** | `/spike3d/` | `director/design/world-structure.md`, then `world3d-handover.md` (then `world3d-m0.md`, `voxel-engine-brief.md`), and the open items in `director/design/review-2026-10-29.md` | `src/core/world3d`, `src/engine3d`, `src/art/textures3d.ts`, `src/content/spike3d.ts`, `src/content/maps`, `src/content/furnish.ts`, `src/spike3d` |
+| Kinds of person (people × calling × …), the map's cast | | `director/design/people-kinds.md` | `src/core/persons.ts`, `src/content/people/kinds`, `MapSpec.people` in `src/core/world3d/mapgen.ts` |
 | Magic | | `director/design/magic-filaments.md`, `magic-on-map.md` | `src/core/filaments.ts` (rules), `src/core/world3d/filaments3d.ts` (field) |
 
 The deeper designs (`skill-web.md`, `people-library.md`, `ways-of-use.md`) are for when you change the shape, not for every task. Debug hook: `window.spike` (see the 3D handover).

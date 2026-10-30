@@ -1,4 +1,5 @@
 import { type CompiledMap, type MapSpec, compileMap } from '../../core/world3d/mapgen';
+import { PERSON_KINDS } from '../people';
 import { THINGS } from '../things';
 import { HAMLET_MAP } from './hamlet';
 import { SPIKE_MAP } from './spike';
@@ -13,13 +14,13 @@ export const MAPS: Record<string, MapSpec> = {
 
 const compiled = new Map<string, CompiledMap>();
 
-/** The compiled map (cached): ground, layout, hero start, the villager's beat, and any problems. */
+/** The compiled map (cached): ground, layout, hero start, the people, and any problems. */
 export function mapNamed(name: string): CompiledMap {
   let c = compiled.get(name);
   if (!c) {
     const spec = MAPS[name];
     if (!spec) throw new Error(`no map called ${name}`);
-    compiled.set(name, (c = compileMap(spec, THINGS)));
+    compiled.set(name, (c = compileMap(spec, THINGS, PERSON_KINDS)));
   }
   return c;
 }

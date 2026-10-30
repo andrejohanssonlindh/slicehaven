@@ -19,7 +19,7 @@ export const SPIKE_MAP: MapSpec = {
     { x: 15, z: 0.4, r: 2 },
   ],
   houses: [
-    { id: 'home', at: { x: 0, z: -2.5, rot: 0.08 }, size: { width: 6.2, depth: 4.6 }, seed: 7, wallH: 2.5, roof: 'thatch' },
+    { id: 'home', at: { x: 0, z: -2.5, rot: 0.08 }, size: { width: 6.2, depth: 4.6 }, seed: 7, wallH: 2.5, roof: 'thatch', torch: true },
     { id: 'west', at: { x: -22, z: -0.5, rot: -0.05 }, room: 'herbalist', size: { width: 5.4, depth: 4.2 }, seed: 12, wallH: 2.4, roof: 'shingle' },
     { id: 'east', at: { x: 15, z: -3.5, rot: 0.14 }, room: 'weaver', size: { width: 5, depth: 4 }, seed: 21, wallH: 2.4, roof: 'sod' },
     { id: 'far', at: { x: 25, z: -1, rot: -0.1 }, room: 'inn', size: { width: 7.4, depth: 5 }, seed: 33, wallH: 2.6, roof: 'tile' },
@@ -84,5 +84,7 @@ export const SPIKE_MAP: MapSpec = {
     { kind: 'bridge', x: 8, z: -17.5, rot: -1.35, len: 5, seed: 47 },
   ],
   hero: [2.4, 1.2],
-  walk: [[-12, 5.6], [-3, 5.0], [6, 5.8], [12, 4.8]],
+  people: [
+    { id: 'villager', is: ['human', 'job-miller'], seed: 2, routine: { beat: [[-12, 5.6], [-3, 5.0], [6, 5.8], [12, 4.8]] } },
+  ],
 };

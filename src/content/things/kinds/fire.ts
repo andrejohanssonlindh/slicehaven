@@ -4,6 +4,7 @@ import type { ThingDef } from '../../../core/world3d/things';
 import { solid } from '../parts';
 
 const POST_HEIGHT = 1.9;
+const BRACKET_HEIGHT = 2.25;
 
 /** Things that burn on purpose. `fire` is also a kind in the skill library, so its hooks reach every flame below. */
 const things: ThingDef[] = [
@@ -18,6 +19,20 @@ const things: ThingDef[] = [
     draw: () => {
       const m = emptyMesh();
       addBox(m, [-0.07, 0, -0.07], [0.07, POST_HEIGHT, 0.07]);
+      return solid('plank', m);
+    },
+  },
+  {
+    id: 'walltorch',
+    is: 'fire',
+    look: 'A torch in an iron bracket beside the door.',
+    // On the wall, out of the way of feet. Its flame is as high as a hand can reach from the floor (the floor stands on a footing).
+    filament: { kind: 'fire', weight: TORCH_FIRE },
+    flame: { y: BRACKET_HEIGHT },
+    draw: () => {
+      const m = emptyMesh();
+      addBox(m, [-0.03, BRACKET_HEIGHT - 0.32, -0.12], [0.03, BRACKET_HEIGHT - 0.26, 0.04]);
+      addBox(m, [-0.035, BRACKET_HEIGHT - 0.3, -0.035], [0.035, BRACKET_HEIGHT, 0.035]);
       return solid('plank', m);
     },
   },
