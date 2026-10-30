@@ -2,7 +2,7 @@
 
 ## 2026-10-30 — Step 3 designed: kinds of person, with their characters
 
-- [Kinds of person](design/people-kinds.md): three layers (kind of person, the person in a map, their character). The character is the creator's `CharState` + `derive()`, so facets, look and name come from it rather than from separate tags. Most people's characters are made headlessly from kind + seed + id and only when looked at; the hero's is the creator's save. Build order in the page; decision logged, Q26 asked (default proceeds).
+- [Kinds of person](design/people-kinds.md): three layers (kind of person, the person in a map, their sheet). **Revised after the director's correction: sheets are authored and composed, not generated.** Reusable templates (innkeeper, guard, bandit, wolf) inherit down a tree; a sheet is people + template chain + grade + the person's own changes, with no dice; variation is opt-in per person. Enemies use the same pipeline (grade = threat). The creator's 100 callings give first drafts of templates. Facets, look and name come from the sheet. Decision logged; Q26 holds three small choices with defaults.
 
 ## 2026-10-29 — Plan step 2 begins: the torch post is a kind of fire
 

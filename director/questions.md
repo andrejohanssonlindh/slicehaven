@@ -4,8 +4,11 @@ Newest on top. Answer in chat (just reference the number, e.g. "Q11: option B").
 
 ---
 
-### Q26 — How much character does a passer-by get? *(open; I'm proceeding with my lean)*
-Design: [kinds of person](design/people-kinds.md). Every person points at a character, race to skills. For the hero it is the creator's save. For everyone else I would **make the full sheet from their kind, the map's seed and their id, only when someone looks at, talks to or rolls against them**: always the same person, nothing stored, cheap for a crowd. A story character who must be exactly so can carry their own saved sheet instead. Alternatives: (a) full sheets for named people only and a short card (people, calling, three skills) for the crowd; (b) every person pre-made when the map loads. Say if you want (a) or (b); otherwise I build the on-demand version.
+### Q26 — Templates for sheets: three small choices *(open; defaults below let me start; the big one is answered: authored, not rolled)*
+Design: [kinds of person](design/people-kinds.md). Answered by the director: sheets are **authored and composed** (an innkeeper skill set, a guard skill set, the same for enemies), never random unless a person is marked `vary`. What is left, with my defaults:
+1. **Grades.** One template at `apprentice` / `journeyman` / `master` (a fixed step on its few *core* skills) also serves as enemy tiers. OK, or do you want a finer scale, or each tier written out by hand?
+2. **Starting from the creator's 100 callings.** A helper drafts a template from a background's skill grants (Innkeeper: Cooking 4, Well-fed 4, Welcoming smile 4), and I then edit the files by hand, adding what our world needs. OK, or should templates be written from scratch only?
+3. **Crowds.** For market-day passers-by only, `vary` gives names, looks and ±1 on non-core skills from a hash of their id (the same every time). OK, or no variation at all?
 
 ### Q25 — How do maps join up? *(open, no rush: needed before step 6 of [the world structure](design/world-structure.md))*
 Today one map is loaded per page (`?map=hamlet`). Once maps are files, the game needs to know how you get from one to another. Options, any mix:

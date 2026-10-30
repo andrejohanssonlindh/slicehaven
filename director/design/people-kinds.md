@@ -1,70 +1,89 @@
 # Kinds of person, and the character behind each one
 
-*2026-10-30. Step 3 of [the world structure](world-structure.md). The director's ask: a kind of person must also point at that person's **character**, "everything from race to skills". This page is the design; nothing is built yet.*
+*2026-10-30, revised the same day after the director's correction: characters are **authored and composed, not rolled**. Step 3 of [the world structure](world-structure.md). Nothing here is built yet.*
 
-## Three layers, so each says one thing
+## The correction, in one line
+A character is never "generated" by dice unless someone asks for it. An innkeeper has an **innkeeper skill set**, written down once, and every innkeeper gets it. The same goes for guards, bandits and wolves: **enemies have character sheets too, made the same way**. So the strategy is not a generator but a **library of reusable, named pieces that are combined on purpose**.
+
+## Three layers
 | Layer | What it is | Where | Example |
 |---|---|---|---|
-| **Kind of person** | What *sort* of person: how they look in general, what they do all day, which facets (`job-innkeeper`, `martial`) they usually carry, and how to make a character for one | `content/things/kinds/people.ts` (a kind of thing, like a well) | `innkeeper`, `villager`, `guard`, `horse` |
-| **Person** | One individual in a map: a kind, a name, a home, and a **character** | the map file (`people: [...]`) | "Mara, the innkeeper of the Ferry Inn" |
-| **Character** | The full sheet: people (race), homeland, religion, background, archetype, attributes, every skill, languages, drives, details | `CharState` (the decisions) → `derive()` (everything else), already built for the creator | Mara's sheet |
+| **Kind of person** | What sort of person: how they look in general, what they do all day, and which **template** gives them their sheet | `content/things/kinds/people.ts` (a kind of thing, like a well) | `innkeeper`, `guard`, `bandit`, `wolf` |
+| **Person** | One individual placed in a map: a kind, a name, a home, optional changes to the sheet | the map file (`people: [...]`) | "Mara, the innkeeper of the Ferry Inn" |
+| **Sheet** | The character as the world reads it: people (race), homeland, religion, background, age, gender, attributes, every skill's value, languages, marks, gear, drives, details | plain data, `core/characters/sheet.ts` | Mara's sheet |
 
-The hero is a person like the rest: their character is the one made in the creator (`/chargen/`) and saved in the browser.
+The **hero** is a person like the rest. Their sheet comes from the creator: `sheetOf(derive(state))`. So everything that reads a sheet (rolls, facets, the tap-to-inspect panel, fights) reads one shape, whoever it belongs to.
 
-## What a kind of person says
+## Where a sheet comes from: templates, composed
+A **template** is a reusable named piece of sheet, one small file each in `content/characters/templates/`, inheriting down a tree exactly as kinds of thing do ("a guard is a kind of fighter"):
+
 ```ts
-const innkeeper: PersonDef = {
+const innkeeper: Template = {
   id: 'innkeeper',
-  is: 'villager',                       // down the kind tree, inheriting
-  look: 'A broad, busy innkeeper.',
-  figure: { ... },                      // how to draw them (a recipe for the walk set), refined by the character
-  routine: 'keeper-rounds',             // a Rounds kind: what they do all day
-  facets: ['job-innkeeper'],            // the people-library tags this kind carries by default
-  character: {                          // how to make a character for one (a CharSpec)
-    background: 'Värdshusvärd',         // fixed where the kind insists...
-    people: { human: 0.8, dwarf: 0.1 }, // ...weighted where it allows variation
-    homeland: 'near',                   // 'near' = one of the map's own
-    skills: ['E:Argumentera', 'H:Bryggning'],  // emphasis: these end up high
+  is: 'tradesperson',
+  background: 'Krögare',                         // the creator's own calling, for its facet (job-innkeeper) and wording
+  skills: {                                      // the innkeeper skill set: value of each at a journeyman
+    'H:Kock': 4, 'K:Välgödd': 4, 'K:Välkomnande leende': 4, 'E:Argumentera': 3, 'E:Räkna': 3, ...
   },
+  core: ['H:Kock', 'K:Välkomnande leende', 'E:Argumentera'],   // what "master" and "apprentice" move
+  languages: { spoken: ['common'] },
 };
 ```
-Like every kind, it says only what differs from its parent. `villager` says "ordinary adult, a round of the village"; a `guard` is a kind of villager with `martial`, a sword and a post.
+A **sheet** is then `buildSheet(spec)`, a plain function with no dice:
 
-## The character is what everything else reads
-One source of truth, **derived, not copied**:
-- **Facets** (what the people library's leanings read) come from the character: its people gives `peopleFacet`, homeland the realm, religion the faith, background the `job-…` facet (`backgroundFacet`). The kind's `facets` are only the defaults for a character not yet made. No hand-written tags to keep in step.
-- **Look**: the figure takes people (race), age and gender from the character; the kind adds the clothes and tools.
-- **Skills and attributes** feed rolls against them (a guard's Perception when you sneak, an innkeeper's Argumentera when you haggle) and what they can do (a healer who can heal).
-- **Languages** decide whom they can talk to; **drives** decide what they want; **details** (name, age, family, story) are what you read when you tap them.
+`sheet = people's base + template chain (parents first) + grade + the person's own changes`
 
-## Making a character without a player
-Only the hero is chosen by hand. For everyone else the character is **made from the kind's `CharSpec`, the map's seed and the person's id**: the same person every time, no storage. It needs a *headless* version of the creator: take the decisions it would ask for, answer them from the spec where fixed and from the dice (`core/rng.ts`) where open, and hand back a `CharState` that `derive()` accepts. The creator already has the tables and rules; this is "play it through by itself" (`core/chargen/make.ts`, new).
+- **People** (race): the base attributes and traits of the people (the creator's `peoples.ts`), so a dwarf innkeeper is a dwarf.
+- **Template chain**: `tradesperson` → `innkeeper`; each adds or raises skills, languages, gear. A later piece wins over an earlier one for the same skill.
+- **Grade** (`apprentice`, `journeyman`, `master`; default journeyman): moves the template's `core` skills by a fixed step (−1, 0, +1 or +2). Not random: Mara is a master, her cousin's tavern has an apprentice.
+- **The person's own changes** (`sheet: { skills: {'E:Gyckla': 3}, name: 'Mara' }`): for the named and the special. A story character can be a template plus a dozen overrides, or a **fully written sheet** in `content/characters/people/` with no template at all.
 
-**Characters are made when looked at**, not when the map loads: a map of a thousand people is a thousand specs, and a sheet is worked out the first time someone taps one, talks to them or rolls against them (then kept while they are near, like furnished rooms). This keeps "nothing is sized by the world" true. The cost to check: how long one headless character takes (a test will measure it).
+### Variation is opt-in, never a default
+Three ways to differ, in order of how often they should be used:
+1. **Authored** (default): the sheet is exactly what the files say. Same every time, by design.
+2. **Grade and small changes**: an explicit field in the map.
+3. **Seeded variation, only if a person says `vary`**: for crowds (market-day passers-by): names from the name tables, looks, ±1 on non-core skills, from a hash of the person's id. Deterministic too, so there is no save to keep, but it is a choice made for that person, never for a named one.
 
-A person may also carry their own `CharState` inline or a saved id (for a named story character who must be exactly so); then nothing is generated.
+## Enemies are people with a different template
+A bandit, a wolf, a wight: a **kind of person** (or creature) that names a template, same as an innkeeper.
 
-## The person in a map
-```ts
-people: [
-  { id: 'mara', kind: 'innkeeper', name: 'Mara', home: 'inn' },        // character made from the kind
-  { id: 'tomas', kind: 'guard', home: 'gate', post: { x: 4, z: 17 } },  // a different routine anchor
-  { id: 'hero', kind: 'hero', character: { saved: 'c1x9f' } },          // the creator's save
-]
-```
-This replaces what is hard-wired in `SpikeWorld` today (the hero's and the villager's looks, the keeper as "first house with a stair", the villager's beat, the door torch on `houses[0]`): review item 9.
+- Fighting templates are the same kind of file: `fighter` → `bandit` → `bandit-archer`, `brute`, `veteran`.
+- **Threat** is the grade: the same `bandit` template at `apprentice`, `journeyman` or `master` is three tiers of enemy, so encounters scale without writing new sheets.
+- Creatures that the creator cannot make (a wolf, a wight) need things it does not have: natural attacks, hide, a different set of attributes. The sheet has an optional `natural` block (attack damage, armour, speed) for those, filled by the template. Animals get a smaller sheet; how fights read it is decided when fights are built (this design only reserves the place).
+- **Wounds, fatigue, mood and where they are** are the person's *state*, not the sheet. A bandit that is hurt is the same sheet with more damage on the person.
+
+## The creator is the source of the starting sets
+The creator already carries the tabletop's own professions: a background such as **Innkeeper (Krögare)** grants `H:Kock 4, K:Välgödd 4, K:Välkomnande leende 4`. We use those as **starting points, not as the answer**:
+- A helper `templateFromBackground(id)` writes the first draft of a template from a background's grants (and its facet), so the 100 callings are a quick start.
+- The authored template file then **replaces** the draft: add the skills an innkeeper in *our* world needs, remove what does not suit. Authored always wins.
+- A template may also borrow from an **archetype** (the creator's life paths), when it fits.
+
+## What reads the sheet
+One source of truth, derived and never copied:
+- **Facets** (what the people library's leanings read) come from the sheet: people → `peopleFacet`, homeland → the realm, religion → the faith, background → the `job-…` facet. The kind's own facets are only extras (`on duty`, `drunk`). No hand-written tags to keep in step.
+- **Look**: the figure takes people, age and gender from the sheet; the kind adds clothes and tools.
+- **Rolls against them and by them**: skills and attributes. **Talk**: languages. **Wants**: drives. **Tap**: name, people, calling, best skills, story.
+
+## Checks that keep the library honest (tests)
+- Every skill id in a template exists in the skill library; every value is within the creator's limits.
+- Templates form a tree with no loops, and each chain ends at a root.
+- **Cost report**: each template's skills are priced in the creator's own units, so an enemy or an NPC can be compared with what a player of the same standing would have. It is a report, not a rule: the director can decide a master is worth more than the creator would allow.
+- Same spec → byte-identical sheet.
 
 ## Build order (each step small, tested, pushed)
-1. **Kinds of person**: `PersonDef`/`Things` carry `figure`, `routine`, `facets`, `character`; people kinds as files (`villager`, `innkeeper`, `guard`, `farmer`, the hero); `person` joins the kind tree.
-2. **The cast from the map**: `MapSpec.people`; the world builds its walkers and routines from them; the hard-wired hero, villager and keeper go. Routines become kinds (`keeper-rounds`, `beat`, `stand`).
-3. **Characters for people**: `CharSpec` and the headless `makeCharacter`, deterministic, measured; facets, look and name come from the character.
-4. **The hero as a person**: the creator's saved character is loaded into the world (the sheet in the browser's storage), its facets and skills used by rolls.
-5. **Tap a person**: see who they are (name, people, what they do, their best skills), and later use skills on them (plan step 5).
+1. **`Sheet` and `buildSheet`** (`core/characters/`): the shape, template inheritance, grade, overrides; a handful of templates (tradesperson, innkeeper, villager, fighter, guard, bandit) as files; the checks above. No world changes yet.
+2. **`sheetOf(derive(state))`** for the hero, so one shape serves both.
+3. **Kinds of person** (`content/things/kinds/people.ts`): look, routine, template; `person` joins the kind tree.
+4. **The cast from the map** (`MapSpec.people`): the world builds its walkers and routines from them; the hard-wired hero, villager, keeper and door torch go (review item 9).
+5. **Facets and look from the sheet.**
+6. **Tap a person**: who they are; later, use skills on them (plan step 5).
+7. `templateFromBackground` and the cost report, to fill out the library of professions.
 
 ## Decided here, change if you disagree
-- Minor people get full characters but only **on demand**, deterministically from kind + seed + id.
-- A kind's `character` spec is *tendencies* (weights, emphasis), not a finished sheet; exact sheets are for named people.
-- Animals (the horse) are kinds of person-like things with a much smaller sheet; they follow after humans.
-- The creator stays the one place that knows the rules of making a character; the world never re-implements them.
+- Characters are authored; dice are for variation someone chose, per person.
+- "Made" in this design means **resolved**: `buildSheet` composes the pieces the first time a sheet is needed and keeps the result while they are near, like furnished rooms. It does not mean random.
+- The creator stays the one place that knows the rules of making a *player* character; the world reads its output and never re-implements it. NPCs and enemies use templates, not a replay of the creator.
+- Named story people are templates plus overrides, or fully written; they are never varied.
+- Animals and monsters use the same pipeline with the `natural` block; the exact combat reading comes with fights.
 
 Open for the director: see Q26 in [questions](../questions.md).
