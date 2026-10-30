@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { THINGS } from '../src/content/things';
 import { SPIKE_GROUND, SPIKE_HERO, SPIKE_HOUSE, SPIKE_LAYOUT, SPIKE_TREE, spikeFilamentWorld } from '../src/content/spike3d';
 import { buildHouses } from '../src/core/world3d/layout';
 import type { Environment } from '../src/core/environment';
@@ -217,7 +218,7 @@ describe('walls and smoothness', () => {
 });
 
 describe('filaments on the spike', () => {
-  const f = new FilamentField(spikeFilamentWorld(SPIKE_GROUND, buildHouses(SPIKE_LAYOUT)));
+  const f = new FilamentField(spikeFilamentWorld(SPIKE_GROUND, buildHouses(SPIKE_LAYOUT, THINGS)));
   f.setConditions({ env: DAY });
 
   it('every aspect reads in -3..3 everywhere on the patch', () => {

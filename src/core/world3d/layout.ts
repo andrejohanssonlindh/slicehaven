@@ -45,14 +45,15 @@ export interface BuiltHouse {
 
 /** A house's model, made once for each look (the same spec always gives the same model, and nothing changes it). */
 const models = new Map<string, HouseModel>();
-const modelOf = (spec: House3DSpec): HouseModel => {
+const modelOf = (spec: House3DSpec, things: Things): HouseModel => {
   const k = `${spec.seed}|${spec.width}|${spec.depth}|${spec.wallH}|${spec.roof}|${spec.walls}|${spec.plan}`;
   let m = models.get(k);
-  if (!m) models.set(k, (m = buildHouse(spec)));
+  if (!m) models.set(k, (m = buildHouse(spec, things.building(spec.plan))));
   return m;
 };
 
-export const buildHouses = (l: Pick<Layout, 'houses'>): BuiltHouse[] => l.houses.map((place) => ({ place, model: modelOf(place.spec) }));
+/** The houses of a layout, built to their kind of building (asked of the kinds of thing). */
+export const buildHouses = (l: Pick<Layout, 'houses'>, things: Things): BuiltHouse[] => l.houses.map((place) => ({ place, model: modelOf(place.spec, things) }));
 
 /** House-local (x, z) to world. */
 export function houseToWorld(h: PlacedHouse, x: number, z: number): { x: number; z: number } {

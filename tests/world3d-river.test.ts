@@ -31,7 +31,7 @@ describe('the stream and its bridge', () => {
     const r = g.rivers![0];
     const mid = r.pts[4];
     expect(groundHeight(g, mid[0], mid[1])).toBeLessThan(0);
-    const houses = buildHouses(SPIKE_LAYOUT);
+    const houses = buildHouses(SPIKE_LAYOUT, THINGS);
     const grid = new NavGrid(g.size, layoutObstacles(SPIKE_LAYOUT, houses, THINGS), { radius: 0.2, blocked: (x, z) => lakeDist(g, x, z) < 0.2 });
     expect(grid.walkable(mid[0], mid[1])).toBe(false);
     // The deck is dry, level and walkable down its middle; the way across is found.

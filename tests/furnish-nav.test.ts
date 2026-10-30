@@ -10,7 +10,7 @@ import { lakeDist } from '../src/core/world3d/terrain';
 /** Feet and furniture: the same obstacles the world builds, checked from the inside of every house of the hamlet. */
 describe('furniture blocks feet', () => {
   const map = mapNamed('hamlet');
-  const built = buildHouses(map.layout);
+  const built = buildHouses(map.layout, THINGS);
   const rooms = built.map((b) => furnish((b.place.room ?? 'home') as RoomSet, b.model.room, b.model.door[0], b.place.spec.seed));
   const shapes = [...layoutObstacles(map.layout, built, THINGS),...built.flatMap((b, i) => furnitureObstacles(b, footprints(rooms[i].plan)))];
   const nav = new NavGrid(map.ground.size, shapes, { radius: 0.2, blocked: (x, z) => lakeDist(map.ground, x, z) < 0.2 });

@@ -53,7 +53,7 @@ describe('kinds of thing', () => {
   it('every kind that can be placed has a look and something to say when looked at', () => {
     for (const id of THINGS.placeable) {
       const t = THINGS.get(id);
-      expect(!!(t.draw || t.tree || t.furniture), id).toBe(true);
+      expect(!!(t.draw || t.tree || t.furniture || t.building), id).toBe(true);
       expect(t.look, id).toBeTruthy();
     }
   });
@@ -90,6 +90,18 @@ describe('kinds of thing', () => {
     expect(THINGS.get('hearth').chain).toContain('fire');
     expect(THINGS.get('footlocker').chain).toContain('container');
     expect(THINGS.get('loom').filament).toMatchObject({ kind: 'art' });
+  });
+
+  it('kinds of building are structures with a plan, and a map that names another is told so', () => {
+    for (const id of ['cottage', 'inn', 'shop', 'stable']) expect(kindChain(id, LIBRARY.parents), id).toContain('structure');
+    expect(THINGS.building().storeys).toEqual([2.5]);
+    expect(THINGS.building('inn').storeys).toHaveLength(3);
+    expect(() => THINGS.building('well')).toThrow(/not a kind of building/);
+    const base = { name: 't', seed: 1, size: 60, roads: [], props: [], hero: [0, 0] as [number, number] };
+    const c = compileMap({ ...base, houses: [{ id: 'a', at: { x: 0, z: 0 }, plan: 'castle' }, { id: 'b', at: { x: 20, z: 0 }, plan: 'well' }] }, THINGS);
+    expect(c.problems).toContain('house a: no kind of building called castle');
+    expect(c.problems).toContain('house b: well is not a kind of building');
+    expect(c.layout.houses.every((h) => h.spec.plan === undefined)).toBe(true);
   });
 
   it('a run takes its length from the placement, else its kind', () => {

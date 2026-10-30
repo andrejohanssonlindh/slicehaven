@@ -24,15 +24,37 @@ export type RoofKind = 'thatch' | 'shingle' | 'tile' | 'sod';
 /** How the walls are made: plaster in a timber frame (the default), bare planks, or fieldstone. */
 export type WallKind = 'framed' | 'plank' | 'stone';
 
-/** What the building is: the cottage is the village's one-room house. */
-export type HousePlan = 'cottage' | 'inn' | 'shop' | 'stable';
+/** What the building is: the id of a kind of building (`content/things/kinds/buildings.ts`; the cottage is the village's one-room house). */
+export type HousePlan = string;
 
-/** Outside sizes of the bigger plans, metres (the cottage is whatever the spec says; the old small one is 5 x 4). */
-export const PLAN_SIZE: Record<Exclude<HousePlan, 'cottage'>, { width: number; depth: number }> = {
-  inn: { width: 12.4, depth: 8.4 },
-  shop: { width: 9.2, depth: 6.6 },
-  stable: { width: 12.2, depth: 6.4 },
-};
+/** Where the street door goes on the front. */
+export type DoorPlace =
+  /** In the middle of one of the first `n` bays, give or take. */
+  | { inBay: number }
+  /** Near the middle, anywhere within this many metres. */
+  | { spread: number }
+  /** This far in from the inner face of the right wall, give or take (the stairs fill the left). */
+  | { fromRight: number };
+
+/**
+ * A kind of building as data: how many storeys and how tall, the door, the windows, and what is inside. One builder
+ * (`buildHouse`) reads it, so a new kind of building is a new entry, not another branch.
+ */
+export interface BuildingPlan {
+  /** Outside size when the map does not say (the cottage is whatever the spec says). */
+  size?: { width: number; depth: number };
+  /** Wall height of each storey, ground first. A one-storey plan takes the spec's `wallH` instead, if it has one. A third storey is the attic under the roof, and its last is the knee wall. */
+  storeys: number[];
+  door: { width: number; height: number; at: DoorPlace };
+  /** The side walls: one window each (a cottage) or one in every bay. */
+  sideWindows: 'one' | 'perBay';
+  /** A diagonal brace on the right wall (a cottage). */
+  braced?: boolean;
+  /** The ground floor: one room, or stalls along the back with an aisle in front. */
+  ground: 'open' | { stalls: { count: number; depth: number } };
+  /** Storeys above: the first floor is a corridor along the front with rooms behind it (`shares` of the width, `roles` of the rooms). Stairs rise from the front-left. */
+  upstairs?: { shares: number[]; roles: string[] };
+}
 
 export interface House3DSpec {
   walls?: WallKind;
@@ -40,9 +62,10 @@ export interface House3DSpec {
   /** Outside width along the front and depth, in metres. */
   width: number;
   depth: number;
-  /** Wall height from the top of the footing to the eaves (cottage and stable; the other plans set their own). */
+  /** Wall height from the top of the footing to the eaves (for a one-storey plan; the others set their own). */
   wallH?: number;
   roof?: RoofKind;
+  /** The kind of building (default: a cottage). */
   plan?: HousePlan;
 }
 
@@ -131,15 +154,15 @@ const TREAD = 0.26;
 const STAIR_W = 1.0;
 const DOOR_OPEN = 0.6; // half the gap in a partition for a doorway
 
-export function buildHouse(spec: House3DSpec): HouseModel {
+export function buildHouse(spec: House3DSpec, plan: BuildingPlan): HouseModel {
   const rng = Rng.fromSeed(spec.seed);
-  const plan = spec.plan ?? 'cottage';
   const W = spec.width, D = spec.depth;
   const roofKind = spec.roof ?? 'thatch';
   const hw = W / 2, hd = D / 2;
 
-  // Storeys: heights of their walls (the inn's last is the attic's knee wall).
-  const heights = plan === 'inn' ? [2.7, 2.5, 1.5] : plan === 'shop' ? [2.8, 2.2] : [spec.wallH ?? (plan === 'stable' ? 2.7 : 2.5)];
+  // Storeys: heights of their walls (a third is the attic's knee wall).
+  const heights = plan.storeys.length === 1 ? [spec.wallH ?? plan.storeys[0]] : plan.storeys;
+  const hasAttic = heights.length > 2;
   const nL = heights.length, topLevel = nL - 1;
   const floorY: number[] = [], wallTop: number[] = [], wallBot: number[] = [];
   heights.forEach((h, k) => {
@@ -236,18 +259,15 @@ export function buildHouse(spec: House3DSpec): HouseModel {
   // Where the door is, and how big.
   const bays = Math.max(2, Math.round(W / 2));
   const bay = W / bays;
-  const doorW = plan === 'stable' ? 2.0 : plan === 'inn' ? 1.3 : plan === 'shop' ? 1.1 : 1.0;
-  const doorH = plan === 'stable' ? 2.25 : 1.95;
+  const doorW = plan.door.width, doorH = plan.door.height, at = plan.door.at;
   let dx: number;
-  if (plan === 'cottage') {
-    // The door sits in the middle of one of the first two bays.
-    const doorBay = rng.int(2);
+  if ('inBay' in at) {
+    const doorBay = rng.int(at.inBay);
     dx = -hw + bay * (doorBay + 0.5) + (rng.next() - 0.5) * 0.3;
-  } else if (plan === 'stable') {
-    dx = (rng.next() - 0.5) * 1.2;
+  } else if ('spread' in at) {
+    dx = (rng.next() - 0.5) * at.spread;
   } else {
-    // The stairs fill the front's left end; the door is in the right part.
-    dx = ix1 - (plan === 'inn' ? 3.0 : 2.0) + (rng.next() - 0.5) * 0.6;
+    dx = ix1 - at.fromRight + (rng.next() - 0.5) * 0.6;
   }
 
   // Timber frame, standing proud of the plaster. Front parts are cut away with the wall.
@@ -256,7 +276,7 @@ export function buildHouse(spec: House3DSpec): HouseModel {
   const frontFace: Vec3 = [0, 0, 1], sideFace: Vec3 = [1, 0, 0];
   const beam = (m: MeshData, a: Vec3, b: Vec3, face: Vec3): void => addBeam(m, a, b, BEAM, face, { aoBottom: 0.85 });
   const sideBays = Math.max(1, Math.round(D / 2));
-  const windowsAt = (k: number): number => floorY[k] + heights[k] * (k === topLevel && plan === 'inn' ? 0.5 : 0.55);
+  const windowsAt = (k: number): number => floorY[k] + heights[k] * (k === topLevel && hasAttic ? 0.5 : 0.55);
   const winList: HouseModel['windows'] = [];
   const win = (m: MeshData, sm: MeshData, at: Vec3, face: Vec3): void => {
     const w = 0.8, h = 0.7;
@@ -306,7 +326,7 @@ export function buildHouse(spec: House3DSpec): HouseModel {
         beam(st, [xr, y, hd], [xr, y, -hd], sideFace);
         beam(st, [-xr, y, hd], [-xr, y, -hd], [-1, 0, 0]);
       }
-      if (k === 0 && plan === 'cottage') beam(st, [xr, midY, -hd + 0.1], [xr, yt - 0.1, -hd + D * 0.35], sideFace);
+      if (k === 0 && plan.braced) beam(st, [xr, midY, -hd + 0.1], [xr, yt - 0.1, -hd + D * 0.35], sideFace);
     }
 
     // Windows: one in every front bay that has no door, and on the side walls (the cottage has one each, the bigger plans one per bay).
@@ -318,7 +338,7 @@ export function buildHouse(spec: House3DSpec): HouseModel {
       winList.push({ at: [x, winY, hd + 0.1], normal: [0, 0, 1] });
     }
     const sw = part('window', sideLevel, 'windows').mesh, ss = part('shutter', sideLevel, 'shutters').mesh;
-    const nSide = plan === 'cottage' ? 1 : sideBays;
+    const nSide = plan.sideWindows === 'one' ? 1 : sideBays;
     for (let i = 0; i < nSide; i++) {
       const sz = hd - D / sideBays * (i + 0.5);
       win(sw, ss, [hw + 0.02, winY, sz], [1, 0, 0]);
@@ -420,11 +440,11 @@ export function buildHouse(spec: House3DSpec): HouseModel {
   };
 
   const doorRoomKey = 'main';
-  if (plan === 'cottage') {
+  if (plan.ground === 'open' && nL === 1) {
     levels[0].rooms.push({ rect: fullRect, doorX: dx, role: doorRoomKey, reserved: [] });
-  } else if (plan === 'stable') {
+  } else if (plan.ground !== 'open') {
     // Stalls along the back, each with its own low partitions; the aisle in front.
-    const nStall = 5, stallD = 3.0;
+    const nStall = plan.ground.stalls.count, stallD = plan.ground.stalls.depth;
     const stallZ1 = iz0 + stallD;
     const sw = (ix1 - ix0 - PART_T * (nStall - 1)) / nStall;
     for (let i = 0; i < nStall; i++) {
@@ -438,10 +458,12 @@ export function buildHouse(spec: House3DSpec): HouseModel {
       levels[0].rooms.push({ rect: rectOf(xa, xb, iz0, stallZ1), doorX: (xa + xb) / 2, role: 'stall', reserved: [], clear: { half: 0.6, depth: 0.5 } });
     }
     levels[0].rooms.push({ rect: rectOf(ix0, ix1, stallZ1 + 0.05, iz1), doorX: dx, role: 'aisle', reserved: [] });
-  } else {
-    // Inn and shop: the main stair rises from the front-left to the first floor.
+  } else if (plan.upstairs) {
+    // More than one storey: the stairs rise from the front-left, flight by flight, to the top.
     const xs1 = ix0 + 1.0;
-    const f1 = flight(0, xs1, plan === 'shop');
+    const flights: Stair[] = [];
+    for (let k = 0; k < nL - 1; k++) flights.push(flight(k, k === 0 ? xs1 : flights[k - 1].rect.x1, k === nL - 2));
+    const f1 = flights[0];
     const f1x1 = f1.rect.x1;
     levels[0].rooms.push({ rect: fullRect, doorX: dx, role: doorRoomKey, reserved: [rectOf(ix0, f1x1 + 0.1, iz1 - STAIR_W - 0.4, iz1)] });
     const head1 = f1.path[3];
@@ -473,18 +495,13 @@ export function buildHouse(spec: House3DSpec): HouseModel {
       });
       for (const { r, d, role } of made) levels[1].rooms.push({ rect: r, doorX: d, role, reserved: [] });
     };
-    if (plan === 'shop') {
-      // The shop: a bedroom and the keeper's own room off a landing.
-      slab(1, f1.rect);
-      firstFloor([0.4, 0.6], ['guest', 'upstairs'], [f1.rect]);
-    } else {
-      // Inn: the second flight carries on from the first to the attic, and a corridor with four guest rooms behind it fills the first floor.
-      const f2 = flight(1, f1x1, true);
-      const f2x1 = f2.rect.x1;
-      slab(1, f1.rect);
-      slab(2, f2.rect);
-      firstFloor([1, 1, 1, 1], ['guest', 'guest', 'guest', 'guest'], [rectOf(xs1, f2x1, iz1 - STAIR_W, iz1)]);
+    // Each storey above has its floor, with an opening where its flight comes up; the first floor is the corridor and its rooms.
+    for (let k = 1; k < nL; k++) slab(k, flights[k - 1].rect);
+    const stairwell = rectOf(xs1, flights[nL - 2].rect.x1, iz1 - STAIR_W, iz1);
+    firstFloor(plan.upstairs.shares, plan.upstairs.roles, [stairwell]);
+    if (hasAttic) {
       // The attic: one long room under the roof, with the stairs coming up at its front.
+      const f2 = flights[1], f2x1 = f2.rect.x1;
       const head2 = f2.path[3];
       levels[2].rooms.push({
         rect: rectOf(ix0, ix1, iz0 + 0.2, iz1),

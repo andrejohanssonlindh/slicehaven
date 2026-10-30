@@ -517,7 +517,7 @@ export class SpikeWorld {
       // The ground floor's walls, partitions and furniture block the ground's walking; the storeys above have grids of their own.
       const ground = rooms.filter((r) => r.level === 0);
       return { room: rooms, shapes: [...levelWalls(b, 0), ...furnitureObstacles(b, ground.flatMap((r) => footprints(r.plan)))], sources };
-    });
+    }, THINGS);
     const houseIndex = this.houseIndex;
     // Feet: the houses' walls and furniture block (held whole, in an index), and so do the trunks, posts and props the
     // placed index knows by chunk, so the ground is asked only about what is near; so does the water.

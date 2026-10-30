@@ -2,6 +2,7 @@ import { CHUNK, chunkKey } from './chunks';
 import type { FSource } from './filaments3d';
 import { type BuiltHouse, type PlacedHouse, buildHouses, houseBox, houseOuterBox } from './layout';
 import { type Shape, shapeDist } from './space';
+import type { Things } from './things';
 
 /**
  * The houses of a map, by chunk, so a city of any size is asked only about the streets that are looked at. The
@@ -41,7 +42,7 @@ export class HouseIndex<R> {
   private readonly entries = new Map<PlacedHouse, HouseEntry<R>>();
   private readonly lites = new Map<PlacedHouse, HouseLite>();
 
-  constructor(readonly places: readonly PlacedHouse[], private readonly make: (b: BuiltHouse) => HouseMade<R>) {
+  constructor(readonly places: readonly PlacedHouse[], private readonly make: (b: BuiltHouse) => HouseMade<R>, private readonly things: Things) {
     for (const h of places) {
       this.ids.set(h.id, h);
       const k = chunkKey(Math.floor(h.x / CHUNK), Math.floor(h.z / CHUNK));
@@ -65,7 +66,7 @@ export class HouseIndex<R> {
   lite(place: PlacedHouse): HouseLite {
     let l = this.lites.get(place);
     if (!l) {
-      const built = buildHouses({ houses: [place] })[0];
+      const built = buildHouses({ houses: [place] }, this.things)[0];
       this.lites.set(place, (l = { built, outer: houseOuterBox(built), box: houseBox(built) }));
     }
     return l;

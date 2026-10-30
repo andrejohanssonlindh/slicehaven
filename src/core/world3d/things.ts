@@ -1,4 +1,5 @@
 import type { FSource, SourceKind } from './filaments3d';
+import type { BuildingPlan } from './house';
 import type { MeshData } from './mesh';
 import type { Lumps, PlacedProp } from './props';
 import { type Shape, circle } from './space';
@@ -86,6 +87,8 @@ export interface ThingDef {
    * It is drawn as a painted card, not meshes (`content/things/kinds/furniture.ts`).
    */
   furniture?: { mount: 'floor' | 'hung' | 'flat'; d?: number; maxW?: number };
+  /** A kind of building: how it is put together (`buildHouse` reads this). */
+  building?: BuildingPlan;
   /** It sends up a column of smoke from this high above the ground. */
   smoke?: { y: number };
   /** Its look, built from the placement (meshes by material). Trees use `tree` instead. */
@@ -147,6 +150,13 @@ export class Things {
     const t = out as unknown as Thing;
     this.made.set(id, t);
     return t;
+  }
+
+  /** The plan of a kind of building (no id: a cottage). Throws for a kind that is not a building. */
+  building(id = 'cottage'): BuildingPlan {
+    const b = this.get(id).building;
+    if (!b) throw new Error(`${id} is not a kind of building`);
+    return b;
   }
 
   /** The placement with the kind's defaults filled in. */

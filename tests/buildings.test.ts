@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { furnishHouse, type FurnishedRoom } from '../src/content/furnish';
-import { type HouseModel, type HousePlan, PLAN_SIZE, buildHouse } from '../src/core/world3d/house';
+import { buildHouse } from '../src/content/buildhouse';
+import { THINGS } from '../src/content/things';
+import type { HouseModel, HousePlan } from '../src/core/world3d/house';
 import { type BuiltHouse, furnitureObstacles, houseWalls, levelWalls } from '../src/core/world3d/layout';
 import { buildHouses } from '../src/core/world3d/layout';
 import { footprints } from '../src/core/world3d/roomplan';
@@ -14,9 +16,11 @@ const PLANS: { plan: Exclude<HousePlan, 'cottage'>; main: string; levels: number
   { plan: 'stable', main: 'home', levels: 1, stairs: 0 },
 ];
 
+const sizeOf = (plan: HousePlan): { width: number; depth: number } => THINGS.building(plan).size!;
+
 const make = (plan: Exclude<HousePlan, 'cottage'>, seed = 4): { built: BuiltHouse; rooms: FurnishedRoom[]; model: HouseModel } => {
-  const { width, depth } = PLAN_SIZE[plan];
-  const built = buildHouses({ houses: [{ id: plan, x: 0, z: 0, rot: 0, spec: { seed, width, depth, plan, roof: 'shingle' }, room: PLANS.find((p) => p.plan === plan)!.main }] })[0];
+  const { width, depth } = sizeOf(plan);
+  const built = buildHouses({ houses: [{ id: plan, x: 0, z: 0, rot: 0, spec: { seed, width, depth, plan, roof: 'shingle' }, room: PLANS.find((p) => p.plan === plan)!.main }] }, THINGS)[0];
   return { built, rooms: furnishHouse(built.model, PLANS.find((p) => p.plan === plan)!.main as never, seed), model: built.model };
 };
 
@@ -33,7 +37,7 @@ describe('the bigger buildings', () => {
       expect(model.stairs.length, p.plan).toBe(p.stairs);
     }
     // The inn is about six cottages on the ground (5 to 6 times), the shop two to three, the stable three.
-    const area = (p: keyof typeof PLAN_SIZE): number => PLAN_SIZE[p].width * PLAN_SIZE[p].depth;
+    const area = (p: HousePlan): number => sizeOf(p).width * sizeOf(p).depth;
     expect(area('inn') / small).toBeGreaterThan(4.8);
     expect(area('inn') / small).toBeLessThan(6.5);
     expect(area('shop') / small).toBeGreaterThan(2);

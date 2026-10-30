@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SPIKE_GROUND, SPIKE_HOUSE, SPIKE_WALK } from '../src/content/spike3d';
-import { buildHouse } from '../src/core/world3d/house';
+import { buildHouse } from '../src/content/buildhouse';
 import { addBox, bounds, emptyMesh, vertexCount } from '../src/core/world3d/mesh';
 import { cloudDensity, cloudThreshold, skyLight } from '../src/core/world3d/sky';
 import { WATER_Y, buildTerrain, groundHeight, heightAt, lakeDist, splatAt } from '../src/core/world3d/terrain';

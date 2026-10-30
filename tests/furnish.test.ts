@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { type RoomSet, RECIPES, furnish } from '../src/content/furnish';
-import { buildHouse } from '../src/core/world3d/house';
+import { buildHouse } from '../src/content/buildhouse';
 import { DOOR_CLEAR, type PieceIn, type RoomRect, footprints, planRoom } from '../src/core/world3d/roomplan';
 
 /** Rooms of the bigger buildings are tested in their own buildings (`buildings.test.ts`), not in a cottage. */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { type FurnishedRoom, furnishHouse } from '../src/content/furnish';
 import { type Actor, Walking, keeperRounds, newActor, stepRounds } from '../src/core/world3d/actors';
-import { PLAN_SIZE } from '../src/core/world3d/house';
+import { THINGS } from '../src/content/things';
 import { HouseIndex } from '../src/core/world3d/houses';
 import { type PlacedHouse, furnitureObstacles, houseToWorld, levelWalls } from '../src/core/world3d/layout';
 import { footprints } from '../src/core/world3d/roomplan';
@@ -9,14 +9,14 @@ import { NavGrid } from '../src/core/world3d/space';
 
 /** Walking for everyone (`core/world3d/actors.ts`), on a patch with an inn and a cottage, as the world sets it up. */
 
-const INN: PlacedHouse = { id: 'inn', x: 0, z: 0, rot: 0, spec: { seed: 4, ...PLAN_SIZE.inn, plan: 'inn', roof: 'shingle' }, room: 'inn' };
+const INN: PlacedHouse = { id: 'inn', x: 0, z: 0, rot: 0, spec: { seed: 4, ...THINGS.building('inn').size!, plan: 'inn', roof: 'shingle' }, room: 'inn' };
 const COTTAGE: PlacedHouse = { id: 'cot', x: 22, z: 4, rot: 0.4, spec: { seed: 7, width: 5, depth: 4 } };
 
 function setup(): { w: Walking; index: HouseIndex<FurnishedRoom[]> } {
   const index = new HouseIndex<FurnishedRoom[]>([INN, COTTAGE], (b) => {
     const rooms = furnishHouse(b.model, (b.place.room ?? 'home') as never, b.place.spec.seed);
     return { room: rooms, shapes: [...levelWalls(b, 0), ...furnitureObstacles(b, rooms.filter((r) => r.level === 0).flatMap((r) => footprints(r.plan)))], sources: [] };
-  });
+  }, THINGS);
   const ground = new NavGrid(200, { near: (x0, z0, x1, z1) => index.shapesNear(x0, z0, x1, z1) }, { radius: 0.2 });
   const w = new Walking(ground, 200, {
     holding: (x, z) => index.houseContaining(x, z, -0.1)?.built ?? null,

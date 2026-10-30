@@ -8,7 +8,7 @@ const propSource = (p: PlacedProp) => THINGS.source(p);
 import { NavGrid, findPath, shapeDist } from '../src/core/world3d/space';
 import { WATER_Y, groundHeight, lakeDist, roadDist } from '../src/core/world3d/terrain';
 
-const houses = buildHouses(SPIKE_LAYOUT);
+const houses = buildHouses(SPIKE_LAYOUT, THINGS);
 const g = SPIKE_GROUND;
 
 describe('layout', () => {

@@ -1,7 +1,7 @@
 import { fbm } from '../noise';
 import { Rng } from '../rng';
 import { CHUNK } from './chunks';
-import { type House3DSpec, type HousePlan, PLAN_SIZE, type RoofKind, type WallKind } from './house';
+import type { House3DSpec, HousePlan, RoofKind, WallKind } from './house';
 import { type Layout, type PlacedHouse, type PlacedTree, buildHouses, houseOuterBox, houseToWorld, layoutObstacles, layoutPads, layoutShade } from './layout';
 import { type ChunkContent, type ChunkGenerator, PlacedIndex } from './placed';
 import { type PlacedProp } from './props';
@@ -252,8 +252,12 @@ export function compileMap(spec: MapSpec, things: Things): CompiledMap {
 
   // Houses.
   const houses: PlacedHouse[] = spec.houses.map((h) => {
-    const dims = h.plan && h.plan !== 'cottage' ? PLAN_SIZE[h.plan] : typeof h.size === 'object' ? h.size : SIZES[h.size ?? 'medium'];
-    const hs: House3DSpec = { seed: h.seed ?? hashStr(h.id) % 1000, width: dims.width, depth: dims.depth, wallH: h.wallH ?? 2.5, roof: h.roof ?? 'thatch', walls: h.walls, plan: h.plan };
+    // A kind of building nobody defined is told so, and built as a cottage.
+    let plan = h.plan;
+    if (plan && !things.has(plan)) problems.push(`house ${h.id}: no kind of building called ${plan}`), plan = undefined;
+    else if (plan && !things.get(plan).building) problems.push(`house ${h.id}: ${plan} is not a kind of building`), plan = undefined;
+    const dims = (plan && things.building(plan).size) || (typeof h.size === 'object' ? h.size : SIZES[h.size ?? 'medium']);
+    const hs: House3DSpec = { seed: h.seed ?? hashStr(h.id) % 1000, width: dims.width, depth: dims.depth, wallH: h.wallH ?? 2.5, roof: h.roof ?? 'thatch', walls: h.walls, plan };
     if ('road' in h.at) {
       const road = spec.roads[h.at.road];
       if (!road) {
@@ -290,7 +294,7 @@ export function compileMap(spec: MapSpec, things: Things): CompiledMap {
     }
   }
 
-  const built = buildHouses(layout);
+  const built = buildHouses(layout, things);
   const boxes = built.map(houseOuterBox);
 
   // Scatter: seeded random spots that keep clear of everything already there.
@@ -406,7 +410,7 @@ function validate(spec: MapSpec, c: CompiledMap, things: Things, houses: { id: s
   const half = g.size / 2;
   const inMap = (x: number, z: number, m = 1): boolean => Math.abs(x) < half - m && Math.abs(z) < half - m;
   const lakeD = (x: number, z: number): number => lakeDist(g, x, z);
-  const built = buildHouses(c.layout);
+  const built = buildHouses(c.layout, things);
   const problem = (s: string): void => {
     if (!out.includes(s)) out.push(s);
   };
