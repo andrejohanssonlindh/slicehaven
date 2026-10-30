@@ -35,7 +35,7 @@ import { TEXELS_PER_M } from '../core/world3d/tiers';
 import type { Clump } from '../core/world3d/tree';
 import { fbm } from '../core/noise';
 import { Weather } from '../core/world3d/weather';
-import { makeFlame, makeOrb } from './fire';
+import { type Flame, makeFlame, makeOrb } from './fire';
 import { EXPLORED_WINDOW, type LitOpts, SEE_SLOTS, WORLD, exploredTexture, lit, pixTexture, shellOf, sightTexture } from './materials';
 import { SCORCH_SIZE, scorchImage } from '../core/world3d/scorch';
 import { RAYS, type SightLight, type VisionSpec, angleGap, castSight, lightReach, litSeenAt, seenAt, turnToward, visibleLights, visionOf } from '../core/world3d/vision';
@@ -120,6 +120,8 @@ interface Torch {
   always?: boolean;
   base: number;
   seed: number;
+  /** Lets go of the flame's geometry and material when the torch is taken down. */
+  dispose?: () => void;
 }
 
 /** What a resident chunk holds on the GPU. */
@@ -663,6 +665,9 @@ export class SpikeWorld {
     };
   }
 
+  /** The material of every shadow-only twin (they are drawn only into the shadow map): one for all, never let go. */
+  private readonly shadowOnly = new THREE.MeshBasicMaterial();
+
   /** Stand a house up in the world: its model, its furniture cards, its hearth's light. It belongs to the chunk `st`. */
   private standHouse(entry: HouseEntry<FurnishedRoom[]>, st: Standing): void {
     const { built, room: rooms } = entry;
@@ -679,7 +684,7 @@ export class SpikeWorld {
       if (p.cut) {
         inst.cut.push({ mesh, level: p.level ?? 0, away: p.away ?? -1, t: 0 });
         // The roof keeps shading the room when it is cut away: a shadow-only twin on layer 1.
-        const proxy = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
+        const proxy = new THREE.Mesh(geo, this.shadowOnly);
         proxy.layers.set(1);
         proxy.castShadow = true;
         inst.group.add(proxy);
@@ -1074,7 +1079,10 @@ export class SpikeWorld {
         if (g && !g.userData.shared) g.dispose();
       });
     }
-    for (const t of st.torches) this.torches.splice(this.torches.indexOf(t), 1);
+    for (const t of st.torches) {
+      this.torches.splice(this.torches.indexOf(t), 1);
+      t.dispose?.();
+    }
     for (const s of st.shells) this.shells.splice(this.shells.indexOf(s), 1);
     st.objects.length = st.shells.length = st.torches.length = 0;
   }
@@ -1199,7 +1207,7 @@ export class SpikeWorld {
     light.visible = false; // (the pool in `update` decides which shine: a light that is on counts in every shader)
     light.position.set(x, y + (look.lightY ?? 0.3), z);
     this.scene.add(light);
-    const torch: Torch = { light, flame: fx.object, tick: fx.tick, base: power, seed: this.torchSeed * 7 / 11 + 1 };
+    const torch: Torch = { light, flame: fx.object, tick: fx.tick, base: power, seed: this.torchSeed * 7 / 11 + 1, dispose: fx.dispose };
     this.torchSeed++;
     this.torches.push(torch);
     if (st) {
@@ -1692,10 +1700,10 @@ export class SpikeWorld {
   // Adding a light the shaders were not built for freezes the game while every one is rebuilt, so neither light is new:
   // the orb takes a place in the pool of point lights (the nearest few shine, the rest do not, as with torches), and the
   // ray's spot light is always in the scene, dark until it is raised.
-  private orb: { group: THREE.Group; torch: Torch; fx: { object: THREE.Object3D; tick(t: number): void } } | null = null;
+  private orb: { group: THREE.Group; torch: Torch; fx: Flame } | null = null;
   private ray: { group: THREE.Group; beam: THREE.Mesh } | null = null;
   /** The torch in the hero's hand, if they carry one: a flame and a light that go where they go, and sight is the better for it. */
-  private hand: { fx: { object: THREE.Object3D; tick(t: number): void }; torch: Torch } | null = null;
+  private hand: { fx: Flame; torch: Torch } | null = null;
 
   get torchOn(): boolean {
     return this.hand !== null;
@@ -1706,6 +1714,7 @@ export class SpikeWorld {
     if (this.hand) {
       this.scene.remove(this.hand.fx.object, this.hand.torch.light);
       this.torches.splice(this.torches.indexOf(this.hand.torch), 1);
+      this.hand.fx.dispose();
       this.hand = null;
       return;
     }
@@ -1731,6 +1740,7 @@ export class SpikeWorld {
     if (this.orb) {
       this.scene.remove(this.orb.group);
       this.torches.splice(this.torches.indexOf(this.orb.torch), 1);
+      this.orb.fx.dispose();
       this.orb = null;
       return;
     }
@@ -1751,6 +1761,8 @@ export class SpikeWorld {
     if (this.ray) {
       this.scene.remove(this.ray.group);
       this.rayLight.intensity = 0;
+      this.ray.beam.geometry.dispose();
+      (this.ray.beam.material as THREE.Material).dispose();
       this.ray = null;
       return;
     }

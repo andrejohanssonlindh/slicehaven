@@ -106,6 +106,18 @@ describe('spike3d lightning and fires', () => {
     await w('(w.douseFires(), 0)');
     expect(await w('w.campfires')).toBe(0);
 
+    // Nothing is kept on the GPU after it is put away: campfires, the hand torch, the orb and the ray, again and again.
+    const geos = () => page.evaluate('window.spike.pipeline.renderer.info.memory.geometries') as Promise<number>;
+    await page.waitForTimeout(500);
+    const before = await geos();
+    for (let i = 0; i < 4; i++) {
+      await w('(w.lightFire(), w.lightFire(), w.toggleTorch(), w.toggleOrb(), w.toggleRay(), 0)');
+      await page.waitForTimeout(300);
+      await w('(w.douseFires(), w.toggleTorch(), w.toggleOrb(), w.toggleRay(), 0)');
+      await page.waitForTimeout(300);
+    }
+    expect(await geos()).toBeLessThanOrEqual(before);
+
     // A strike on open ground by day leaves a burnt, fern-scarred patch that stays (and is ash to the filament field).
     await w("(w.weather.setHour(12), w.autoBolts = false, w.strike({ x: w.hero.x + 3, z: w.hero.z + 4 }), 0)");
     await page.waitForTimeout(1500);

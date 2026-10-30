@@ -11,7 +11,15 @@ export interface Flame {
   object: THREE.Object3D;
   /** Move every bit to its place at time `t` seconds; `wind` leans the flame (x, z) a little. */
   tick(t: number, wind?: { x: number; z: number }): void;
+  /** Let go of its geometry and material (after it is taken out of the scene). */
+  dispose(): void;
 }
+
+const disposer = (mesh: THREE.InstancedMesh) => (): void => {
+  mesh.geometry.dispose();
+  (mesh.material as THREE.Material).dispose();
+  mesh.dispose();
+};
 
 /** Heat colours from the base to the tip, then the soot at the very top. */
 const HEAT = [0xfff4b0, 0xffc040, 0xf07a20, 0xc83c14, 0x6a2410].map((c) => new THREE.Color(c));
@@ -65,7 +73,7 @@ export function makeOrb(size = 1, count = 14): Flame {
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   };
   tick(0);
-  return { object: mesh, tick };
+  return { object: mesh, tick, dispose: disposer(mesh) };
 }
 
 /**
@@ -119,5 +127,5 @@ export function makeFlame(size = 1, count = 18, seed = 0): Flame {
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   };
   tick(0);
-  return { object: mesh, tick };
+  return { object: mesh, tick, dispose: disposer(mesh) };
 }
