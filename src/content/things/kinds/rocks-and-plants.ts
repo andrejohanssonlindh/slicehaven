@@ -18,6 +18,7 @@ const things: ThingDef[] = [
     is: 'rock',
     look: 'A boulder, half sunk in the ground.',
     foot: [{ circle: 0.75 }],
+    keepClear: 0.8,
     blocksSight: true,
     filament: { kind: 'rock' },
     draw: (p) => ({ meshes: [], lumps: { material: 'stone', lumps: buildBoulder(p.seed) } }),

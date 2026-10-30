@@ -62,6 +62,8 @@ export interface ThingDef {
   foot?: Foot[] | ((p: Placed) => Shape[]);
   /** The eye cannot see through it. */
   blocksSight?: boolean;
+  /** The room things scattered by a map rule leave round it, metres (default 0.5). */
+  keepClear?: number;
   /** What it gives off to the filament field, if anything. */
   filament?: { kind: SourceKind; weight?: number } | null;
   /** The default run length for things that are runs (fences, walls), metres. */

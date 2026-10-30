@@ -1,5 +1,12 @@
 # Devlog
 
+## 2026-10-31 — Maps are files, map rules are files
+
+- **Maps as files (plan step 4) ✅:** every map is `content/maps/<name>.json`, found without a list; a map says what it is in `about`. Spike and hamlet compile byte for byte as before (checked with a fingerprint of every house, tree, prop, chunk, start and person).
+- **Map rules, one file each** (`content/maps/rules/`): `street` (houses along a road every so many metres, listed or by turns from a list of looks, a look with `max` only that often), `torches`, `scatter`. A new rule is a new file. Eastgate's code loop and the wilds' hamlet are now two `street`s; the wilds' houses moved a little, since a street measures real metres along the road (the old code guessed the road at 8400 m).
+- **Typos are reported:** a key nothing reads, anywhere in a map or a rule, is a problem, as is a rule nobody wrote. House spots along a road may be in metres (`m`) as well as shares (`t`).
+- The scatter no longer asks a thing's name for how much room to leave: kinds say `keepClear`. The wilds' `where` function is now an `area` (review item 14 ✅: the review is done).
+
 ## 2026-10-30 — Review fixes, and maps as files
 
 - **Leaks (review bug 3) ✅:** every house's shadow twins share one material instead of a new one each; torch flames are let go when their chunk leaves, and so are the hand torch, the orb and the ray when put away (`Flame.dispose`). A browser test lights and puts them away four times and checks the GPU holds no more than before (it fails on the old code: 12 geometries kept).

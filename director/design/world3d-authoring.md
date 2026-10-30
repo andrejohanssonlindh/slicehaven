@@ -33,21 +33,28 @@ bakery: [
 A map house can be `plan: 'inn' | 'shop' | 'stable'` (own size, storeys, stairs); `room` is still the ground floor's recipe. The upstairs rooms use their own recipes by role (`guestroom`, `landing`, `attic`, `upstairs`, `stall`, `aisle`) in `RECIPES`; add a role in `ROLE_SETS` and a line in `house.ts` where the rooms are made. A piece with `vary: true` takes a seed from its room (each stall's horse differs). See the handover, session 29.
 
 ## Adding a map
-Write a `MapSpec` (`content/maps/<name>.ts`) and add it to `MAPS` in `content/maps/index.ts`. Look at `hamlet.ts`: houses by intent, scatter by region, torches by line.
+A map is a JSON file, `content/maps/<name>.json` (its `name` the same). It is found by itself: no list to edit. Look at `hamlet.json`: houses by intent, the rest by rules. JSON has no comments, so a map says what it is in `about`.
 
-```ts
-houses: [
-  { id: 'inn', room: 'inn', size: 'large', roof: 'tile', at: { road: 0, t: 0.5, side: 'north' } },
-  { id: 'cottage', size: 'small', roof: 'sod', at: { x: 12, z: -30, rot: 0.1 } },   // or an exact spot
+```json
+"houses": [
+  { "id": "inn", "room": "inn", "plan": "inn", "roof": "tile", "torch": true, "at": { "road": 0, "t": 0.5, "side": "north" } },
+  { "id": "cottage", "size": "small", "roof": "sod", "at": { "x": 12, "z": -30, "rot": 0.1 } }
 ],
-scatter: [{ kind: 'tree', count: 70, area: { ring: [0, 0, 40, 64] } }],
-torchLines: [{ road: 0, every: 14, side: 'south' }],
-doorMud: true,
-hero: { house: 'inn' },
+"rules": [
+  { "rule": "torches", "road": 0, "every": 14, "side": "south" },
+  { "rule": "street", "id": "east", "road": 0, "from": 400, "to": 1100, "every": 20, "cycle": [{ "size": "small" }, { "room": "inn", "max": 1 }] },
+  { "rule": "scatter", "kind": "tree", "count": 70, "area": { "ring": [0, 0, 40, 64] } }
+],
+"doorMud": true,
+"hero": { "house": "inn" }
 ```
-- **Houses** go along a road (`road` index, `t` 0 to 1, a compass `side`, optional `gap`) and face it, or at an exact `x, z, rot`. Sizes `small`/`medium`/`large` (or `{width, depth}`), roofs thatch/shingle/tile/sod, a `room` kind.
-- **Scatter** (trees, shrubs, boulders) fills an `area` (`circle`, `rect`, `ring`, `all`) with seeded spots that keep clear of houses, roads, water and each other. It reports `only room for N of M` instead of silently dropping.
-- **Compile** (`compileMap`) returns the ground, the layout, the hero start, the villager's beat and **`problems`**: a house in the lake or on a road or touching another, a thing off the map, a door the hero cannot reach, a house id used twice. `tests/maps.test.ts` requires **no problems for every map in `MAPS`**, so a new map is checked the moment it is listed.
+- **Houses** go along a road (`road` index, `m` metres from its start or `t` a share 0 to 1, a compass `side`, optional `gap`) and face it, or at an exact `x, z, rot`. Sizes `small`/`medium`/`large` (or `{width, depth}`), roofs thatch/shingle/tile/sod, a `room` kind, a `plan` (kind of building), `torch` for a torch by the door.
+- **Rules** (`"rule": "<name>"`) place things by intent, in the order written. Each is one file in `content/maps/rules/` (`MapRule` in `core/world3d/mapgen.ts`: its name, the keys it takes, its phase, and `expand`). A new rule is a new file. There are three:
+  - `street`: houses along a road every so many metres, on one or both sides; listed (`houses`, ids kept) or by turns from `cycle` (a look with `max` is used only that often).
+  - `torches`: a torch post (or any `kind`) every so many metres along one side of a road.
+  - `scatter`: a number of a kind in an `area` (`circle`, `rect`, `ring`, `all`), at seeded spots clear of houses, roads, water and each other (each thing's `keepClear`). It reports `only room for N of M`.
+- **Wild** woods (`wild`) are made chunk by chunk; `area` keeps them to a district.
+- **Compile** (`compileMap`, or `compile` in `content/maps`, which brings every library) returns the ground, the layout, the hero start, the people and **`problems`**: a house in the lake or on a road or touching another, a thing off the map, a door the hero cannot reach, an id used twice, a person nobody can be, **a key nothing reads (a typo)**, a rule nobody wrote. `tests/maps.test.ts` requires **no problems for every map**, so a new file is checked the moment it is saved.
 - **See it**: `/spike3d/?map=hamlet`. Problems also go to the browser console. `?world=N` overrides the size.
 - Deterministic: same spec, same world (the seed is in the spec).
 

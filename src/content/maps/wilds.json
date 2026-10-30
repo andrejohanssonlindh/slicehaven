@@ -1,0 +1,49 @@
+{
+  "name": "wilds",
+  "about": "A map eight kilometres across (the spike is 64 m): a long road, a cross road, a lake, a hamlet on the road and Eastgate a little east of it, a town of a house every 20 m on both sides for 700 m (a test for houses that stream in and out as you walk, and a place to see how rooms read). Woods, bushes and rocks are made chunk by chunk as you go, so the size costs nothing until you walk it. Try /spike3d/?map=wilds, set Walk x3, and tap far down the road.",
+  "seed": 23,
+  "size": 8192,
+  "roads": [
+    { "pts": [[-4000, 220], [-3000, -60], [-2000, 140], [-1000, 20], [0, -30], [900, 90], [2000, -120], [3000, 60], [4000, 240]], "width": 3.4 },
+    { "pts": [[60, -34], [400, -500], [1000, -1400], [1900, -2400], [3300, -3500]], "width": 2.8 }
+  ],
+  "lake": { "x": -1500, "z": 700, "r": 130 },
+  "doorMud": true,
+  "rules": [
+    {
+      "rule": "street", "id": "hamlet", "road": 0, "from": 4180, "every": 22, "sides": ["north", "south"],
+      "houses": [
+        { "id": "inn", "room": "inn", "size": "large", "roof": "tile", "torch": true },
+        { "id": "bakery", "room": "bakery", "size": "medium", "roof": "shingle" },
+        { "id": "smithy", "room": "smithy", "size": "medium", "roof": "shingle", "walls": "stone" },
+        { "id": "store", "room": "general", "size": "medium", "roof": "thatch" },
+        { "id": "weaver", "room": "weaver", "size": "small", "roof": "sod" },
+        { "id": "herbs", "room": "herbalist", "size": "small", "roof": "thatch" },
+        { "id": "fish", "room": "fishmonger", "size": "medium", "roof": "thatch", "walls": "plank" },
+        { "id": "home1", "room": "fisher", "size": "small", "roof": "thatch" },
+        { "id": "home2", "size": "small", "roof": "sod", "walls": "stone" },
+        { "id": "home3", "size": "medium", "roof": "thatch", "walls": "plank" }
+      ]
+    },
+    {
+      "rule": "street", "id": "east", "road": 0, "from": 4420, "to": 5120, "every": 20, "sides": ["north", "south"], "step": 3,
+      "cycle": [
+        { "size": "small", "roof": "thatch" },
+        { "room": "fisher", "size": "small", "roof": "thatch", "walls": "plank" },
+        { "size": "medium", "roof": "shingle" },
+        { "room": "weaver", "size": "small", "roof": "sod" },
+        { "room": "bakery", "size": "medium", "roof": "shingle" },
+        { "size": "small", "roof": "thatch", "walls": "stone" },
+        { "room": "herbalist", "size": "small", "roof": "thatch" },
+        { "room": "general", "size": "medium", "roof": "thatch" },
+        { "size": "medium", "roof": "tile", "walls": "plank" },
+        { "room": "inn", "size": "large", "roof": "tile", "max": 1 }
+      ]
+    }
+  ],
+  "wild": { "trees": 22, "mix": ["oak", "oak", "pine", "pine", "pine", "dead", "young"], "shrubs": 7, "boulders": 1.2, "grain": 120 },
+  "hero": { "house": "inn" },
+  "people": [
+    { "id": "villager", "is": ["human", "job-miller"], "seed": 2, "routine": { "beat": { "road": 0, "from": 4150, "to": 4420 } } }
+  ]
+}

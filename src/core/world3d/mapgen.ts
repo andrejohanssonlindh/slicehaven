@@ -22,6 +22,9 @@ import { type Ground3D, type Road, type XZ, lakeDist, roadDist } from './terrain
 
 export type HouseSize = 'small' | 'medium' | 'large' | { width: number; depth: number };
 
+/** A side of a road, as a compass point. */
+export type Side = 'north' | 'south' | 'east' | 'west';
+
 const SIZES: Record<'small' | 'medium' | 'large', { width: number; depth: number }> = {
   small: { width: 5, depth: 4 },
   medium: { width: 6, depth: 4.6 },
@@ -34,10 +37,11 @@ export type HouseAt =
   | {
     /** Index into `roads`. */
     road: number;
-    /** How far along the road, 0 (start) to 1 (end). */
-    t: number;
+    /** How far along the road in metres from its start (or `t`, a share of its length, 0 to 1). */
+    m?: number;
+    t?: number;
     /** Which side of the road, as a compass point: north is up the screen (-z), south down (+z). */
-    side: 'north' | 'south' | 'east' | 'west';
+    side: Side;
     /** Space between the road's edge and the house's porch, metres (default 2). */
     gap?: number;
   };
@@ -62,7 +66,7 @@ export interface MapHouse {
 /** Someone who lives in the map: what kinds of person they are (`core/persons.ts`), and what they do all day. */
 export interface MapPerson extends PersonSpec {
   id: string;
-  /** Walk a line there and back (points, or a stretch of a road, 0 to 1 along it, default 0.2 to 0.8), or go the rounds of a house. */
+  /** Walk a line there and back (points, or a stretch of a road in metres from its start, default 20% to 80% of it), or go the rounds of a house. */
   routine: { beat: XZ[] | { road: number; from?: number; to?: number } } | { rounds: string };
 }
 
@@ -79,15 +83,54 @@ export type Area =
   /** The whole map, minus a margin at its edge. */
   | { all: true };
 
-export interface Scatter {
-  kind: 'tree' | 'shrub' | 'boulder';
-  count: number;
-  area: Area;
-  /** Extra space kept clear around each, metres. */
-  gap?: number;
-  seed?: number;
-  /** Trees only: the kinds of tree to mix (each tree picks one at random; omitted, all are oaks). */
-  mix?: string[];
+/** Is (x, z) in an area? (`all` is the map less its edge, `half - edge` from the middle.) */
+export function inArea(a: Area, x: number, z: number, inner: number): boolean {
+  if ('circle' in a) return Math.hypot(x - a.circle[0], z - a.circle[1]) <= a.circle[2];
+  if ('rect' in a) return x >= a.rect[0] && x <= a.rect[2] && z >= a.rect[1] && z <= a.rect[3];
+  if ('ring' in a) {
+    const d = Math.hypot(x - a.ring[0], z - a.ring[1]);
+    return d >= a.ring[2] && d <= a.ring[3];
+  }
+  return Math.abs(x) <= inner && Math.abs(z) <= inner;
+}
+
+/**
+ * A map rule: one way of saying "put things here" by intent ("a street of houses along road 0, every 20 m"), one
+ * file each in `content/maps/rules/`. A map uses one with `{ "rule": "street", ...what it takes }`; the compiler runs
+ * the uses in the order written. A rule of the `houses` phase runs before the houses are placed and adds houses and
+ * people; one of the `things` phase runs after, and adds trees and props, keeping clear of what is there.
+ */
+export interface MapRule {
+  id: string;
+  /** One line on what it does, for whoever writes maps. */
+  about: string;
+  phase: 'houses' | 'things';
+  /** The keys a use of it may have (besides `rule`); any other is reported. */
+  keys: string[];
+  expand(use: RuleUse, ctx: RuleContext): void;
+}
+
+/** A use of a rule in a map: its name and what it was given (checked by the rule). */
+export type RuleUse = { rule: string } & Record<string, unknown>;
+
+/** What a rule may read and add to while the map is compiled. */
+export interface RuleContext {
+  spec: MapSpec;
+  things: Things;
+  /** The map's own seeded generator (rules take turns with it, in order, so a map compiles the same every time). */
+  rng: Rng;
+  /** Half the map's side, and the margin kept clear at its edge. */
+  half: number;
+  edge: number;
+  problem(s: string): void;
+  /** `houses` phase: the houses and people so far (add to them). */
+  houses: MapHouse[];
+  people: MapPerson[];
+  /** `things` phase: the layout so far (add trees and props), and the houses' whole boxes. */
+  layout: Layout;
+  boxes: Shape[];
+  lakeD(x: number, z: number): number;
+  roadD(x: number, z: number): number;
 }
 
 /**
@@ -104,12 +147,15 @@ export interface WildSpec {
   boulders?: number;
   /** About how big the woods and clearings are, metres (default 90). */
   grain?: number;
-  /** Only where (x, z) says so (a district, a margin); default everywhere. */
-  where?: (x: number, z: number) => boolean;
+  /** Only in this area (a district, a margin); default everywhere. */
+  area?: Area;
 }
 
 export interface MapSpec {
+  /** The map's name: its file is `content/maps/<name>.json`. */
   name: string;
+  /** What the map is, for whoever opens the file (JSON has no comments). */
+  about?: string;
   seed: number;
   /** Side of the square map, metres. */
   size: number;
@@ -120,16 +166,14 @@ export interface MapSpec {
   mud?: { x: number; z: number; r: number }[];
   /** Stamp mud in front of every door. */
   doorMud?: boolean;
-  houses: MapHouse[];
-  /** Things dropped wherever there is room. */
-  scatter?: Scatter[];
+  houses?: MapHouse[];
+  /** Things placed by intent, in order (see `MapRule`): streets of houses, torches along a road, scattered woods. */
+  rules?: RuleUse[];
   /** Trees, bushes and rocks made chunk by chunk as the map is explored (for large outdoor areas). */
   wild?: WildSpec;
   /** Things at exact spots. */
   trees?: PlacedTree[];
   props?: PlacedProp[];
-  /** Torch posts along a road every so many metres (single posts are props of kind `torchpost`). */
-  torchLines?: { road: number; every: number; side: 'north' | 'south' | 'east' | 'west'; offset?: number }[];
   /** Where the hero starts: a spot, or in front of a house's door. */
   hero?: [number, number] | { house: string };
   /** The people who live here. */
@@ -174,7 +218,7 @@ export function roadPoint(r: Road, s: number): { x: number; z: number; tx: numbe
 const COMPASS = { north: [0, -1], south: [0, 1], east: [1, 0], west: [-1, 0] } as const;
 
 /** The unit normal of a road at a point that points toward a compass side. */
-function sideNormal(tx: number, tz: number, side: keyof typeof COMPASS): [number, number] {
+export function sideNormal(tx: number, tz: number, side: Side): [number, number] {
   const n: [number, number] = [-tz, tx];
   const c = COMPASS[side];
   return n[0] * c[0] + n[1] * c[1] >= 0 ? n : [-n[0], -n[1]];
@@ -212,7 +256,7 @@ export function wildGenerator(w: WildSpec, ctx: WildContext): ChunkGenerator {
   const grain = w.grain ?? 90;
   const free = (x: number, z: number, lake: number, road: number, house: number): boolean => {
     if (Math.abs(x) > ctx.half - ctx.edge || Math.abs(z) > ctx.half - ctx.edge) return false;
-    if (w.where && !w.where(x, z)) return false;
+    if (w.area && !inArea(w.area, x, z, ctx.half - ctx.edge)) return false;
     if (ctx.lakeD(x, z) < lake || ctx.roadD(x, z) < road) return false;
     if (ctx.clear.some((c) => Math.hypot(x - c.x, z - c.z) < c.r)) return false;
     return !ctx.houses.near(x - house, z - house, x + house, z + house).some((b) => shapeDist(b, x, z) < house);
@@ -255,13 +299,38 @@ export function wildGenerator(w: WildSpec, ctx: WildContext): ChunkGenerator {
 
 // --- compiling -------------------------------------------------------------
 
+/** What the compiler checks a map against; each is optional (what is not given is not checked, or not available). */
+export interface CompileOptions {
+  /** The kinds of person (`content/people`), to check the cast by. */
+  persons?: PersonKinds;
+  /** The kinds of furniture a house's rooms call for (`content/furnish.ts`), to check houses against the view. */
+  pieces?: (b: BuiltHouse) => string[];
+  /** The map rules there are, by name (`content/maps/rules/`). */
+  rules?: Record<string, MapRule>;
+}
+
+/** The keys each part of a map may have: anything else is a typo, and is reported. */
+const KEYS = {
+  map: ['name', 'about', 'seed', 'size', 'roads', 'lake', 'rivers', 'mud', 'doorMud', 'houses', 'rules', 'wild', 'trees', 'props', 'hero', 'people'],
+  house: ['id', 'room', 'size', 'roof', 'walls', 'wallH', 'seed', 'plan', 'torch', 'at'],
+  at: ['x', 'z', 'rot', 'road', 'm', 't', 'side', 'gap'],
+  wild: ['trees', 'mix', 'shrubs', 'boulders', 'grain', 'area'],
+  person: ['id', 'is', 'seed', 'look', 'routine'],
+};
+
+/** Report the keys of `o` that are not in `allowed`. */
+export function strayKeys(o: object, allowed: readonly string[], where: string, problem: (s: string) => void): void {
+  for (const k of Object.keys(o)) if (!allowed.includes(k)) problem(`${where}: unknown key "${k}"`);
+}
+
 /**
- * Compile a map. `things` is the kinds of thing (`content/things`): what every placed thing is; `persons` the kinds of
- * person (`content/people`), to check the cast by (without it the cast is taken as written); `pieces` the kinds of
- * furniture a house's rooms call for (`content/furnish.ts`), to check houses against the view (without it, not checked).
+ * Compile a map. `things` is the kinds of thing (`content/things`): what every placed thing is. The options add the
+ * other libraries the map is checked against, and the rules it may use.
  */
-export function compileMap(spec: MapSpec, things: Things, persons?: PersonKinds, pieces?: (b: BuiltHouse) => string[]): CompiledMap {
+export function compileMap(spec: MapSpec, things: Things, opts: CompileOptions = {}): CompiledMap {
+  const { persons, pieces } = opts;
   const problems: string[] = [];
+  const problem = (s: string): void => void problems.push(s);
   const rng = Rng.fromSeed(spec.seed);
   const half = spec.size / 2;
   const edge = 4;
@@ -271,8 +340,34 @@ export function compileMap(spec: MapSpec, things: Things, persons?: PersonKinds,
   const lakeD = (x: number, z: number): number => lakeDist(shape, x, z);
   const roadD = (x: number, z: number): number => spec.roads.reduce((m, r) => Math.min(m, roadDist(r, x, z) - r.width / 2), Infinity);
 
+  // Typos: every part of the map has only the keys it can have.
+  strayKeys(spec, KEYS.map, 'map', problem);
+  for (const h of spec.houses ?? []) {
+    strayKeys(h, KEYS.house, `house ${h.id}`, problem);
+    strayKeys(h.at, KEYS.at, `house ${h.id} at`, problem);
+  }
+  if (spec.wild) strayKeys(spec.wild, KEYS.wild, 'wild', problem);
+  for (const p of spec.people ?? []) strayKeys(p, KEYS.person, `person ${p.id}`, problem);
+
+  // The rules, in order, each in its phase (a rule nobody wrote is told so).
+  const ctx: RuleContext = {
+    spec, things, rng, half, edge, problem, lakeD, roadD,
+    houses: [...(spec.houses ?? [])], people: [...(spec.people ?? [])],
+    layout: { houses: [], trees: [...(spec.trees ?? [])], props: [...(spec.props ?? [])] }, boxes: [],
+  };
+  const uses = (spec.rules ?? []).flatMap((use, n) => {
+    const rule = opts.rules?.[use.rule];
+    if (!rule) {
+      problem(`rule ${n + 1}: no map rule called ${use.rule}`);
+      return [];
+    }
+    strayKeys(use, ['rule', ...rule.keys], `rule ${n + 1} (${use.rule})`, problem);
+    return [{ rule, use }];
+  });
+  for (const { rule, use } of uses) if (rule.phase === 'houses') rule.expand(use, ctx);
+
   // Houses.
-  const houses: PlacedHouse[] = spec.houses.map((h) => {
+  const houses: PlacedHouse[] = ctx.houses.map((h) => {
     // A kind of building nobody defined is told so, and built as a cottage.
     let plan = h.plan;
     if (plan && !things.has(plan)) problems.push(`house ${h.id}: no kind of building called ${plan}`), plan = undefined;
@@ -285,7 +380,7 @@ export function compileMap(spec: MapSpec, things: Things, persons?: PersonKinds,
         problems.push(`house ${h.id}: no road ${h.at.road}`);
         return { id: h.id, x: 0, z: 0, rot: 0, spec: hs, room: h.room };
       }
-      const p = roadPoint(road, h.at.t * roadLength(road));
+      const p = roadPoint(road, h.at.m ?? (h.at.t ?? 0) * roadLength(road));
       const [nx, nz] = sideNormal(p.tx, p.tz, h.at.side);
       // The house's front (local +z) faces the road; its footprint runs 0.6 m past the front wall for the porch.
       const dist = road.width / 2 + (h.at.gap ?? 2) + dims.depth / 2 + 0.6;
@@ -295,28 +390,12 @@ export function compileMap(spec: MapSpec, things: Things, persons?: PersonKinds,
     return { id: h.id, x: h.at.x, z: h.at.z, rot: h.at.rot ?? 0, spec: hs, room: h.room };
   });
 
-  const layout: Layout = {
-    houses,
-    trees: [...(spec.trees ?? [])],
-    props: [...(spec.props ?? [])],
-  };
-  for (const tl of spec.torchLines ?? []) {
-    const road = spec.roads[tl.road];
-    if (!road) {
-      problems.push(`torch line: no road ${tl.road}`);
-      continue;
-    }
-    const len = roadLength(road);
-    for (let s = tl.every / 2; s < len; s += tl.every) {
-      const p = roadPoint(road, s);
-      const [nx, nz] = sideNormal(p.tx, p.tz, tl.side);
-      const d = road.width / 2 + (tl.offset ?? 0.9);
-      layout.props.push({ kind: 'torchpost', x: p.x + nx * d, z: p.z + nz * d, seed: layout.props.length });
-    }
-  }
+  const layout = ctx.layout;
+  layout.houses = houses;
 
   const built = buildHouses(layout, things);
   const boxes = built.map(houseOuterBox);
+  ctx.boxes = boxes;
   // A room painted as seen from its front (a bed, a horse) must be in a house that roughly faces the view.
   if (pieces) {
     for (const b of built) {
@@ -326,49 +405,11 @@ export function compileMap(spec: MapSpec, things: Things, persons?: PersonKinds,
     }
   }
 
-  // Scatter: seeded random spots that keep clear of everything already there.
-  const KEEP = { tree: 0.9, shrub: 0.5, boulder: 0.8 } as const;
-  const placed: { x: number; z: number; r: number }[] = [
-    ...layout.trees.map((t) => ({ x: t.x, z: t.z, r: KEEP.tree })),
-    ...layout.props.map((p) => ({ x: p.x, z: p.z, r: p.kind === 'woodpile' ? 1 : p.kind === 'torchpost' ? 0.4 : KEEP[p.kind === 'boulder' ? 'boulder' : 'shrub'] })),
-  ];
-  const inArea = (a: Area): (() => [number, number]) => {
-    if ('circle' in a) return () => {
-      const r = a.circle[2] * Math.sqrt(rng.next()), t = rng.next() * Math.PI * 2;
-      return [a.circle[0] + Math.cos(t) * r, a.circle[1] + Math.sin(t) * r];
-    };
-    if ('rect' in a) return () => [a.rect[0] + rng.next() * (a.rect[2] - a.rect[0]), a.rect[1] + rng.next() * (a.rect[3] - a.rect[1])];
-    if ('ring' in a) return () => {
-      const [cx, cz, r0, r1] = a.ring;
-      const r = Math.sqrt(r0 * r0 + rng.next() * (r1 * r1 - r0 * r0)), t = rng.next() * Math.PI * 2;
-      return [cx + Math.cos(t) * r, cz + Math.sin(t) * r];
-    };
-    return () => [(rng.next() * 2 - 1) * (half - edge), (rng.next() * 2 - 1) * (half - edge)];
-  };
-  for (const sc of spec.scatter ?? []) {
-    const pick = inArea(sc.area);
-    const r = KEEP[sc.kind] + (sc.gap ?? (sc.kind === 'tree' ? 2.6 : 0.8));
-    let got = 0;
-    for (let tries = 0; got < sc.count && tries < sc.count * 80; tries++) {
-      const [x, z] = pick();
-      if (Math.abs(x) > half - edge || Math.abs(z) > half - edge) continue;
-      if (lakeD(x, z) < 1.6 || roadD(x, z) < 1.4) continue;
-      if (boxes.some((b) => shapeDist(b, x, z) < (sc.kind === 'tree' ? 2.4 : 1.2))) continue;
-      if (placed.some((o) => Math.hypot(o.x - x, o.z - z) < r + o.r)) continue;
-      placed.push({ x, z, r: KEEP[sc.kind] });
-      got++;
-      if (sc.kind === 'tree') {
-        const seed = 1 + Math.floor(rng.next() * 60);
-        // The kind is drawn only when asked for, so maps without a mix place exactly what they always did.
-        layout.trees.push(sc.mix?.length ? { x, z, seed, kind: sc.mix[Math.floor(rng.next() * sc.mix.length)] } : { x, z, seed });
-      }
-      else layout.props.push({ kind: sc.kind === 'boulder' ? 'boulder' : 'shrub', x, z, seed: 1 + Math.floor(rng.next() * 60), size: 0.8 + rng.next() * 0.5 });
-    }
-    if (got < sc.count) problems.push(`scatter ${sc.kind}: only room for ${got} of ${sc.count}`);
-  }
+  // The rules that place things (torches along a road, scattered woods), keeping clear of the houses.
+  for (const { rule, use } of uses) if (rule.phase === 'things') rule.expand(use, ctx);
 
-  // Torches beside doors (after the scatter, which keeps clear of the houses anyway).
-  spec.houses.forEach((h, i) => {
+  // Torches beside doors (after the rules: the scatter keeps clear of the houses anyway).
+  ctx.houses.forEach((h, i) => {
     if (!h.torch) return;
     const b = built[i], d = b.model.door;
     const w = houseToWorld(b.place, d[0] + 0.95, d[2] + 0.25);
@@ -406,13 +447,13 @@ export function compileMap(spec: MapSpec, things: Things, persons?: PersonKinds,
 
   // The people: a beat along a road becomes points just off its middle, and every person must be one the kinds know.
   const cast: CastMember[] = [];
-  for (const p of spec.people ?? []) {
+  for (const p of ctx.people) {
     const bad = persons?.problem(p);
     if (bad) problems.push(`person ${p.id}: ${bad}`);
     if (cast.some((c) => c.id === p.id)) problems.push(`two people are called ${p.id}`);
     const r = p.routine;
     if ('rounds' in r) {
-      if (!spec.houses.some((h) => h.id === r.rounds)) problems.push(`person ${p.id}: no house ${r.rounds} to go the rounds of`);
+      if (!ctx.houses.some((h) => h.id === r.rounds)) problems.push(`person ${p.id}: no house ${r.rounds} to go the rounds of`);
       cast.push({ ...p, routine: r });
     } else if (Array.isArray(r.beat)) cast.push({ ...p, routine: { beat: r.beat } });
     else {
@@ -421,9 +462,9 @@ export function compileMap(spec: MapSpec, things: Things, persons?: PersonKinds,
         problems.push(`person ${p.id}: no road ${r.beat.road}`);
         continue;
       }
-      const len = roadLength(road), from = r.beat.from ?? 0.2, to = r.beat.to ?? 0.8;
+      const len = roadLength(road), from = r.beat.from ?? len * 0.2, to = r.beat.to ?? len * 0.8;
       const beat = [0, 1, 2, 3].map((k) => {
-        const q = roadPoint(road, len * (from + ((to - from) * k) / 3));
+        const q = roadPoint(road, from + ((to - from) * k) / 3);
         return [q.x + q.tz * 0.6, q.z - q.tx * 0.6] as XZ;
       });
       cast.push({ ...p, routine: { beat } });
@@ -444,7 +485,6 @@ export function compileMap(spec: MapSpec, things: Things, persons?: PersonKinds,
   };
   layout.props = layout.props.filter((p) => kindOk(p.kind, 'prop'));
   layout.trees = layout.trees.filter((t) => kindOk(t.kind ?? 'oak', 'tree'));
-  for (const sc of spec.scatter ?? []) for (const k of sc.mix ?? []) kindOk(k, 'scatter mix');
   for (const k of spec.wild?.mix ?? []) kindOk(k, 'wild mix');
   problems.push(...unknown);
 
@@ -452,12 +492,12 @@ export function compileMap(spec: MapSpec, things: Things, persons?: PersonKinds,
   if (generator) ground.extraShade = (x, z) => index.shadeAt(x, z);
 
   const compiled: CompiledMap = { name: spec.name, ground, layout, placed: index, hero, cast, problems };
-  problems.push(...validate(spec, compiled, things, built.map((b, i) => ({ id: b.place.id, box: boxes[i], door: houseToWorld(b.place, b.model.door[0], b.model.door[2] - 0.9) }))));
+  problems.push(...validate(ctx.houses, compiled, things, built.map((b, i) => ({ id: b.place.id, box: boxes[i], door: houseToWorld(b.place, b.model.door[0], b.model.door[2] - 0.9) }))));
   return compiled;
 }
 
 /** What is wrong with a compiled map (empty if nothing). */
-function validate(spec: MapSpec, c: CompiledMap, things: Things, houses: { id: string; box: Shape; door: { x: number; z: number } }[]): string[] {
+function validate(mapHouses: readonly MapHouse[], c: CompiledMap, things: Things, houses: { id: string; box: Shape; door: { x: number; z: number } }[]): string[] {
   const out: string[] = [];
   const g = c.ground;
   const half = g.size / 2;
@@ -517,6 +557,6 @@ function validate(spec: MapSpec, c: CompiledMap, things: Things, houses: { id: s
       }
     }
   }
-  if (spec.houses.length !== new Set(spec.houses.map((h) => h.id)).size) out.push('two houses share an id');
+  if (mapHouses.length !== new Set(mapHouses.map((h) => h.id)).size) out.push('two houses share an id');
   return out;
 }

@@ -86,7 +86,7 @@ describe('the cast of a map', () => {
         { id: 'walker', is: ['human', 'job-miller'], routine: { beat: { road: 0 } } },
         { id: 'keeper', is: ['dwarf', 'job-innkeeper'], routine: { rounds: 'inn' } },
       ],
-    }, THINGS, PERSON_KINDS);
+    }, THINGS, { persons: PERSON_KINDS });
     expect(c.problems).toEqual([]);
     expect(c.cast.map((p) => p.id)).toEqual(['walker', 'keeper']);
     const beat = (c.cast[0].routine as { beat: [number, number][] }).beat;
@@ -103,7 +103,7 @@ describe('the cast of a map', () => {
         { id: 'x', is: ['dwarf', 'elf'], routine: { beat: [[0, 0], [1, 0]] } },
         { id: 'x', is: ['human'], routine: { rounds: 'castle' } },
       ],
-    }, THINGS, PERSON_KINDS);
+    }, THINGS, { persons: PERSON_KINDS });
     expect(c.problems).toEqual(expect.arrayContaining([
       expect.stringMatching(/person x: a person can't be both dwarf and elf/),
       'person x: no house castle to go the rounds of',

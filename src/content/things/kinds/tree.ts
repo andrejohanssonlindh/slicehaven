@@ -12,6 +12,7 @@ const trees: ThingDef[] = [
     abstract: true,
     foot: [{ circle: 0.5 }],
     blocksSight: true,
+    keepClear: 0.9,
     filament: { kind: 'tree' },
     tree: { model: (seed) => buildTree(seed, 7, 'oak'), crown: { y: 5.2, r: 2 } },
   },

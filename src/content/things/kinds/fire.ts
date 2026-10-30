@@ -14,6 +14,7 @@ const things: ThingDef[] = [
     look: 'A timber post with a torch burning on top.',
     // The post itself: a walker can stand against it.
     foot: [{ circle: 0.12 }],
+    keepClear: 0.4,
     filament: { kind: 'fire', weight: TORCH_FIRE },
     flame: { y: POST_HEIGHT },
     draw: () => {

@@ -37,4 +37,4 @@
 
 ## How to add a large map
 
-Write a `MapSpec` with `size` in the thousands, roads as polylines, the authored places (houses, props) where you want them and a `wild: { trees: 22, mix: [...], shrubs, boulders, grain }` for everything else; add it to `content/maps/index.ts`. `tests/maps.test.ts` checks that it compiles clean. Use `where: (x, z) => ...` on the `wild` to confine it to a district or leave a clearing.
+Write a map file (`content/maps/<name>.json`) with `size` in the thousands, roads as polylines, the authored places (houses, props, streets) where you want them and a `wild: { trees: 22, mix: [...], shrubs, boulders, grain }` for everything else. It is found by itself; `tests/maps.test.ts` checks that it compiles clean. Use `area` on the `wild` (a `circle`, `rect` or `ring`) to confine it to a district.

@@ -10,6 +10,7 @@ const things: ThingDef[] = [
     is: 'structure',
     look: 'Split logs stacked to dry.',
     foot: [{ box: [0.9, 0.55] }],
+    keepClear: 1,
     sink: 0.02,
     draw: (p) => solid('bark', buildWoodpile(p.seed)),
   },

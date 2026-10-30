@@ -34,21 +34,13 @@ Read only the handover for the area you're asked about; don't read the whole `di
 | Skills, people, hooks | `/skills/` | `director/design/skill-map-handover.md` | `src/content/skillweb`, `src/content/people`, `src/core/skillweb.ts`, `src/core/people.ts` |
 | Character creator | `/chargen/` | `director/design/character-creator.md` | `src/core/chargen`, `src/content/chargen`, `src/chargen` |
 | Gate scene rules (data for the skill map; its hex page is gone) | | `director/archive/exploration-scenes.md` | `src/core/scene.ts`, `src/content/scenes` |
-| **3D world (current focus, three.js)** | `/spike3d/` | `director/design/world-structure.md`, then `world3d-handover.md` (then `world3d-m0.md`, `voxel-engine-brief.md`), and the open items in `director/design/review-2026-10-29.md` | `src/core/world3d`, `src/engine3d`, `src/art/textures3d.ts`, `src/content/spike3d.ts`, `src/content/maps`, `src/content/furnish.ts`, `src/spike3d` |
+| **3D world (current focus, three.js)** | `/spike3d/` | `director/design/world-structure.md`, then `world3d-handover.md` (then `world3d-m0.md`, `voxel-engine-brief.md`); maps: `world3d-authoring.md` | `src/core/world3d`, `src/engine3d`, `src/art/textures3d.ts`, `src/content/spike3d.ts`, `src/content/maps` (JSON maps, `rules/`), `src/content/furnish.ts`, `src/spike3d` |
 | Kinds of person (people × calling × …), the map's cast | | `director/design/people-kinds.md` | `src/core/persons.ts`, `src/content/people/kinds`, `MapSpec.people` in `src/core/world3d/mapgen.ts` |
 | Magic | | `director/design/magic-filaments.md`, `magic-on-map.md` | `src/core/filaments.ts` (rules), `src/core/world3d/filaments3d.ts` (field) |
 
 The deeper designs (`skill-web.md`, `people-library.md`, `ways-of-use.md`) are for when you change the shape, not for every task. Debug hook: `window.spike` (see the 3D handover).
 
 **The 2D hex engine was removed on 2026-10-29** (sandbox, gate scene page, Reedwater, Art Lab). Its code is in the git tag `2d-archive`, its art as pictures in `director/archive/2d-art.md`. Don't bring hex code back; take a painter from the tag only to give it a 3D use.
-
-## Standing work order: 3D review fixes (remove this section when every item in the review is fixed)
-Sessions fixing `director/design/review-2026-10-29.md` (Sonnet does the rest; Opus did item 4, the actors refactor, which also fixed bugs 1 and 2):
-- Order: bug 3 (leaks), the failing torch e2e, item 5, item 6, item 7, items 10–13. Items 8 and 9 are design work: only if asked.
-- One commit per item; skip items marked ✅; don't take on items you weren't asked for. Walking lives in `core/world3d/actors.ts`: keep it there.
-- Edit files only with Edit/Write, never `sed` or other shell edits.
-- Before every push: `npm test`, `npm run build` **and** `npm run test:e2e` (about 8 minutes; wait for it). All must pass.
-- Add a test for each bug fixed; mark the item ✅ in the review and add a devlog line.
 
 ## Tech
 - Vite + TypeScript (strict). **three.js for the 3D world** (`src/engine3d`, code-split; decision 2026-10-28); art is still painted per pixel by code (`src/art`) and put on textures and sprite cards. Vitest for unit tests (`tests/`). **Playwright** (Chromium) for browser tests and screenshots (`e2e/`; on a new machine run `npx playwright install chromium`, no sudo needed). `marked` for the Director's Room.
