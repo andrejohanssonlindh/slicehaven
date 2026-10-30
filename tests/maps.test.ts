@@ -1,9 +1,27 @@
 import { describe, expect, it } from 'vitest';
-import { MAPS, mapNamed } from '../src/content/maps';
+import { MAPS, housePieces, mapNamed } from '../src/content/maps';
 import { THINGS } from '../src/content/things';
 import { type CompiledMap, type MapSpec, compileMap, roadLength, roadPoint } from '../src/core/world3d/mapgen';
 
 const compile = (spec: MapSpec): CompiledMap => compileMap(spec, THINGS);
+
+describe('houses against the view (review item 10)', () => {
+  const at = (side: 'north' | 'south') => ({ road: 0, t: 0.5, side });
+  const spec = (side: 'north' | 'south', plan?: string): MapSpec => ({
+    name: 't', seed: 1, size: 80, roads: [{ pts: [[-40, 0], [40, 0]], width: 3 }], hero: [0, 0], houses: [{ id: 'h', at: at(side), ...(plan ? { plan } : {}) }],
+  });
+  const problems = (s: MapSpec): string[] => compileMap(s, THINGS, undefined, housePieces).problems;
+
+  it('a stable or an inn turned away from the view is reported (its horses and beds are painted from the front)', () => {
+    expect(problems(spec('south', 'stable'))).toEqual([expect.stringMatching(/house h faces away from the view, and its horse/)]);
+    expect(problems(spec('south', 'inn'))).toEqual([expect.stringMatching(/house h faces away from the view, and its bed/)]);
+    expect(problems(spec('north', 'stable'))).toEqual([]);
+  });
+
+  it('a cottage may face any way (nothing in it is painted for one way of looking)', () => {
+    expect(problems(spec('south'))).toEqual([]);
+  });
+});
 
 /** The gate every map passes: whatever the author wrote, it compiles to a world with nothing wrong in it. */
 describe('every map', () => {

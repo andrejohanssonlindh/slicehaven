@@ -347,6 +347,12 @@ export function furnish(set: RoomSet, room: RoomRect, doorX: number, seed = 0, o
 const ROLE_SETS: Record<string, RoomSet> = { guest: 'guestroom', landing: 'landing', attic: 'attic', upstairs: 'upstairs', stall: 'stall', aisle: 'aisle' };
 export const roleSet = (role: string, main: RoomSet): RoomSet => ROLE_SETS[role] ?? main;
 
+/** The kinds of piece a building's rooms call for (without placing them): what the map compiler checks. */
+export function piecesOf(model: HouseModel, main: RoomSet): string[] {
+  const sets = new Set(model.levels.flatMap((lv) => lv.rooms.map((r) => roleSet(r.role, main))));
+  return [...new Set([...sets].flatMap((s) => (s === 'smithy' ? [] : RECIPES[s].map((l) => l.piece))))];
+}
+
 /** A furnished room of a building, with the storey it is on. */
 export interface FurnishedRoom extends Furnished {
   level: number;

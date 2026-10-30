@@ -86,7 +86,13 @@ export interface ThingDef {
    * A piece of furniture: how it sits in a room (on the floor, hung on a wall, or flat like a rug) and how big it is.
    * It is drawn as a painted card, not meshes (`content/things/kinds/furniture.ts`).
    */
-  furniture?: { mount: 'floor' | 'hung' | 'flat'; d?: number; maxW?: number };
+  furniture?: {
+    mount: 'floor' | 'hung' | 'flat';
+    d?: number;
+    maxW?: number;
+    /** Its card is painted as seen from the room's front (a bed's head at the back wall, a horse from behind): in a house that faces away from the view it reads wrong, and the map compiler says so. */
+    facesView?: boolean;
+  };
   /** A kind of building: how it is put together (`buildHouse` reads this). */
   building?: BuildingPlan;
   /** It sends up a column of smoke from this high above the ground. */

@@ -31,6 +31,8 @@ interface Piece {
   /** Cap on the width, metres, for sprites drawn much wider than the thing is. */
   maxW?: number;
   gives?: { kind: SourceKind; weight: number };
+  /** See `facesView` in `core/world3d/things.ts`. */
+  facesView?: boolean;
 }
 
 const floor = (is: string, look: string, art: () => Prop, d?: number, maxW?: number, gives?: Piece['gives']): Piece => ({ is, look, art, mount: 'floor', d, maxW, gives });
@@ -72,8 +74,8 @@ const PIECES: Record<string, Piece> = {
   straw: flat('Straw on the floor.', () => makeStrawBits()),
   litter: flat('Odds and ends on the floor.', () => makeClutter()),
   // A guest's bed is the old, handsome one (a frame, a tick, a blanket); the village's own is the pallet.
-  bed: floor(F, 'A bed with a frame, a tick and a blanket.', () => makeGuestBed(), 1.25, 2.0),
-  horse: floor(F, 'A horse in its stall.', () => makeHorse(), 2.6, 0.8),
+  bed: { ...floor(F, 'A bed with a frame, a tick and a blanket.', () => makeGuestBed(), 1.25, 2.0), facesView: true },
+  horse: { ...floor(F, 'A horse in its stall.', () => makeHorse(), 2.6, 0.8), facesView: true },
   haybale: floor(F, 'A bale of hay.', () => makeHayBale(), 0.7, 1.0),
   hayRack: hung('A hay rack.', () => makeHayRack(), undefined, 1.2),
 };
@@ -87,7 +89,7 @@ export default [
     id,
     is: p.is,
     look: p.look,
-    furniture: { mount: p.mount, d: p.d, maxW: p.maxW },
+    furniture: { mount: p.mount, d: p.d, maxW: p.maxW, ...(p.facesView ? { facesView: true } : {}) },
     ...(p.gives ? { filament: p.gives } : {}),
   })),
 ] satisfies ThingDef[];

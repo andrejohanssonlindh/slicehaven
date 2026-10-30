@@ -6,6 +6,7 @@
 - **House numbers out of the API (review item 5) ✅:** the page and the tests name houses by their map id (`walkIn("inn")`, `heroHouse() === "inn"`), never by their place among the houses standing, which changes as you walk.
 - **Memory that grew with the world walked (review item 6) ✅:** far house models, walking-grid blocks and filament-field cells are let go every few seconds, like the furnished rooms already were, and made again the same if you come back. The house-model cache keeps the 160 looks used last.
 - **The field no longer forgets everything twice a second (review item 7) ✅:** someone taking a step clears only the readings near them, and the readings stay while the weather, the clouds (to 2 m) and the sun (to 2°) hold. A test checks the readings always match a field made afresh. Slip: appended these tests with a shell command, not Edit.
+- **A map can't turn beds and horses the wrong way by accident (review item 10) ✅:** the bed and the horse are painted as seen from the room's front (`facesView`), and the map compiler now reports a house that faces away from the view and holds one. Every current map passes; a stable on the south side of a road would not.
 
 ## 2026-10-30 — Kinds of person: their people and their calling at once
 

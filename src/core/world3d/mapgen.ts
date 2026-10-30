@@ -2,7 +2,8 @@ import { fbm } from '../noise';
 import { Rng } from '../rng';
 import { CHUNK } from './chunks';
 import type { House3DSpec, HousePlan, RoofKind, WallKind } from './house';
-import { type Layout, type PlacedHouse, type PlacedTree, buildHouses, houseOuterBox, houseToWorld, layoutObstacles, layoutPads, layoutShade } from './layout';
+import { FACING_MIN, VIEW_YAW } from './view';
+import { type BuiltHouse, type Layout, type PlacedHouse, type PlacedTree, buildHouses, houseOuterBox, houseToWorld, layoutObstacles, layoutPads, layoutShade } from './layout';
 import { type ChunkContent, type ChunkGenerator, PlacedIndex } from './placed';
 import { type PlacedProp } from './props';
 import type { PersonKinds, PersonSpec } from '../persons';
@@ -256,9 +257,10 @@ export function wildGenerator(w: WildSpec, ctx: WildContext): ChunkGenerator {
 
 /**
  * Compile a map. `things` is the kinds of thing (`content/things`): what every placed thing is; `persons` the kinds of
- * person (`content/people`), to check the cast by (without it the cast is taken as written).
+ * person (`content/people`), to check the cast by (without it the cast is taken as written); `pieces` the kinds of
+ * furniture a house's rooms call for (`content/furnish.ts`), to check houses against the view (without it, not checked).
  */
-export function compileMap(spec: MapSpec, things: Things, persons?: PersonKinds): CompiledMap {
+export function compileMap(spec: MapSpec, things: Things, persons?: PersonKinds, pieces?: (b: BuiltHouse) => string[]): CompiledMap {
   const problems: string[] = [];
   const rng = Rng.fromSeed(spec.seed);
   const half = spec.size / 2;
@@ -315,6 +317,14 @@ export function compileMap(spec: MapSpec, things: Things, persons?: PersonKinds)
 
   const built = buildHouses(layout, things);
   const boxes = built.map(houseOuterBox);
+  // A room painted as seen from its front (a bed, a horse) must be in a house that roughly faces the view.
+  if (pieces) {
+    for (const b of built) {
+      if (Math.cos(VIEW_YAW - b.place.rot) >= FACING_MIN) continue;
+      const wrong = pieces(b).filter((k) => things.has(k) && things.get(k).furniture?.facesView);
+      if (wrong.length) problems.push(`house ${b.place.id} faces away from the view, and its ${wrong.join(' and ')} would read wrong (put it on the other side of the road, or turn it)`);
+    }
+  }
 
   // Scatter: seeded random spots that keep clear of everything already there.
   const KEEP = { tree: 0.9, shrub: 0.5, boulder: 0.8 } as const;

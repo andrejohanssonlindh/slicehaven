@@ -34,6 +34,7 @@ import { type Ground3D, groundHeight, lakeDist, splatAt } from '../core/world3d/
 import { TEXELS_PER_M } from '../core/world3d/tiers';
 import type { Clump } from '../core/world3d/tree';
 import { fbm } from '../core/noise';
+import { VIEW_YAW } from '../core/world3d/view';
 import { Weather } from '../core/world3d/weather';
 import { type Flame, makeFlame, makeOrb } from './fire';
 import { EXPLORED_WINDOW, type LitOpts, SEE_SLOTS, WORLD, exploredTexture, lit, pixTexture, shellOf, sightTexture } from './materials';
@@ -51,7 +52,7 @@ import { type Water, makeWater } from './water';
  * then runs it (weather, light, the walking villager, the cut-away).
  */
 
-export const YAW = 0.42;
+export const YAW = VIEW_YAW;
 /** About 39°: ground is squashed to ~0.63, as in the old hex art (20 px rows on 32 px tiles). */
 export const PITCH = 0.68;
 const CAM_DIST = 60;
