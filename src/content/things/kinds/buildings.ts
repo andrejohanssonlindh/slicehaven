@@ -6,7 +6,11 @@ import type { ThingDef } from '../../../core/world3d/things';
  * inside. Buildings are placed by a map's `houses`, not as props. They are a kind of `structure` to the skill hooks.
  */
 const things: ThingDef[] = [
-  { id: 'building', is: 'structure', abstract: true },
+  {
+    id: 'building', is: 'structure', abstract: true,
+    // What kind of room (`rooms.ts`) each room of a building is, by its role; the `main` room is the map's `room`.
+    rooms: { guest: 'guestroom', landing: 'landing', attic: 'attic', upstairs: 'upstairs', stall: 'horsestall', aisle: 'aisle' },
+  },
   {
     id: 'cottage',
     is: 'building',

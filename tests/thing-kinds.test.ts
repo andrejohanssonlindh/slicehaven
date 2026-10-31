@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RECIPES } from '../src/content/furnish';
+import { ROOM_KINDS, roomKindOf } from '../src/content/furnish';
 import { LIBRARY } from '../src/content/skillweb';
 import { KIND_PARENTS } from '../src/content/skillweb/kinds';
 import { THINGS } from '../src/content/things';
@@ -53,7 +53,7 @@ describe('kinds of thing', () => {
   it('every kind that can be placed has a look and something to say when looked at', () => {
     for (const id of THINGS.placeable) {
       const t = THINGS.get(id);
-      expect(!!(t.draw || t.tree || t.furniture || t.building), id).toBe(true);
+      expect(!!(t.draw || t.tree || t.furniture || t.building || t.room), id).toBe(true);
       expect(t.look, id).toBeTruthy();
     }
   });
@@ -85,11 +85,28 @@ describe('kinds of thing', () => {
   });
 
   it('every piece the room recipes call for is a kind of furniture, and furniture is an item', () => {
-    for (const [set, lines] of Object.entries(RECIPES)) for (const l of lines) expect(THINGS.get(l.piece).furniture, `${set}: ${l.piece}`).toBeTruthy();
+    for (const set of ROOM_KINDS) for (const l of THINGS.recipe(set)) expect(THINGS.get(l.piece).furniture, `${set}: ${l.piece}`).toBeTruthy();
     expect(THINGS.get('bed').chain).toEqual(['bed', 'furniture', 'item']);
     expect(THINGS.get('hearth').chain).toContain('fire');
     expect(THINGS.get('footlocker').chain).toContain('container');
     expect(THINGS.get('loom').filament).toMatchObject({ kind: 'art' });
+  });
+
+  it('kinds of room: a recipe each, inherited and changed down the tree, and a building says which room is which', () => {
+    expect(ROOM_KINDS).toEqual(expect.arrayContaining(['home', 'fisher', 'taproom', 'smithy', 'guestroom', 'horsestall']));
+    expect(THINGS.isRoom('room')).toBe(false);
+    expect(THINGS.isRoom('bed')).toBe(false);
+    // A fisher's home is a home without the sacks, with nets.
+    const home = THINGS.recipe('home').map((l) => l.piece), fisher = THINGS.recipe('fisher').map((l) => l.piece);
+    expect(fisher).toEqual([...home.filter((p) => p !== 'sacks'), 'nets', 'hungNet']);
+    expect(() => THINGS.recipe('well')).toThrow(/not a kind of room/);
+    // Every building inherits what its rooms are; every one named is a kind of room.
+    for (const b of ['cottage', 'inn', 'shop', 'stable']) for (const r of Object.values(THINGS.get(b).rooms ?? {})) expect(THINGS.isRoom(r), `${b}: ${r}`).toBe(true);
+    expect(roomKindOf('stall', 'home', 'stable')).toBe('horsestall');
+    expect(roomKindOf('main', 'bakery', 'shop')).toBe('bakery');
+    const c = compileMap({ name: 't', seed: 1, size: 60, roads: [], props: [], hero: [0, 0], houses: [{ id: 'h', room: 'ballroom', at: { x: 10, z: 10 } }] }, THINGS);
+    expect(c.problems).toContain('house h: no kind of room called ballroom');
+    expect(c.layout.houses[0].room).toBeUndefined();
   });
 
   it('kinds of building are structures with a plan, and a map that names another is told so', () => {

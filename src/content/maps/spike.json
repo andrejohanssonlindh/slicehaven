@@ -15,7 +15,7 @@
     { "id": "home", "at": { "x": 0, "z": -2.5, "rot": 0.08 }, "size": { "width": 6.2, "depth": 4.6 }, "seed": 7, "wallH": 2.5, "roof": "thatch", "torch": true },
     { "id": "west", "at": { "x": -22, "z": -0.5, "rot": -0.05 }, "room": "herbalist", "size": { "width": 5.4, "depth": 4.2 }, "seed": 12, "wallH": 2.4, "roof": "shingle" },
     { "id": "east", "at": { "x": 15, "z": -3.5, "rot": 0.14 }, "room": "weaver", "size": { "width": 5, "depth": 4 }, "seed": 21, "wallH": 2.4, "roof": "sod" },
-    { "id": "far", "at": { "x": 25, "z": -1, "rot": -0.1 }, "room": "inn", "size": { "width": 7.4, "depth": 5 }, "seed": 33, "wallH": 2.6, "roof": "tile" }
+    { "id": "far", "at": { "x": 25, "z": -1, "rot": -0.1 }, "room": "taproom", "size": { "width": 7.4, "depth": 5 }, "seed": 33, "wallH": 2.6, "roof": "tile" }
   ],
   "trees": [
     { "x": 9.5, "z": -7.5, "seed": 3 },

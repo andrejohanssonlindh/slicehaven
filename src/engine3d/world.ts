@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { makeWalkSet, viewFor } from '../art/folkWalk';
 import type { Pix } from '../art/pix';
-import { type FurnishedRoom, type RoomSet, furnishHouse } from '../content/furnish';
+import { type FurnishedRoom, furnishHouse } from '../content/furnish';
 import {
   barkTex, doorTex, floorTex, groundChunkPainter, leafTex, plasterTex, roofUnderTex, shingleTex, shutterTex, sodTex, stoneTex, thatchTex,
   tileTex, timberTex, windowGlowTex, windowTex,
@@ -532,7 +532,7 @@ export class SpikeWorld {
     // Each room is furnished by rules (see `content/furnish.ts`) when something first comes near its house; what stands
     // on the floor blocks feet, and what is in it (the hearth, books, pictures) feeds the filament field.
     this.houseIndex = new HouseIndex<FurnishedRoom[]>(layout.houses, (b) => {
-      const rooms = furnishHouse(b.model, (b.place.room ?? 'home') as RoomSet, b.place.spec.seed);
+      const rooms = furnishHouse(b.model, b.place.room ?? 'home', b.place.spec.seed, b.place.spec.plan);
       const sources: FSource[] = [];
       for (const room of rooms) {
         const fire = room.plan.pieces.filter((p) => p.fire).pop();

@@ -1,6 +1,7 @@
 import type { FSource, SourceKind } from './filaments3d';
 import type { BuildingPlan } from './house';
 import type { MeshData } from './mesh';
+import type { RoomLine, RoomRecipe } from './roomplan';
 import type { Lumps, PlacedProp } from './props';
 import { type Shape, circle } from './space';
 import type { TreeModel } from './tree';
@@ -97,6 +98,13 @@ export interface ThingDef {
   };
   /** A kind of building: how it is put together (`buildHouse` reads this). */
   building?: BuildingPlan;
+  /**
+   * A building: what kind of room each of its rooms is, by the room's role (`guest`, `attic`, `stall`...). The
+   * ground floor's `main` room is the kind the map gives the house (`room`).
+   */
+  rooms?: Record<string, string>;
+  /** A kind of room: what it holds and where (read with `Things.recipe`, which applies what it inherits). */
+  room?: RoomRecipe;
   /** It sends up a column of smoke from this high above the ground. */
   smoke?: { y: number };
   /** Its look, built from the placement (meshes by material). Trees use `tree` instead. */
@@ -165,6 +173,27 @@ export class Things {
     const b = this.get(id).building;
     if (!b) throw new Error(`${id} is not a kind of building`);
     return b;
+  }
+
+  /** Is it a kind of room (one a house can be furnished as)? */
+  isRoom(id: string): boolean {
+    return this.has(id) && !this.get(id).abstract && !!this.get(id).room;
+  }
+
+  /**
+   * The lines of a kind of room, with what it inherits: the nearest kind up its chain that lists its own `lines`,
+   * then each kind below it in turn leaves out its `without` and adds its `plus`. Throws for a kind that is no room.
+   */
+  recipe(id: string): RoomLine[] {
+    const chain = this.get(id).chain.filter((k) => this.defs.get(k)?.room);
+    const from = chain.findIndex((k) => this.defs.get(k)!.room!.lines);
+    if (from < 0) throw new Error(`${id} is not a kind of room`);
+    let lines = this.defs.get(chain[from])!.room!.lines!;
+    for (const k of chain.slice(0, from).reverse()) {
+      const r = this.defs.get(k)!.room!;
+      lines = [...lines.filter((l) => !r.without?.includes(l.piece)), ...(r.plus ?? [])];
+    }
+    return lines;
   }
 
   /** The placement with the kind's defaults filled in. */

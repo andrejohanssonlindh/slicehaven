@@ -49,7 +49,7 @@ export type HouseAt =
 
 export interface MapHouse {
   id: string;
-  /** What is inside: a key of `RECIPES` in `content/furnish.ts` (default the humble home). */
+  /** What is inside: a kind of room (`content/things/kinds/rooms.ts`; default the humble `home`). */
   room?: string;
   size?: HouseSize;
   roof?: RoofKind;
@@ -443,22 +443,25 @@ export function compileMap(spec: MapSpec, things: Things, opts: CompileOptions =
     let plan = h.plan;
     if (plan && !things.has(plan)) problems.push(`house ${h.id}: no kind of building called ${plan}`), plan = undefined;
     else if (plan && !things.get(plan).building) problems.push(`house ${h.id}: ${plan} is not a kind of building`), plan = undefined;
+    // So is a kind of room nobody defined: the house is furnished as a home.
+    let room = h.room;
+    if (room && !things.isRoom(room)) problems.push(`house ${h.id}: no kind of room called ${room}`), room = undefined;
     const dims = (plan && things.building(plan).size) || (typeof h.size === 'object' ? h.size : SIZES[h.size ?? 'medium']);
     const hs: House3DSpec = { seed: h.seed ?? hashStr(h.id) % 1000, width: dims.width, depth: dims.depth, wallH: h.wallH ?? 2.5, roof: h.roof ?? 'thatch', walls: h.walls, plan };
     if ('road' in h.at) {
       const road = spec.roads[h.at.road];
       if (!road) {
         problems.push(`house ${h.id}: no road ${h.at.road}`);
-        return { id: h.id, x: 0, z: 0, rot: 0, spec: hs, room: h.room };
+        return { id: h.id, x: 0, z: 0, rot: 0, spec: hs, room };
       }
       const p = roadPoint(road, h.at.m ?? (h.at.t ?? 0) * roadLength(road));
       const [nx, nz] = sideNormal(p.tx, p.tz, h.at.side);
       // The house's front (local +z) faces the road; its footprint runs 0.6 m past the front wall for the porch.
       const dist = road.width / 2 + (h.at.gap ?? 2) + dims.depth / 2 + 0.6;
       const rot = Math.atan2(-nx, -nz) + (rng.next() - 0.5) * 0.12;
-      return { id: h.id, x: p.x + nx * dist, z: p.z + nz * dist, rot, spec: hs, room: h.room };
+      return { id: h.id, x: p.x + nx * dist, z: p.z + nz * dist, rot, spec: hs, room };
     }
-    return { id: h.id, x: h.at.x, z: h.at.z, rot: h.at.rot ?? 0, spec: hs, room: h.room };
+    return { id: h.id, x: h.at.x, z: h.at.z, rot: h.at.rot ?? 0, spec: hs, room };
   });
 
   const layout = ctx.layout;

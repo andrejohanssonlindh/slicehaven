@@ -137,12 +137,12 @@ describe('map rules', () => {
       ...base,
       rules: [{
         rule: 'street', id: 'st', road: 0, from: 20, to: 120, every: 20, sides: ['north', 'south'],
-        cycle: [{ size: 'small' }, { room: 'inn', size: 'large', max: 1 }],
+        cycle: [{ size: 'small' }, { room: 'taproom', size: 'large', max: 1 }],
       }],
     });
     expect(c.problems).toEqual([]);
     expect(c.layout.houses.map((h) => h.id)).toEqual(['st0n', 'st0s', 'st1n', 'st1s', 'st2n', 'st2s', 'st3n', 'st3s', 'st4n', 'st4s']);
-    expect(c.layout.houses.filter((h) => h.room === 'inn').length).toBe(1);
+    expect(c.layout.houses.filter((h) => h.room === 'taproom').length).toBe(1);
     // A house every 20 m along the road (x), north (z < 0) and south of it.
     const north = c.layout.houses.filter((h) => h.id.endsWith('n'));
     for (let k = 1; k < north.length; k++) expect(north[k].x - north[k - 1].x).toBeCloseTo(20, 0);
@@ -161,7 +161,7 @@ describe('map rules', () => {
   it('wilds: the hamlet and Eastgate are streets (one inn in Eastgate, as before)', () => {
     const w = mapNamed('wilds');
     expect(w.layout.houses.filter((h) => h.id.startsWith('east')).length).toBe(70);
-    expect(w.layout.houses.filter((h) => h.room === 'inn').map((h) => h.id)).toEqual(['inn', 'east3n']);
+    expect(w.layout.houses.filter((h) => h.room === 'taproom').map((h) => h.id)).toEqual(['inn', 'east3n']);
   });
 
   it('a typo is reported: an unknown key anywhere, an unknown rule, a key a rule does not take', () => {

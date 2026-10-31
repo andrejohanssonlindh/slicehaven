@@ -1,7 +1,7 @@
 import type { BuiltHouse } from '../../core/world3d/layout';
 import { type CompiledMap, type MapRule, type MapSpec, compileMap } from '../../core/world3d/mapgen';
 import { BEHAVIOURS } from '../behaviours';
-import { type RoomSet, piecesOf } from '../furnish';
+import { piecesOf } from '../furnish';
 import { PERSON_KINDS } from '../people';
 import { THINGS } from '../things';
 
@@ -28,7 +28,7 @@ for (const m of Object.values(ruleFiles)) {
 }
 
 /** The kinds of furniture a house's rooms call for (the compiler checks the ones painted for one way of looking). */
-export const housePieces = (b: BuiltHouse): string[] => piecesOf(b.model, (b.place.room ?? 'home') as RoomSet);
+export const housePieces = (b: BuiltHouse): string[] => piecesOf(b.model, b.place.room ?? 'home', b.place.spec.plan);
 
 /** Compile a map against everything the game has: the kinds of thing and person, the furniture, the rules. */
 export const compile = (spec: MapSpec): CompiledMap => compileMap(spec, THINGS, { persons: PERSON_KINDS, pieces: housePieces, rules: MAP_RULES, behaviours: BEHAVIOURS });

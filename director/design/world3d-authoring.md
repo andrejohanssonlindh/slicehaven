@@ -7,42 +7,42 @@ The brief's milestones ([voxel-engine-brief](voxel-engine-brief.md) §9): M2 ass
 
 Two systems, both pure (`core/`), tested, deterministic:
 
-1. **Rooms are furnished by rules** (`core/world3d/roomplan.ts`, content in `content/furnish.ts`).
+1. **Rooms are furnished by rules** (`core/world3d/roomplan.ts`; the kinds of room in `content/things/kinds/rooms.ts`, furnished by `content/furnish.ts`).
 2. **Maps are written as intent and compiled** (`core/world3d/mapgen.ts`, content in `content/maps/`).
 
-## Adding a room kind
-Write a recipe in `RECIPES` (`content/furnish.ts`): a list of lines in priority order, each a piece and a rule. No coordinates.
+## Adding a kind of room
+A kind of room is a kind of thing (2026-10-31), an entry in `content/things/kinds/rooms.ts`: a list of lines in priority order, each a piece (a kind of furniture) and a rule. No coordinates. A map names it in a house's `room`; a name nobody defined is reported and the house gets a `home`.
 
 ```ts
-bakery: [
+room('bakery', 'room', 'A bakery: an oven, a kneading trough, loaves on the shelves.', [
   { piece: 'oven', rule: corner('backRight'), fire: true },
-  { piece: 'trough', rule: corner('backLeft') },
+  { piece: 'kneadtrough', rule: corner('backLeft') },
   { piece: 'shelf', variant: 'loaves', rule: back(0.35), lift: 22 },
   { piece: 'counter', variant: 'bread', rule: center(0, 0.6) },
-  { piece: 'stool', n: 2, rule: { at: 'around', of: 'table' } },
   { piece: 'basket', rule: free },
-],
+]),
 ```
+A kind can inherit its parent's recipe and change it: `{ id: 'fisher', is: 'home', room: { without: ['sacks'], plus: [nets, hungNet] } }` is a home without the sacks, with nets. The kinds today: `home`, `fisher`, `taproom` (an inn's common room; the building is `inn`), `bakery`, `herbalist`, `fishmonger`, `general`, `weaver`, `smithy`, and the rooms of bigger buildings, `guestroom`, `landing`, `attic`, `upstairs`, `horsestall`, `aisle`.
 - **Rules**: `back(x)` and `front(x)` along a wall, `side('left'|'right', z)`, `corner(...)`, `center(dx, dz)`, `around` another piece (by id, optionally a `side`), `free` (anywhere there is room). A piece whose rule fails falls back to `free`; the fire never does.
-- **Kinds** (in the catalog `PIECES`): `floor` stands and blocks feet, `flat` lies on the floor (rug, straw), `hung` is on the back wall at a `lift`.
-- **Sizes come from the sprite**, so a new piece needs only an entry (`floor(() => makeX())`) and, if the sprite is drawn much wider than the thing, a `maxW`.
+- **Pieces** are kinds of furniture (`content/things/kinds/furniture.ts`): `floor` stands and blocks feet, `flat` lies on the floor (rug, straw), `hung` is on the back wall at a `lift`. The smithy's forge, anvil, quench tub, workbench, coal bin and tool rack are pieces like the rest.
+- **Sizes come from the sprite**, so a new piece needs only an entry (`floor(F, 'look', () => makeX())`) and, if the sprite is drawn much wider than the thing, a `maxW`. A piece whose art differs by line (`counter`, `shelf`, `bed`, `horse`) takes the line's `variant` and seed.
 - **The solver** (`planRoom`) keeps the door clear, never overlaps two pieces, and refuses any spot that would leave the door unable to reach 92 % of the free floor (with a wider walker than the real one, because the nav grid is coarse). Low-priority pieces drop out of a room that is too small; the first four lines and the fire never do (tested). The footprints go straight into the nav grid, so furniture blocks feet.
-- Tests (`tests/furnish.test.ts`) run every recipe in four house sizes. A new recipe is covered by adding its name to `RECIPES`.
+- Tests (`tests/furnish.test.ts`) run every kind of room in four house sizes, found by themselves.
 
 ## Rooms upstairs and bigger buildings
-A map house can be `plan: 'inn' | 'shop' | 'stable'` (own size, storeys, stairs); `room` is still the ground floor's recipe. The upstairs rooms use their own recipes by role (`guestroom`, `landing`, `attic`, `upstairs`, `stall`, `aisle`) in `RECIPES`; add a role in `ROLE_SETS` and a line in `house.ts` where the rooms are made. A piece with `vary: true` takes a seed from its room (each stall's horse differs). See the handover, session 29.
+A map house can be `plan: 'inn' | 'shop' | 'stable'` (own size, storeys, stairs); `room` is still the ground floor's kind. A building's other rooms have a role (`guest`, `landing`, `attic`, `upstairs`, `stall`, `aisle`), and the kind of building says which kind of room each role is (`rooms`, inherited from the `building` family: a stall is a `horsestall`). A new role is a line there and a line in `house.ts` where the rooms are made. A piece with `vary: true` takes a seed from its room (each stall's horse differs). See the handover, session 29.
 
 ## Adding a map
 A map is a JSON file, `content/maps/<name>.json` (its `name` the same). It is found by itself: no list to edit. Look at `hamlet.json`: houses by intent, the rest by rules. JSON has no comments, so a map says what it is in `about`.
 
 ```json
 "houses": [
-  { "id": "inn", "room": "inn", "plan": "inn", "roof": "tile", "torch": true, "at": { "road": 0, "t": 0.5, "side": "north" } },
+  { "id": "inn", "room": "taproom", "plan": "inn", "roof": "tile", "torch": true, "at": { "road": 0, "t": 0.5, "side": "north" } },
   { "id": "cottage", "size": "small", "roof": "sod", "at": { "x": 12, "z": -30, "rot": 0.1 } }
 ],
 "rules": [
   { "rule": "torches", "road": 0, "every": 14, "side": "south" },
-  { "rule": "street", "id": "east", "road": 0, "from": 400, "to": 1100, "every": 20, "cycle": [{ "size": "small" }, { "room": "inn", "max": 1 }] },
+  { "rule": "street", "id": "east", "road": 0, "from": 400, "to": 1100, "every": 20, "cycle": [{ "size": "small" }, { "room": "taproom", "max": 1 }] },
   { "rule": "scatter", "kind": "tree", "count": 70, "area": { "ring": [0, 0, 40, 64] } }
 ],
 "doorMud": true,

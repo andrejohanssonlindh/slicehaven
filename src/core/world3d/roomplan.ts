@@ -39,6 +39,37 @@ export type Rule =
   /** Old-style fractions (u across, d from the door to the back), for sets not yet converted. */
   | { at: 'fixed'; u: number; d: number };
 
+/** One line of a kind of room's recipe: a kind of furniture and the rule for where it goes. */
+export interface RoomLine {
+  piece: string;
+  rule: Rule;
+  /** How many (each is placed in turn). */
+  n?: number;
+  /** Which counter or shelf it is (the art differs). */
+  variant?: string;
+  /** Hung pieces: how high up the wall, in sprite pixels. */
+  lift?: number;
+  fire?: boolean;
+  /** Books on it (a few shelves of them add a little iconotropy and semotropy to the room). */
+  books?: number;
+  /** A different seed for the art, so two of a kind differ. */
+  seed?: number;
+  /** Tells two lines of the same piece apart (the stool at the table's front, the stool at its back). */
+  tag?: string;
+  /** The art takes the room's own seed too, so each room (each stall's horse) looks different. */
+  vary?: boolean;
+}
+
+/**
+ * What a kind of room holds (`content/things/kinds/rooms.ts`). A kind either lists its own `lines`, or takes its
+ * parent's and changes them: leaves out the lines of some pieces (`without`) and adds its own (`plus`).
+ */
+export interface RoomRecipe {
+  lines?: RoomLine[];
+  without?: string[];
+  plus?: RoomLine[];
+}
+
 export interface PieceIn {
   id: string;
   /** Footprint on the floor, metres (width across, depth front to back). */

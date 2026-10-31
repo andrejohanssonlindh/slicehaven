@@ -9,7 +9,7 @@ import { NavGrid } from '../src/core/world3d/space';
 
 /** Walking for everyone (`core/world3d/actors.ts`), on a patch with an inn and a cottage, as the world sets it up. */
 
-const INN: PlacedHouse = { id: 'inn', x: 0, z: 0, rot: 0, spec: { seed: 4, ...THINGS.building('inn').size!, plan: 'inn', roof: 'shingle' }, room: 'inn' };
+const INN: PlacedHouse = { id: 'inn', x: 0, z: 0, rot: 0, spec: { seed: 4, ...THINGS.building('inn').size!, plan: 'inn', roof: 'shingle' }, room: 'taproom' };
 const COTTAGE: PlacedHouse = { id: 'cot', x: 22, z: 4, rot: 0.4, spec: { seed: 7, width: 5, depth: 4 } };
 
 function setup(): { w: Walking; index: HouseIndex<FurnishedRoom[]> } {

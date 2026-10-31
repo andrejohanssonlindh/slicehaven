@@ -13,7 +13,7 @@ import { NavGrid } from '../src/core/world3d/space';
 
 /** What people do (`core/world3d/behave.ts`, `content/behaviours/`): schedules of behaviours, on the real walking grid. */
 
-const INN: PlacedHouse = { id: 'inn', x: 0, z: -20, rot: 0, spec: { seed: 4, ...THINGS.building('inn').size!, plan: 'inn', roof: 'shingle' }, room: 'inn' };
+const INN: PlacedHouse = { id: 'inn', x: 0, z: -20, rot: 0, spec: { seed: 4, ...THINGS.building('inn').size!, plan: 'inn', roof: 'shingle' }, room: 'taproom' };
 const COT: PlacedHouse = { id: 'cot', x: 25, z: -20, rot: 0, spec: { seed: 7, width: 5, depth: 4 } };
 
 function setup(): Walking {

@@ -4,8 +4,9 @@ import {
   makeRagRug, makeRoughShelf, makeSacks, makeStool3, makeStrawBits, makeTrestleTable,
 } from '../../../art/humble';
 import type { Prop } from '../../../art/grit';
+import { smithyItems } from '../../../art/interior';
 import {
-  makeAleKegs, makeBakeOven, makeCounter, makeCrateStack, makeFishRack, makeFishTubs, makeHerbRack, makeHooks, makeHungNet, makeInnBench,
+  type CounterKind, type ShelfKind, makeAleKegs, makeBakeOven, makeCounter, makeWallShelves,makeCrateStack, makeFishRack, makeFishTubs, makeHerbRack, makeHooks, makeHungNet, makeInnBench,
   makeKneadTrough, makeLongTable, makeLoom, makeMortarBench, makeNetHeap,
 } from '../../../art/shopItems';
 import { makeHayBale, makeHayRack, makeHorse } from '../../../art/stable';
@@ -24,7 +25,8 @@ type Mount = 'floor' | 'hung' | 'flat';
 interface Piece {
   is: string;
   look: string;
-  art: () => Prop;
+  /** Its card; a recipe line's `variant` (which counter, which shelf) and art seed, for the pieces that take them. */
+  art: (variant?: string, seed?: number) => Prop;
   mount: Mount;
   /** Depth, metres (the default is about half the width). */
   d?: number;
@@ -35,10 +37,12 @@ interface Piece {
   facesView?: boolean;
 }
 
-const floor = (is: string, look: string, art: () => Prop, d?: number, maxW?: number, gives?: Piece['gives']): Piece => ({ is, look, art, mount: 'floor', d, maxW, gives });
-const hung = (look: string, art: () => Prop, gives?: Piece['gives'], maxW = 1.5): Piece => ({ is: 'furniture', look, art, mount: 'hung', maxW, gives });
-const flat = (look: string, art: () => Prop, gives?: Piece['gives']): Piece => ({ is: 'furniture', look, art, mount: 'flat', gives });
+const floor = (is: string, look: string, art: Piece['art'], d?: number, maxW?: number, gives?: Piece['gives']): Piece => ({ is, look, art, mount: 'floor', d, maxW, gives });
+const hung = (look: string, art: Piece['art'], gives?: Piece['gives'], maxW = 1.5): Piece => ({ is: 'furniture', look, art, mount: 'hung', maxW, gives });
+const flat = (look: string, art: Piece['art'], gives?: Piece['gives']): Piece => ({ is: 'furniture', look, art, mount: 'flat', gives });
 const F = 'furniture';
+/** The smithy's own pieces, painted together (`smithyItems`): forge, anvil, quench tub, workbench, coal bin, tool rack. */
+const smithy = (i: number) => (): Prop => smithyItems()[i].prop;
 
 /** Every piece, by the id of its kind. */
 const PIECES: Record<string, Piece> = {
@@ -63,8 +67,9 @@ const PIECES: Record<string, Piece> = {
   fishRack: floor(F, 'A rack of drying fish.', () => makeFishRack(26), 0.7, 1.2),
   fishTubs: floor(F, 'Tubs of fish in water.', () => makeFishTubs(28), 0.7, 1.1, { kind: 'water', weight: 0.5 }),
   nets: floor(F, 'A heap of nets.', () => makeNetHeap(3), 0.6, 1.0),
-  counter: floor(F, 'A shop counter.', () => makeCounter('general', 38), 0.6, 1.7),
-  shelf: hung('A rough shelf on the wall.', () => makeRoughShelf()),
+  counter: floor(F, 'A shop counter.', (v, s) => makeCounter((v ?? 'general') as CounterKind, s ?? 20), 0.6, 1.7),
+  // A shelf of wares (bread, bottles, bolts...) when a recipe names which; else the rough shelf of a home.
+  shelf: hung('A rough shelf on the wall.', (v, s) => (v ? makeWallShelves(v as ShelfKind, s ?? 23) : makeRoughShelf())),
   pegs: hung('Pegs for cloaks.', () => makeCloakPegs()),
   hanging: hung('A hanging cloth, woven with a pattern.', () => makeHanging(), { kind: 'art', weight: 0.7 }),
   hooks: hung('Hooks in the wall.', () => makeHooks(24)),
@@ -74,10 +79,16 @@ const PIECES: Record<string, Piece> = {
   straw: flat('Straw on the floor.', () => makeStrawBits()),
   litter: flat('Odds and ends on the floor.', () => makeClutter()),
   // A guest's bed is the old, handsome one (a frame, a tick, a blanket); the village's own is the pallet.
-  bed: { ...floor(F, 'A bed with a frame, a tick and a blanket.', () => makeGuestBed(), 1.25, 2.0), facesView: true },
-  horse: { ...floor(F, 'A horse in its stall.', () => makeHorse(), 2.6, 0.8), facesView: true },
+  bed: { ...floor(F, 'A bed with a frame, a tick and a blanket.', (_, s) => makeGuestBed(1 + (s ?? 0) % 5), 1.25, 2.0), facesView: true },
+  horse: { ...floor(F, 'A horse in its stall.', (_, s) => makeHorse(s ?? 1), 2.6, 0.8), facesView: true },
   haybale: floor(F, 'A bale of hay.', () => makeHayBale(), 0.7, 1.0),
   hayRack: hung('A hay rack.', () => makeHayRack(), undefined, 1.2),
+  forge: floor('fire', 'A smith’s forge, its coals glowing.', smithy(0), 0.9, 1.4),
+  anvil: floor('tool', 'An anvil on a stump.', smithy(1), 0.5, 0.8),
+  quenchtub: floor('container', 'A tub of water for quenching hot iron.', smithy(2), 0.5, 1.1),
+  workbench: floor(F, 'A smith’s workbench.', smithy(3), 0.6, 1.6),
+  coalbin: floor('container', 'A bin of charcoal.', smithy(4), 0.5, 0.9),
+  toolrack: hung('A rack of tongs and hammers.', smithy(5), undefined, 1.4),
 };
 
 /** The family every piece of furniture is a kind of: an item in a room. */
@@ -95,4 +106,4 @@ export default [
 ] satisfies ThingDef[];
 
 /** The art of each piece (a painted card), by kind id: made on demand, shared by `furnish`. */
-export const PIECE_ART: Record<string, () => Prop> = Object.fromEntries(Object.entries(PIECES).map(([id, p]) => [id, p.art]));
+export const PIECE_ART: Record<string, Piece['art']> =Object.fromEntries(Object.entries(PIECES).map(([id, p]) => [id, p.art]));

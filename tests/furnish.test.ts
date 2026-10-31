@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { type RoomSet, RECIPES, furnish } from '../src/content/furnish';
+import { ROOM_KINDS, furnish } from '../src/content/furnish';
 import { buildHouse } from '../src/content/buildhouse';
+import { THINGS } from '../src/content/things';
 import { DOOR_CLEAR, type PieceIn, type RoomRect, footprints, planRoom } from '../src/core/world3d/roomplan';
 
 /** Rooms of the bigger buildings are tested in their own buildings (`buildings.test.ts`), not in a cottage. */
-const BIG = ['guestroom', 'landing', 'attic', 'upstairs', 'stall', 'aisle'];
-const SETS = [...Object.keys(RECIPES).filter((k) => !BIG.includes(k)), 'smithy'] as RoomSet[];
+const BIG = Object.values(THINGS.get('building').rooms!);
+const SETS = ROOM_KINDS.filter((k) => !BIG.includes(k));
 /** House sizes that houses actually come in (width × depth, metres). */
 const SIZES: [number, number][] = [[5, 4], [5.4, 4.2], [6.2, 4.6], [7.4, 5]];
 /** From what width a room takes the whole recipe (the inn wants room for its tables). */
-const COMFORT: Partial<Record<RoomSet, number>> = { inn: 9 };
+const COMFORT: Record<string, number> = { taproom: 9 };
 
 const overlaps = (a: { x: number; z: number; hw: number; hd: number }, b: { x: number; z: number; hw: number; hd: number }): boolean =>
   Math.abs(a.x - b.x) < a.hw + b.hw && Math.abs(a.z - b.z) < a.hd + b.hd;
@@ -45,7 +46,7 @@ describe('furnishing by rules', () => {
         // The smithy keeps its authored fractions and was drawn for a bigger room; it may crowd a small one, but never the door.
         if (set !== 'smithy') {
           // The first four lines of a recipe are what the room is for; the rest may be left out of a tight room, nothing more.
-          const core = RECIPES[set as keyof typeof RECIPES].slice(0, 4).map((l) => l.piece);
+          const core = THINGS.recipe(set).slice(0, 4).map((l) => l.piece);
           for (const id of plan.unplaced) expect(core, `${set} ${w}x${d}: ${id} dropped`).not.toContain(id.split(/[#:]/)[0]);
           // And a comfortable room takes everything.
           if (w >= (COMFORT[set] ?? 6.2)) expect(plan.unplaced, `${set} ${w}x${d}`).toEqual([]);
@@ -72,7 +73,7 @@ describe('furnishing by rules', () => {
   }
 
   it('a fire is marked in every room that has one, and hung things hang off the floor', () => {
-    for (const set of ['home', 'inn', 'bakery', 'weaver', 'smithy'] as RoomSet[]) {
+    for (const set of ['home', 'taproom', 'bakery', 'weaver', 'smithy']) {
       const m = buildHouse({ seed: 7, width: 6.2, depth: 4.6 });
       const { plan } = furnish(set, m.room, m.door[0]);
       expect(plan.pieces.filter((p) => p.fire).length, set).toBe(1);
@@ -84,7 +85,7 @@ describe('furnishing by rules', () => {
 
   it('is deterministic', () => {
     const m = buildHouse({ seed: 7, width: 6.2, depth: 4.6 });
-    const a = furnish('inn', m.room, m.door[0], 3).plan, b = furnish('inn', m.room, m.door[0], 3).plan;
+    const a = furnish('taproom', m.room, m.door[0], 3).plan, b = furnish('taproom', m.room, m.door[0], 3).plan;
     expect(JSON.stringify(a)).toBe(JSON.stringify(b));
   });
 

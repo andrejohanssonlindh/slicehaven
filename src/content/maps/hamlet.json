@@ -7,7 +7,7 @@
   "lake": { "x": -38, "z": 36, "r": 15 },
   "doorMud": true,
   "houses": [
-    { "id": "inn", "room": "inn", "plan": "inn", "roof": "tile", "torch": true, "at": { "road": 0, "t": 0.5, "side": "north" } },
+    { "id": "inn", "room": "taproom", "plan": "inn", "roof": "tile", "torch": true, "at": { "road": 0, "t": 0.5, "side": "north" } },
     { "id": "bakery", "room": "bakery", "size": "medium", "roof": "shingle", "at": { "road": 0, "t": 0.38, "side": "north" } },
     { "id": "smithy", "room": "smithy", "size": "medium", "roof": "shingle", "walls": "stone", "at": { "road": 0, "t": 0.63, "side": "north" } },
     { "id": "store", "room": "general", "plan": "shop", "roof": "shingle", "at": { "road": 0, "t": 0.27, "side": "north" } },

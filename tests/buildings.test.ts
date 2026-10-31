@@ -11,7 +11,7 @@ import { NavGrid, findPath, pathLength } from '../src/core/world3d/space';
 /** The bigger buildings: the inn, the shop and the stable, with their storeys, stairs and rooms. */
 
 const PLANS: { plan: Exclude<HousePlan, 'cottage'>; main: string; levels: number; stairs: number }[] = [
-  { plan: 'inn', main: 'inn', levels: 3, stairs: 2 },
+  { plan: 'inn', main: 'taproom', levels: 3, stairs: 2 },
   { plan: 'shop', main: 'general', levels: 2, stairs: 1 },
   { plan: 'stable', main: 'home', levels: 1, stairs: 0 },
 ];
@@ -21,7 +21,7 @@ const sizeOf = (plan: HousePlan): { width: number; depth: number } => THINGS.bui
 const make = (plan: Exclude<HousePlan, 'cottage'>, seed = 4): { built: BuiltHouse; rooms: FurnishedRoom[]; model: HouseModel } => {
   const { width, depth } = sizeOf(plan);
   const built = buildHouses({ houses: [{ id: plan, x: 0, z: 0, rot: 0, spec: { seed, width, depth, plan, roof: 'shingle' }, room: PLANS.find((p) => p.plan === plan)!.main }] }, THINGS)[0];
-  return { built, rooms: furnishHouse(built.model, PLANS.find((p) => p.plan === plan)!.main as never, seed), model: built.model };
+  return { built, rooms: furnishHouse(built.model, PLANS.find((p) => p.plan === plan)!.main, seed, plan), model: built.model };
 };
 
 /** The walking grid of one storey, as the world builds it. */

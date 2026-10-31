@@ -13,7 +13,7 @@
     {
       "rule": "street", "id": "hamlet", "road": 0, "from": 4180, "every": 22, "sides": ["north", "south"],
       "houses": [
-        { "id": "inn", "room": "inn", "size": "large", "roof": "tile", "torch": true },
+        { "id": "inn", "room": "taproom", "size": "large", "roof": "tile", "torch": true },
         { "id": "bakery", "room": "bakery", "size": "medium", "roof": "shingle" },
         { "id": "smithy", "room": "smithy", "size": "medium", "roof": "shingle", "walls": "stone" },
         { "id": "store", "room": "general", "size": "medium", "roof": "thatch" },
@@ -37,7 +37,7 @@
         { "room": "herbalist", "size": "small", "roof": "thatch" },
         { "room": "general", "size": "medium", "roof": "thatch" },
         { "size": "medium", "roof": "tile", "walls": "plank" },
-        { "room": "inn", "size": "large", "roof": "tile", "max": 1 }
+        { "room": "taproom", "size": "large", "roof": "tile", "max": 1 }
       ]
     }
   ],
