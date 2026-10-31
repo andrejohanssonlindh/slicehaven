@@ -14,12 +14,12 @@ describe('pages', () => {
   it('the hub links only to pages that open', async () => {
     const { page, errors } = await openPage(env, '/');
     const links = await page.locator('.hub a').evaluateAll((as) => as.map((a) => (a as HTMLAnchorElement).getAttribute('href')));
-    expect(links).toEqual(['spike3d/', 'chargen/', 'skills/', 'director/']);
+    expect(links).toEqual(['spike3d/', 'chargen/', 'npcs/', 'skills/', 'director/']);
     expect(errors).toEqual([]);
     await page.context().close();
   });
 
-  for (const path of ['/chargen/', '/skills/', '/director/']) {
+  for (const path of ['/chargen/', '/npcs/', '/skills/', '/director/']) {
     it(`${path} opens without errors`, async () => {
       const { page, errors } = await openPage(env, path);
       await page.waitForTimeout(800);
