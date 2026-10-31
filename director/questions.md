@@ -4,6 +4,13 @@ Newest on top. Answer in chat (just reference the number, e.g. "Q11: option B").
 
 ---
 
+### Q27 — Sheets for kinds of person: three things to check *(open; try the Kinds of person page)*
+1. **Attributes by level.** You said levels 2–4 get the book's numbers, level 1 lower and level 5 higher. A *person* is never untrained, so I read it as: a **novice** is half a die lower, **capable and skilled** are the book's, a **master** half a die higher. Right, or should novices keep the book's numbers?
+2. **Knacks.** Besides main and side skills, each person picks 2–3 extra side skills from their archetype's list in the book (a guard might know Riding, another Marching). This is my way of making two guards differ. Keep it?
+3. **Gifts of a people** (a tirak's darkvision, keen smell) show up as side skills at the person's level. Some of these are really on or off. Fine for now, or leave gifts off the sheet?
+
+---
+
 ### Q25 — How do maps join up? *(open, not decided; no rush: needed before step 6 of [the world structure](design/world-structure.md))*
 Today one map is loaded per page (`?map=hamlet`). Once maps are files, the game needs to know how you get from one to another. The director's likely handle: **walk to the end of the map and arrive on an overworld.** Not decided yet. Other options, any mix:
 - **Exits at the edge** into the next map directly (a forest, the next village).

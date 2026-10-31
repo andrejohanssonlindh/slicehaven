@@ -1,5 +1,12 @@
 # Devlog
 
+## 2026-10-31 — Rooms are kinds; sheets for kinds of person, and a page to see them
+
+- **Rooms as kinds ✅:** every kind of room is an entry in `content/things/kinds/rooms.ts`, like furniture and buildings. A kind can take its parent's recipe and change it (a fisher's home is a home without the sacks, with nets). A building says what kind each of its rooms is (a stable's stall is a `horsestall`). The smithy's forge, anvil and the rest are furniture like any other piece, so the smithy is an ordinary room now. A map that names a room nobody defined is told so. Two renames: the inn's common room is `taproom` (the building is `inn`), the stall room `horsestall`. Checked: all 164 rooms (every kind, three seeds, three sizes, and every house in every map) furnish exactly as before.
+- **Sheets for kinds of person** (the director's frame: five levels, main and side skills, stacking kinds, a little randomness, attributes following the level less): [kinds of person](design/people-kinds.md#sheets-built-2026-10-31). All 100 callings and every people have a sheet from data we had (the book's 8 archetypes on the 15 groups of callings, each calling's skills from the creator's backgrounds, each people's build and gifts from the creator); seven armed kinds made by hand (guard with sword, spear, bow or crossbow; brigand with axe or bow; pikeman).
+- **New page: Kinds of person** (`/npcs/`, on the start page): pick a people, a kind and a level, see the spans and one rolled person with a name and gear; "Another" rolls the next. The choice is in the address, so a link shows the same person.
+- Not done: the two issues from the director (a map selector; people see-through in front of things) are still open, next in line.
+
 ## 2026-10-31 — What people do: schedules, behaviours, places, events, crowds
 
 - **The director's ask:** behaviour rules to apply to different people as needed (a plaza full at a time of day, a crowd at a beheading, a guard round a camp), flexible enough for NPCs and enemies. [What people do](design/behaviours.md).

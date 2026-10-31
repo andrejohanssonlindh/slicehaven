@@ -1,3 +1,4 @@
+import { type MergedSheet, type SheetDef, mergeSheets } from './npcsheet';
 import type { Dimension, Facet } from './people';
 import { Rng } from './rng';
 
@@ -13,8 +14,8 @@ import { Rng } from './rng';
  * of others (`is: ['marnakh', 'job-soldier']`). A *person* in a map is "these kinds, this seed", plus their own changes.
  * Looks are merged down the line, parents first and left to right, so a calling's clothes go on a people's body.
  *
- * A kind has a slot for a character sheet. What goes in it (skills a kind is stronger or weaker in, and how much a
- * person varies) is not designed yet: see `director/design/people-kinds.md`.
+ * A kind has a character sheet (`core/npcsheet.ts`): the skills it is good at, main or side, and the rest. Sheets stack
+ * down a person's chain like looks, each facet's base sheet (made from the creator's data) first, then the kind's own.
  */
 
 /** How a person is drawn: names of the folk art's ramps and parts (`art/folk.ts`, `folkOf`). Plain data, for the save. */
@@ -42,8 +43,8 @@ export interface Look {
 /** A look as a kind gives it: each part one value, or a few to choose from (the person's seed chooses). */
 export type LookDef = { [K in keyof Look]?: Look[K] | readonly NonNullable<Look[K]>[] };
 
-/** The character sheet a kind of person has. Empty for now: filling sheets is its own, later piece of work. */
-export type SheetSlot = Record<string, never>;
+/** The character sheet a kind of person has: its main and side skills, attributes, knacks and gear (`core/npcsheet.ts`). */
+export type SheetSlot = SheetDef;
 
 export interface PersonKindDef {
   /** A facet of the people library this gives a body to (`dwarf`, `job-innkeeper`), or a new kind's own name. */
@@ -78,7 +79,8 @@ const LOOK_KEYS: (keyof Look)[] = ['build', 'skin', 'hair', 'style', 'beard', 'g
 export class PersonKinds {
   private readonly defs = new Map<string, PersonKindDef>();
 
-  constructor(defs: readonly PersonKindDef[], private readonly facets: Record<string, Facet>) {
+  /** `base`: the sheet each facet starts with, before any kind's own (`content/people/sheets.ts`). */
+  constructor(defs: readonly PersonKindDef[], private readonly facets: Record<string, Facet>, private readonly base: Record<string, SheetDef> = {}) {
     for (const d of defs) {
       if (this.defs.has(d.id)) throw new Error(`two kinds of person are called ${d.id}`);
       const facet = facets[d.id];
@@ -96,6 +98,16 @@ export class PersonKinds {
 
   get kinds(): string[] {
     return [...this.defs.keys()];
+  }
+
+  /** A kind of person as written (undefined for a facet nobody wrote a file for). */
+  def(id: string): PersonKindDef | undefined {
+    return this.defs.get(id);
+  }
+
+  /** What every person of these kinds shares on their sheet: each kind in the chain, its base sheet, then its own. */
+  sheet(p: PersonSpec): MergedSheet {
+    return mergeSheets(this.resolve(p).chain.flatMap((id) => [this.base[id], this.defs.get(id)?.sheet]));
   }
 
   /** What is wrong with a person (an unknown kind, two peoples), or null. */

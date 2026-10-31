@@ -35,7 +35,7 @@ Read only the handover for the area you're asked about; don't read the whole `di
 | Character creator | `/chargen/` | `director/design/character-creator.md` | `src/core/chargen`, `src/content/chargen`, `src/chargen` |
 | Gate scene rules (data for the skill map; its hex page is gone) | | `director/archive/exploration-scenes.md` | `src/core/scene.ts`, `src/content/scenes` |
 | **3D world (current focus, three.js)** | `/spike3d/` | `director/design/world-structure.md`, then `world3d-handover.md` (then `world3d-m0.md`, `voxel-engine-brief.md`); maps: `world3d-authoring.md` | `src/core/world3d`, `src/engine3d`, `src/art/textures3d.ts`, `src/content/spike3d.ts`, `src/content/maps` (JSON maps, `rules/`), `src/content/furnish.ts`, `src/spike3d` |
-| Kinds of person (people × calling × …), the map's cast | | `director/design/people-kinds.md` | `src/core/persons.ts`, `src/content/people/kinds`, `MapSpec.people` in `src/core/world3d/mapgen.ts` |
+| Kinds of person (people × calling × …), their sheets (levels, main/side skills), the map's cast | `/npcs/` | `director/design/people-kinds.md` | `src/core/persons.ts`, `src/core/npcsheet.ts`, `src/content/people/kinds`, `src/content/people/sheets.ts`, `src/npcs`, `MapSpec.people` in `src/core/world3d/mapgen.ts` |
 | What people do (schedules, behaviours, places, events, crowds) | | `director/design/behaviours.md` | `src/core/world3d/behave.ts`, `src/content/behaviours/` (`does/`, `when/`), `src/content/maps/rules/crowd.ts` |
 | Magic | | `director/design/magic-filaments.md`, `magic-on-map.md` | `src/core/filaments.ts` (rules), `src/core/world3d/filaments3d.ts` (field) |
 

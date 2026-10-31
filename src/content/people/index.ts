@@ -3,6 +3,7 @@ import { type PersonKindDef, PersonKinds } from '../../core/persons';
 import { FACETS } from './facets';
 import { KIN } from './kin';
 import { LEANINGS } from './leanings';
+import { BASE_SHEETS } from './sheets';
 
 export { FACETS, FACET_LIST, PEOPLE_KINDS, backgroundFacet, peopleFacet } from './facets';
 export { KIN } from './kin';
@@ -13,8 +14,8 @@ export const PEOPLE_LIBRARY: PeopleLibrary = { facets: FACETS, leanings: LEANING
 
 /**
  * Every kind of person, one file each in `kinds/` (a file may hold a small family as an array): a new file is a new
- * kind, nothing else to edit. They sit on the library's facet trees; see `core/persons.ts`.
+ * kind, nothing else to edit (a test run that misses a new file has a stale glob: edit this file once). They sit on the library's facet trees; see `core/persons.ts`.
  */
 const files = import.meta.glob<{ default: PersonKindDef | PersonKindDef[] }>('./kinds/*.ts', { eager: true });
 
-export const PERSON_KINDS = new PersonKinds(Object.values(files).flatMap((m) => [m.default].flat()), FACETS);
+export const PERSON_KINDS = new PersonKinds(Object.values(files).flatMap((m) => [m.default].flat()), FACETS, BASE_SHEETS);
