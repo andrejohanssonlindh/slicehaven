@@ -469,6 +469,14 @@ setTimeout(() => {
   // ?map=hamlet loads another map (see content/maps). ?world=192 makes the patch bigger, to see chunks stream in as you pan.
   const name = params.get('map') ?? 'spike';
   if (!(name in MAPS)) console.warn(`spike3d: no map called ${name}; maps are ${Object.keys(MAPS).join(', ')}`);
+  // The map picker in the top bar: every map there is; picking one loads the page again with it (other settings kept).
+  const pick = document.getElementById('map-pick') as HTMLSelectElement;
+  for (const m of Object.keys(MAPS).sort()) pick.add(new Option(m[0].toUpperCase() + m.slice(1), m));
+  pick.value = name in MAPS ? name : 'spike';
+  pick.addEventListener('change', () => {
+    params.set('map', pick.value);
+    location.search = params.toString();
+  });
   const map = mapNamed(name in MAPS ? name : 'spike');
   if (map.problems.length) console.warn(`spike3d: map ${map.name} has problems:\n${map.problems.join('\n')}`);
   const size = Number(params.get('world')) || map.ground.size;

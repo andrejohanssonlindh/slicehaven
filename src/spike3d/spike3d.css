@@ -1,6 +1,10 @@
 /* The 3D spike: the shared layout, a stats overlay, and rows of small toggles. */
 
 #topbar .btn:first-child { padding: 3px 8px; }
+#map-pick { flex-shrink: 0; font-size: 13px; padding: 4px 6px; background: var(--panel-hi); color: var(--ink); border: 1px solid var(--panel-hi); border-radius: 4px; }
+/* On a phone the build stamp gives way to the map picker (cut short, never pushing the bar wider). */
+#topbar .tag { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 480px) { #topbar .logo { display: none; } }
 #stage { overflow: hidden; }
 
 #stats {

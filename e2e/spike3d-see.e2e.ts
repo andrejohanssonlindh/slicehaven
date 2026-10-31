@@ -19,7 +19,8 @@ describe('spike3d see-through', () => {
     await w('(w.hero.x = 8.9, w.hero.z = -9.6, w.placeHero(), w.focus.x = 9.5, w.focus.z = -8, 0)');
     await page.waitForTimeout(2500);
     await page.screenshot({ path: `${OUT}spike3d-see-revealed.png` });
-    expect(await w('w.people.map((p) => p.id + p.reveals)')).toEqual(['villagertrue', 'herotrue']);
+    // Only the hero cuts an oval; the map's people are hidden by what stands in front of them.
+    expect(await w('w.people.map((p) => p.id + p.reveals)')).toEqual(['villagerfalse', 'herotrue']);
     await w('(w.people.find((p) => p.id === "hero").reveals = false, 0)');
     await page.waitForTimeout(800);
     await page.screenshot({ path: `${OUT}spike3d-see-hidden.png` });

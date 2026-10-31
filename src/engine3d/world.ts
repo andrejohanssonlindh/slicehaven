@@ -442,7 +442,7 @@ export class SpikeWorld {
   private leaves = new Leaves(96);
   /**
    * The people in the world. Anyone with `reveals` gets a see-through oval cut in the trees
-   * between them and the camera; leave it off for someone who should stay hidden.
+   * between them and the camera; today that is only the hero (the director, 2026-10-31).
    */
   readonly people: Person[] = [];
   /** The map's people, each following their schedule (see `stepCast`). */
@@ -581,7 +581,8 @@ export class SpikeWorld {
       const card = personCard(who), blob = blobShadow(0.32);
       card.mesh.visible = blob.visible = false;
       this.cast.push({ who, card, blob, mind: newMind(who.id, who.start[0], who.start[1], who.seed ?? 1, who.slot, who.home) });
-      this.people.push({ id: who.id, card, reveals: true });
+      // Only the hero shows through what stands in front of them: anyone else behind a tree or a wall is hidden by it.
+      this.people.push({ id: who.id, card, reveals: false });
       this.scene.add(card.mesh, blob);
       this.sprites.push(card);
     }
