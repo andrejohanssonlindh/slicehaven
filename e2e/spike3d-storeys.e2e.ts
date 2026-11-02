@@ -23,7 +23,7 @@ describe('spike3d storeys', () => {
     expect(await w('w.climb(1)')).not.toBeNull();
     await done();
     expect(await w('w.heroLevel')).toBe(1);
-    const y = (await w('w.heroCard.mesh.position.y')) as number;
+    const y = (await w('w.heroFig.place.position.y')) as number;
     // Drag the view to the far corner until the inn is taken down.
     await w('(w.follow = false, w.focus.x = 60, w.focus.z = 60, 0)');
     await page.waitForFunction(`!(() => { const w = window.spike.world; return ${standing}; })()`, undefined, { timeout: 60_000 });
@@ -34,7 +34,7 @@ describe('spike3d storeys', () => {
     await page.waitForFunction(`(() => { const w = window.spike.world; return ${standing}; })()`, undefined, { timeout: 60_000 });
     await page.waitForTimeout(500);
     expect(await w('w.heroLevel')).toBe(1);
-    expect(await w('w.heroCard.mesh.position.y')).toBeCloseTo(y, 2);
+    expect(await w('w.heroFig.place.position.y')).toBeCloseTo(y, 2);
     expect(await w('w.stairsHint')).toEqual({ up: true, down: true });
     expect(errors).toEqual([]);
   });

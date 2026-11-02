@@ -176,9 +176,6 @@ function buildControls(): void {
   button('row-fx', () => t('spike.ray', 'Light ray'), () => world.rayOn, () => { world.toggleRay(); });
   button('row-fx', () => t('spike.speed', 'Walk ×{n}', { n: world.speedMul }), () => world.speedMul > 1, () => { world.speedMul = cycle([1, 2, 3], world.speedMul); });
 
-  // People are 3D bodies (plan item A2); the button (or ?cards in the address) shows the old flat cards instead.
-  button('row-look', () => t('spike.bodies', 'Bodies'), () => world.bodies, () => { world.bodies = !world.bodies; });
-  if (!params.has('cards')) world.bodies = true;
   button('row-look', () => t('spike.inside', 'Inside'), () => world.inside, () => { world.inside = !world.inside; });
   button('row-look', () => t('spike.up', 'Upstairs'), () => world.heroLevel > 0, () => {
     if (world.climb(1) === null) notify(t('spike.nostairs', 'No stairs up from here.'));

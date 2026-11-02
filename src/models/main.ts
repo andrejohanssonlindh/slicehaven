@@ -1,6 +1,4 @@
 import * as THREE from 'three';
-import { makeWalkSet, viewFor } from '../art/folkWalk';
-import { folkOf } from '../art/folk';
 import { PERSON_KINDS } from '../content/people';
 import { bodySpecOf } from '../content/people/bodies';
 import { IDLE, IDLE_SECONDS, WALK } from '../content/people/poses';
@@ -10,7 +8,7 @@ import { cyclePose } from '../core/world3d/pose';
 import { BODY_SHELLS, type BodyRig, makeBodyRig } from '../engine3d/body';
 import { WORLD, lit } from '../engine3d/materials';
 import { Pipeline } from '../engine3d/pipeline';
-import { spriteCard, walkCard } from '../engine3d/sprites';
+import { spriteCard } from '../engine3d/sprites';
 import { thingGroup } from '../engine3d/things';
 import { THINGS } from '../content/things';
 import { MODELS } from '../content/things/models';
@@ -19,7 +17,7 @@ import { t } from '../i18n';
 
 /**
  * The model gallery (plan item A2): every kind of body on a slowly turning stand, in the real pixel pipeline, with
- * today's flat card beside the first one to compare. Judge models here on the phone; whoever builds one checks it here.
+ * each piece of furniture's old card beside it to compare. Judge models here on the phone; whoever builds one checks it here.
  */
 
 const PITCH = 0.68;
@@ -167,10 +165,6 @@ function fillList(): void {
   }
 }
 
-// Today's card beside the first body, to compare.
-const first = CAST[0].who;
-const card = walkCard(makeWalkSet(folkOf(PERSON_KINDS.resolve(first).look, first.seed ?? 1)), PITCH);
-scene.add(card.mesh);
 
 function fit(): void {
   pipeline.resize(stage.clientWidth, stage.clientHeight, window.devicePixelRatio || 1);
@@ -258,14 +252,6 @@ function loop(now: number): void {
     else r.rig.pose(cyclePose(IDLE, time / IDLE_SECONDS));
   }
   if (state.walking) state.phase += (speed * dt) / rigs[0].rig.model.stride;
-  // The card stands beside the first body, facing the camera, showing the view that matches the turn.
-  const a = spot(0);
-  card.mesh.visible = state.card && show === 'people';
-  card.mesh.position.set(a.x + 0.75, 0, a.z + 0.3);
-  const v = viewFor(Math.sin(state.angle), Math.cos(state.angle), 0, card.view, Math.cos(card.mesh.rotation.y) < 0);
-  card.pose(v.view, state.walking, speed);
-  card.mesh.rotation.y = v.left ? Math.PI : 0;
-  card.tick(time);
   pipeline.render(scene, camera, new THREE.Vector2(0, 0), 1 / ZOOMS[state.zoom]);
   requestAnimationFrame(loop);
 }

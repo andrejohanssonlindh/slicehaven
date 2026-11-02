@@ -6,7 +6,7 @@
 - ✅ **People: one builder, five bodies.** Every people family has its own proportions, and every people its own size from the creator's typical height and weight for women and men. Dressed from the looks the kinds of person already have (no person is made by hand).
 - ✅ **Movement as data:** a walk and a standing breath, as poses in a loop.
 - ✅ **The gallery** `/models/`: the eight bodies on turning stands, the old card beside the first; toggles for turning, walking, shells and the outline.
-- ✅ **In the world, by default:** every person on the map is a body (one skinned mesh on a skeleton, three draw calls a person). The **Bodies** button (Look row), or `?cards` in the address, shows the old cards.
+- ✅ **In the world:** every person on the map is a body (one skinned mesh on a skeleton, three draw calls a person). The flat people cards are gone (the director, 2026-11-02): a person on screen is a `Figure` in `engine3d/world.ts`, an anchor the rules place and show, carrying the body.
 - ⬜ To judge on the phone, then: held things, faces, more poses (sit, work, fight, fall), and the cards go.
 - ✅ **Furniture, the pattern and four examples:** `table`, `keg`, `bed`, `shelf` are models; they turn to face out from their wall; [the how-to](models-authoring.md) lists the rest in six batches.
 - ✅ **Furniture, all of it but the horse:** the other 36 pieces made by three Sonnet helpers from the how-to, checked by the tests and looked over by Claude in the gallery. They are first passes: built from the pieces' descriptions, not copied from the cards, and real size (the cards were painted larger than life).

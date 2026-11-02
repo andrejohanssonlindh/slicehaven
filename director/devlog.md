@@ -4,7 +4,8 @@
 
 ## 2026-11-02 — All the furniture in 3D, and bodies in the world
 
-- **Bodies are the default in the 3D world:** everyone on the map is a 3D body. The Bodies button (Look row) or `?cards` in the address brings the old cards back for comparison.
+- **Everyone in the 3D world is a 3D body**, and the old flat people are gone (your call): no Bodies button, no old card beside the farmer in the gallery. Only the stable's horses are still cards.
+- **Noted, not fixed:** the inn's two flights of stairs meet with no landing between them (minor; the bigger buildings get redesigned, C6).
 - **Lighter bodies:** each body is now one skinned mesh on its skeleton (three draw calls a person instead of about thirty). With everyone in a body, the hamlet draws in about 360 calls (it was about 290 with cards, and 590 with the first bodies).
 - **36 more pieces of furniture**, made by three Sonnet helpers working from the how-to: stools, pallets, chests, baskets, sacks, the hearth and the oven, rugs and straw, the inn's long tables, benches and ale kegs, counters (with their goods), the whole smithy, the loom, racks of fish and herbs, nets, hay. Every house is now furnished in 3D except the stable's horses. I went over them in the gallery: nothing broken or floating, all inside their footprints, but they are first passes from the descriptions, so tell me which ones read wrong.
 - **Next:** your notes on the pieces; then the horse waits for kinds of creature (C3).

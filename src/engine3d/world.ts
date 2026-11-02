@@ -1,12 +1,10 @@
 import * as THREE from 'three';
-import { makeWalkSet, viewFor } from '../art/folkWalk';
 import type { Pix } from '../art/pix';
 import { type FurnishedRoom, furnishHouse } from '../content/furnish';
 import {
   barkTex, doorTex, floorTex, groundChunkPainter, leafTex, plasterTex, roofUnderTex, shingleTex, shutterTex, sodTex, stoneTex, thatchTex,
   tileTex, timberTex, windowGlowTex, windowTex,
 } from '../art/textures3d';
-import { folkOf } from '../art/folk';
 import { mapNamed } from '../content/maps';
 import { PERSON_KINDS } from '../content/people';
 import { HERO_PERSON, streamingFilamentWorld } from '../content/spike3d';
@@ -45,7 +43,7 @@ import { RAYS, type SightLight, type VisionSpec, angleGap, castSight, lightReach
 import { Leaves } from './leaves';
 import { Rain } from './rain';
 import { type Chimney, Smoke } from './smoke';
-import { type SpriteCard, type WalkCard, blobShadow, spriteCard, walkCard } from './sprites';
+import { type SpriteCard, blobShadow, spriteCard } from './sprites';
 import { type BodyRig, makeBodyRig } from './body';
 import { geometryOf, thingGroup, thingMaterial } from './things';
 import { bodySpecOf } from '../content/people/bodies';
@@ -94,12 +92,31 @@ interface CutPart {
 const HERO_SPEED = 1.6;
 
 /** Someone who goes from room to room of a house on every storey, by the stairs, and out again (see `core/world3d/actors.ts`). */
-/** Someone from the map's cast, on screen: their card, and their mind (where they are, what they are doing). */
+/** Someone from the map's cast, on screen: their figure, and their mind (where they are, what they are doing). */
 interface CastCard {
   who: CastMember;
-  card: WalkCard;
+  fig: Figure;
   blob: THREE.Mesh;
   mind: Mind;
+}
+
+/**
+ * A person on screen: an anchor where they stand (the rules place it and say whether it is shown), carrying their 3D
+ * body (`core/world3d/body.ts`), which turns the way they face and walks while they move (`stepFigures`).
+ */
+export interface Figure {
+  place: THREE.Group;
+  rig: BodyRig;
+  /** The way the body faces (as `rotation.y`), and the way it is turning toward. */
+  yaw: number;
+  want: number;
+  /** Walking now, how far through the walk's loop, and how long since the last step (seconds). */
+  moving: boolean;
+  phase: number;
+  still: number;
+  /** Where the anchor was last frame (the walk's loop follows the ground covered). */
+  lastX: number;
+  lastZ: number;
 }
 
 /** People farther than this from both the view and the hero wait (a big map does not run everyone), metres. */
@@ -107,8 +124,13 @@ const MIND_REACH = 140;
 
 const byDistance = (a: { d: number }, b: { d: number }): number => a.d - b.d;
 
-/** A person's walking card, drawn from their kinds. */
-const personCard = (p: PersonSpec): WalkCard => walkCard(makeWalkSet(folkOf(PERSON_KINDS.resolve(p).look, p.seed ?? 1)), PITCH);
+/** A person's figure: their body, built from their kinds, on an anchor. */
+function personFigure(p: PersonSpec, yaw: number): Figure {
+  const rig = makeBodyRig(buildBody(bodySpecOf(PERSON_KINDS.resolve(p), p.seed ?? 1)));
+  const place = new THREE.Group();
+  place.add(rig.group);
+  return { place, rig, yaw, want: yaw, moving: false, phase: 0, still: 1, lastX: 0, lastZ: 0 };
+}
 /** How far the ray of light reaches, metres. */
 const RAY_LENGTH = 9;
 
@@ -162,10 +184,8 @@ export interface Person {
   id: string;
   /** Who they are (their body is built from it). */
   spec: PersonSpec;
-  /** Where they stand and whether they are drawn: the card is the person's place even when a body is shown instead. */
-  card: WalkCard;
-  /** Their 3D body, while bodies are on (`SpikeWorld.bodies`): it stands where the card is and walks as it moves. */
-  body?: { rig: BodyRig; phase: number; yaw: number; x: number; z: number; still: number };
+  /** Where they stand, whether they are drawn, and their body. */
+  fig: Figure;
   /** Cuts a see-through oval in whatever (trees) stands between them and the camera. False for the hidden. */
   reveals: boolean;
 }
@@ -459,7 +479,7 @@ export class SpikeWorld {
   readonly nav: NavGrid;
   /** The hero: where they stand (metres), the house and storey they are on, the walk in hand. */
   readonly hero: Actor = newActor(0, 0);
-  readonly heroCard!: WalkCard;
+  readonly heroFig!: Figure;
   private heroBlob!: THREE.Mesh;
   /** The keys: how far right and how far up the screen the hero is being steered (-1..1 each). Set by the page. */
   input = { right: 0, up: 0 };
@@ -587,22 +607,19 @@ export class SpikeWorld {
     this.places = map.places;
     this.mapEvents = map.events;
     for (const who of map.cast) {
-      const card = personCard(who), blob = blobShadow(0.32);
-      card.mesh.visible = blob.visible = false;
-      this.cast.push({ who, card, blob, mind: newMind(who.id, who.start[0], who.start[1], who.seed ?? 1, who.slot, who.home) });
+      const fig = personFigure(who, this.yaw), blob = blobShadow(0.32);
+      fig.place.visible = blob.visible = false;
+      this.cast.push({ who, fig, blob, mind: newMind(who.id, who.start[0], who.start[1], who.seed ?? 1, who.slot, who.home) });
       // Only the hero shows through what stands in front of them: anyone else behind a tree or a wall is hidden by it.
-      this.people.push({ id: who.id, spec: who, card, reveals: false });
-      this.scene.add(card.mesh, blob);
-      this.sprites.push(card);
+      this.people.push({ id: who.id, spec: who, fig, reveals: false });
+      this.scene.add(fig.place, blob);
     }
     // The hero. Tap the ground and they walk there.
-    this.heroCard = personCard(HERO_PERSON);
-    this.people.push({ id: 'hero', spec: HERO_PERSON, card: this.heroCard, reveals: true });
+    this.heroFig = personFigure(HERO_PERSON, this.yaw);
+    this.people.push({ id: 'hero', spec: HERO_PERSON, fig: this.heroFig, reveals: true });
     this.heroBlob = blobShadow(0.32);
-    this.heroCard.mesh.rotation.y = this.yaw;
     this.placeHero();
-    this.scene.add(this.heroCard.mesh, this.heroBlob);
-    this.sprites.push(this.heroCard);
+    this.scene.add(this.heroFig.place, this.heroBlob);
     const ring = new THREE.RingGeometry(0.22, 0.32, 16);
     ring.rotateX(-Math.PI / 2);
     this.marker = new THREE.Mesh(ring, new THREE.MeshBasicMaterial({ color: 0xffd36a, transparent: true, opacity: 0.8, depthWrite: false }));
@@ -1452,7 +1469,7 @@ export class SpikeWorld {
   private placeHero(lift = 0): void {
     this.moves.settle(this.hero); // (tests move the hero by hand)
     const y = this.footY(this.hero);
-    this.heroCard.mesh.position.set(this.hero.x, y + lift, this.hero.z);
+    this.heroFig.place.position.set(this.hero.x, y + lift, this.hero.z);
     this.heroBlob.position.set(this.hero.x, y + 0.03, this.hero.z);
   }
 
@@ -1487,7 +1504,7 @@ export class SpikeWorld {
     if (mag < 0.1) {
       if (this.steering) {
         this.steering = false;
-        this.faceWalker(this.heroCard, this.heroDir.x, this.heroDir.z, false, 0);
+        this.faceWalker(this.heroFig, this.heroDir.x, this.heroDir.z, false);
       }
       return false;
     }
@@ -1500,7 +1517,7 @@ export class SpikeWorld {
     const speed = HERO_SPEED * this.speedMul;
     const pose = this.moves.steer(this.hero, wx, wz, speed * dt);
     this.placeHero();
-    if (pose) this.faceWalker(this.heroCard, pose.dx, pose.dz, pose.moving, speed);
+    if (pose) this.faceWalker(this.heroFig, pose.dx, pose.dz, pose.moving);
     return true;
   }
 
@@ -1524,21 +1541,14 @@ export class SpikeWorld {
     const speed = HERO_SPEED * this.speedMul;
     const pose = this.moves.step(h, dt, speed);
     this.placeHero();
-    if (pose) this.faceWalker(this.heroCard, pose.dx, pose.dz, pose.moving, speed);
+    if (pose) this.faceWalker(this.heroFig, pose.dx, pose.dz, pose.moving);
     if (!h.legs.length) this.marker.visible = false;
   }
 
-  /**
-   * Show the view that matches the way a person walks (front, back or profile) and
-   * their step. A left-facing profile is the right-facing art on a card turned round,
-   * which keeps its lit side toward the camera.
-   */
-  private faceWalker(card: WalkCard, dirX: number, dirZ: number, moving: boolean, speed: number): void {
-    const m = card.mesh;
-    const wasLeft = Math.cos(m.rotation.y - this.yaw) < 0;
-    const v = viewFor(dirX, dirZ, this.yaw, card.view, wasLeft);
-    card.pose(v.view, moving, speed);
-    m.rotation.y = v.left ? this.yaw + Math.PI : this.yaw;
+  /** A person faces the way they go (a standing still direction keeps the last), and walks or stands. */
+  private faceWalker(fig: Figure, dirX: number, dirZ: number, moving: boolean): void {
+    if (Math.hypot(dirX, dirZ) > 1e-6) fig.want = Math.atan2(dirX, dirZ);
+    fig.moving = moving;
   }
 
   /**
@@ -1597,7 +1607,7 @@ export class SpikeWorld {
     const near = this.seeOrder;
     near.length = 0;
     for (const p of this.people) if (p.reveals) near.push(p);
-    const d = (p: Person): number => Math.hypot(p.card.mesh.position.x - f.x, p.card.mesh.position.z - f.z);
+    const d = (p: Person): number => Math.hypot(p.fig.place.position.x - f.x, p.fig.place.position.z - f.z);
     if (near.length > SEE_SLOTS) near.sort((a, b) => d(a) - d(b));
     const v = this.seeV;
     for (let i = 0; i < slots.length; i++) {
@@ -1607,7 +1617,7 @@ export class SpikeWorld {
         continue;
       }
       // The oval is centred on the chest.
-      v.copy(p.card.mesh.position);
+      v.copy(p.fig.place.position);
       v.y += 0.9;
       v.applyMatrix4(this.camera.matrixWorldInverse);
       s.set(v.x, v.y, -v.z, 1);
@@ -1709,7 +1719,7 @@ export class SpikeWorld {
     if (this.camps.length >= 6) return false;
     // A placed thing of the kind `campfire`, built like any other, at the hero's height (they may be upstairs).
     const p: PlacedProp = { kind: 'campfire', x: this.hero.x + 0.9, z: this.hero.z + 0.2, seed: this.camps.length };
-    const y = this.heroCard.mesh.position.y;
+    const y = this.heroFig.place.position.y;
     const st: Standing = { houses: [], objects: [], shells: [], torches: [] };
     this.buildProp(p, st, y);
     const smoke = THINGS.get(p.kind).smoke;
@@ -1818,14 +1828,14 @@ export class SpikeWorld {
     if (this.orb) out.push({ x: this.orb.group.position.x, z: this.orb.group.position.z, kind: 'light', weight: 1 });
     if (this.hand) out.push({ x: this.hand.fx.object.position.x, z: this.hand.fx.object.position.z, kind: 'fire', weight: TORCH_FIRE });
     if (this.ray) {
-      const hp = this.heroCard.mesh.position, dl = Math.hypot(this.heroDir.x, this.heroDir.z) || 1;
+      const hp = this.heroFig.place.position, dl = Math.hypot(this.heroDir.x, this.heroDir.z) || 1;
       for (const s of [1.5, 3.5, 5.5, 7.5]) out.push({ x: hp.x + (this.heroDir.x / dl) * s, z: hp.z + (this.heroDir.z / dl) * s, kind: 'light', weight: 0.6 });
     }
     return out;
   }
 
   private stepMagicLights(): void {
-    const hp = this.heroCard.mesh.position;
+    const hp = this.heroFig.place.position;
     if (this.hand) {
       // Held out a little in front, at about the height of a hand.
       const dl = Math.hypot(this.heroDir.x, this.heroDir.z) || 1;
@@ -1859,57 +1869,24 @@ export class SpikeWorld {
     this.field.setSources([]); // the field asks `fieldExtras` again
   }
 
-  // --- 3D bodies instead of cards (plan item A2, on trial beside the cards) ---
-  private bodiesOn = false;
-
-  get bodies(): boolean {
-    return this.bodiesOn;
-  }
-
-  /**
-   * Show people as 3D bodies (`core/world3d/body.ts`) instead of flat cards. The cards stay where they are and keep
-   * deciding who is drawn; they are only moved to a layer no camera looks at.
-   */
-  set bodies(on: boolean) {
-    if (on === this.bodiesOn) return;
-    this.bodiesOn = on;
+  /** Each person's body turns the way they go and walks while they move (the walk's loop follows the ground covered). */
+  private stepFigures(dt: number): void {
     for (const p of this.people) {
-      p.card.mesh.layers.set(on ? 2 : 0);
-      if (on) {
-        const rig = makeBodyRig(buildBody(bodySpecOf(PERSON_KINDS.resolve(p.spec), p.spec.seed ?? 1)));
-        const m = p.card.mesh;
-        this.scene.add(rig.group);
-        p.body = { rig, phase: 0, yaw: Math.atan2(this.heroDir.x, this.heroDir.z), x: m.position.x, z: m.position.z, still: 1 };
-      } else {
-        p.body?.rig.dispose();
-        delete p.body;
-      }
-    }
-  }
-
-  /** Each body stands where its person's card is, turns the way they move, and walks while they do. */
-  private stepBodies(dt: number): void {
-    if (!this.bodiesOn) return;
-    for (const p of this.people) {
-      const b = p.body;
-      if (!b) continue;
-      const m = p.card.mesh, g = b.rig.group;
-      g.visible = m.visible;
-      if (!m.visible) continue;
-      const dx = m.position.x - b.x, dz = m.position.z - b.z, d = Math.hypot(dx, dz);
-      b.x = m.position.x;
-      b.z = m.position.z;
+      const f = p.fig, at = f.place.position;
+      if (!f.place.visible) continue;
+      const dx = at.x - f.lastX, dz = at.z - f.lastZ, d = Math.hypot(dx, dz);
+      f.lastX = at.x;
+      f.lastZ = at.z;
       // A jump (a load, a teleport) is not a step.
       if (d > 0.001 && d < 1) {
-        const want = Math.atan2(dx, dz);
-        b.yaw += wrapAngle(want - b.yaw) * (1 - Math.exp(-dt / 0.08));
-        b.phase += d / b.rig.model.stride;
-        b.still = 0;
-      } else b.still += dt;
-      g.position.copy(m.position);
-      g.rotation.y = b.yaw;
-      b.rig.pose(b.still < 0.15 ? cyclePose(WALK, b.phase) : cyclePose(IDLE, this.time / IDLE_SECONDS));
-      b.rig.setShells(Math.min(2, this.settings.shells));
+        f.want = Math.atan2(dx, dz);
+        f.phase += d / f.rig.model.stride;
+        f.still = 0;
+      } else f.still += dt;
+      f.yaw += wrapAngle(f.want - f.yaw) * (1 - Math.exp(-dt / 0.08));
+      f.rig.group.rotation.y = f.yaw;
+      f.rig.pose(f.still < 0.15 ? cyclePose(WALK, f.phase) : cyclePose(IDLE, this.time / IDLE_SECONDS));
+      f.rig.setShells(Math.min(2, this.settings.shells));
     }
   }
 
@@ -1922,12 +1899,9 @@ export class SpikeWorld {
     const dt = Math.min(0.1, dtMs / 1000);
     this.time += dt;
     if (this.turnInput) this.turn(this.turnInput * TURN_SPEED * dt);
-    // When the view has turned, the people's cards and the furniture turn with it (the hero, standing, too).
+    // When the view has turned, the furniture cards that are left turn with it.
     const turned = this.yaw !== this.facedYaw;
-    if (turned) {
-      this.facedYaw = this.yaw;
-      this.faceWalker(this.heroCard, this.heroDir.x, this.heroDir.z, false, 0);
-    }
+    if (turned) this.facedYaw = this.yaw;
     const w = this.weather;
     if (this.dayMinutes > 0) w.advance((dt * 24) / (this.dayMinutes * 60));
     w.update(dtMs);
@@ -2058,7 +2032,7 @@ export class SpikeWorld {
       this.focus.z += (this.hero.z - this.focus.z) * k;
     }
     for (const s of this.sprites) s.tick(this.time);
-    this.stepBodies(dt);
+    this.stepFigures(dt);
 
     this.placeCamera();
     this.updateSee();
@@ -2145,7 +2119,7 @@ export class SpikeWorld {
   get minds(): { id: string; doing: string | null; x: number; z: number; house: string | null; shown: boolean }[] {
     return this.cast.map((c) => ({
       id: c.who.id, doing: c.mind.entry >= 0 ? c.who.does[c.mind.entry].do : null,
-      x: c.mind.actor.x, z: c.mind.actor.z, house: c.mind.actor.house, shown: c.card.mesh.visible,
+      x: c.mind.actor.x, z: c.mind.actor.z, house: c.mind.actor.house, shown: c.fig.place.visible,
     }));
   }
 
@@ -2161,18 +2135,18 @@ export class SpikeWorld {
       const a = c.mind.actor;
       const far = Math.hypot(a.x - this.focus.x, a.z - this.focus.z) > MIND_REACH && Math.hypot(a.x - this.hero.x, a.z - this.hero.z) > MIND_REACH;
       if (far) {
-        c.card.mesh.visible = c.blob.visible = false;
+        c.fig.place.visible = c.blob.visible = false;
         continue;
       }
       const pose = stepMind(c.mind, c.who.does, BEHAVIOURS, ctx, dt);
       const y = this.footY(a);
-      this.faceWalker(c.card, pose.dx, pose.dz, pose.moving, 1.1);
-      c.card.mesh.position.set(a.x, y, a.z);
+      this.faceWalker(c.fig, pose.dx, pose.dz, pose.moving);
+      c.fig.place.position.set(a.x, y, a.z);
       c.blob.position.set(a.x, y + 0.03, a.z);
       // (Indoors the roof is lifted only while the hero is in there, on the storey they look at.)
       const hs = a.house ? this.standingOf(a.house) : null;
       const shown = a.house ? !!hs && hs.open && hs.view === a.level : sees(a.x, a.z);
-      c.card.mesh.visible = c.blob.visible = shown;
+      c.fig.place.visible = c.blob.visible = shown;
     }
   }
 }

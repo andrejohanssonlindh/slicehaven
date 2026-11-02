@@ -16,7 +16,7 @@
 - **Orthographic camera, fixed pitch, free yaw** (`world.yaw`, `world.turn(rad)`, `world.turnInput` held by the ⟲ ⟳ buttons, Q/E and a two-finger twist), snapped to whole render pixels at any yaw (no texture crawl once it stops). Yaw 0 looks from +z; the start is `VIEW_YAW`.
 - **Textures painted by code** (`art/textures3d.ts`, about 21 texels a metre, nearest filtering).
 - **Shells**: one or two layers pushed out along the normal (6–24 cm), with sparse alpha-tested pixels for a rough edge (`shellOf()` in `engine3d/materials.ts`), per material.
-- **People and furniture are flat camera-facing cards** from an atlas (`engine3d/sprites.ts`, `atlas.ts`), painted from the front. Plan item A2 replaces them with low-poly models with shells.
+- **People are 3D bodies** (`engine3d/body.ts`, one skinned mesh each; a person on screen is a `Figure`), **furniture is 3D models** (`content/things/models/`); see [models](models.md). Only the stable's horses are still flat cards from the atlas (`engine3d/sprites.ts`, `atlas.ts`).
 - **Light**: `lit()` (Lambert, cloud shadow, wetness, wind sway, AO); the sun and moon from the hour; torches and fires are a pool of point lights.
 
 ## Code map
@@ -51,4 +51,4 @@
 - **Tests:** unit tests check that a path exists, not that it looks right. Check visual work in Chrome. The browser tests (`npm run test:e2e`, about 8 minutes) run against a live dev server: don't edit files the 3D page imports while they run; read the summary line (`N passed`), not the exit code.
 
 ## Known gaps in the engine (not plan items yet)
-Doors don't open; stall gates are rails only; partitions block sight only on your own storey; upstairs windows aren't lit by room fires; scatter is O(n²); one lake per map; generated chunks are never forgotten.
+The inn's two flights of stairs meet with no landing between them (the director, 2026-11-02; minor, the bigger buildings get redesigned, C6); doors don't open; stall gates are rails only; partitions block sight only on your own storey; upstairs windows aren't lit by room fires; scatter is O(n²); one lake per map; generated chunks are never forgotten.
