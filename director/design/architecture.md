@@ -53,13 +53,13 @@ Each needs a short design, agreed with the director, before any feature that res
 
 | Foundation | Needed by | What it would be (first sketch, not agreed) |
 |---|---|---|
-| **Actions on things** (plan step 5) | Tapping a thing or a person, using a skill on it | The kind chain lists what can be done (from the skill hooks); doing it runs a check from the rules and changes instance state |
+| **Actions on things** (plan B3, in slices B3a–d) | Tapping a thing or a person, using a skill on it, taking, carrying, using without leave | One pipeline: offer (skill hooks + verbs on the kind chain) → gates (owner, tools, place, state, size; one file each) → resolve (the roll modes we have) → outcome (state, time, item, flag). Sketch: [actions](actions.md) (Q33) |
 | **Time model for actions** | Anything that takes time or happens in rounds: combat, spells, crafting | Settled (A3): live, and only a fight goes to rounds of 4 seconds. The code for rounds comes with combat (B8) |
 | **Effects** (things that happen to a thing or person: burning, wet, wounded, afraid) | A fireball, rain putting out a fire, poison, fear | An effect is a kind too (one file each): what it changes, how long it lasts, how it shows. Applied to instance state |
 | **Abilities and spells** | A fireball | An ability is a kind: what it costs (filaments), what it targets (a point, an area, a person), what roll it needs, which effects it applies. Its look (projectile, burst) points at shared engine code, like a kind points at a builder |
 | **Damage and wounds; combat** | Fights, enemies | From the ruleset; lives in `core/`, reads the sheet |
 | **People reacting** (perception, alarm, chase, flee) | Enemies, guards, thieves | New behaviours and conditions (`when/`: "sees the hero", "heard a noise"), so it extends the behaviours pattern rather than standing beside it |
-| **Items and inventory** | Gear, loot, tools that help skills | Items are kinds of thing (`item` already exists in the tree); a person or container holds instances |
+| **Items and inventory** | Gear, loot, tools that help skills, found maps | Items are kinds of thing (`item` already exists in the tree) with a shape, a weight and a size class; a person or container holds instances in grids (pockets, bag, add-ons that are items themselves); weight → encumbrance → base fatigue (plan B6, Q34) |
 | **Locations** (plan step 6, Q25) | Travelling between maps | Exits and arrivals; likely an overworld |
 
 **Worked example: "add a fireball".** It needs an ability (missing), a target and an area (missing), an effect, burning (missing), state on what it hits (there now: `states`), damage (missing), and rounds (settled, not built). So the answer is not "add a fireball": it is "design actions and effects, then the fireball is one ability file". By contrast, "add a barrel with a lid" is one kind under `container` today, with an `open` state; opening it by hand waits for actions (B3).

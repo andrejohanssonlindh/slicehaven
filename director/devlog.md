@@ -2,6 +2,13 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-02 — Your notes on inventory, B3, found maps and sight, sorted into the plan
+
+- **Your notes** are kept as written in [vision](vision/2026-11-02-director-notes-2.md), with a digest.
+- **B3 is split into a frame and slices** (B3a–B3d), sketched in [actions](design/actions.md): offer → gates → resolve → outcome. A lot of it exists from the 2D days (the skill hooks); what's new is permission, requirements and changing the world.
+- **Inventory (B6) grew** (shapes, pockets, bag, add-ons, weight → base fatigue) and moved up beside B3. **Crafting (B10)** is new, from your smith example. **Maps you find (D4)** are new. **Rolled sight** went into perception (B5). The smoke and torch faults are **small fixes F1, F2**.
+- **Questions Q33–Q36**: the new order, inventory on a phone and how carried weight counts, how sight is rolled, and what exactly is wrong with smoke and torches.
+
 ## 2026-11-02 — Dice: dropped from higher, rethrown when they land badly, OK to close; D10+n
 
 - **Dropped from a height** along the longer side of the screen (from the side on a wide phone, from the bottom when it's tall), so they bounce more before they roll out.
