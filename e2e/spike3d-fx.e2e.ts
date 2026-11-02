@@ -108,6 +108,10 @@ describe('spike3d lightning and fires', () => {
 
     // Nothing is kept on the GPU after it is put away: campfires, the hand torch, the orb and the ray, again and again.
     const geos = () => page.evaluate('window.spike.pipeline.renderer.info.memory.geometries') as Promise<number>;
+    // One round first: what is made once and then shared (a flame's or smoke's shape) is not a leak.
+    await w('(w.lightFire(), w.lightFire(), w.toggleTorch(), w.toggleOrb(), w.toggleRay(), 0)');
+    await page.waitForTimeout(300);
+    await w('(w.douseFires(), w.toggleTorch(), w.toggleOrb(), w.toggleRay(), 0)');
     await page.waitForTimeout(500);
     const before = await geos();
     for (let i = 0; i < 4; i++) {

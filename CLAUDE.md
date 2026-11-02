@@ -60,8 +60,7 @@ The deeper designs (`skill-web.md`, `people-library.md`, `ways-of-use.md`) are f
 ## Tech
 - Vite + TypeScript (strict). **three.js for the 3D world** (`src/engine3d`, code-split; decision 2026-10-28); art is still painted per pixel by code (`src/art`) and put on textures and sprite cards. Vitest for unit tests (`tests/`). **Playwright** (Chromium) for browser tests and screenshots (`e2e/`; on a new machine run `npx playwright install chromium`, no sudo needed). `marked` for the Director's Room.
 - `npm run dev` (also on LAN with `--host`), `npm test`, `npm run build`, `npm run test:e2e` (Playwright browser tests in `e2e/`, ~9 minutes for all, ~2 per file).
-  - **Run only the browser test files the change can reasonably affect** (decision 2026-11-02): `npm run test:e2e -- spike3d-rooms spike3d.e2e`. Each file's first line says what it covers. The whole suite only for broad changes (the pipeline, materials, chunk streaming, the page's start-up). Known: `spike3d-fx` fails its GPU-memory check by one geometry, from before 2026-11-02.
-- Deploy: `.github/workflows/deploy.yml` builds and publishes `dist/` on every push to `main`.
+  - **Run only the browser test files the change can reasonably affect** (decision 2026-11-02): `npm run test:e2e -- spike3d-rooms spike3d.e2e`. Each file's first line says what it covers. The whole suite only for broad changes (the pipeline, materials, chunk streaming, the page's start-up).- Deploy: `.github/workflows/deploy.yml` builds and publishes `dist/` on every push to `main`.
 - Vite `base` is `/slicehaven/`. Static assets go in `public/` and are referenced as `import.meta.env.BASE_URL + 'assets/...'`.
 
 ## Code structure
