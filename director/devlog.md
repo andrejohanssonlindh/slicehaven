@@ -2,6 +2,13 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-02 — All the furniture in 3D, and bodies in the world
+
+- **Bodies are the default in the 3D world:** everyone on the map is a 3D body. The Bodies button (Look row) or `?cards` in the address brings the old cards back for comparison.
+- **Lighter bodies:** each body is now one skinned mesh on its skeleton (three draw calls a person instead of about thirty). With everyone in a body, the hamlet draws in about 360 calls (it was about 290 with cards, and 590 with the first bodies).
+- **36 more pieces of furniture**, made by three Sonnet helpers working from the how-to: stools, pallets, chests, baskets, sacks, the hearth and the oven, rugs and straw, the inn's long tables, benches and ale kegs, counters (with their goods), the whole smithy, the loom, racks of fish and herbs, nets, hay. Every house is now furnished in 3D except the stable's horses. I went over them in the gallery: nothing broken or floating, all inside their footprints, but they are first passes from the descriptions, so tell me which ones read wrong.
+- **Next:** your notes on the pieces; then the horse waits for kinds of creature (C3).
+
 ## 2026-11-02 — Furniture models: four examples and a how-to for Sonnet
 
 - **Your notes on the bodies, fixed:** the walk no longer pauses where the legs pass (the motion was easing to a stop at every pose; now it flows through them); every torso has sloping shoulders, so the tirak aren't pointy; the gallery opens without the outline.

@@ -58,8 +58,12 @@ undyed `0xc0b494`, straw/tick `0xc8b484`, linen `0xe0d8c4`, madder red `0x8a3a2e
 - **New kinds, new materials, or changes to the kit or the solver:** ask (or leave a note in the batch's report).
 - **Never** change `furniture.ts`, `furnish.ts`, the tests or the room recipes to make a model fit. If it doesn't fit, the model's size is wrong, or say so.
 
-## The pieces still on cards
-Done: `table`, `keg`, `bed`, `shelf`. To do, in batches of about six, roughly in order of how often they're seen:
+## Tips from the first batches
+- **A new file the tests don't see** (only the old models are tested): vitest's cache. Delete `node_modules/.vite/vitest` and run again.
+- **Look at the card's painter** in `src/art/`, not only the look line: the first batches were made from the descriptions and match the cards only roughly.
+
+## The pieces
+All done but the horse (2026-11-02): `table`, `keg`, `bed`, `shelf` by Claude as examples, the rest by Sonnet in these batches:
 
 | Batch | Kinds |
 |---|---|

@@ -6,10 +6,11 @@
 - ✅ **People: one builder, five bodies.** Every people family has its own proportions, and every people its own size from the creator's typical height and weight for women and men. Dressed from the looks the kinds of person already have (no person is made by hand).
 - ✅ **Movement as data:** a walk and a standing breath, as poses in a loop.
 - ✅ **The gallery** `/models/`: the eight bodies on turning stands, the old card beside the first; toggles for turning, walking, shells and the outline.
-- ✅ **In the world, on trial:** the **Bodies** button (Look row, or `?bodies` in the address) puts every person on the map in their body instead of their card.
+- ✅ **In the world, by default:** every person on the map is a body (one skinned mesh on a skeleton, three draw calls a person). The **Bodies** button (Look row), or `?cards` in the address, shows the old cards.
 - ⬜ To judge on the phone, then: held things, faces, more poses (sit, work, fight, fall), and the cards go.
 - ✅ **Furniture, the pattern and four examples:** `table`, `keg`, `bed`, `shelf` are models; they turn to face out from their wall; [the how-to](models-authoring.md) lists the rest in six batches.
-- ⬜ **Furniture, the other ~40:** Sonnet in batches, reviewed by Claude.
+- ✅ **Furniture, all of it but the horse:** the other 36 pieces made by three Sonnet helpers from the how-to, checked by the tests and looked over by Claude in the gallery. They are first passes: built from the pieces' descriptions, not copied from the cards, and real size (the cards were painted larger than life).
+- ⬜ To go over with the director: pieces that read wrong. Known rough spots: the ale kegs stand on their rack instead of lying (the kit has no lying cylinder), the forge's hood and chimney are about 2 m tall.
 - ⬜ **Horses** and other animals with kinds of creature (C3).
 
 ## The bodies
@@ -26,7 +27,7 @@ Each person varies ±4% in height by their seed, and their weight makes them bro
 ## How a body is made (for whoever extends it)
 - **Rules:** `core/world3d/body.ts` (`buildBody(spec)`: about 25 tapered boxes on 11 joints, ~400 triangles) and `core/world3d/pose.ts` (poses, loops, mirroring). Pure and tested (`tests/body.test.ts`).
 - **Data:** `content/people/bodies.ts` (the families' proportions; `bodySpecOf` turns a person into a spec), `content/people/poses.ts` (the walk and the standing breath).
-- **Engine:** `engine3d/body.ts` (`makeBodyRig`: a group per joint, colours in the vertices, one material for every body, two shells over cloth and hair).
+- **Engine:** `engine3d/body.ts` (`makeBodyRig`: one skinned mesh per body on a skeleton of its joints, colours in the vertices, one material for every body, two shells over cloth and hair on the same skeleton).
 - **A new people with a body of its own:** a new entry in `BODY_PLANS` under its family kind. A new movement: a new loop in `poses.ts`.
 
 ## Furniture

@@ -276,5 +276,5 @@ fillList();
 centre();
 fit();
 new ResizeObserver(fit).observe(stage);
-(window as unknown as { models: unknown }).models = { rigs, furnItems, state, build, BODY_SHELLS, pipeline, get show() { return show; } };
+(window as unknown as { models: unknown }).models = { rigs, furnItems, state, build, BODY_SHELLS, pipeline, target, placeCamera, get show() { return show; } };
 requestAnimationFrame((n) => { last = n; loop(n); });
