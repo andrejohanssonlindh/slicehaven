@@ -2,6 +2,16 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-02 — B2: one roll system, shown three ways
+
+- **Every roll goes through one place** (`core/dice.ts`): open rolls (a six is taken away and rolls two new dice), plain pools, and the creator's table rolls. A roll comes back as plain data that says what each die showed and which six it split from, so it can be shown and saved. The skill checks and the creator use it; seeded rolls come out exactly as before.
+- **Shown at the level you pick** (one setting for every page): **dice on glass**, real 3D dice thrown up over the game that tumble and land on what was rolled (a D6 is a rounded cube; a D100 or D10 is a ten-sided token with its number); **icons**, small dice spinning in a row; or **just the result**. A six that splits glows as it lands and its two new dice come out of it. A tap lands the dice; the next closes the result.
+- **Skins** are kept apart from the rolling: *bone* and *ember* for now, one file each in `content/dice/skins/`.
+- **The character creator** rolls through it too: its dice now land on the real numbers (before, they flickered at random and the result appeared afterwards).
+- **Try it:** in the 3D world, panel → **Game** row: *Dice:* changes the level, *Skin:* the dice, *Roll 4D6 vs 14* rolls a skill test (keep rolling to see sixes split), *Roll D100* a table roll. In the creator, any 🎲 button.
+- **Your call:** which level should be the default (it's *icons* now), and whether a D100 should be two ten-sided dice (tens and ones) as at the table rather than one token.
+- **Next:** B3, actions on things: tap the hearth, light it with a roll.
+
 ## 2026-11-02 — A2 and A3 done; B1: things remember, the world is saved
 
 - **The flat cards are gone** (your call: A2 done). Every piece of furniture must have a model now; the card painters, the sprite atlas and the "old card" in the gallery are removed (about 2,000 lines). The stable's horse goes with them, so **the stalls are empty** until horses come back as kinds of creature (C3).

@@ -2,6 +2,11 @@ import { type Sky, WIND_DIRS, clockText } from '../core/environment';
 import { ASPECTS, LEVEL_NAMES } from '../core/filaments';
 import { MAPS, mapNamed } from '../content/maps';
 import { clearWorld, loadWorld, saveWorld } from '../core/world3d/save';
+import { rollTable, rollTest } from '../core/dice';
+import { Rng } from '../core/rng';
+import { DICE_SKINS } from '../content/dice/skins';
+import { showRolls } from '../ui/dice';
+import { DICE_LEVELS, loadSettings, saveSettings } from '../ui/settings';
 import { Governor, TIERS, type DeviceInfo, type Tier, type TierName, pickTier, qualityAt } from '../core/world3d/tiers';
 import { Pipeline } from '../engine3d/pipeline';
 import { SpikeWorld } from '../engine3d/world';
@@ -175,6 +180,17 @@ function buildControls(): void {
     notify(f.lit ? t('spike.hearthout', 'The hearth in {house} is out.', { house: f.house }) : t('spike.hearthlit', 'The hearth in {house} is lit.', { house: f.house }));
     save();
   });
+  // The one roll system (B2), to try until checks have something to act on: how rolls are shown (a setting every
+  // page shares), which dice, and two rolls: a skill test that can split sixes, and a creator's table roll.
+  const levelName = { glass: t('spike.dice.glass', 'Dice: on glass'), icons: t('spike.dice.icons', 'Dice: icons'), result: t('spike.dice.result', 'Dice: result') };
+  button('row-game', () => levelName[loadSettings().dice], () => false, () => { saveSettings({ dice: cycle(DICE_LEVELS, loadSettings().dice) }); });
+  const skins = Object.keys(DICE_SKINS).sort();
+  button('row-game', () => t('spike.dice.skin', 'Skin: {name}', { name: t(`dice.skin.${loadSettings().diceSkin}`, DICE_SKINS[loadSettings().diceSkin]?.name ?? '?') }), () => false, () => {
+    saveSettings({ diceSkin: cycle(skins, loadSettings().diceSkin) });
+  });
+  const diceRng = Rng.fromSeed(Date.now() >>> 0);
+  button('row-game', () => t('spike.roll4d6', 'Roll 4D6 vs 14'), () => false, () => { void showRolls([rollTest({ n: 4, mod: 0 }, 14, diceRng, t('spike.testroll', 'Test'))]); });
+  button('row-game', () => t('spike.rolld100', 'Roll D100'), () => false, () => { void showRolls([rollTable(100, diceRng, t('spike.tableroll', 'Table'))]); });
   const times: [number, string][] = [[6, t('spike.dawn', 'Dawn')], [12, t('spike.day', 'Day')], [18.5, t('spike.dusk', 'Dusk')], [0, t('spike.night', 'Night')]];
   const nearHour = (h: number): boolean => w.hour !== null && Math.abs(((w.hour - h + 36) % 24) - 12) < 1.5 && world.dayMinutes === 0;
   for (const [h, name] of times) button('row-time', () => name, () => nearHour(h), () => { world.dayMinutes = 0; w.setHour(h); });

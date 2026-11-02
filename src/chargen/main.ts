@@ -1,7 +1,9 @@
 /** Character creator page: state, saving, actions and rendering. */
 import { derive, rollsTwice, STEP, STEPS, type Derived } from '../core/chargen/derive';
 import type { Attr, TableId } from '../core/chargen/grants';
-import { exportChar, importChar, loadRoster, newChar, roll, saveRoster, type CharState, type RollRec, type Roster } from '../core/chargen/state';
+import { exportChar, importChar, loadRoster, newChar, rollOn, saveRoster, type CharState, type RollRec, type Roster } from '../core/chargen/state';
+import type { Roll } from '../core/dice';
+import { showRolls } from '../ui/dice';
 import type { PointModel } from '../core/chargen/tables';
 import type { Family } from '../core/chargen/types';
 import { CONTENT } from '../content/chargen';
@@ -83,28 +85,26 @@ function goto(step: number): void {
   window.scrollTo(0, 0);
 }
 
-/** Show rolling dice for a moment before the result lands. */
-function rollFx(sides: number, count = 1): Promise<void> {
-  const el = document.getElementById('toast') as HTMLElement;
-  el.hidden = false;
-  const tick = () => (el.innerHTML = `<span class="dice">${Array.from({ length: count }, () => `<span class="die rolling ${sides === 10 ? 'd10' : ''}">${1 + Math.floor(Math.random() * sides)}</span>`).join('')}</span>`);
-  tick();
-  const iv = window.setInterval(tick, 70);
-  return new Promise((res) =>
-    window.setTimeout(() => {
-      clearInterval(iv);
-      el.hidden = true;
-      res();
-    }, 550),
-  );
+/** The rolls made since the last throw was shown: every roll the creator makes goes through `roll` below. */
+let thrown: Roll[] = [];
+
+/** Roll on a table through the one roll system (`core/dice.ts`), noting it to be shown. */
+function roll(state: CharState, sides: number): number {
+  const r = rollOn(state, sides);
+  thrown.push(r);
+  return r.total;
 }
 
-async function withRoll(sides: number, count: number, apply: () => void): Promise<void> {
+/** Make the rolls, show them landing (at the level the settings say, `ui/dice`), then the result. */
+async function withRoll(apply: () => void): Promise<void> {
   if (busy) return;
   busy = true;
   try {
-    await rollFx(sides, count);
+    thrown = [];
     apply();
+    const rolls = thrown;
+    thrown = [];
+    await showRolls(rolls);
     commit();
   } finally {
     busy = false;
@@ -162,7 +162,7 @@ app.parentElement!.addEventListener('click', (ev) => {
       view.open.people = true;
       return render();
     case 'rollHomeland':
-      return void withRoll(100, 2, () => {
+      return void withRoll(() => {
         view.open.homeland = true;
         s.homelandRolls = [roll(s, 100), roll(s, 100)];
         const hit = CONTENT.homelands.filter((h) => s.homelandRolls!.some((r) => r >= h.lo && r <= h.hi));
@@ -172,13 +172,13 @@ app.parentElement!.addEventListener('click', (ev) => {
         }
       });
     case 'rollBg':
-      return void withRoll(100, 2, () => {
+      return void withRoll(() => {
         s.bgRolls = [roll(s, 100), roll(s, 100)];
         if (!s.bgRolls.includes(s.background ?? -1)) s.background = undefined;
         if (s.bgRolls[0] === s.bgRolls[1]) s.background = s.bgRolls[0];
       });
     case 'rollPeople':
-      return void withRoll(100, 1, () => {
+      return void withRoll(() => {
         const r = roll(s, 100);
         s.subRolls.people = [r];
         const p = CONTENT.peoples.find((x) => x.family === 'manniska' && x.lo !== undefined && r >= x.lo && r <= (x.hi ?? x.lo));
@@ -186,7 +186,7 @@ app.parentElement!.addEventListener('click', (ev) => {
         delete view.open.people;
       });
     case 'rollSub':
-      return void withRoll(Number(a.sides), 1, () => {
+      return void withRoll(() => {
         let r = roll(s, Number(a.sides));
         if (key === 'arch') while (r === 10) r = roll(s, 10);
         s.subRolls[key] = [r];
@@ -195,7 +195,7 @@ app.parentElement!.addEventListener('click', (ev) => {
         delete view.open[key === 'arch' ? 'archetype' : 'environment'];
       });
     case 'rollPick':
-      return void withRoll(Number(a.sides), Number(a.times), () => {
+      return void withRoll(() => {
         s.subRolls[key] = Array.from({ length: Number(a.times) }, () => roll(s, Number(a.sides)));
         const rec = d.picks.find((p) => p.key === key);
         if (rec && Number(a.times) === 1 && !rec.group.roll?.must) {
@@ -244,10 +244,9 @@ app.parentElement!.addEventListener('click', (ev) => {
       setChoice(key, undefined);
       return commit();
     case 'rollSlot':
-      return void withRoll(100, 1, () => rollSlot(key));
+      return void withRoll(() => rollSlot(key));
     case 'rollAll': {
-      const open = d.slots.filter((x) => x.needsRoll && x.table).length;
-      return void withRoll(100, Math.min(open, 6), () => {
+      return void withRoll(() => {
         // Roll until nothing more is open (results may add slots).
         for (let i = 0; i < 50; i++) {
           const dd = derive(s, CONTENT);
@@ -260,7 +259,7 @@ app.parentElement!.addEventListener('click', (ev) => {
     }
     case 'reroll':
       if (s.rerollUsed && d.slots.some((x) => x.key === s.rerollUsed && x.results.length)) return toast('You have already used your one re-roll.');
-      return void withRoll(100, 1, () => {
+      return void withRoll(() => {
         const rec = s.rolls[key];
         if (!rec) return;
         if (rollsTwice(rec.table)) {
@@ -343,7 +342,7 @@ app.parentElement!.addEventListener('click', (ev) => {
       return commit();
     }
     case 'rollDrives':
-      return void withRoll(100, 4, () => {
+      return void withRoll(() => {
         s.subRolls.drives = Array.from({ length: 4 }, () => roll(s, 100));
       });
     case 'drive': {
@@ -360,7 +359,7 @@ app.parentElement!.addEventListener('click', (ev) => {
       if (s.drives.secondary === a.val) s.drives.secondary = undefined;
       return commit();
     case 'armRoll':
-      return void withRoll(10, 1, () => {
+      return void withRoll(() => {
         s.details.armRoll = roll(s, 10);
         s.details.arm = s.details.armRoll === 10 ? 'vänster' : 'höger';
       });

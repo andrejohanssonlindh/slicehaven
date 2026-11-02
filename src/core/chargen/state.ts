@@ -2,6 +2,7 @@
  * Character-creation state: only the player's decisions and dice results.
  * Everything else is derived (see derive.ts). Plain JSON, versioned.
  */
+import { type Roll, rollTable } from '../dice';
 import { Rng } from '../rng';
 import type { Attr, TableId } from './grants';
 import type { PointModel } from './tables';
@@ -127,12 +128,17 @@ export function newChar(seed = Date.now()): CharState {
   };
 }
 
-/** Roll one die with `sides` sides, advancing the stored seed. */
-export function roll(state: CharState, sides: number): number {
+/** Roll on a table: one die with `sides` sides through the one roll system (`core/dice.ts`), advancing the stored seed. */
+export function rollOn(state: CharState, sides: number, label?: string): Roll {
   const rng = new Rng(state.seed);
-  const v = 1 + rng.int(sides);
+  const r = rollTable(sides, rng, label);
   state.seed = rng.seed;
-  return v;
+  return r;
+}
+
+/** Roll one die with `sides` sides, advancing the stored seed: just the face. */
+export function roll(state: CharState, sides: number): number {
+  return rollOn(state, sides).total;
 }
 
 /**

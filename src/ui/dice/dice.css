@@ -1,0 +1,98 @@
+/* Showing rolls (src/ui/dice): an overlay over any page. Colours of the dice come from the skin (--die-*). */
+.dice-show {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 0 16px calc(24px + env(safe-area-inset-bottom));
+  gap: 12px;
+  touch-action: none;
+  animation: dice-in 0.15s ease-out;
+}
+.dice-show.leaving {
+  opacity: 0;
+  transition: opacity 0.25s;
+}
+@keyframes dice-in {
+  from { opacity: 0; }
+}
+.dice-show canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* The line(s) saying what it came to. */
+.dice-lines {
+  position: relative;
+  max-width: 100%;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: rgba(16, 12, 10, 0.86);
+  color: #f0e6d0;
+  font: 600 15px/1.35 system-ui, sans-serif;
+  text-align: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+.dice-lines .ok { color: #b8e08a; }
+.dice-lines .fail { color: #f0a080; }
+
+/* The spinning icons. */
+.dice-tray {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  max-width: 100%;
+}
+.die-icon {
+  width: 40px;
+  height: 40px;
+  box-sizing: border-box;
+  padding: 6px;
+  display: grid;
+  grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+  place-items: center;
+  border-radius: 8px;
+  background: var(--die-body);
+  border: 2px solid var(--die-edge);
+  box-shadow: 0 3px 0 var(--die-edge), 0 4px 8px rgba(0, 0, 0, 0.45);
+  transition: opacity 0.3s;
+}
+.die-icon[hidden] { display: none; }
+.die-icon i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--die-pip);
+}
+.die-icon.dn {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: auto;
+  min-width: 46px;
+  border-radius: 50%;
+  color: var(--die-pip);
+  font: 800 17px system-ui, sans-serif;
+}
+.die-icon.spin { animation: die-spin 0.28s linear infinite; }
+@keyframes die-spin {
+  0% { transform: rotate(0deg) scale(1.05); }
+  50% { transform: rotate(180deg) scale(0.92) translateY(-4px); }
+  100% { transform: rotate(360deg) scale(1.05); }
+}
+.die-icon.split {
+  box-shadow: 0 0 0 3px var(--die-split), 0 0 14px var(--die-split);
+  opacity: 0.55;
+}
+
+/* Dice on glass: the game dims a little behind the glass. */
+.dice-show.dice-glass {
+  background: rgba(18, 14, 10, 0.22);
+}
