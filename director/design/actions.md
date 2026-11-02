@@ -1,6 +1,6 @@
 # Actions on things and people: a sketch of the frame (B3)
 
-*2026-11-02. **A sketch, not agreed.** Written from the director's notes of [the same day](../vision/2026-11-02-director-notes-2.md). The point: build a frame that every later action plugs into as data, so the first version can do 10–20 % of what's wanted and the rest is added one file at a time.*
+*2026-11-02. **The frame and the order of slices are agreed** (Q33); the details get settled as each slice is built. Written from the director's notes of [the same day](../vision/2026-11-02-director-notes-2.md). The point: build a frame that every later action plugs into as data, so the first version can do 10–20 % of what's wanted and the rest is added one file at a time.*
 
 ## What is already there (from the 2D days)
 More than it looks. The **skill hooks** (`core/skillweb.ts`, `content/skillweb/hooks/`, one file per kind of effort) already say, per kind of thing: what can be tried, with which skills, at what difficulty, and what success, failure and a strong success do (something said, a flag set, time passing, mood moved, a clue). Social conflicts and challenges (`core/social.ts`, `core/challenge.ts`) exist as rules. What's missing is the **3D world asking them**, and three things the hooks never had: **permission, requirements (tools, items, place), and changing the world** (a state, an item, the clock).

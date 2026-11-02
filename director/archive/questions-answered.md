@@ -3,6 +3,10 @@
 *Archive of the questions in [questions](../questions.md) once answered or dropped. Newest on top. What they decided, if it still stands, is in the [decisions](../decisions.md).*
 
 ## 2026-11-02
+- **Q36 Smoke and torches seen from inside** → inside a house, cut **that house's** smoke and **its** door torch. Not logical, but it looks better. (Fixed: F1, F2.)
+- **Q35 Rolling sight** → **open on easy, hidden otherwise.** A roll **against 8**; each advantage gives more; a failure gives a poor, half cone and short sight.
+- **Q34 Inventory on a phone, and weight** → tap to pick up, tap to place, turn, auto-pack: **yes**. Weight: the director knows of rules: being over-encumbered gives **base fatigue** (grundutmattning), a form of damage, and we implement that. **Lifting** heavy things is a roll on **Physique** (kroppsbyggnad). *(The extracted text has armour's encumbrance → base fatigue table and gear weights in kg, but no rule for carried kilograms found yet: the page is asked for in the plan, B6.)*
+- **Q33 B3 as a frame, built in slices, and the order** → **agreed**, order as proposed. That taking things has no consequence until B3c doesn't matter: it's testing.
 - **Q32 Dice: the default level, and the D100** → **on glass** by default; a D100 is **two D10s**, tens (00–90) and ones (0–9). Also: the glass dice should feel physical, tumbling and knocking into each other before they land.
 - **Q31 Low-poly models: is this the plan?** → **yes, with one change:** the peoples need **different bodies**, or at least different sizes, not one body for all. Furniture by Sonnet from examples and a how-to: yes. The gallery: yes.
 - **Q28 Turning the view: how far?** → **free turning.** The trouble from other angles only comes from things painted as flat cards (people, furniture, horses); low-poly 3D models fix it (plan A1, A2).

@@ -475,7 +475,7 @@ export function compileMap(spec: MapSpec, things: Things, opts: CompileOptions =
     if (!h.torch) return;
     const b = built[i], d = b.model.door;
     const w = houseToWorld(b.place, d[0] + 0.95, d[2] + 0.25);
-    layout.props.push({ kind: 'walltorch', x: w.x, z: w.z, rot: b.place.rot, seed: layout.props.length });
+    layout.props.push({ kind: 'walltorch', x: w.x, z: w.z, rot: b.place.rot, on: b.place.id, seed: layout.props.length });
   });
 
   // Ground.

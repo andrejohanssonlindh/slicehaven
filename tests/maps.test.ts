@@ -16,6 +16,12 @@ describe('every map', () => {
       expect(c.layout.houses.length).toBeGreaterThan(0);
     });
 
+    it(`${name}: a door torch says which house it is fixed to (it hides while the hero is inside)`, () => {
+      const c = mapNamed(name);
+      const ids = new Set(c.layout.houses.map((h) => h.id));
+      for (const p of c.layout.props.filter((p) => p.kind === 'walltorch')) expect(ids.has(p.on!)).toBe(true);
+    });
+
     it(`${name} compiles the same every time`, () => {
       expect(JSON.stringify(compile(MAPS[name]))).toBe(JSON.stringify(compile(MAPS[name])));
     });

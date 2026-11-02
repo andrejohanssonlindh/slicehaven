@@ -914,8 +914,15 @@ export class SpikeWorld {
     group.position.set(p.x, y - (kind.sink ?? 0), p.z);
     this.scene.add(group);
     st.objects.push(group);
-    if (kind.flame) this.placeTorch(p.x, y + kind.flame.y * (p.size ?? 1), p.z, st, kind.flame);
+    const torch = kind.flame ? this.placeTorch(p.x, y + kind.flame.y * (p.size ?? 1), p.z, st, kind.flame) : null;
+    if (p.on) {
+      this.fixedTo.set(group, p.on);
+      if (torch) this.fixedTo.set(torch.flame, p.on);
+    }
   }
+
+  /** Things fixed to a house (a door torch, its flame), by the house's id: hidden while the hero is inside it (see `update`). */
+  private fixedTo = new Map<THREE.Object3D, string>();
 
   private grassGeo: THREE.BufferGeometry | null = null;
   private grassMat: THREE.MeshLambertMaterial | null = null;
@@ -1092,6 +1099,7 @@ export class SpikeWorld {
     st.houses.length = 0;
     for (const o of st.objects) {
       this.scene.remove(o);
+      this.fixedTo.delete(o);
       o.traverse((c) => {
         const g = (c as THREE.Mesh).geometry as THREE.BufferGeometry | undefined;
         if (g && !g.userData.shared) g.dispose();
@@ -1218,7 +1226,7 @@ export class SpikeWorld {
   private grassShare = 1;
 
   /** A flame with its light (on a bracket, or on a thing that carries one); into `st` when it belongs to a chunk. */
-  private placeTorch(x: number, y: number, z: number, st: Standing | null, look: { size?: number; count?: number; power?: number; lightY?: number } = {}): void {
+  private placeTorch(x: number, y: number, z: number, st: Standing | null, look: { size?: number; count?: number; power?: number; lightY?: number } = {}): Torch {
     const power = look.power ?? 9;
     const fx = makeFlame(look.size ?? 0.42, look.count ?? 10, this.torchSeed);
     fx.object.position.set(x, y + 0.02, z);
@@ -1234,6 +1242,7 @@ export class SpikeWorld {
       st.objects.push(fx.object, light);
       st.torches.push(torch);
     }
+    return torch;
   }
 
   private torchSeed = 0;
@@ -2060,6 +2069,8 @@ export class SpikeWorld {
       hs.furniture.forEach((f, i) => { f.visible = hs.cutT > 0.02 && hs.furnLevel[i] === hs.view; });
     }
     for (const s of this.shells) s.mesh.visible = s.layer <= this.settings.shells && (!s.cutOf || s.cutOf.cutT < 0.3);
+    // What is fixed to the outside of the house the hero is in (its door torch) goes with the cut-away: not logical, but the room reads better.
+    for (const [o, id] of this.fixedTo) o.visible = !this.houses.some((hs) => hs.open && hs.built.place.id === id);
 
     this.stepCast(dt);
     this.stepHero(dt);
@@ -2099,7 +2110,8 @@ export class SpikeWorld {
     const sm: { c: Chimney; d: number }[] = [];
     for (const hs of this.houses) {
       const c = hs.chimney;
-      if (!c) continue;
+      // Not the smoke of the house the hero is in: it would hang over the cut-away room (it thins away rather than cutting off).
+      if (!c || hs.open) continue;
       const d = Math.hypot(c.x - this.focus.x, c.z - this.focus.z);
       if (d >= 60) continue;
       // Once a chimney has been seen its smoke stays (it is remembered, like the ground); one never seen shows nothing.

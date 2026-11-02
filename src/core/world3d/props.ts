@@ -22,6 +22,8 @@ export interface PlacedProp {
   len?: number;
   /** Gates: the leaves are swung back. */
   open?: boolean;
+  /** The id of the house it is fixed to (a torch beside the door): it is hidden while the hero is inside that house, so the cut-away view stays clean. */
+  on?: string;
   seed: number;
 }
 

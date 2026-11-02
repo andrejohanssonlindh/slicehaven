@@ -2,6 +2,13 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-02 — Q33–Q36 answered; smoke and door torch hidden inside their own house
+
+- **Inside a house, its own chimney smoke thins away and its door torch is hidden** (F1, F2, your answer to Q36). The neighbours' smoke and torches stay. **Try it:** walk into the home on the Spike map, or the inn, at dusk.
+- **Answers recorded** ([decisions](decisions.md)): the action frame and order (Q33); inventory by tap and auto-pack, being over-encumbered gives base fatigue, lifting is a Physique roll (Q34); sight rolled against 8, shown on easy only (Q35).
+- **One small ask for later (B6):** I can't find the carried-weight rule in the text I have (only armour's encumbrance table and gear weights). When we get to inventory, the page number would help.
+- **Next:** B3a, the frame for actions, and lighting a fire.
+
 ## 2026-11-02 — Your notes on inventory, B3, found maps and sight, sorted into the plan
 
 - **Your notes** are kept as written in [vision](vision/2026-11-02-director-notes-2.md), with a digest.
