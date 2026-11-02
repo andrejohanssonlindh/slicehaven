@@ -37,5 +37,18 @@ const rest: Pose = { joints: { shoulderL: [0, 0, 0.06], shoulderR: [0, 0, -0.06]
 const breathe: Pose = { joints: { spine: [-0.02, 0, 0], neck: [0.02, 0, 0], shoulderL: [0, 0, 0.08], shoulderR: [0, 0, -0.08], elbowL: [-0.12, 0, 0], elbowR: [-0.12, 0, 0] }, lift: 0.002 };
 export const IDLE: Cycle = { keys: [rest, breathe] };
 
+/**
+ * Sitting (the verb `sit`): thighs level and forward, shins straight down, leaning a little forward with the hands on
+ * the knees. The renderer sets the body down so the hips rest on the seat.
+ */
+const seated: Pose = {
+  joints: {
+    hipL: [-1.5, 0, 0.06], hipR: [-1.5, 0, -0.06], kneeL: [1.5, 0, 0], kneeR: [1.5, 0, 0],
+    spine: [0.06, 0, 0], shoulderL: [-0.55, 0, 0.1], shoulderR: [-0.55, 0, -0.1], elbowL: [-0.5, 0, 0], elbowR: [-0.5, 0, 0],
+  },
+};
+const seatedBreathe: Pose = { joints: { ...seated.joints, spine: [0.03, 0, 0], neck: [0.03, 0, 0] } };
+export const SIT: Cycle = { keys: [seated, seatedBreathe] };
+
 /** How many seconds one loop of standing takes. */
 export const IDLE_SECONDS = 3.2;

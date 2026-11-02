@@ -1,4 +1,5 @@
 import { Rng } from '../rng';
+import type { ActResult, ActTarget } from './actions';
 import { type Actor, type Pose, type Walking, newActor } from './actors';
 import { houseToWorld } from './layout';
 import type { Area } from './mapgen';
@@ -50,6 +51,19 @@ export const newMind = (id: string, x: number, z: number, seed: number, slot = 0
   id, actor: newActor(x, z), entry: -1, state: null, rng: Rng.fromSeed(`${id}:${seed}`).seed, slot, ...(home ? { home } : {}),
 });
 
+/**
+ * Doing things in the world, as the hero does (the action frame, `core/world3d/actions.ts`): a behaviour that lights
+ * a hearth goes through the same offer, gates, roll and outcome. Given by whoever runs the world.
+ */
+export interface Acts {
+  /** A house's fire (hearth, oven, forge) as something to act on; null if it has none. */
+  fireOf(house: string): ActTarget | null;
+  /** Is it burning? */
+  lit(t: ActTarget): boolean;
+  /** Try an offer (`verb:light`) as this person. */
+  act(mind: Mind, offer: string, t: ActTarget): ActResult;
+}
+
 /** What a behaviour may use while it runs. */
 export interface BehaveContext {
   walking: Walking;
@@ -57,6 +71,8 @@ export interface BehaveContext {
   clock: Clock;
   /** The mind's own generator for this step (its state is written back after). */
   rng: Rng;
+  /** Acting on things; absent where nothing can be done (tests of walking alone). */
+  acts?: Acts;
 }
 
 export interface Behaviour {

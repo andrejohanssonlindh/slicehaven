@@ -2,6 +2,17 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-02 — B3a: tap a thing, and do something with it
+
+- **Tap a thing** in the 3D world (or close to it: thin torches are easy to hit) and a sheet comes up with what it is and what you can try. Choose, and the hero walks up to it and does it; if it takes a roll, the dice show it. Tap the **hero** for what you can do where you stand.
+- **What you can do so far:** **light** a fire that is out and **put out** one that burns (hearths, ovens, forges, torch posts, door torches, campfires). Lighting is an easy Survival roll (harder in the rain out of doors) and takes ten minutes of world time; a fire put out has no light, flame, smoke or fire for the magic. **Sit** on a stool, a bench, an inn bench or a bed; walking gets you up. **Make a fire here**, but not indoors and not among the houses (three or more within 20 m count as the village). The **skill library's tries** on things show up too (search a footlocker, climb a tree, and so on), rolled with your best fitting skill.
+- **The villagers light their hearths at dawn**, through the very same action: on the Hamlet map, put out a house's hearth (or the inn's) at night; between six and eight they go to it and light it.
+- **Built as a frame** that later actions plug into as files ([what was built and how to add to it](design/actions.md)): offer, gates, roll, outcome. **Owners are a stub** (everything is allowed) until B3c; villagers have no sheets yet (B4), so they roll 3D6.
+- **The hero who acts** is the character open in the creator, if it has skills; otherwise the default shepherd.
+- **Gone:** the panel's *Nearest hearth* button (tapping does it now). **Saves from before today are dropped** (the save now keeps flags too).
+- **To tune when you've tried it:** a stool is sat on facing its own front, so at a table you may sit with your back to it.
+- **Next:** B6, items and inventory. When we get there I need the page of the carried-weight rule.
+
 ## 2026-11-02 — Q33–Q36 answered; smoke and door torch hidden inside their own house
 
 - **Inside a house, its own chimney smoke thins away and its door torch is hidden** (F1, F2, your answer to Q36). The neighbours' smoke and torches stay. **Try it:** walk into the home on the Spike map, or the inn, at dusk.

@@ -52,6 +52,7 @@ const things: ThingDef[] = [
     id: 'bench',
     is: 'structure',
     look: 'A plank bench.',
+    seat: 0.5,
     foot: [{ box: [0.75, 0.18] }],
     draw: () => fromParts(bench()),
   },

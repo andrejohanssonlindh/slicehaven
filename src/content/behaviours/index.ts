@@ -3,7 +3,8 @@ import type { Behaviour, BehaviourLibrary, Condition } from '../../core/world3d/
 /**
  * What people can do and what their schedules can ask, one file each (or a small family as an array): behaviours in
  * `does/`, conditions in `when/`. A new file is a new behaviour or condition, nothing else to edit. See
- * `core/world3d/behave.ts` and `director/design/behaviours.md`. (A vitest run that misses a brand-new file has a stale
+ * `core/world3d/behave.ts` and `director/design/behaviours.md`; a behaviour that does something to a thing goes
+ * through the action frame (`ctx.acts`, like `tendfire`). (A vitest run that misses a brand-new file has a stale
  * glob: edit this file once.)
  */
 const doFiles = import.meta.glob<{ default: Behaviour | Behaviour[] }>('./does/*.ts', { eager: true });

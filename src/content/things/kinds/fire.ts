@@ -13,6 +13,7 @@ const things: ThingDef[] = [
   {
     id: 'torchpost',
     is: 'fire',
+    name: 'torch',
     look: 'A timber post with a torch burning on top.',
     // The post itself: a walker can stand against it.
     foot: [{ circle: 0.12 }],
@@ -28,6 +29,7 @@ const things: ThingDef[] = [
   {
     id: 'walltorch',
     is: 'fire',
+    name: 'torch',
     look: 'A torch in an iron bracket beside the door.',
     // On the wall, out of the way of feet. Its flame is as high as a hand can reach from the floor (the floor stands on a footing).
     filament: { kind: 'fire', weight: TORCH_FIRE },

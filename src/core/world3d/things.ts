@@ -4,7 +4,7 @@ import type { MeshData } from './mesh';
 import type { RoomLine, RoomRecipe } from './roomplan';
 import type { Lumps, PlacedProp } from './props';
 import { type Shape, circle } from './space';
-import type { StateDef } from './state';
+import { type StateDef, placedId } from './state';
 import type { TreeModel } from './tree';
 
 /**
@@ -73,6 +73,10 @@ export interface ThingDef {
   abstract?: boolean;
   /** One line for when it is looked at (English; through `t()` when shown). */
   look?: string;
+  /** What it is called in lines ("Light the {name}"), lower case; default its id. Not inherited. */
+  name?: string;
+  /** It can be sat on: the seat's height above the floor, metres (the verb `sit`). */
+  seat?: number;
   /**
    * The states its placed things can be in, and what each starts as (`core/world3d/state.ts`): a fire's `lit`, a
    * door's `open`. Merged down the tree: a kind adds to what it inherits, and may change a start.
@@ -133,7 +137,7 @@ export interface ThingDef {
 /** A kind with everything inherited filled in. */
 export type Thing = Readonly<ThingDef> & { readonly chain: readonly string[] };
 
-const FIELDS_NOT_INHERITED = new Set(['id', 'is', 'abstract']);
+const FIELDS_NOT_INHERITED = new Set(['id', 'is', 'abstract', 'name']);
 
 export class Things {
   private readonly defs = new Map<string, ThingDef>();
@@ -230,10 +234,11 @@ export class Things {
     return !!this.get(p.kind).blocksSight;
   }
 
-  /** The filament source it is, if any. */
+  /** The filament source it is, if any. A thing with states says which it is (`of`), so the field can ask whether it gives now (a torch put out does not). */
   source(p: PlacedProp): FSource | null {
-    const f = this.get(p.kind).filament;
-    return f ? { x: p.x, z: p.z, kind: f.kind, ...(f.weight !== undefined ? { weight: f.weight } : {}) } : null;
+    const t = this.get(p.kind), f = t.filament;
+    if (!f) return null;
+    return { x: p.x, z: p.z, kind: f.kind, ...(f.weight !== undefined ? { weight: f.weight } : {}), ...(t.states ? { of: { id: placedId(p), kind: p.kind } } : {}) };
   }
 
   /** Its look: meshes by material (empty for a kind with no `draw`). */

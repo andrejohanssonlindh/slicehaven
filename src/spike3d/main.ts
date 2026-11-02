@@ -11,6 +11,7 @@ import { Governor, TIERS, type DeviceInfo, type Tier, type TierName, pickTier, q
 import { Pipeline } from '../engine3d/pipeline';
 import { SpikeWorld } from '../engine3d/world';
 import { t } from '../i18n';
+import { makeSheet } from './actsheet';
 
 /**
  * M0, the 3D spike: one house with a working cut-away, ground with stamped mud
@@ -166,19 +167,11 @@ function save(): void {
 
 function buildControls(): void {
   const w = world.weather;
-  // The game: a new game forgets this map's save; the hearth button puts out (or lights) the nearest hearth, to test
-  // the things' states and the save until tapping things (B3) can.
+  // The game: a new game forgets this map's save. (Hearths and torches are lit and put out by tapping them: B3a.)
   button('row-game', () => t('spike.newgame', 'New game'), () => false, () => {
     saveOff = true;
     clearWorld(mapName, localStorage);
     location.reload();
-  });
-  button('row-game', () => t('spike.hearth', 'Nearest hearth'), () => false, () => {
-    const f = world.firesNear()[0];
-    if (!f) return notify(t('spike.nohearth', 'No hearth near. Walk up to a house.'));
-    world.states.set(f.id, f.kind, 'lit', !f.lit);
-    notify(f.lit ? t('spike.hearthout', 'The hearth in {house} is out.', { house: f.house }) : t('spike.hearthlit', 'The hearth in {house} is lit.', { house: f.house }));
-    save();
   });
   // The one roll system (B2), to try until checks have something to act on: how rolls are shown (a setting every
   // page shares), which dice, and two rolls: a skill test that can split sixes, and a creator's table roll.
@@ -398,7 +391,12 @@ function setTier(name: TierName): void {
   fit();
 }
 
-// --- input: drag to pan, tap the ground to walk, tap the house to step inside, zoom buttons and wheel ---
+// --- input: drag to pan, tap the ground to walk, tap the house to step inside, tap a thing to act, zoom buttons and wheel ---
+
+/** How far from a thing (CSS px) a tap still means it. */
+const TAP_SLACK = 22;
+/** The sheet a tapped thing opens (plan B3a). */
+const sheet = makeSheet(() => world, notify, save);
 
 function bindInput(): void {
   let down: { x: number; y: number; id: number; moved: number } | null = null;
@@ -450,6 +448,15 @@ function bindInput(): void {
     if (down.moved < 8) {
       const r = canvas.getBoundingClientRect();
       const nx = ((e.clientX - r.left) / r.width) * 2 - 1, ny = -(((e.clientY - r.top) / r.height) * 2 - 1);
+      // A tap on a thing (or near enough, on a phone) shows what it is and what can be tried; on the hero, the spot they stand on.
+      const slack = { x: TAP_SLACK / (r.width / 2), y: TAP_SLACK / (r.height / 2) };
+      const hit = e.shiftKey ? null : world.tapped(nx, ny, slack);
+      if (hit) {
+        sheet.open(hit === 'hero' ? null : hit);
+        down = null;
+        return;
+      }
+      sheet.close();
       const house = e.shiftKey ? world.pick(nx, ny) : world.houseTapped(nx, ny);
       if (e.shiftKey && house !== null) {
         // Dev: shift-click lifts or lowers that roof by hand.
@@ -560,6 +567,7 @@ function loop(now: number): void {
       magic,
     ].filter(Boolean).join('\n');
   }
+  sheet.tick();
   // The stairs buttons show what can be climbed from where the hero is.
   const hint = world.stairsHint;
   stairsEl.hidden = !hint.up && !hint.down;

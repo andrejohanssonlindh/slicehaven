@@ -67,6 +67,9 @@ const PIECES: Record<string, Piece> = {
   toolrack: hung('A rack of tongs and hammers.'),
 };
 
+/** What can be sat on, and how high its seat is (metres): the verb `sit` (`content/actions/verbs/sit.ts`) is for these. */
+const SEATS: Record<string, number> = { stool: 0.45, innbench: 0.45, bed: 0.5 };
+
 /** The family every piece of furniture is a kind of: an item in a room. */
 const family: ThingDef = { id: 'furniture', is: 'item', abstract: true };
 
@@ -75,6 +78,6 @@ export default [
   ...Object.entries(PIECES).map(([id, p]): ThingDef => {
     const model = MODELS[id];
     if (!model) throw new Error(`furniture ${id} has no model in content/things/models/${id}.ts`);
-    return { id, is: p.is, look: p.look, furniture: { mount: p.mount, model }, ...(p.gives ? { filament: p.gives } : {}) };
+    return { id, is: p.is, look: p.look, furniture: { mount: p.mount, model }, ...(p.gives ? { filament: p.gives } : {}), ...(SEATS[id] ? { seat: SEATS[id] } : {}) };
   }),
 ] satisfies ThingDef[];

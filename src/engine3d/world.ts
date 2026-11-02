@@ -19,7 +19,10 @@ import { Rng } from '../core/rng';
 import type { HouseMaterial } from '../core/world3d/house';
 import { type BuiltHouse, type Layout, type PlacedTree, furnitureObstacles, houseAt, houseBox, houseOuterBox, houseToLocal, houseToWorld, houseWalls, levelWalls, sightWalls } from '../core/world3d/layout';
 import { Explored } from '../core/world3d/explored';
-import { type StatesJSON, ThingStates, pieceId } from '../core/world3d/state';
+import { type StatesJSON, ThingStates, pieceId, placedId } from '../core/world3d/state';
+import { type ActResult, type ActTarget, type ActWorld, type Doer, type Offer, type Spot, offers, perform } from '../core/world3d/actions';
+import { ACTIONS } from '../content/actions';
+import { LIBRARY } from '../content/skillweb';
 import { PlacedIndex } from '../core/world3d/placed';
 import { footprints } from '../core/world3d/roomplan';
 import { type HouseEntry, HouseIndex } from '../core/world3d/houses';
@@ -27,7 +30,7 @@ import type { PlacedProp } from '../core/world3d/props';
 import { THINGS } from '../content/things';
 import { cloudDrift, cloudThreshold } from '../core/world3d/sky';
 import { type Actor, Walking, newActor } from '../core/world3d/actors';
-import { type Clock, type Mind, newMind, stepMind } from '../core/world3d/behave';
+import { type Acts, type Clock, type Mind, newMind, stepMind } from '../core/world3d/behave';
 import { BEHAVIOURS } from '../content/behaviours';
 import { NavGrid, type P2, type Shape, shapeDist } from '../core/world3d/space';
 import { type Ground3D, groundHeight, lakeDist, splatAt } from '../core/world3d/terrain';
@@ -48,7 +51,7 @@ import { blobShadow } from './shadow';
 import { type BodyRig, makeBodyRig } from './body';
 import { geometryOf, thingGroup, thingMaterial } from './things';
 import { bodySpecOf } from '../content/people/bodies';
-import { IDLE, IDLE_SECONDS, WALK } from '../content/people/poses';
+import { IDLE, IDLE_SECONDS, SIT, WALK } from '../content/people/poses';
 import { buildBody } from '../core/world3d/body';
 import { cyclePose } from '../core/world3d/pose';
 import { type Heat, makeFloorHeat, makeHeat } from './heat';
@@ -172,6 +175,21 @@ interface Standing {
   objects: THREE.Object3D[];
   shells: Shell[];
   torches: Torch[];
+}
+
+/** What a thing's group says about itself, for a tap (`userData.thing`). */
+interface Tagged {
+  id: string;
+  kind: string;
+  /** The house it stands in (furniture), or null outdoors. */
+  house: string | null;
+  level: number;
+  /** Which way it faces in the world. */
+  rot: number;
+  /** Only this part counts as the thing (a tree's trunk), not the whole group. */
+  pick?: THREE.Object3D;
+  /** Only a tap right on it counts (no slack round it). */
+  exact?: boolean;
 }
 
 interface Shell {
@@ -299,6 +317,16 @@ export class SpikeWorld {
   readonly explored = new Explored();
   /** The states of placed things that differ from their kind's start (a hearth put out): what the save keeps (`core/world3d/state.ts`). */
   readonly states = new ThingStates(THINGS);
+  /** Flags the world remembers (set by actions' outcomes; quests later). Saved. */
+  flags: Record<string, boolean> = {};
+  /** The flames of placed fires standing now, by thing id, so a torch put out goes dark (and lights again). */
+  private placedFires = new Map<string, { kind: string; torch: Torch }>();
+  /** Flames that are out: hidden whatever else would show them. */
+  private outFlames = new Set<THREE.Object3D>();
+  /** Where the hero sits, while they sit (the verb `sit`): the seat's top and which way they face; the spot they stood on. */
+  private seated: { x: number; z: number; y: number; floor: number; yaw: number; from: P2 } | null = null;
+  /** Rolls made by actions (the hero's and the people's). */
+  private actRng = Rng.fromSeed(Date.now() >>> 0);
   private markedAt: { x: number; z: number; f: number; t: number } | null = null;
   private exploredWin = { ox: 0, oz: 0, dirty: true };
 
@@ -637,6 +665,7 @@ export class SpikeWorld {
     // A thing's state changed: what stands redraws, and the field reads its sources again.
     this.states.on((c) => {
       for (const hs of this.houses) if (hs.fireOf?.id === c.id) this.showFire(hs);
+      this.showPlacedFire(c.id);
       this.syncFires();
     });
   }
@@ -766,6 +795,8 @@ export class SpikeWorld {
         const g = thingGroup(THINGS.get(mp.kind).furniture!.model.draw(mp.seed, mp.variant));
         g.position.set(it.x, floorY + it.lift, it.z);
         g.rotation.y = it.rot;
+        // What a tap on it means (`thingAt`): this piece, in this house, on this storey.
+        g.userData.thing = { id: pieceId(h.id, ri, it.id), kind: mp.kind, house: h.id, level: room.level, rot: h.rot + it.rot } satisfies Tagged;
         inst.group.add(g);
         inst.furniture.push(g);
         inst.furnLevel.push(room.level);
@@ -878,6 +909,8 @@ export class SpikeWorld {
     const wood = new THREE.Mesh(geo.wood, this.barkMat);
     wood.castShadow = wood.receiveShadow = true;
     group.add(wood);
+    // A tap on the trunk means the tree (not the crown: it hangs over ground you want to walk to).
+    group.userData.thing = { id: placedId({ kind, x: place.x, z: place.z }), kind, house: null, level: 0, rot: 0, pick: wood, exact: true } satisfies Tagged;
     group.position.set(place.x, this.store.heightAt(place.x, place.z), place.z);
     this.scene.add(group);
     st.objects.push(group);
@@ -919,6 +952,29 @@ export class SpikeWorld {
       this.fixedTo.set(group, p.on);
       if (torch) this.fixedTo.set(torch.flame, p.on);
     }
+    const id = placedId(p);
+    group.userData.thing = { id, kind: p.kind, house: null, level: 0, rot: p.rot ?? 0 } satisfies Tagged;
+    // A flame that can be put out follows its thing's `lit` state.
+    if (torch && kind.states?.lit) {
+      this.placedFires.set(id, { kind: p.kind, torch });
+      this.showPlacedFire(id);
+    }
+  }
+
+  /** A placed fire (a torch, a campfire) as its `lit` state says: lit, its flame burns and its light is in the pool; out, neither. */
+  private showPlacedFire(id: string): void {
+    const f = this.placedFires.get(id);
+    if (!f) return;
+    const lit = this.fireLit({ id, kind: f.kind });
+    const listed = this.torches.includes(f.torch);
+    if (lit && !listed) this.torches.push(f.torch);
+    if (!lit && listed) {
+      this.torches.splice(this.torches.indexOf(f.torch), 1);
+      f.torch.light.visible = false;
+    }
+    if (lit) this.outFlames.delete(f.torch.flame);
+    else this.outFlames.add(f.torch.flame);
+    f.torch.flame.visible = lit;
   }
 
   /** Things fixed to a house (a door torch, its flame), by the house's id: hidden while the hero is inside it (see `update`). */
@@ -1106,9 +1162,13 @@ export class SpikeWorld {
       });
     }
     for (const t of st.torches) {
-      this.torches.splice(this.torches.indexOf(t), 1);
+      // (A torch that is out is not in the pool.)
+      const i = this.torches.indexOf(t);
+      if (i >= 0) this.torches.splice(i, 1);
+      this.outFlames.delete(t.flame);
       t.dispose?.();
     }
+    for (const [id, f] of this.placedFires) if (st.torches.includes(f.torch)) this.placedFires.delete(id);
     for (const s of st.shells) this.shells.splice(this.shells.indexOf(s), 1);
     st.objects.length = st.shells.length = st.torches.length = 0;
   }
@@ -1539,6 +1599,11 @@ export class SpikeWorld {
     const b = this.moves.house(h);
     const lift = b ? this.footY(h) - this.houseBaseY(b) - b.model.floorY : 0;
     this.focusLift += (lift - this.focusLift) * (1 - Math.exp(-dt / 0.3));
+    // Walking (or being moved) gets the hero up off a seat, back on their feet where they stood.
+    if (this.seated && (h.legs.length || Math.hypot(h.x - this.seated.from.x, h.z - this.seated.from.z) > 0.05)) {
+      this.seated = null;
+      this.placeHero();
+    }
     if (this.steer(dt)) return;
     if (!h.legs.length) return;
     const speed = HERO_SPEED * this.speedMul;
@@ -1746,6 +1811,168 @@ export class SpikeWorld {
     return out.sort((a, b) => a.d - b.d);
   }
 
+  // --- actions (plan B3a): what a tap on a thing means, and doing things through the frame (`core/world3d/actions.ts`) ---
+
+  /**
+   * What a tap points at: a thing, the hero (`'hero'`: the spot they stand on), or nothing. What is right under the
+   * finger wins, the nearer first (the hero on a stool, or the hearth behind them); then the hero within `slack`
+   * (screen units, x and y) of their middle; then a thing within `slack` of its middle, so a thin torch is easy to hit
+   * on a phone. Indoors only the furniture of the hero's house on the storey in view counts, outdoors what stands in
+   * sight; a house nearer than the thing (its wall in front) means nothing.
+   */
+  tapped(ndcX: number, ndcY: number, slack: { x: number; y: number }): ActTarget | 'hero' | null {
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
+    const exact = this.thingAt(ndcX, ndcY, null);
+    const onHero = ray.intersectObject(this.heroFig.place, true)[0];
+    if (onHero && (!exact || onHero.distance < exact.d)) return 'hero';
+    if (exact) return exact.t;
+    if (this.heroTapped(ndcX, ndcY, slack)) return 'hero';
+    return this.thingAt(ndcX, ndcY, slack)?.t ?? null;
+  }
+
+  /** The thing a tap points at: right on it (`slack` null), or else within `slack` of its middle; and how far along the ray. */
+  private thingAt(ndcX: number, ndcY: number, slack: { x: number; y: number } | null): { t: ActTarget; d: number } | null {
+    const inHouse = this.standingOf(this.hero.house);
+    const groups: THREE.Object3D[] = [];
+    if (inHouse) groups.push(...inHouse.furniture.filter((f) => f.visible));
+    else {
+      for (const lc of this.chunks.values()) for (const o of lc.standing.objects) if (o.userData.thing) groups.push(o);
+      for (const c of this.camps) groups.push(...c.st.objects.filter((o) => o.userData.thing));
+    }
+    const seenAt = (o: THREE.Object3D): boolean => inHouse !== null || this.seen(o.position.x, o.position.z) >= 0.25;
+    const tagged = groups.filter((g) => g.visible && seenAt(g));
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
+    let best: { g: THREE.Object3D; d: number } | null = null;
+    for (const g of tagged) {
+      const tag = g.userData.thing as Tagged;
+      const hit = ray.intersectObject(tag.pick ?? g, true).find((h) => h.object.visible);
+      if (hit && (!best || hit.distance < best.d)) best = { g, d: hit.distance };
+    }
+    if (best && !inHouse) {
+      // A house in front hides it.
+      for (const hs of this.houses) {
+        const h = ray.intersectObject(hs.group, true).find((x) => x.object.visible);
+        if (h && h.distance < best.d - 0.3) return null;
+      }
+    }
+    if (!best && slack) {
+      // Near misses: the closest middle on screen within the slack.
+      const box = new THREE.Box3(), v = new THREE.Vector3();
+      let bestE = 1;
+      for (const g of tagged) {
+        if ((g.userData.thing as Tagged).exact) continue;
+        box.setFromObject(g).getCenter(v).project(this.camera);
+        const e = Math.hypot((v.x - ndcX) / slack.x, (v.y - ndcY) / slack.y);
+        if (e < bestE) {
+          bestE = e;
+          best = { g, d: 0 };
+        }
+      }
+    }
+    return best ? { t: this.targetOf(best.g), d: best.d } : null;
+  }
+
+  /** A tagged group as something to act on, where it stands in the world now. */
+  private targetOf(g: THREE.Object3D): ActTarget {
+    const tag = g.userData.thing as Tagged, at = g.getWorldPosition(new THREE.Vector3());
+    return { id: tag.id, kind: tag.kind, x: at.x, z: at.z, level: tag.level, house: tag.house, rot: tag.rot };
+  }
+
+  /** Does a tap point at the hero (within `slack` of their middle on screen)? */
+  private heroTapped(ndcX: number, ndcY: number, slack: { x: number; y: number }): boolean {
+    const v = this.heroFig.place.getWorldPosition(new THREE.Vector3());
+    v.y += 0.8;
+    v.project(this.camera);
+    return Math.hypot((v.x - ndcX) / slack.x, (v.y - ndcY) / slack.y) < 1;
+  }
+
+  /** Where the hero stands, as the rules see a spot. */
+  heroSpot(): Spot {
+    return { x: this.hero.x, z: this.hero.z, level: this.hero.level, house: this.heroHouse() };
+  }
+
+  /** How far the hero is from a thing, metres; Infinity if it is on another storey or in another house. */
+  reachTo(t: Spot): number {
+    const h = this.heroSpot();
+    if (h.house !== t.house || (t.house !== null && h.level !== t.level)) return Infinity;
+    return Math.hypot(t.x - h.x, t.z - h.z);
+  }
+
+  /** What actions may read and change: the things' states, the world's flags, the weather and the houses. */
+  private get acting(): ActWorld {
+    const w = this.weather, idx = this.houseIndex;
+    return {
+      things: THINGS, states: this.states, flags: this.flags, rng: this.actRng, library: LIBRARY,
+      view: {
+        rain: w.rain, hour: w.hour ?? 12,
+        housesNear: (x, z, r) => idx.liteNear(x - r, z - r, x + r, z + r).filter((e) => Math.hypot(e.built.place.x - x, e.built.place.z - z) <= r).length,
+      },
+    };
+  }
+
+  /** What can be tried on a thing, or (null) on the spot the doer stands on. */
+  offersFor(target: ActTarget | null, doer: Doer): Offer[] {
+    return offers(target, target ?? this.heroSpot(), doer, this.acting, ACTIONS);
+  }
+
+  /**
+   * Do an offer through the frame, as `doer`, and carry out what needs the world: for the hero the clock moves on by
+   * what it took, a campfire is built, they sit. Returns what happened, for the page to show (the roll, the lines).
+   */
+  act(offer: string, target: ActTarget | null, doer: Doer, at: Spot = target ?? this.heroSpot()): ActResult {
+    const r = perform(offer, target, at, doer, this.acting, ACTIONS);
+    const hero = doer.id === 'hero';
+    for (const e of r.events) {
+      if (e.kind === 'time' && hero && this.weather.hour !== null) this.weather.advance(e.minutes / 60);
+      else if (e.kind === 'make' && e.thing === 'campfire') this.lightFire();
+      else if (e.kind === 'sit' && hero) this.sitHero(e.target);
+    }
+    return r;
+  }
+
+  /**
+   * What the map's people may do to things (their behaviours act through the same frame as the hero). They have no
+   * sheets yet (plan B4), so for now everyone rolls 3D6 for any skill: a stub.
+   */
+  private readonly acts: Acts = {
+    fireOf: (house) => this.fireOf(house),
+    lit: (t) => this.fireLit(t),
+    act: (mind, offer, t) => this.act(offer, t, { id: mind.id, dice: () => ({ n: 3, mod: 0 }) }),
+  };
+
+  /** Set the hero down on a seat: on its top, facing the way it faces, until they walk. */
+  private sitHero(t: ActTarget): void {
+    const seat = THINGS.get(t.kind).seat;
+    if (seat === undefined) return;
+    const b = t.house ? this.moves.byId(t.house) : null;
+    const floor = b ? this.houseBaseY(b) + b.model.levels[t.level].floorY : this.store.heightAt(t.x, t.z);
+    this.seated = { x: t.x, z: t.z, y: floor + seat, floor, yaw: t.rot ?? 0, from: { x: this.hero.x, z: this.hero.z } };
+  }
+
+  get sitting(): boolean {
+    return this.seated !== null;
+  }
+
+  /** A house's fire (its hearth, oven or forge) as something to act on, whether or not the house stands now; null if it has none. */
+  fireOf(id: string): ActTarget | null {
+    const place = this.houseIndex.byId(id);
+    if (!place) return null;
+    const e = this.houseIndex.entry(place);
+    let out: ActTarget | null = null;
+    e.room.forEach((room, ri) => {
+      for (const it of room.plan.pieces) {
+        const mp = room.models.get(it.id);
+        if (!it.fire || !mp) continue;
+        const w = houseToWorld(e.built.place, it.x, it.z);
+        // (The last fire in the house is its fire, as `standHouse` reads it.)
+        out = { id: pieceId(id, ri, it.id), kind: mp.kind, x: w.x, z: w.z, level: room.level, house: id, rot: e.built.place.rot + it.rot };
+      }
+    });
+    return out;
+  }
+
   /** Put the hero down at a spot (a loaded game): on storey `level` if the spot is in a house that has one. */
   placeHeroAt(x: number, z: number, level = 0): void {
     const h = this.hero;
@@ -1765,13 +1992,14 @@ export class SpikeWorld {
   }
 
   /** What the save keeps of the world (the page adds the map and writes it: `core/world3d/save.ts`). */
-  saveState(): { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON } {
+  saveState(): { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags: Record<string, boolean> } {
     const h = this.hero;
-    return { hour: this.weather.hour ?? 12, hero: { x: h.x, z: h.z, level: h.stair ? 0 : h.level }, explored: this.explored.toJSON(), things: this.states.toJSON() };
+    return { hour: this.weather.hour ?? 12, hero: { x: h.x, z: h.z, level: h.stair ? 0 : h.level }, explored: this.explored.toJSON(), things: this.states.toJSON(), flags: { ...this.flags } };
   }
 
   /** Take a save back: the clock, the hero, what was seen, the things' states. */
-  loadState(s: { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON }): void {
+  loadState(s: { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags?: Record<string, boolean> }): void {
+    this.flags = { ...s.flags };
     this.weather.setHour(s.hour);
     this.explored.assign(s.explored);
     this.exploredWin.dirty = true;
@@ -1934,9 +2162,19 @@ export class SpikeWorld {
         f.phase += d / f.rig.model.stride;
         f.still = 0;
       } else f.still += dt;
+      // The hero on a seat: set down so the hips rest on it, facing the way it faces.
+      const seat = p.id === 'hero' ? this.seated : null;
+      if (seat) {
+        f.place.position.set(seat.x, seat.y + 0.04 - f.rig.model.joints.root.at[1], seat.z);
+        f.lastX = seat.x;
+        f.lastZ = seat.z;
+        f.want = seat.yaw;
+        f.still = 1;
+        this.heroBlob.position.set(seat.x, seat.floor + 0.03, seat.z);
+      }
       f.yaw += wrapAngle(f.want - f.yaw) * (1 - Math.exp(-dt / 0.08));
       f.rig.group.rotation.y = f.yaw;
-      f.rig.pose(f.still < 0.15 ? cyclePose(WALK, f.phase) : cyclePose(IDLE, this.time / IDLE_SECONDS));
+      f.rig.pose(seat ? cyclePose(SIT, this.time / IDLE_SECONDS) : f.still < 0.15 ? cyclePose(WALK, f.phase) : cyclePose(IDLE, this.time / IDLE_SECONDS));
       f.rig.setShells(Math.min(2, this.settings.shells));
     }
   }
@@ -2070,7 +2308,7 @@ export class SpikeWorld {
     }
     for (const s of this.shells) s.mesh.visible = s.layer <= this.settings.shells && (!s.cutOf || s.cutOf.cutT < 0.3);
     // What is fixed to the outside of the house the hero is in (its door torch) goes with the cut-away: not logical, but the room reads better.
-    for (const [o, id] of this.fixedTo) o.visible = !this.houses.some((hs) => hs.open && hs.built.place.id === id);
+    for (const [o, id] of this.fixedTo) o.visible = !this.outFlames.has(o) && !this.houses.some((hs) => hs.open && hs.built.place.id === id);
 
     this.stepCast(dt);
     this.stepHero(dt);
@@ -2123,7 +2361,7 @@ export class SpikeWorld {
       sm.push({ c, d });
     }
     // A campfire smokes too (the hero lit it, so it is in view); doused, its smoke thins away rather than cutting off.
-    for (const k of this.camps) sm.push({ c: k.smoke, d: Math.hypot(k.p.x - this.focus.x, k.p.z - this.focus.z) });
+    for (const k of this.camps) if (this.fireLit({ id: placedId(k.p), kind: k.p.kind })) sm.push({ c: k.smoke, d: Math.hypot(k.p.x - this.focus.x, k.p.z - this.focus.z) });
     sm.sort((a, b) => a.d - b.d);
     this.smoke.update(this.time, sm.map((s) => s.c), { x: wx, z: wz }, 1 - env.night * 0.8, 1 - Math.min(1, w.rain) * 0.5);
     if (this.water) {
@@ -2179,7 +2417,7 @@ export class SpikeWorld {
    */
   private stepCast(dt: number): void {
     const sees = (x: number, z: number): boolean => this.vision.outer <= 0 || this.seen(x, z) >= 0.25;
-    const ctx = { walking: this.moves, places: this.places, clock: this.clock };
+    const ctx = { walking: this.moves, places: this.places, clock: this.clock, acts: this.acts };
     for (const c of this.cast) {
       const a = c.mind.actor;
       const far = Math.hypot(a.x - this.focus.x, a.z - this.focus.z) > MIND_REACH && Math.hypot(a.x - this.hero.x, a.z - this.hero.z) > MIND_REACH;

@@ -32,6 +32,7 @@
       "homes": ["home1", "home2", "home3", "home4", "fish", "herbs"],
       "does": [
         { "when": { "event": "gathering" }, "do": "attend", "at": "speaker", "ring": 3 },
+        { "when": { "hours": [6, 8] }, "do": "tendfire" },
         { "when": { "hours": [8, 19] }, "do": "wander", "in": "green" },
         { "do": "home" }
       ]
@@ -49,7 +50,7 @@
   "hero": { "house": "inn" },
   "people": [
     { "id": "villager", "is": ["human", "job-miller"], "seed": 2, "does": [{ "do": "beat", "path": "lane" }] },
-    { "id": "keeper", "is": ["human", "job-innkeeper"], "seed": 6, "home": "inn", "does": [{ "do": "rounds", "house": "inn" }] },
+    { "id": "keeper", "is": ["human", "job-innkeeper"], "seed": 6, "home": "inn", "does": [{ "when": { "hours": [6, 7] }, "do": "tendfire" }, { "do": "rounds", "house": "inn" }] },
     { "id": "guard", "is": ["human", "job-guard"], "seed": 9, "does": [{ "when": { "hours": [6, 22] }, "do": "patrol", "path": "round the green", "wait": 1.5 }, { "do": "stay", "at": "speaker" }] }
   ]
 }

@@ -1,0 +1,131 @@
+import { CONTENT } from '../content/chargen';
+import { THINGS } from '../content/things';
+import { defaultHero, heroFromChar, rollableName } from '../content/rollables';
+import { derive } from '../core/chargen/derive';
+import { loadRoster } from '../core/chargen/state';
+import { type Hero, diceOf } from '../core/hero';
+import { type ActResult, type ActTarget, type Doer, thingName } from '../core/world3d/actions';
+import type { SpikeWorld } from '../engine3d/world';
+import { t } from '../i18n';
+import { showRolls } from '../ui/dice';
+
+/**
+ * The page's side of actions (plan B3a): a tapped thing's sheet (what it is, what can be tried), walking up to it,
+ * doing it through the world (`SpikeWorld.act`, the frame in `core/world3d/actions.ts`), then the dice and what
+ * happened. The rules decide; this only shows and asks.
+ */
+
+/** How close the hero must be to act on a thing, metres (from its middle: a hearth is wide). */
+const REACH = 2.1;
+
+/** The hero who acts: the character open in the creator, if they have skills yet; else the default shepherd. */
+export function pageHero(): Hero {
+  try {
+    const r = loadRoster();
+    const s = r.chars.find((c) => c.id === r.current) ?? r.chars[0];
+    if (s) {
+      const h = heroFromChar(s.details?.name ?? '', derive(s, CONTENT));
+      if (Object.keys(h.dice).some((k) => !k.startsWith('attr:'))) return h;
+    }
+  } catch {
+    /* a character the creator can't read: the shepherd */
+  }
+  return defaultHero();
+}
+
+export interface Sheet {
+  open(target: ActTarget | null): void;
+  close(): void;
+  /** Every frame: an action waiting for the hero to arrive is done once they stop. */
+  tick(): void;
+}
+
+export function makeSheet(world: () => SpikeWorld, notify: (text: string) => void, save: () => void): Sheet {
+  const el = document.getElementById('act')!;
+  const nameEl = el.querySelector<HTMLElement>('.name')!, lookEl = el.querySelector<HTMLElement>('.look')!, offersEl = el.querySelector<HTMLElement>('.offers')!;
+  const notice = document.getElementById('notice')!;
+  const hero = pageHero();
+  const doer: Doer = { id: 'hero', dice: (s) => diceOf(hero, s) };
+  let pending: { offer: string; target: ActTarget | null } | null = null;
+
+  const close = (): void => {
+    el.hidden = true;
+    notice.classList.remove('above');
+  };
+  el.querySelector('.close')!.addEventListener('click', close);
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !el.hidden) close(); });
+
+  /** Say what happened: the dice first (if it rolled), then the lines, and how long it took. */
+  async function report(r: ActResult, offer: string): Promise<void> {
+    if (!r.done) {
+      notify(t(`act.no.${offer}`, r.reason ?? 'That cannot be done.'));
+      return;
+    }
+    if (r.roll) await showRolls([{ ...r.roll, label: r.skill ? rollableName(r.skill) : r.roll.label }]);
+    const lines: string[] = [];
+    r.events.forEach((e, i) => {
+      if (e.kind === 'say') lines.push(t(`act.${offer}.${i}`, e.line.text));
+      if (e.kind === 'time' && e.minutes >= 5) lines.push(t('act.time', '({n} minutes pass.)', { n: e.minutes }));
+    });
+    if (lines.length) notify(lines.join(' '));
+    save();
+  }
+
+  function doIt(offer: string, target: ActTarget | null): void {
+    void report(world().act(offer, target, doer), offer);
+  }
+
+  function choose(offer: string, target: ActTarget | null): void {
+    close();
+    const w = world();
+    if (!target || w.reachTo(target) <= REACH) return doIt(offer, target);
+    // Walk up to it first; it is done when they stop (see `tick`).
+    if (w.walkTo(target.x, target.z, target.level) === null) return notify(t('act.noway', 'You can\'t get there.'));
+    pending = { offer, target };
+  }
+
+  function open(target: ActTarget | null): void {
+    const w = world();
+    const kind = target ? THINGS.get(target.kind) : null;
+    nameEl.textContent = kind ? t(`thing.${kind.id}.name`, cap(thingName(kind))) : t('act.here', 'Where you stand');
+    lookEl.textContent = kind ? t(`thing.${kind.id}.look`, kind.look ?? '') : w.heroIndoors ? t('act.hereIn', 'A floor of boards and beaten earth.') : t('act.hereOut', 'Open ground.');
+    offersEl.replaceChildren();
+    const list = w.offersFor(target, doer);
+    for (const o of list) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      const label = document.createElement('span');
+      label.textContent = t(`act.offer.${o.id}`, o.label);
+      b.appendChild(label);
+      if (o.skills.length) {
+        const s = document.createElement('small');
+        s.textContent = o.skills.map(rollableName).slice(0, 2).join(', ');
+        b.appendChild(s);
+      }
+      b.addEventListener('click', () => choose(o.id, target));
+      offersEl.appendChild(b);
+    }
+    if (!list.length) {
+      const p = document.createElement('p');
+      p.className = 'none';
+      p.textContent = t('act.nothing', 'Nothing to try here.');
+      offersEl.appendChild(p);
+    }
+    el.hidden = false;
+    notice.classList.add('above');
+  }
+
+  return {
+    open,
+    close,
+    tick() {
+      if (!pending || world().walking) return;
+      const { offer, target } = pending;
+      pending = null;
+      if (target && world().reachTo(target) > REACH) return notify(t('act.cantreach', 'You can\'t get close enough.'));
+      doIt(offer, target);
+    },
+  };
+}
+
+const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);

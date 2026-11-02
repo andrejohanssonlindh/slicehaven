@@ -1,0 +1,38 @@
+import type { FactDef } from '../../core/world3d/actions';
+
+/**
+ * Facts about a spot that gates and rolls ask: true or false there. A gate names them (`place`: "not among the
+ * houses"), and a roll can be harder where one holds (rain on an outdoor fire). A new fact is an entry here.
+ */
+export const FACTS: FactDef[] = [
+  {
+    id: 'indoors',
+    about: 'Inside a house.',
+    holds: (at) => at.house !== null,
+    whenTrue: 'Not indoors.',
+    whenFalse: 'Only indoors.',
+  },
+  {
+    id: 'raining',
+    about: 'Out of doors, in rain.',
+    holds: (at, view) => at.house === null && view.rain > 0.3,
+    whenTrue: 'Not in this rain.',
+    whenFalse: 'Only in the rain.',
+  },
+  {
+    // A settlement by intent rather than drawn bounds: where houses stand close, it is the village. Maps that draw a
+    // palisade or a town line can make this sharper later.
+    id: 'inSettlement',
+    about: 'Among houses: three or more within 20 m.',
+    holds: (at, view) => view.housesNear(at.x, at.z, 20) >= 3,
+    whenTrue: 'Not here, among the houses: folk would not thank you for a fire in the street.',
+    whenFalse: 'Only among the houses.',
+  },
+  {
+    id: 'dark',
+    about: 'Night (before six or after eight in the evening).',
+    holds: (_at, view) => view.hour < 6 || view.hour >= 20,
+    whenTrue: 'Not in the dark.',
+    whenFalse: 'Only after dark.',
+  },
+];

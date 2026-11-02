@@ -40,6 +40,7 @@
 | `attend` | gathers round a place facing it, twelve to a ring, by their number in the crowd | `at`, `ring` (metres) |
 | `home` | goes into their house (or a named one) and stays in its back room | `house` |
 | `rounds` | goes the rounds of a house: each storey, up, down, out to the door | `house` (`home` = their own) |
+| `tendfire` | sees to a house's fire: if it is out, walks to it and lights it through the action frame (`verb:light`, the same gates and roll as the hero; a failed try is tried again 20 s later), then stays by it | `house` (default their own) |
 
 | Condition | Holds | Value |
 |---|---|---|
@@ -57,7 +58,7 @@ The **`crowd`** map rule makes `count` people from `kinds` and `homes` taken in 
 A schedule that names a behaviour, condition, place or house that is not there, a key a behaviour does not take, a missing key it needs (`stay` without `at`), a bad value for a condition (`hours: [8]`): each is a map problem, so `tests/maps.test.ts` fails on it.
 
 ## How to add
-- **A behaviour**: a file in `content/behaviours/does/` exporting a `Behaviour` (`core/world3d/behave.ts`): `id`, `about`, `keys` (and which are `places` / `houses`, which it `needs`), `start` (its state, plain data) and `step` (move the actor with `ctx.walking`, return how to draw them). Helpers: `walkOn`, `idle`, `spotIn`, `placeCentre`, `insideHouse`. Use `ctx.rng`, never `Math.random`.
+- **A behaviour**: a file in `content/behaviours/does/` exporting a `Behaviour` (`core/world3d/behave.ts`): `id`, `about`, `keys` (and which are `places` / `houses`, which it `needs`), `start` (its state, plain data) and `step` (move the actor with `ctx.walking`, return how to draw them). Helpers: `walkOn`, `idle`, `spotIn`, `placeCentre`, `insideHouse`. Use `ctx.rng`, never `Math.random`. A behaviour that *does* something to a thing goes through the action frame, `ctx.acts` (`act(mind, 'verb:light', target)`), never by setting a state itself: see `tendfire`.
 - **A condition**: an entry in a file in `content/behaviours/when/` (`id`, `about`, `check`, `holds(value, clock, mind)`). Weather, an alarm, "the hero is near" would go here.
 - **A kind of place**: a branch in `placeOf` in `core/world3d/mapgen.ts` and the `PlaceSpec` type.
 
@@ -67,6 +68,7 @@ A schedule that names a behaviour, condition, place or house that is not there, 
 - Night: each goes home (they live in the south-side cottages).
 - A guard patrols a loop round the green from 06:00 to 22:00, then stands at its middle.
 - The villager walks the road; the innkeeper goes the rounds of the inn.
+- At dawn (06:00–08:00, the innkeeper 06:00–07:00) each sees to their hearth: one that was put out in the night is lit again.
 
 ## Not done yet (natural next steps)
 - **Reacting to the hero**: a condition like `sees: "hero"` or an `alarm` event, and behaviours `chase`, `flee`, `talk`. The structure takes them as new files; enemies need these.

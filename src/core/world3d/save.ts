@@ -8,7 +8,7 @@ import type { StatesJSON } from './state';
  * No migrations while the design moves: a save of another version is dropped. Bump `WORLD_SAVE_VERSION` whenever
  * the shape changes or the maps change in a way that moves things (ids are where things stand).
  */
-export const WORLD_SAVE_VERSION = 1;
+export const WORLD_SAVE_VERSION = 2;
 
 export interface WorldSave {
   v: number;
@@ -20,6 +20,8 @@ export interface WorldSave {
   explored: Record<string, string>;
   /** Placed things' states (`ThingStates.toJSON`). */
   things: StatesJSON;
+  /** Flags set by actions (`core/world3d/actions.ts`). */
+  flags: Record<string, boolean>;
 }
 
 const key = (map: string): string => `slicehaven.world.${map}`;
