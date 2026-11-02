@@ -3,7 +3,7 @@
 *2026-10-28. Decision from the director: there will be a lot of maps, some large, so a map or a room must be cheap to make. Nothing is placed by hand-tuned coordinates unless it has to be.*
 
 ## The plan, and where this sits
-The brief's milestones ([voxel-engine-brief](voxel-engine-brief.md) §9): M2 asset pipeline, M3 lighting, M4 weather, M5 walking and the world (streaming, culling), M6 Reedwater ported. The 3D handover lists M2's jobs. M2's assets are in (layout, roofs, props, furniture, people who walk). This page is the part M6 needs most: **authoring**, so that porting Reedwater and every map after it is data, not tuning.
+What to build next is [the plan](../todo.md). This page is **authoring**: making every map and room data, not tuning.
 
 Two systems, both pure (`core/`), tested, deterministic:
 
@@ -58,9 +58,5 @@ A map is a JSON file, `content/maps/<name>.json` (its `name` the same). It is fo
 - **See it**: `/spike3d/?map=hamlet`. Problems also go to the browser console. `?world=N` overrides the size.
 - Deterministic: same spec, same world (the seed is in the spec).
 
-## What is not done (next, in this order)
-1. **Streaming for large maps.** The world builds every house, tree and prop at start. That is fine at 140 m (about 170 draw calls, 11 houses, 90 trees); a 500 m map needs per-chunk loading of placed things (the ground already streams) and instancing for trees and props. Do this before the first big map.
-2. **A way for the director to see and nudge a map on the phone**: a map overview page (top-down, tap a house to read its id and room). Authoring stays in text; this is for looking.
-3. **More rules**: rooms with two floors or a loft, doors between rooms, a `fence` and `path` along a line, hills in the ground (the spec has only a lake and roads).
-4. **Reedwater** as a `MapSpec` (the village content: `content/village/reedwater.ts`, its nine rooms are already recipes).
-5. Furniture is not yet a filament source; people in rooms are not placed (the village's are left out).
+## What is not done
+Houses and placed things stream by chunk ([scale](world3d-scale.md)). Still missing, each on [the plan](../todo.md): a farmstead rule (C1), fields and pasture (C2, C3), a map maker page (C5). Not on the plan yet: a `fence` and `path` along a line, hills in the ground (a map has only a lake and roads).

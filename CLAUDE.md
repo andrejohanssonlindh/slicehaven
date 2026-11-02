@@ -19,7 +19,7 @@ Grounded fantasy campaign game in a live 3D pixel world (measured in metres, no 
   - **What to build, in order → `director/todo.md`** (the one plan; update status as items move, put new asks in it).
   - Open questions for the user → `director/questions.md` (newest on top; tie each to a plan item). When answered, move it to `director/archive/questions-answered.md` and record the decision.
   - Decisions the user made → `director/decisions.md` (date + decision + why).
-  - What was done each session → `director/devlog.md`.
+  - What was done each session → `director/devlog.md` (newest on top; older entries in `director/archive/devlog-to-2026-11-02.md`).
   - The director's own vision notes → `director/vision/` (original text kept verbatim, plus an English digest). **Read these before designing anything.** They're ambitions to build on, not a checklist to do right away.
 - The Eon 5 PDFs in the project root are **copyrighted reference for the world only** (ignore the RPG rules). Never commit them, never paste their text into the repo. Write our own prose. See `director/world/eon-notes.md`.
 
@@ -31,14 +31,24 @@ Every new ask gets a senior-dev check **before any code**: which established pat
 - Extracted book text lives in `reference/` (gitignored; never commit it or paste it in).
 
 ## Cold start: where to read
-Read only the handover for the area you're asked about; don't read the whole `director/` folder. `devlog.md` is long: read its top entry at most. Skill ids are the creator's Swedish ids (`Argumentera`, `E:`/`K:`/`H:`/`F:` prefixes, `attr:`); `rollableName(id)` gives the English.
+Every new session, in this order, and nothing more until the task needs it:
+1. **`director/todo.md`**: the plan; "Next up" says what we're on.
+2. **`director/design/architecture.md`**: the patterns and missing foundations (for the pattern check).
+3. `director/questions.md` (open questions) and the top entry of `director/devlog.md`.
+4. The handover for the area you're asked about (table below). Don't read the whole `director/` folder.
+
+**`director/archive/` is history, not guidance.** Don't read it unless a live page or the director points there; never take a plan, a "next step" or a design from it.
+
+When work moves: tick the item in `todo.md`, add a devlog entry, move answered questions to the archive, record decisions. When a page is replaced or finished, move it to `director/archive/` (and list it in `archive/README.md`) rather than letting two pages say the same thing.
+
+Skill ids are the creator's Swedish ids (`Argumentera`, `E:`/`K:`/`H:`/`F:` prefixes, `attr:`); `rollableName(id)` gives the English.
 
 | Area | Page | Handover (read first) | Code |
 |---|---|---|---|
 | Skills, people, hooks | `/skills/` | `director/design/skill-map-handover.md` | `src/content/skillweb`, `src/content/people`, `src/core/skillweb.ts`, `src/core/people.ts` |
 | Character creator | `/chargen/` | `director/design/character-creator.md` | `src/core/chargen`, `src/content/chargen`, `src/chargen` |
-| Gate scene rules (data for the skill map; its hex page is gone) | | `director/archive/exploration-scenes.md` | `src/core/scene.ts`, `src/content/scenes` |
-| **3D world (current focus, three.js)** | `/spike3d/` | `director/design/world-structure.md`, then `world3d-handover.md` (then `world3d-m0.md`, `voxel-engine-brief.md`); maps: `world3d-authoring.md` | `src/core/world3d`, `src/engine3d`, `src/art/textures3d.ts`, `src/content/spike3d.ts`, `src/content/maps` (JSON maps, `rules/`), `src/content/furnish.ts`, `src/spike3d` |
+| Gate scene rules (data for the skill map; its hex page is gone; the one archive page you may read for this) | | `director/archive/exploration-scenes.md` | `src/core/scene.ts`, `src/content/scenes` |
+| **3D world (current focus, three.js)** | `/spike3d/` | `director/design/world-structure.md`, then `world3d-handover.md`; maps: `world3d-authoring.md`; scale: `world3d-scale.md` | `src/core/world3d`, `src/engine3d`, `src/art/textures3d.ts`, `src/content/spike3d.ts`, `src/content/maps` (JSON maps, `rules/`), `src/content/furnish.ts`, `src/spike3d` |
 | Kinds of person (people × calling × …), their sheets (levels, main/side skills), the map's cast | `/npcs/` | `director/design/people-kinds.md` | `src/core/persons.ts`, `src/core/npcsheet.ts`, `src/content/people/kinds`, `src/content/people/sheets.ts`, `src/npcs`, `MapSpec.people` in `src/core/world3d/mapgen.ts` |
 | What people do (schedules, behaviours, places, events, crowds) | | `director/design/behaviours.md` | `src/core/world3d/behave.ts`, `src/content/behaviours/` (`does/`, `when/`), `src/content/maps/rules/crowd.ts` |
 | Magic | | `director/design/magic-filaments.md`, `magic-on-map.md` | `src/core/filaments.ts` (rules), `src/core/world3d/filaments3d.ts` (field) |

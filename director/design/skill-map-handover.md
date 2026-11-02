@@ -1,6 +1,6 @@
 # Skill map and people library: handover
 
-*Updated 2026-10-28, session 20 (person hooks finished except bribe; structure fixed in session 18, see the [structure review](skill-structure-review.md)). For the next session. Read this first; for building hooks, **§4 is the recipe**. Read [Skill web](skill-web.md), [People library](people-library.md) and [Ways a skill can be used](ways-of-use.md) only when changing the shape.*
+*Updated 2026-10-28, session 20 (person hooks finished except bribe; structure fixed in session 18, see the [structure review](../archive/skill-structure-review.md)). For the next session. Read this first; for building hooks, **§4 is the recipe**. Read [Skill web](skill-web.md), [People library](people-library.md) and [Ways a skill can be used](ways-of-use.md) only when changing the shape.*
 
 The director's estimate: skills and their connections are about **40% done**. What is built is the data and the first set of rules on top of it; what is missing is mostly more of the same, plus using it in real scenes.
 

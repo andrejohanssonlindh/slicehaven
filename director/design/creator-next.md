@@ -1,6 +1,6 @@
 # Character creator — next design pass
 
-*2026-10-26, from the director's review. Plans only, nothing here is built yet. Ranked list of everything open: [Backlog](backlog.md). Current state of the creator: [Character creator](character-creator.md).*
+*2026-10-26, from the director's review. Plans only, nothing here is built yet. Ranked list of everything open: [Backlog](../archive/backlog-2026-10-27.md) (parked). Current state of the creator: [Character creator](character-creator.md).*
 
 ## 1. The creator is not a free pen-and-paper creator
 The creator will be used a few times, and often with parts already decided. Example: you find a grumpy dwarf who joins you; his people and primary drive are fixed, the rest is open.

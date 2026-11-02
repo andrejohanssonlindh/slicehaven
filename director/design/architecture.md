@@ -8,6 +8,16 @@
 3. **If it doesn't fit:** stop. Name the missing foundation, sketch it (what it is, where it lives, how the second and tenth feature like this would be added), put it in front of the director, and only build the feature once the foundation is agreed. A fireball is the example: no actions, effects or combat exist yet.
 4. **Never** solve it with an `if` on a name, a one-off in the renderer, or a hand-tuned list in a page script. Those are what made the two refactors of October necessary.
 
+## Game principles (they hold for every feature)
+1. **The world reacts.** Weather, light, fire, bodies and sources change the ground around them.
+2. **Not linear.** Finishing one route never closes the others.
+3. **Almost everything can be tried.** Look at it, use a skill on it; most attempts just do nothing.
+4. **Hints are optional.** The game won't tell you which skill is useful; looking around does.
+5. **Phone first.** Portrait, everything tappable, no hover.
+6. **Measurements, not hexes.** Distances are metres, fights included.
+7. **Authoring by intent.** Maps, houses and rooms are written as rules ("a bakery on the north side of the road"), not tuned coordinates.
+8. **Free time, fights in rounds.** The world runs freely with a slow day and night; a fight stops it and plays in rounds of 4 seconds.
+
 ## The layers
 | Layer | Folder | Holds | Never |
 |---|---|---|---|

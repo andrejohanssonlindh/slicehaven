@@ -3,18 +3,16 @@
 *2026-11-02. One list for everything ahead: the director's notes ([2026-11-02](vision/2026-11-02-director-notes.md)), the foundations from [how we build things](design/architecture.md), and what was left of [the world plan](design/world-structure.md). Ordered by **what shapes the most other work**, not by size. Questions that block an item are linked by number ([questions](questions.md)). Status: ⬜ not started · 🔶 in progress · ✅ done · ⏸ parked.*
 
 ## Next up
-**A1, turning the view.** Your idea, and the one that shapes the most: today the camera looks one way, and a lot leans on that (see A1). Every house, room and person drawn before we settle it is drawn for one angle. It's also a small, visible step you can try on the phone. Q28 asks how far it turns; I'll go with my lean unless you say otherwise.
-
-Then **B1–B3** (state, one roll system, actions), with **lighting a fire** as the first thing you can do: that's where the functionality starts.
+**A1, turning the view (free turning),** then **A2, low-poly models with shells** for everything that is a flat card today. Together they make the world right from every side, and every person, piece of furniture and animal drawn after them is drawn once. Then **B1–B3** (state, one roll system, actions), with **lighting a fire** as the first thing you can do: that's where the functionality starts.
 
 ---
 
 ## A. Decide what shapes everything (cheap now, costly later)
 | | Item | Why it comes first | Needs |
 |---|---|---|---|
-| ⬜ A1 | **Turning the view**: arrows to swing the camera round the hero | The camera's direction is fixed today, and things lean on it: beds and horses are painted from the front (`facesView`), and so are the room cut-aways, house fronts and the see-through oval. Deciding now keeps every later piece of art and every map right from all sides, and it may answer the house-design trouble in Q20 | Q28 |
-| ⬜ A2 | **People's bodies**: a simple polygon body with shells (clothes colour, then an overlapping pixel edge), replacing the flat cards | A card shows one side, which matters once the view turns (A1). Riding (C4), carriages, and visible wounds (B8) all hang on what a body is. A spike: one person next to today's card, judged on the phone | A1, Q30 |
-| ⬜ A3 | **Time: the live world and rounds** | Actions, sneaking, combat, magic and the dice all depend on how the ruleset's rounds meet a world that runs in real time. You said in Q9 you want both | Q29 |
+| ⬜ A1 | **Turning the view, freely** (decided, Q28): turn the camera round the hero (arrows, and maybe a drag). The cut-away and the see-through must work from any angle. To judge on the phone: whether the pixel look shimmers while turning (if it does, it can settle crisp when you stop) | The camera's direction is fixed today, and the cut-aways, the see-through and front-painted art lean on that. Deciding now keeps every later piece of art and every map right from all sides, and may answer the house-design trouble in Q20 | — |
+| ⬜ A2 | **Low-poly models with shells instead of flat cards** (decided, Q28/Q30): people first (a simple body; one shell for the clothes' colour, one overlapping for a pixel edge, most of all on limbs), then furniture, horses and animals. Start with one person next to today's card, judged on the phone | Flat cards are the only things that look wrong from other sides; models fix that and let bodies **animate** (walking, fighting). Riding (C4), carriages and visible wounds (B8) all hang on it | A1 |
+| ⬜ A3 | **Time** (decided, Q29): the game runs in free time; a fight stops the world and plays it in rounds (a round is 4 seconds of world time), very slowly. A **slow** day and night (not rushed). Still open: how fast the clock runs, and whether a tense moment that isn't a fight (sneaking past a guard) also goes to rounds; settled when we get to combat | Actions, sneaking, combat, magic and the dice all depend on it | — |
 
 ## B. Foundations for doing things (the functionality)
 | | Item | What it gives | Needs |
@@ -23,7 +21,7 @@ Then **B1–B3** (state, one roll system, actions), with **lighting a fire** as 
 | ⬜ B2 | **One roll system**: one set of dice rules (open rolls where sixes split into two dice, plain pools, the creator's table rolls), shown at three levels you choose in settings: dice on glass over the game, spinning dice icons, or just the result. Dice skins kept separate so they can be swapped (a reward, maybe) | Every check, fight and spell rolls through it. The rules are mostly one already (`core/checks.ts`); the creator's rolls and the showing are what's split | — |
 | ⬜ B3 | **Actions on things** (old step 5): tap a thing or a person, see its look, do something (use a skill on it). **First: light a fire.** Chimneys smoke only when the hearth is lit, and a behaviour can do an action, so an NPC lights the hearth at dawn | The skill hooks finally reach the 3D world. Lighting a fire tests B1, B2 and B3 at once and shows in the world | B1, B2, (A3 for anything long) |
 | ⬜ B4 | **Sheets on map people** (Q27 follow-ups): every person on a map gets a rolled sheet; a people's gifts (a tirak's darkvision) are always there, not by chance; people get their people's basic skills if their kinds didn't already give them | Real people to roll against | — |
-| ⬜ B5 | **Perception**: what NPCs see (a sight cone, light and dark, cover) and hear. As conditions for behaviours ("sees the hero", "heard a noise") | Sneaking, people reacting, guards, combat | A3 |
+| ⬜ B5 | **Perception**: what NPCs see and hear. The hero already has a sight cone with range from Alertness, blocked by houses and trunks (`core/world3d/vision.ts`); NPCs get the same, plus hearing, as conditions for behaviours ("sees the hero", "heard a noise") | Sneaking, people reacting, guards, combat | A3 |
 | ⬜ B6 | **Items and inventory**: items are kinds of thing; people and containers hold them | Gear that helps skills, loot, keys, quest items | B1 |
 | ⬜ B7 | **Effects**: burning, wet, wounded, afraid; one file each, on a thing or a person | Fire spreading, rain putting it out, wounds, fear | B1 |
 | ⬜ B8 | **Combat**: damage and wounds from the ruleset, read from the sheet; **visible injuries planned in from the start** | Fights, enemies | A2, A3, B2, B5, B7 |
@@ -49,7 +47,7 @@ Then **B1–B3** (state, one roll system, actions), with **lighting a fire** as 
 ## Parked
 - **Story** (was Q5): until the engine is further along.
 - **Hosting privately** (Q11): you'll bring it up when it's relevant.
-- **Character creator backlog**: still in the [ranked backlog](design/backlog.md); not on this plan until you call it.
+- **Character creator and skill map work**: the old [ranked backlog](archive/backlog-2026-10-27.md) (event cards, pre-set characters, life events) is archived; not on this plan until you call it.
 
 ## Done (for reference)
 The world structure is in place: kinds of thing, kinds of person with sheets, rooms as kinds, maps as files with rules, behaviours, the 3D review fixed. See [how the world is put together](design/world-structure.md) and the [devlog](devlog.md).

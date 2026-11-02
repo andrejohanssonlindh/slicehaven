@@ -7,7 +7,7 @@ import { marked } from 'marked';
  */
 const docs = import.meta.glob('/director/**/*.md', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
 
-const ORDER = ['README', 'questions', 'devlog', 'decisions'];
+const ORDER = ['README', 'todo', 'questions', 'decisions', 'devlog', 'design/architecture'];
 
 function title(path: string): string {
   return path.replace('/director/', '').replace(/\.md$/, '');
@@ -22,10 +22,13 @@ const paths = Object.keys(docs).sort((a, b) => {
 const select = document.getElementById('doc-select') as HTMLSelectElement;
 const main = document.getElementById('doc') as HTMLElement;
 
-for (const p of paths) select.add(new Option(title(p), title(p)));
+// The picker lists the live pages only; the archive is reached through its own index page.
+const listed = (p: string): boolean => !title(p).startsWith('archive/') || title(p) === 'archive/README';
+for (const p of paths.filter(listed)) select.add(new Option(title(p), title(p)));
 
 function show(name: string): void {
   const path = paths.find((p) => title(p) === name) ?? paths[0];
+  if (!listed(path) && !select.querySelector(`option[value="${title(path)}"]`)) select.add(new Option(title(path), title(path)));
   select.value = title(path);
   main.innerHTML = marked.parse(docs[path], { async: false });
   // Make relative .md links navigate inside the viewer.
