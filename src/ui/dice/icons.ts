@@ -7,6 +7,8 @@ import { PIPS, type Stage, schedule } from '.';
 
 /** The inside of a die showing `face`: pips for a D6, the number for anything else. */
 export function faceHtml(sides: number, face: number): string {
+  // A D100 is two D10s, tens (00–90) and ones (0–9); 00 and 0 make 100.
+  if (sides === 100) return `<b>${face === 100 ? '00' : face < 10 ? '00' : Math.floor(face / 10) * 10}</b><b>${face % 10}</b>`;
   if (sides !== 6) return `<b>${face}</b>`;
   return PIPS[face].map(([x, y]) => `<i style="grid-area:${y + 1}/${x + 1}"></i>`).join('');
 }
@@ -23,7 +25,7 @@ export async function spinIcons(stage: Stage): Promise<void> {
   root.append(tray);
   const els = shown.map((s) => {
     const el = document.createElement('span');
-    el.className = `die-icon${s.die.sides === 6 ? '' : ' dn'}`;
+    el.className = `die-icon${s.die.sides === 6 ? '' : s.die.sides === 100 ? ' dn d100' : ' dn'}`;
     el.hidden = true;
     tray.append(el);
     return el;
@@ -42,7 +44,7 @@ export async function spinIcons(stage: Stage): Promise<void> {
           el.classList.add('spin');
           if (!el.dataset.t || now - Number(el.dataset.t) > 70) {
             el.dataset.t = String(now);
-            el.innerHTML = faceHtml(s.die.sides, 1 + Math.floor(Math.random() * Math.min(s.die.sides, 6)));
+            el.innerHTML = faceHtml(s.die.sides, 1 + Math.floor(Math.random() * s.die.sides));
           }
           return;
         }

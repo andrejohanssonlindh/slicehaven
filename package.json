@@ -12,6 +12,7 @@
     "test:e2e": "vitest run --config vitest.e2e.config.ts"
   },
   "dependencies": {
+    "cannon-es": "^0.20.0",
     "marked": "^18.1.1",
     "three": "^0.186.1"
   },

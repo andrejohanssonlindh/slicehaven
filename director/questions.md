@@ -2,10 +2,7 @@
 
 Newest on top. Answer in chat (just reference the number, e.g. "Q31: A"). Answered questions move to the [archive](archive/questions-answered.md); what they decided goes to the [decisions](decisions.md). Each question names the [plan](todo.md) item it holds up.
 
-## Q32 Dice: the default level, and the D100 (B2, done; not blocking)
-Try the three levels in the 3D world (panel → Game → *Dice:*).
-- **Default level** for a new player: **A** on glass, **B** icons (now), **C** result only.
-- **The D100:** **A** one ten-sided token showing 1–100 (now), **B** two ten-sided dice, tens and ones, as at the table.
+*No open questions right now.*
 
 ---
 

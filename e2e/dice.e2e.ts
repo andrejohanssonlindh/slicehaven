@@ -39,16 +39,17 @@ describe('dice', () => {
         expect(await page.locator('.dice-show').count()).toBe(1);
         await page.screenshot({ path: `${OUT}dice-${level}-${skin}-throw.png` });
         await page.waitForSelector('.dice-lines', { timeout: 15_000 });
-        await page.screenshot({ path: `${OUT}dice-${level}-${skin}-landed.png` });
+        // (Read before the picture: the result-only show is up for two seconds.)
         expect(await page.locator('.dice-lines').textContent()).toMatch(/Test 4D6 vs 14: \d+, (success|failure)/);
+        await page.screenshot({ path: `${OUT}dice-${level}-${skin}-landed.png` });
         // A tap closes it.
-        await page.mouse.click(200, 300);
+        await page.mouse.click(200, 300).catch(() => undefined);
         await page.waitForSelector('.dice-show', { state: 'detached', timeout: 5_000 });
         // A table roll.
         await roll('Roll D100');
         await page.waitForSelector('.dice-lines', { timeout: 15_000 });
-        await page.screenshot({ path: `${OUT}dice-${level}-${skin}-d100.png` });
         expect(await page.locator('.dice-lines').textContent()).toMatch(/Table D100: \d+/);
+        await page.screenshot({ path: `${OUT}dice-${level}-${skin}-d100.png` });
         await page.waitForSelector('.dice-show', { state: 'detached', timeout: 8_000 });
         expect(errors).toEqual([]);
         await page.context().close();

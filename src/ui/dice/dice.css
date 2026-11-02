@@ -81,6 +81,15 @@
   color: var(--die-pip);
   font: 800 17px system-ui, sans-serif;
 }
+.die-icon.d100 {
+  gap: 6px;
+  border-radius: 12px;
+  padding: 6px 10px;
+}
+.die-icon.d100 b + b {
+  border-left: 2px solid var(--die-edge);
+  padding-left: 6px;
+}
 .die-icon.spin { animation: die-spin 0.28s linear infinite; }
 @keyframes die-spin {
   0% { transform: rotate(0deg) scale(1.05); }

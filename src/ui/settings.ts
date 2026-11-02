@@ -15,7 +15,7 @@ export interface Settings {
 
 const VERSION = 1;
 const KEY = 'slicehaven.settings';
-const DEFAULTS: Settings = { v: VERSION, dice: 'icons', diceSkin: 'bone' };
+const DEFAULTS: Settings = { v: VERSION, dice: 'glass', diceSkin: 'bone' };
 
 /** What this page has set, if storage would not keep it. */
 let memo: Settings | null = null;
