@@ -64,7 +64,7 @@ describe('the bigger buildings', () => {
     }
   });
 
-  it('are furnished in every room, with the beds an inn needs and a horse in each stall', () => {
+  it('are furnished in every room, with the beds an inn needs and straw in each stall', () => {
     const inn = make('inn');
     const beds = (rooms: FurnishedRoom[], level: number): number => rooms.filter((r) => r.level === level).reduce((n, r) => n + r.plan.pieces.filter((q) => q.id.startsWith('bed')).length, 0);
     expect(beds(inn.rooms, 1), 'guest room beds').toBeGreaterThanOrEqual(5);
@@ -74,10 +74,8 @@ describe('the bigger buildings', () => {
     const stable = make('stable');
     const stalls = stable.rooms.filter((r) => r.room.role === 'stall');
     expect(stalls.length).toBeGreaterThanOrEqual(5);
-    for (const s of stalls) expect(s.plan.pieces.some((q) => q.id === 'horse')).toBe(true);
-    // And the horses are not all the same colour.
-    const coats = new Set(stalls.map((s) => JSON.stringify(Array.from(s.props.get('horse')!.frames[0].data.slice(0, 4000)))));
-    expect(coats.size).toBeGreaterThan(1);
+    // (The horses come back as a kind of creature, plan item C3.)
+    for (const s of stalls) expect(s.plan.pieces.some((q) => q.id === 'straw')).toBe(true);
   });
 
   it('keep furniture inside its room, off the stairs, off each other', () => {

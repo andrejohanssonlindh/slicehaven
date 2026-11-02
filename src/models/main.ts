@@ -8,16 +8,14 @@ import { cyclePose } from '../core/world3d/pose';
 import { BODY_SHELLS, type BodyRig, makeBodyRig } from '../engine3d/body';
 import { WORLD, lit } from '../engine3d/materials';
 import { Pipeline } from '../engine3d/pipeline';
-import { spriteCard } from '../engine3d/sprites';
 import { thingGroup } from '../engine3d/things';
 import { THINGS } from '../content/things';
 import { MODELS } from '../content/things/models';
-import { PIECE_ART } from '../content/things/kinds/furniture';
 import { t } from '../i18n';
 
 /**
- * The model gallery (plan item A2): every kind of body on a slowly turning stand, in the real pixel pipeline, with
- * each piece of furniture's old card beside it to compare. Judge models here on the phone; whoever builds one checks it here.
+ * The model gallery (plan item A2): every kind of body and every piece of furniture on a slowly turning stand, in
+ * the real pixel pipeline. Judge models here on the phone; whoever builds one checks it here.
  */
 
 const PITCH = 0.68;
@@ -58,7 +56,7 @@ const COLS = 4;
 const spot = (i: number): { x: number; z: number } => ({ x: ((i % COLS) - (COLS - 1) / 2) * 1.5, z: -Math.floor(i / COLS) * 2.2 + 1.1 });
 
 let rigs: { rig: BodyRig; x: number; z: number }[] = [];
-const state = { turning: true, walking: false, shells: 2, card: true, angle: 0, phase: 0, zoom: 1 };
+const state = { turning: true, walking: false, shells: 2, angle: 0, phase: 0, zoom: 1 };
 const ZOOMS = [24, 32, 48, 64];
 const list = document.getElementById('cast')!;
 
@@ -81,14 +79,14 @@ function build(): void {
   });
 }
 
-// --- furniture: every model in `content/things/models/`, its old card beside it ---
+// --- furniture: every model in `content/things/models/` ---
 const params = new URLSearchParams(location.search);
 /** `?only=table` shows just that model (for checking one piece); `?show=furniture` opens on the furniture. */
 const only = params.get('only');
 let show: 'people' | 'furniture' = only || params.get('show') === 'furniture' ? 'furniture' : 'people';
 const furn = new THREE.Group();
 scene.add(furn);
-const furnItems: { model: THREE.Group; card: THREE.Mesh | null }[] = [];
+const furnItems: { model: THREE.Group }[] = [];
 /** Pieces that come in variants are shown in a few of them. */
 const VARIANTS: Record<string, (string | undefined)[]> = { shelf: [undefined, 'loaves', 'bottles', 'bolts'] };
 
@@ -99,20 +97,18 @@ function buildFurniture(): void {
   const lines: string[] = [];
   const ids = Object.keys(MODELS).filter((id) => !only || id === only).sort();
   const entries = ids.flatMap((id) => (VARIANTS[id] ?? [undefined]).map((v) => [id, v] as const));
-  // Laid out in rows by real width: each model, then its old card, then a gap; a new row when a row is full.
+  // Laid out in rows by real width: each model, then a gap; a new row when a row is full.
   const ROW = 7, GAP = 0.6;
   let x = 0, row = 0;
   const rows: THREE.Object3D[][] = [[]];
   entries.forEach(([id, variant]) => {
     const kind = THINGS.get(id);
-    const model = kind.furniture!.model!;
+    const model = kind.furniture!.model;
     const parts = model.draw(1, variant);
     const g = thingGroup(parts);
-    const art = PIECE_ART[id]?.(variant, 1);
-    const cardW = art ? art.frames[0].w / 21 : 0;
     // A turning model sweeps a circle as wide as its diagonal.
     const sweep = Math.hypot(model.w, model.d);
-    if (x > 0 && x + sweep + cardW > ROW) {
+    if (x > 0 && x + sweep > ROW) {
       x = 0;
       row++;
       rows.push([]);
@@ -123,16 +119,8 @@ function buildFurniture(): void {
     g.position.set(x + sweep / 2, y, z);
     furn.add(g);
     rows[row].push(g);
-    let card: THREE.Mesh | null = null;
-    if (art) {
-      const c = spriteCard(art, PITCH, { flat: kind.furniture!.mount === 'flat' });
-      c.mesh.position.set(x + sweep + 0.15 + cardW / 2, y, z);
-      furn.add(c.mesh);
-      rows[row].push(c.mesh);
-      card = c.mesh;
-    }
-    x += sweep + (art ? cardW + 0.15 : 0) + GAP;
-    furnItems.push({ model: g, card });
+    x += sweep + GAP;
+    furnItems.push({ model: g });
     const tris = parts.meshes.reduce((n, p) => n + p.mesh.indices.length / 3, 0);
     lines.push(`${id}${variant ? ` (${variant})` : ''}: ${model.w} × ${model.d} m, ${tris} triangles`);
   });
@@ -222,7 +210,6 @@ toggle(() => t('models.shells', 'Shells {n}', { n: state.shells }), () => state.
   state.shells = (state.shells + 1) % 3;
   rigs.forEach((r) => r.rig.setShells(state.shells));
 });
-toggle(() => t('models.card', 'Old card'), () => state.card, () => { state.card = !state.card; });
 toggle(() => t('models.outline', 'Outline'), () => pipeline.settings.outline > 0, () => { pipeline.settings.outline = pipeline.settings.outline > 0 ? 0 : 0.85; });
 for (const b of document.querySelectorAll<HTMLButtonElement>('#zoom button')) {
   b.addEventListener('click', () => {
@@ -243,7 +230,6 @@ function loop(now: number): void {
   furn.visible = show === 'furniture';
   for (const f of furnItems) {
     f.model.rotation.y = state.angle;
-    if (f.card) f.card.visible = state.card;
   }
   for (const r of rigs) {
     r.rig.group.visible = show === 'people';

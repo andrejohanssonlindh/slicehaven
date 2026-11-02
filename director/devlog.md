@@ -2,6 +2,16 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-02 — A2 and A3 done; B1: things remember, the world is saved
+
+- **The flat cards are gone** (your call: A2 done). Every piece of furniture must have a model now; the card painters, the sprite atlas and the "old card" in the gallery are removed (about 2,000 lines). The stable's horse goes with them, so **the stalls are empty** until horses come back as kinds of creature (C3).
+- **A3 settled** as you said: only combat goes to rounds; everything else plays live.
+- **B1, state on placed things:** a kind says which states its things can be in and how they start (every fire is `lit`, starting lit; the oven is now a kind of fire too). A placed thing only stores what differs, under an id that is the same every time the map is built.
+- **B1, the saved world:** one save per map: where the hero is (and on which storey), the clock, what has been seen, and the things' states. Written every 5 seconds and when you leave the page; a save from another version is dropped.
+- **A hearth that is out** has no glow, no chimney smoke and gives no fire to the magic field.
+- **Try it:** open the panel → **Game** row. *Nearest hearth* puts out (or lights) the hearth of the closest house; walk somewhere, close the page, open it again: you're where you were, at the same hour, the hearth still out, the map you've seen still grey. *New game* starts the map over. (Tapping the hearth itself comes with B3.)
+- **Next:** B2, one roll system.
+
 ## 2026-11-02 — All the furniture in 3D, and bodies in the world
 
 - **Everyone in the 3D world is a 3D body**, and the old flat people are gone (your call): no Bodies button, no old card beside the farmer in the gallery. Only the stable's horses are still cards.

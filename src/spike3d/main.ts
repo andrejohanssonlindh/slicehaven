@@ -1,8 +1,8 @@
 import { type Sky, WIND_DIRS, clockText } from '../core/environment';
 import { ASPECTS, LEVEL_NAMES } from '../core/filaments';
 import { MAPS, mapNamed } from '../content/maps';
-import { Governor, TIERS, type DeviceInfo, type Tier, type TierName, atlasSize, pickTier, qualityAt } from '../core/world3d/tiers';
-import { setAtlasSize, spriteAtlas } from '../engine3d/atlas';
+import { clearWorld, loadWorld, saveWorld } from '../core/world3d/save';
+import { Governor, TIERS, type DeviceInfo, type Tier, type TierName, pickTier, qualityAt } from '../core/world3d/tiers';
 import { Pipeline } from '../engine3d/pipeline';
 import { SpikeWorld } from '../engine3d/world';
 import { t } from '../i18n';
@@ -49,7 +49,6 @@ const device: DeviceInfo = {
   touch: navigator.maxTouchPoints > 0,
   ...probeGpu(),
 };
-setAtlasSize(atlasSize(device));
 let tier: Tier = { ...TIERS[(params.get('tier') as TierName) in TIERS ? (params.get('tier') as TierName) : pickTier(device)] };
 let zoomIndex = tier.zoom;
 
@@ -78,6 +77,7 @@ interface Def {
 }
 /** The admin menu's groups, in ring order; each holds the settings that belong to it. */
 const GROUPS: { id: string; name: string; defs: Def[] }[] = [
+  { id: 'game', name: t('spike.g.game', 'Game'), defs: [] },
   { id: 'time', name: t('spike.g.time', 'Time'), defs: [] },
   { id: 'weather', name: t('spike.g.weather', 'Weather'), defs: [] },
   { id: 'wind', name: t('spike.g.wind', 'Wind'), defs: [] },
@@ -88,7 +88,7 @@ const GROUPS: { id: string; name: string; defs: Def[] }[] = [
   { id: 'view', name: t('spike.g.view', 'Sight'), defs: [] },
   { id: 'perf', name: t('spike.g.perf', 'Quality'), defs: [] },
 ];
-const ROW_GROUP: Record<string, string> = { 'row-time': 'time', 'row-sky': 'weather', 'row-fx': 'fire', 'row-look': 'look', 'row-magic': 'magic', 'row-perf': 'view' };
+const ROW_GROUP: Record<string, string> = { 'row-game': 'game', 'row-time': 'time', 'row-sky': 'weather', 'row-fx': 'fire', 'row-look': 'look', 'row-magic': 'magic', 'row-perf': 'view' };
 
 function makeButton(def: Def, parent: HTMLElement): Btn {
   const el = document.createElement('button');
@@ -146,8 +146,35 @@ function applyQuality(): void {
 
 const cycle = <T>(list: readonly T[], v: T): T => list[(list.indexOf(v) + 1) % list.length];
 
+/**
+ * The saved world (plan item B1): loaded at the start, written every few seconds and when the page is left. Off in
+ * browser tests (they start fresh) unless `?save`; `?nosave` turns it off by hand.
+ */
+const saving = !params.has('nosave') && (!navigator.webdriver || params.has('save'));
+let mapName = 'spike';
+let saveOff = false;
+
+function save(): void {
+  if (!saving || saveOff || !world) return;
+  saveWorld({ map: mapName, ...world.saveState() }, localStorage);
+}
+
 function buildControls(): void {
   const w = world.weather;
+  // The game: a new game forgets this map's save; the hearth button puts out (or lights) the nearest hearth, to test
+  // the things' states and the save until tapping things (B3) can.
+  button('row-game', () => t('spike.newgame', 'New game'), () => false, () => {
+    saveOff = true;
+    clearWorld(mapName, localStorage);
+    location.reload();
+  });
+  button('row-game', () => t('spike.hearth', 'Nearest hearth'), () => false, () => {
+    const f = world.firesNear()[0];
+    if (!f) return notify(t('spike.nohearth', 'No hearth near. Walk up to a house.'));
+    world.states.set(f.id, f.kind, 'lit', !f.lit);
+    notify(f.lit ? t('spike.hearthout', 'The hearth in {house} is out.', { house: f.house }) : t('spike.hearthlit', 'The hearth in {house} is lit.', { house: f.house }));
+    save();
+  });
   const times: [number, string][] = [[6, t('spike.dawn', 'Dawn')], [12, t('spike.day', 'Day')], [18.5, t('spike.dusk', 'Dusk')], [0, t('spike.night', 'Night')]];
   const nearHour = (h: number): boolean => w.hour !== null && Math.abs(((w.hour - h + 36) % 24) - 12) < 1.5 && world.dayMinutes === 0;
   for (const [h, name] of times) button('row-time', () => name, () => nearHour(h), () => { world.dayMinutes = 0; w.setHour(h); });
@@ -508,7 +535,7 @@ function loop(now: number): void {
       `calls ${info.render.calls}  tris ${(info.render.triangles / 1000).toFixed(1)}k`,
       `${pipeline.rw}×${pipeline.rh} ×${pipeline.factor}  ${world.ppm} px/m`,
       `tier ${tier.name}${governor.level ? ` -${governor.level}` : ''}  shadow ${world.settings.shadowMap}`,
-      `chunks ${world.chunkCount}  atlases ${spriteAtlas().count}`,
+      `chunks ${world.chunkCount}`,
       `houses ${world.houses.length}/${world.layout.houses.length}  furnished ${world.houseIndex.made}  chunks held ${world.placed.generatedChunks}`,
       magic,
     ].filter(Boolean).join('\n');
@@ -536,6 +563,7 @@ setTimeout(() => {
     location.search = params.toString();
   });
   const map = mapNamed(name in MAPS ? name : 'spike');
+  mapName = map.name;
   if (map.problems.length) console.warn(`spike3d: map ${map.name} has problems:\n${map.problems.join('\n')}`);
   const size = Number(params.get('world')) || map.ground.size;
   world = new SpikeWorld({ shells: Math.min(2, tier.shells), lights: Math.min(3, tier.lights), shadowMap: tier.shadowMap }, TIERS.high.grass, { ...map, ground: { ...map.ground, size } });
@@ -548,6 +576,16 @@ setTimeout(() => {
   const warm = world.warmHouses();
   pipeline.renderer.compile(world.scene, world.camera);
   warm.done();
+  const saved = saving ? loadWorld(mapName, localStorage) : null;
+  if (saved) {
+    world.loadState(saved);
+    notify(t('spike.welcomeback', 'The world is as you left it. (New game in the panel starts over.)'));
+  }
+  if (saving) {
+    setInterval(save, 5000);
+    addEventListener('pagehide', save);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+  }
   buildControls();
   bindInput();
   loading.hidden = true;

@@ -47,8 +47,6 @@ export interface DeviceInfo {
 /** Software renderers and very old GPUs: start one tier lower than the screen says. */
 export const isWeakGpu = (gpu?: string): boolean => !!gpu && /swiftshader|llvmpipe|software|mali-4|mali-t|adreno \(tm\) [23]\d\d|powervr sgx/i.test(gpu);
 
-/** Atlas size for the device: 512 when the GPU is small or weak, else 1024. */
-export const atlasSize = (d: DeviceInfo): number => ((d.maxTexture !== undefined && d.maxTexture < 4096) || isWeakGpu(d.gpu) ? 512 : 1024);
 
 /** A sensible default: touch and small screens are phones. */
 export function pickTier(d: DeviceInfo): TierName {

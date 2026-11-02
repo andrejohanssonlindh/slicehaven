@@ -1,6 +1,6 @@
 /*
  * Browser test: every furniture model stands alone in the gallery without errors, and gets its picture taken from two
- * sides, next to its old card: e2e/out/model-<id>-a.png and -b.png. Run it after making or changing a model
+ * sides: e2e/out/model-<id>-a.png and -b.png. Run it after making or changing a model
  * (`npm run test:e2e -- models`) and look at the pictures (see director/design/models-authoring.md).
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';

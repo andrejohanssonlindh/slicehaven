@@ -75,7 +75,7 @@ export function filamentWorld(g: Ground3D, layout: Layout, houses: BuiltHouse[] 
  * rectangle from the placed index (trees, rocks, bushes, torches, wells by chunk) plus the extras (house fires and
  * hand-lit campfires), which `extras` gives afresh each time the field is told its sources changed.
  */
-export function streamingFilamentWorld(g: Ground3D, placed: PlacedIndex, houses: BuiltHouse[] | (HouseBoxes & { sourcesIn?(x0: number, z0: number, x1: number, z1: number): FSource[] }), extras: () => FSource[]): FilamentWorld {
+export function streamingFilamentWorld(g: Ground3D, placed: PlacedIndex, houses: BuiltHouse[] | (HouseBoxes & { sourcesIn?(x0: number, z0: number, x1: number, z1: number): FSource[] }), extras: () => FSource[], gives: (s: FSource) => boolean = () => true): FilamentWorld {
   const base = filamentWorld(g, { houses: [], trees: [], props: [] }, houses, []);
   let own = extras();
   return {
@@ -83,7 +83,7 @@ export function streamingFilamentWorld(g: Ground3D, placed: PlacedIndex, houses:
     sources: [],
     sourcesIn: (x0, z0, x1, z1) => {
       const found = [...placed.sourcesIn(x0, z0, x1, z1), ...(Array.isArray(houses) ? [] : houses.sourcesIn?.(x0, z0, x1, z1) ?? [])];
-      return [...found, ...own.filter((s) => s.x >= x0 && s.x < x1 && s.z >= z0 && s.z < z1)];
+      return [...found.filter(gives), ...own.filter((s) => s.x >= x0 && s.x < x1 && s.z >= z0 && s.z < z1)];
     },
     // (`setSources` on the field is the signal that the extras changed: read them again.)
     refresh: () => { own = extras(); },

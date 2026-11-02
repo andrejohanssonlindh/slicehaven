@@ -3,7 +3,7 @@ import { CHUNK, chunkKey } from './chunks';
 /**
  * What the hero has seen: a hash map from chunk to a 32 × 32 mask of one-metre cells (so a world of any size costs
  * only the ground walked near). `mark` records a disc as seen; `fill` writes a window of it for the renderer to
- * draw what is remembered. Plain data: `toJSON` / `fromJSON` are for the save, later.
+ * draw what is remembered. Plain data: `toJSON` / `assign` are for the save (`core/world3d/save.ts`).
  */
 export class Explored {
   private readonly chunks = new Map<string, Uint8Array>();
@@ -74,15 +74,31 @@ export class Explored {
     this.chunks.clear();
   }
 
+  /** For the save: each chunk's mask packed eight cells to a byte, as base64 (about 170 characters a chunk). */
   toJSON(): Record<string, string> {
     const out: Record<string, string> = {};
-    for (const [k, m] of this.chunks) out[k] = Array.from(m, (b) => (b ? '1' : '0')).join('');
+    for (const [k, m] of this.chunks) {
+      const bytes = new Uint8Array(m.length / 8);
+      for (let i = 0; i < m.length; i++) if (m[i]) bytes[i >> 3] |= 1 << (i & 7);
+      out[k] = btoa(String.fromCharCode(...bytes));
+    }
     return out;
+  }
+
+  /** Take what was seen from a save (what `toJSON` wrote), replacing what is held. */
+  assign(data: Record<string, string>): void {
+    this.chunks.clear();
+    for (const [k, s] of Object.entries(data)) {
+      const bytes = Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+      const m = new Uint8Array(CHUNK * CHUNK);
+      for (let i = 0; i < m.length; i++) m[i] = (bytes[i >> 3] >> (i & 7)) & 1;
+      this.chunks.set(k, m);
+    }
   }
 
   static fromJSON(data: Record<string, string>): Explored {
     const e = new Explored();
-    for (const [k, s] of Object.entries(data)) e.chunks.set(k, Uint8Array.from(s, (c) => (c === '1' ? 1 : 0)));
+    e.assign(data);
     return e;
   }
 }

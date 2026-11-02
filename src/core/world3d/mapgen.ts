@@ -2,8 +2,7 @@ import { fbm } from '../noise';
 import { Rng } from '../rng';
 import { CHUNK } from './chunks';
 import type { House3DSpec, HousePlan, RoofKind, WallKind } from './house';
-import { FACING_MIN, VIEW_YAW } from './view';
-import { type BuiltHouse, type Layout, type PlacedHouse, type PlacedTree, buildHouses, houseOuterBox, houseToWorld, layoutObstacles, layoutPads, layoutShade } from './layout';
+import { type Layout, type PlacedHouse, type PlacedTree, buildHouses, houseOuterBox, houseToWorld, layoutObstacles, layoutPads, layoutShade } from './layout';
 import { type ChunkContent, type ChunkGenerator, PlacedIndex } from './placed';
 import { type PlacedProp } from './props';
 import type { PersonKinds, PersonSpec } from '../persons';
@@ -342,8 +341,6 @@ export function wildGenerator(w: WildSpec, ctx: WildContext): ChunkGenerator {
 export interface CompileOptions {
   /** The kinds of person (`content/people`), to check the cast by. */
   persons?: PersonKinds;
-  /** The kinds of furniture a house's rooms call for (`content/furnish.ts`), to check houses against the view. */
-  pieces?: (b: BuiltHouse) => string[];
   /** The map rules there are, by name (`content/maps/rules/`). */
   rules?: Record<string, MapRule>;
   /** What people can do and ask (`content/behaviours`), to check schedules by. */
@@ -399,7 +396,7 @@ export function strayKeys(o: object, allowed: readonly string[], where: string, 
  * other libraries the map is checked against, and the rules it may use.
  */
 export function compileMap(spec: MapSpec, things: Things, opts: CompileOptions = {}): CompiledMap {
-  const { persons, pieces } = opts;
+  const { persons } = opts;
   const problems: string[] = [];
   const problem = (s: string): void => void problems.push(s);
   const rng = Rng.fromSeed(spec.seed);
@@ -470,15 +467,6 @@ export function compileMap(spec: MapSpec, things: Things, opts: CompileOptions =
   const built = buildHouses(layout, things);
   const boxes = built.map(houseOuterBox);
   ctx.boxes = boxes;
-  // A room painted as seen from its front (a bed, a horse) must be in a house that roughly faces the view.
-  if (pieces) {
-    for (const b of built) {
-      if (Math.cos(VIEW_YAW - b.place.rot) >= FACING_MIN) continue;
-      const wrong = pieces(b).filter((k) => things.has(k) && things.get(k).furniture?.facesView);
-      if (wrong.length) problems.push(`house ${b.place.id} faces away from the view, and its ${wrong.join(' and ')} would read wrong (put it on the other side of the road, or turn it)`);
-    }
-  }
-
   // The rules that place things (torches along a road, scattered woods), keeping clear of the houses.
   for (const { rule, use } of uses) if (rule.phase === 'things') rule.expand(use, ctx);
 

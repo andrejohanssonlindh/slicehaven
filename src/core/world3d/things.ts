@@ -4,6 +4,7 @@ import type { MeshData } from './mesh';
 import type { RoomLine, RoomRecipe } from './roomplan';
 import type { Lumps, PlacedProp } from './props';
 import { type Shape, circle } from './space';
+import type { StateDef } from './state';
 import type { TreeModel } from './tree';
 
 /**
@@ -72,6 +73,11 @@ export interface ThingDef {
   abstract?: boolean;
   /** One line for when it is looked at (English; through `t()` when shown). */
   look?: string;
+  /**
+   * The states its placed things can be in, and what each starts as (`core/world3d/state.ts`): a fire's `lit`, a
+   * door's `open`. Merged down the tree: a kind adds to what it inherits, and may change a start.
+   */
+  states?: Record<string, StateDef>;
   /** The ground it takes up: what stops feet, and (if `blocksSight`) the eye. Function form for what changes with the placement. */
   foot?: Foot[] | ((p: Placed) => Shape[]);
   /** The eye cannot see through it. */
@@ -99,17 +105,12 @@ export interface ThingDef {
     lightY?: number;
   };
   /**
-   * A piece of furniture: how it sits in a room (on the floor, hung on a wall, or flat like a rug) and how big it is.
-   * It is drawn as a painted card, not meshes (`content/things/kinds/furniture.ts`).
+   * A piece of furniture: how it sits in a room (on the floor, hung on a wall, or flat like a rug) and its 3D model
+   * (`content/things/models/`, one file each; see `director/design/models-authoring.md`), which gives its footprint.
    */
   furniture?: {
     mount: 'floor' | 'hung' | 'flat';
-    d?: number;
-    maxW?: number;
-    /** Its card is painted as seen from the room's front (a bed's head at the back wall, a horse from behind): in a house that faces away from the view it reads wrong, and the map compiler says so. */
-    facesView?: boolean;
-    /** A 3D model instead of the card (`content/things/models/`, one file each; see `director/design/models-authoring.md`). */
-    model?: FurnitureModel;
+    model: FurnitureModel;
   };
   /** A kind of building: how it is put together (`buildHouse` reads this). */
   building?: BuildingPlan;
@@ -177,6 +178,7 @@ export class Things {
     if (parent) for (const [k, v] of Object.entries(parent)) if (!FIELDS_NOT_INHERITED.has(k)) out[k] = v;
     Object.assign(out, own);
     out.tags = [...new Set([...(parent?.tags ?? []), ...(own.tags ?? [])])];
+    if (parent?.states || own.states) out.states = { ...parent?.states, ...own.states };
     out.chain = chain;
     const t = out as unknown as Thing;
     this.made.set(id, t);

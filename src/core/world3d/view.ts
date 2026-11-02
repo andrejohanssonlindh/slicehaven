@@ -7,9 +7,6 @@ import type { WallSide } from './house';
  */
 export const VIEW_YAW = 0.42;
 
-/** How far (as the cosine of the angle) a house may turn from facing the view before front-painted cards read wrong: 60°. */
-export const FACING_MIN = 0.5;
-
 /**
  * A wall faces the camera (and is cut away) when it is turned toward it at all, beyond a sliver: the cosine of 85°.
  * So two walls are down from almost every angle, and only one when you look within 5° of square onto a wall

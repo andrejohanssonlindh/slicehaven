@@ -43,6 +43,8 @@ State is plain JSON (it goes into the save). A kind is never an instance: the ki
 | **Furniture models** (one file per kind, found by itself; the solver turns them to their wall) | Any piece of furniture in 3D | `content/things/models/`, kit `core/world3d/modelkit.ts`, `FurnitureModel` in `things.ts` | A file `<kind id>.ts`; how-to: `director/design/models-authoring.md` | `tests/furniture-models.test.ts`, `tests/furnish.test.ts`, `e2e/models.e2e.ts` |
 | **Actors** (plain data people, moved by rules) | Anyone who walks | `core/world3d/actors.ts`; the renderer only places their cards | — | `tests/actors.test.ts` |
 | **Skill hooks on the kind chain** | What skills can do to a kind of thing or person (checks, outcomes, social conflicts) | `core/skillweb.ts`, `content/skillweb/` | A hook on the kind in the library | skill tests. **Built in the 2D days; not yet wired into the 3D world** (that is step 5) |
+| **States on placed things** (a kind lists its states and their start, inherited; a thing stores only what differs) | A fire lit or out, a door open, a barrel emptied: anything that changes and must stay changed | `core/world3d/state.ts` (`ThingStates`, `placedId`, `pieceId`); `states` on `ThingDef` | A state on the kind (`states: { open: { default: false } }`); the engine listens (`states.on`) and redraws | `tests/state.test.ts` |
+| **The saved world** (one versioned JSON record per map) | Whatever must survive a reload: the hero's spot, the clock, what was seen, the things' states | `core/world3d/save.ts`; the page writes it (`src/spike3d/main.ts`) | A new field in `WorldSave`, and bump `WORLD_SAVE_VERSION` (old saves are dropped) | `tests/state.test.ts`, `e2e/spike3d-save.e2e.ts` |
 | **Filament field** (magic strength read from what stands where) | Magic sources and their strength | `core/filaments.ts`, `core/world3d/filaments3d.ts`; kinds say `filament` | A `filament` property on the kind | filament tests |
 
 ## Missing foundations (don't build features on these until the base exists)
@@ -50,18 +52,16 @@ Each needs a short design, agreed with the director, before any feature that res
 
 | Foundation | Needed by | What it would be (first sketch, not agreed) |
 |---|---|---|
-| **Instance state** | A door that opens, a barrel that is emptied, a thing that burns, anything saved | A placed thing carries small plain-JSON state; the kind says which states it can have and how each is drawn |
 | **Actions on things** (plan step 5) | Tapping a thing or a person, using a skill on it | The kind chain lists what can be done (from the skill hooks); doing it runs a check from the rules and changes instance state |
-| **Time model for actions** | Anything that takes time or happens in rounds: combat, spells, crafting | The world runs in real time; conflicts in the ruleset run in rounds. How the two meet is a design decision, not code |
+| **Time model for actions** | Anything that takes time or happens in rounds: combat, spells, crafting | Settled (A3): live, and only a fight goes to rounds of 4 seconds. The code for rounds comes with combat (B8) |
 | **Effects** (things that happen to a thing or person: burning, wet, wounded, afraid) | A fireball, rain putting out a fire, poison, fear | An effect is a kind too (one file each): what it changes, how long it lasts, how it shows. Applied to instance state |
 | **Abilities and spells** | A fireball | An ability is a kind: what it costs (filaments), what it targets (a point, an area, a person), what roll it needs, which effects it applies. Its look (projectile, burst) points at shared engine code, like a kind points at a builder |
 | **Damage and wounds; combat** | Fights, enemies | From the ruleset; lives in `core/`, reads the sheet |
 | **People reacting** (perception, alarm, chase, flee) | Enemies, guards, thieves | New behaviours and conditions (`when/`: "sees the hero", "heard a noise"), so it extends the behaviours pattern rather than standing beside it |
 | **Items and inventory** | Gear, loot, tools that help skills | Items are kinds of thing (`item` already exists in the tree); a person or container holds instances |
-| **The saved world** | Anything that must survive a reload | One versioned JSON save of instance states, actors and the clock |
 | **Locations** (plan step 6, Q25) | Travelling between maps | Exits and arrivals; likely an overworld |
 
-**Worked example: "add a fireball".** It needs an ability (missing), a target and an area (missing), an effect, burning (missing), instance state on what it hits (missing), damage (missing), and a time model (missing). So the answer is not "add a fireball": it is "design actions, effects and instance state, then the fireball is one ability file". By contrast, "add a barrel with a lid" is one kind under `container` today, and the lid opening waits for instance state.
+**Worked example: "add a fireball".** It needs an ability (missing), a target and an area (missing), an effect, burning (missing), state on what it hits (there now: `states`), damage (missing), and rounds (settled, not built). So the answer is not "add a fireball": it is "design actions and effects, then the fireball is one ability file". By contrast, "add a barrel with a lid" is one kind under `container` today, with an `open` state; opening it by hand waits for actions (B3).
 
 ## Keeping this page true
 - When a foundation is built: move its row up to the patterns, with where it lives and what test guards it.

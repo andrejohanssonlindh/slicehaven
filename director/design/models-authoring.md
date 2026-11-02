@@ -1,12 +1,12 @@
 # How to make a furniture model
 
-*2026-11-02. The how-to for turning a piece of furniture from a painted card into a small 3D model (plan item A2). Written so another model (Sonnet) can do most of them; Claude reviews each batch before it is pushed. Read [low-poly models](models.md) for why. The four examples (`table`, `keg`, `bed`, `shelf`) are the pattern: read them first.*
+*2026-11-02. The how-to for making a piece of furniture as a small 3D model (plan item A2; the painted cards are gone since 2026-11-02, so a new piece is a line in `furniture.ts` and a model file). Written so another model (Sonnet) can do most of them; Claude reviews each batch before it is pushed. Read [low-poly models](models.md) for why. The four examples (`table`, `keg`, `bed`, `shelf`) are the pattern: read them first.*
 
 ## The whole job, for one piece
-1. **Make one file:** `src/content/things/models/<id>.ts`, where `<id>` is the kind's id in `src/content/things/kinds/furniture.ts` (`stool`, `counter`, `forge`...). The file's default export is a `FurnitureModel`. Nothing else to edit: the file replaces that kind's card everywhere, and the room solver uses its footprint.
+1. **Make one file:** `src/content/things/models/<id>.ts`, where `<id>` is the kind's id in `src/content/things/kinds/furniture.ts` (`stool`, `counter`, `forge`...). The file's default export is a `FurnitureModel`. Add the kind's line in `furniture.ts` (its look and how it sits); the room solver uses the model's footprint.
 2. **Check it:** `npx tsc --noEmit -p .` and `npx vitest run tests/furniture-models.test.ts tests/furnish.test.ts`. The first holds every model to the rules below and says what is wrong; the second makes sure every kind of room can still fit everything in.
-3. **Look at it:** `npm run test:e2e -- models` takes two pictures of every model, from the front-left and the back-right, beside its old card: `e2e/out/model-<id>-a.png` and `-b.png`. Open them and compare with the card. In a browser: `/slicehaven/models/?only=<id>` (dev server: `npm run dev`).
-4. Nothing floating, nothing through the floor, the front where people use it, the size right next to the old card, the look of the card kept (its colours, what is on it).
+3. **Look at it:** `npm run test:e2e -- models` takes two pictures of every model, from the front-left and the back-right: `e2e/out/model-<id>-a.png` and `-b.png`. Open them. In a browser: `/slicehaven/models/?only=<id>` (dev server: `npm run dev`).
+4. Nothing floating, nothing through the floor, the front where people use it, real size, the look line's things shown.
 
 ## The space a model lives in
 - **Metres.** The floor is y = 0. The piece is centred on x and z.
@@ -44,13 +44,13 @@ export default stool;
 - **`vary(seed, salt)`**: a number 0..1 from the seed. Use it for variety (a blanket's colour, how many jars, a little jitter), never `Math.random()`. The same seed must give the same model.
 
 ## Colours
-sRGB hex numbers, muted and earthy like the cards: wood is the `plank` texture (no colour needed). Cloth and goods:
-undyed `0xc0b494`, straw/tick `0xc8b484`, linen `0xe0d8c4`, madder red `0x8a3a2e`, woad blue `0x3c5070`, moss `0x55663a`, rust `0x9a5a2a`, mustard `0x9a7a26`, clay pots `0x9a6a48`, dark clay `0x7a5a3c`, bread `0xa8743a`, green glass `0x2e4a32`, brown glass `0x4a3424`, coal `0x2a2622`, embers `0xd0642a`, iron (default) or brass `0xa8843c`. Take the card's own colours where they say something (the forge's glow, the loom's cloth).
+sRGB hex numbers, muted and earthy: wood is the `plank` texture (no colour needed). Cloth and goods:
+undyed `0xc0b494`, straw/tick `0xc8b484`, linen `0xe0d8c4`, madder red `0x8a3a2e`, woad blue `0x3c5070`, moss `0x55663a`, rust `0x9a5a2a`, mustard `0x9a7a26`, clay pots `0x9a6a48`, dark clay `0x7a5a3c`, bread `0xa8743a`, green glass `0x2e4a32`, brown glass `0x4a3424`, coal `0x2a2622`, embers `0xd0642a`, iron (default) or brass `0xa8843c`. Let colours say something (the forge's glow, the loom's cloth).
 
 ## Budget and style
 - **50–300 triangles** (a box is 12); the test stops at 450. Pixel size is about 4 cm a pixel, so anything under 3 cm disappears: leave it out.
 - **Chunky, readable shapes** over detail: a few boxes that say "anvil" from any side beat many small ones.
-- **What the card shows, the model shows:** the card is the brief (open the `make…` painter in `src/art/` named in `furniture.ts` if the picture isn't clear). Keep its colours and its things-on-top.
+- **What the look line says, the model shows:** its things-on-top and what it is for.
 - **Fires** (`hearth`, `oven`, `forge`): model the stones or the bricks and the coals (cloth in an ember colour); the light is the room's, not the model's.
 
 ## What is not yours
@@ -60,7 +60,6 @@ undyed `0xc0b494`, straw/tick `0xc8b484`, linen `0xe0d8c4`, madder red `0x8a3a2e
 
 ## Tips from the first batches
 - **A new file the tests don't see** (only the old models are tested): vitest's cache. Delete `node_modules/.vite/vitest` and run again.
-- **Look at the card's painter** in `src/art/`, not only the look line: the first batches were made from the descriptions and match the cards only roughly.
 
 ## The pieces
 All done but the horse (2026-11-02): `table`, `keg`, `bed`, `shelf` by Claude as examples, the rest by Sonnet in these batches:

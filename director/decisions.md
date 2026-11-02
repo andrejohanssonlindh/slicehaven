@@ -4,6 +4,9 @@ Only decisions that still stand. Ones that were replaced are removed (git histor
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-02 | **A2 done; the flat cards are gone**: every person and piece of furniture is a 3D model. The horse waits for kinds of creature (C3), so the stalls stand empty until then | Director: checked everything, pretty enough; horses come later as decided. |
+| 2026-11-02 | **A3 settled: only combat runs in turns.** Everything else (sneaking past a guard included) plays live, with the movement we have | Director: it should feel live outside combat. |
+| 2026-11-02 | **B1 and B2 are base work with clear ways to test, so they are built without a design round first** | Director. |
 | 2026-11-02 | **Each people has its own 3D body**: its own proportions (a dwarf's big head and short legs, an elf's long limbs and pointed ears, the tirak's jaw and claws, a missla's big head and eyes) and its own size from the creator's typical height and weight per people and sex (the tirak in three sizes). Furniture becomes models made mostly by Sonnet from Claude's examples and a how-to; a `/models/` gallery to judge them | Director (Q31): not one body for all peoples. |
 | 2026-11-02 | **Cut-away: two walls down** from almost every angle; only one when looking within 5° of square onto a wall | Director, after trying the turning view: needing ~20° off before the second wall went felt wrong. |
 | 2026-11-02 | **Browser tests: run only the files a change can affect**, not the whole suite each time | Director: the full run is ~10 minutes of waiting and rarely fails. |

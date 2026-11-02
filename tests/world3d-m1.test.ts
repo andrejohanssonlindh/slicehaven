@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { SPIKE_GROUND } from '../src/content/spike3d';
-import { AtlasPacker } from '../src/core/world3d/atlas';
 import { CHUNK, TerrainStore, buildChunk, chunkHeightAt, chunkOf, chunkRange, chunksNear } from '../src/core/world3d/chunks';
 import { environment } from '../src/core/world3d/environment3d';
 import { cloudDensity, cloudDrift } from '../src/core/world3d/sky';
-import { Governor, MAX_LEVEL, TIERS, atlasSize, isWeakGpu, pickTier, qualityAt } from '../src/core/world3d/tiers';
+import { Governor, MAX_LEVEL, TIERS, isWeakGpu, pickTier, qualityAt } from '../src/core/world3d/tiers';
 import { groundHeight } from '../src/core/world3d/terrain';
 
 const g = SPIKE_GROUND;
@@ -65,38 +64,6 @@ describe('chunks', () => {
   });
 });
 
-describe('atlas packer', () => {
-  it('gives the same rect for the same key and never overlaps', () => {
-    const p = new AtlasPacker(256, 1);
-    const rects = [];
-    for (let i = 0; i < 120; i++) rects.push(p.place(`k${i}`, 20 + (i % 5) * 7, 16 + (i % 3) * 9));
-    expect(p.place('k3', 1, 1)).toBe(rects[3]);
-    for (let a = 0; a < rects.length; a++) {
-      const A = rects[a];
-      expect(A.x).toBeGreaterThanOrEqual(1);
-      expect(A.x + A.w + 1).toBeLessThanOrEqual(256);
-      expect(A.y + A.h + 1).toBeLessThanOrEqual(256);
-      for (let b = a + 1; b < rects.length; b++) {
-        const B = rects[b];
-        if (A.atlas !== B.atlas) continue;
-        const apart = A.x + A.w + 1 <= B.x - 1 + 1 || B.x + B.w + 1 <= A.x - 1 + 1 || A.y + A.h + 1 <= B.y - 1 + 1 || B.y + B.h + 1 <= A.y - 1 + 1;
-        expect(apart).toBe(true);
-      }
-    }
-    expect(p.count).toBeGreaterThan(1);
-  });
-
-  it('refuses what cannot fit and maps rects to flipped UVs', () => {
-    const p = new AtlasPacker(64, 1);
-    expect(() => p.place('big', 64, 10)).toThrow();
-    const r = p.place('a', 10, 20);
-    const uv = p.uv(r);
-    expect(uv.u0).toBeCloseTo(r.x / 64);
-    expect(uv.v1).toBeCloseTo(1 - r.y / 64);
-    expect(uv.v0).toBeLessThan(uv.v1);
-  });
-});
-
 describe('environment3d', () => {
   const w = { tod: 0, cloud: 0.4, rain: 0, flash: 0, wind: 0.6, wx: 1, wy: 0, windForce: 3 };
 
@@ -122,13 +89,11 @@ describe('environment3d', () => {
 });
 
 describe('tier detection and the governor', () => {
-  it('software GPUs are weak and start low, with small atlases', () => {
+  it('software GPUs are weak and start low', () => {
     expect(isWeakGpu('ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device))')).toBe(true);
     expect(isWeakGpu('Apple GPU')).toBe(false);
     const d = { width: 1920, height: 1080, dpr: 1, touch: false, gpu: 'llvmpipe' };
     expect(pickTier(d)).toBe('low');
-    expect(atlasSize(d)).toBe(512);
-    expect(atlasSize({ ...d, gpu: 'Apple GPU', maxTexture: 16384 })).toBe(1024);
   });
 
   it('quality steps down monotonically and level 0 is the tier', () => {

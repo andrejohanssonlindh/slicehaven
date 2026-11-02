@@ -4,10 +4,12 @@ import { TEXELS_PER_M } from '../core/world3d/tiers';
 import { THATCH, WOOD, boards, stoneWall } from './buildings';
 import { fbm, pick, white } from './grit';
 import { infill } from './houses';
-import { GW } from './humble';
 import { groundColor } from './ground';
 import { P } from './palette';
 import { Pix, ramp } from './pix';
+
+/** Grey-brown weathered wood, dark to light. */
+const GW = ['#1c1612', '#3a3026', '#584a3a', '#7a6850', '#9a8668', '#b8a484'];
 
 /**
  * Textures for the 3D world, painted by the same hands as the 2D art: the

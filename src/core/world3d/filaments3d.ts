@@ -39,6 +39,8 @@ export interface FSource {
   kind: SourceKind;
   /** Strength multiplier (a torch is a small fire); for corpses, how many. Default 1. */
   weight?: number;
+  /** The placed thing it comes from, when that thing can stop giving it (a fire that is put out: `core/world3d/state.ts`). */
+  of?: { id: string; kind: string };
 }
 
 export type { Ground };

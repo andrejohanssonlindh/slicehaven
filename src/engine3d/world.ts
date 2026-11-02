@@ -19,6 +19,7 @@ import { Rng } from '../core/rng';
 import type { HouseMaterial } from '../core/world3d/house';
 import { type BuiltHouse, type Layout, type PlacedTree, furnitureObstacles, houseAt, houseBox, houseOuterBox, houseToLocal, houseToWorld, houseWalls, levelWalls, sightWalls } from '../core/world3d/layout';
 import { Explored } from '../core/world3d/explored';
+import { type StatesJSON, ThingStates, pieceId } from '../core/world3d/state';
 import { PlacedIndex } from '../core/world3d/placed';
 import { footprints } from '../core/world3d/roomplan';
 import { type HouseEntry, HouseIndex } from '../core/world3d/houses';
@@ -43,7 +44,7 @@ import { RAYS, type SightLight, type VisionSpec, angleGap, castSight, lightReach
 import { Leaves } from './leaves';
 import { Rain } from './rain';
 import { type Chimney, Smoke } from './smoke';
-import { type SpriteCard, blobShadow, spriteCard } from './sprites';
+import { blobShadow } from './shadow';
 import { type BodyRig, makeBodyRig } from './body';
 import { geometryOf, thingGroup, thingMaterial } from './things';
 import { bodySpecOf } from '../content/people/bodies';
@@ -195,21 +196,22 @@ interface HouseInst {
   built: BuiltHouse;
   /** Materials this house made for itself (the fading parts), let go when it is taken down. */
   mats: THREE.Material[];
-  /** Its sprites, its hearth's light, and the shells of its roof. */
-  cards: SpriteCard[];
+  /** Its hearth's light. */
   hearth: Torch | null;
+  /** The placed fire that light and smoke come from (a piece of furniture), whose `lit` state they follow; null if it has none. */
+  fireOf: { id: string; kind: string } | null;
+  /** Where its hearth burns and where its smoke leaves, whether or not it is lit now (`hearthAt` and `chimney` are null while it is out). */
+  fireSpots: { hearthAt: P2; chimney: Chimney } | null;
   /** Where its hearth burns, in the world (a light seen from far). */
   hearthAt: P2 | null;
   /** Where its smoke leaves, if it has a fire to make it. */
   chimney: Chimney | null;
   shells: Shell[];
   group: THREE.Group;
-  /** The rooms' furniture cards: only shown when the roof is lifted (and only the storey being looked at), or their tops show through the roof. */
+  /** The rooms' furniture: only shown when the roof is lifted (and only the storey being looked at), or its tops show through the roof. */
   furniture: THREE.Object3D[];
-  /** The storey each furniture card stands on. */
+  /** The storey each piece of furniture stands on. */
   furnLevel: number[];
-  /** The standing furniture cards (not rugs): turned to whichever of the house's sides is nearest the camera (`alignCards`). */
-  upright: THREE.Object3D[];
   cut: CutPart[];
   box: Shape;
   floorHeat: Heat | null;
@@ -295,6 +297,8 @@ export class SpikeWorld {
   private seeV = new THREE.Vector3();
   /** Where the hero has been (seen within the vision radius): drawn grey where it is out of sight now. */
   readonly explored = new Explored();
+  /** The states of placed things that differ from their kind's start (a hearth put out): what the save keeps (`core/world3d/state.ts`). */
+  readonly states = new ThingStates(THINGS);
   private markedAt: { x: number; z: number; f: number; t: number } | null = null;
   private exploredWin = { ox: 0, oz: 0, dirty: true };
 
@@ -474,7 +478,6 @@ export class SpikeWorld {
   private mapEvents: MapEvent[] = [];
   /** Events started (true) or stopped (false) by hand, over what the map's hours say. */
   private eventsByHand = new Map<string, boolean>();
-  private sprites: SpriteCard[] = [];
   /** The invisible navigation grid the hero walks on. */
   readonly nav: NavGrid;
   /** The hero: where they stand (metres), the house and storey they are on, the walk in hand. */
@@ -493,8 +496,6 @@ export class SpikeWorld {
   yaw = VIEW_YAW;
   /** Held turn buttons or keys: -1 turns the world anticlockwise on screen, 1 clockwise. Set by the page. */
   turnInput = 0;
-  /** The yaw the cards and the hero were last turned for. */
-  private facedYaw = NaN;
   private wet = 0;
   /** How full the hollows are with rain, 0..1 (`WORLD.uPool`). */
   private pool = 0;
@@ -563,17 +564,18 @@ export class SpikeWorld {
     this.houseIndex = new HouseIndex<FurnishedRoom[]>(layout.houses, (b) => {
       const rooms = furnishHouse(b.model, b.place.room ?? 'home', b.place.spec.seed, b.place.spec.plan);
       const sources: FSource[] = [];
-      for (const room of rooms) {
+      rooms.forEach((room, ri) => {
         const fire = room.plan.pieces.filter((p) => p.fire).pop();
         if (fire) {
           const w = houseToWorld(b.place, fire.x, fire.z + 0.2);
-          sources.push({ x: w.x, z: w.z, kind: 'fire', weight: HEARTH_FIRE });
+          // It gives fire to the field only while it is lit (the field asks `this.states`; see `gives` below).
+          sources.push({ x: w.x, z: w.z, kind: 'fire', weight: HEARTH_FIRE, of: { id: pieceId(b.place.id, ri, fire.id), kind: room.models.get(fire.id)!.kind } });
         }
         for (const s of room.sources) {
           const w = houseToWorld(b.place, s.x, s.z);
           sources.push({ x: w.x, z: w.z, kind: s.kind, weight: s.weight });
         }
-      }
+      });
       // The ground floor's walls, partitions and furniture block the ground's walking; the storeys above have grids of their own.
       const ground = rooms.filter((r) => r.level === 0);
       return { room: rooms, shapes: [...levelWalls(b, 0), ...furnitureObstacles(b, ground.flatMap((r) => footprints(r.plan)))], sources };
@@ -629,7 +631,14 @@ export class SpikeWorld {
 
     this.weather.setWind(2, 1);
     this.weather.setHour(12);
-    this.field = new FilamentField(streamingFilamentWorld(g, placed, houseIndex, () => this.fieldExtras()));
+    // A source that comes from a placed thing gives only while the thing says so (a hearth put out gives no fire).
+    const gives = (s: FSource): boolean => this.fireLit(s.of);
+    this.field = new FilamentField(streamingFilamentWorld(g, placed, houseIndex, () => this.fieldExtras(), gives));
+    // A thing's state changed: what stands redraws, and the field reads its sources again.
+    this.states.on((c) => {
+      for (const hs of this.houses) if (hs.fireOf?.id === c.id) this.showFire(hs);
+      this.syncFires();
+    });
   }
 
   /** The fixed sources that are not placed things: house fires, the door torch, campfires lit by hand, ground burnt by lightning. */
@@ -724,11 +733,11 @@ export class SpikeWorld {
   /** The material of every shadow-only twin (they are drawn only into the shadow map): one for all, never let go. */
   private readonly shadowOnly = new THREE.MeshBasicMaterial();
 
-  /** Stand a house up in the world: its model, its furniture cards, its hearth's light. It belongs to the chunk `st`. */
+  /** Stand a house up in the world: its model, its furniture, its hearth's light. It belongs to the chunk `st`. */
   private standHouse(entry: HouseEntry<FurnishedRoom[]>, st: Standing): void {
     const { built, room: rooms } = entry;
     const h = built.place, model = built.model;
-    const inst: HouseInst = { built, mats: [], cards: [], hearth: null, hearthAt: null, chimney: null, shells: [], group: new THREE.Group(), furniture: [], furnLevel: [], upright: [], cut: [], box: entry.box, floorHeat: null, cutT: 0, open: false, view: 0 };
+    const inst: HouseInst = { built, mats: [], hearth: null, fireOf: null, fireSpots: null, hearthAt: null, chimney: null, shells: [], group: new THREE.Group(), furniture: [], furnLevel: [], cut: [], box: entry.box, floorHeat: null, cutT: 0, open: false, view: 0 };
     const matFor = (m: HouseMaterial, cut: boolean): { mat: THREE.MeshLambertMaterial; opts: LitOpts } => this.houseMat(m, cut, inst.mats);
     for (const p of model.parts) {
       const geo = geometryOf(p.mesh);
@@ -747,40 +756,25 @@ export class SpikeWorld {
       }
       if (p.material === 'roof') this.addShells(mesh, opts, { density: 0.5, tint: 1.12, step: 0.06 }, p.cut ? inst : null, inst.shells);
     }
-    // Furniture: the solver's plan (`content/furnish.ts`), as sprites on the floor.
-    let fire: { x: number; z: number; level: number } | null = null;
-    for (const room of rooms) {
+    // Furniture: the solver's plan (`content/furnish.ts`): each piece a model (`content/things/models/`), turned to face out from its wall.
+    let fire = null as { x: number; z: number; level: number } | null;
+    rooms.forEach((room, ri) => {
       const floorY = model.levels[room.level].floorY;
       for (const it of room.plan.pieces) {
-        const prop = room.props.get(it.id);
         const mp = room.models.get(it.id);
-        if (mp) {
-          // A model (`content/things/models/`): real 3D, turned to face out from its wall, right from every side.
-          const g = thingGroup(THINGS.get(mp.kind).furniture!.model!.draw(mp.seed, mp.variant));
-          g.position.set(it.x, floorY + it.lift, it.z);
-          g.rotation.y = it.rot;
-          inst.group.add(g);
-          inst.furniture.push(g);
-          inst.furnLevel.push(room.level);
-          if (it.fire) fire = { x: it.x, z: it.z, level: room.level };
-          continue;
-        }
-        if (!prop) continue;
-        const flat = it.kind === 'flat';
-        // Everything follows the house's alignment cross (see roomplan.ts): a standing card is turned to one of the
-        // house's sides (`alignCards`), stretched sideways a little to keep one art pixel to one screen pixel.
-        const card = spriteCard(prop, PITCH, { flat, shadow: false });
-        card.mesh.position.set(it.x, floorY + 0.02 + it.lift, it.z);
-        card.mesh.rotation.y = 0;
-        if (!flat) inst.upright.push(card.mesh);
-        inst.group.add(card.mesh);
-        inst.furniture.push(card.mesh);
+        if (!mp) continue;
+        const g = thingGroup(THINGS.get(mp.kind).furniture!.model.draw(mp.seed, mp.variant));
+        g.position.set(it.x, floorY + it.lift, it.z);
+        g.rotation.y = it.rot;
+        inst.group.add(g);
+        inst.furniture.push(g);
         inst.furnLevel.push(room.level);
-        inst.cards.push(card);
-        this.sprites.push(card);
-        if (it.fire) fire = { x: it.x, z: it.z, level: room.level };
+        if (it.fire) {
+          fire = { x: it.x, z: it.z, level: room.level };
+          inst.fireOf = { id: pieceId(h.id, ri, it.id), kind: mp.kind };
+        }
       }
-    }
+    });
     // The hearth's (or oven's, or forge's) glow, if the room has one.
     if (fire) {
       const hearth = new THREE.PointLight(0xff9a48, 4, 6, 2);
@@ -788,19 +782,20 @@ export class SpikeWorld {
       hearth.position.set(fire.x, model.levels[fire.level].floorY + 0.55, fire.z + 0.2);
       inst.group.add(hearth);
       inst.hearth = { light: hearth, flame: new THREE.Mesh(), base: 4, seed: 3 + Math.round(h.x * 0.37 + h.z * 0.11) % 40 };
-      this.torches.push(inst.hearth);
-      inst.hearthAt = houseToWorld(h, hearth.position.x, hearth.position.z);
     }
     // (What the room gives off to the filaments is the index's: it feeds the field whether or not the house is standing.)
 
     const y = groundHeight(this.ground, h.x, h.z) - 0.05;
-    if (fire) {
+    if (fire && inst.hearth) {
       const c = houseToWorld(h, model.smoke[0], model.smoke[2]);
-      inst.chimney = { x: c.x, y: y + model.smoke[1], z: c.z, seed: Math.round(h.x * 0.91 + h.z * 0.53) % 97 };
+      inst.fireSpots = {
+        hearthAt: houseToWorld(h, inst.hearth.light.position.x, inst.hearth.light.position.z),
+        chimney: { x: c.x, y: y + model.smoke[1], z: c.z, seed: Math.round(h.x * 0.91 + h.z * 0.53) % 97 },
+      };
     }
+    this.showFire(inst);
     inst.group.position.set(h.x, y, h.z);
     inst.group.rotation.y = h.rot;
-    this.alignCards(inst);
     this.scene.add(inst.group);
     this.houses.push(inst);
     st.houses.push(inst);
@@ -827,8 +822,7 @@ export class SpikeWorld {
       const i = this.windowMats.indexOf(m as THREE.MeshLambertMaterial);
       if (i >= 0) this.windowMats.splice(i, 1);
     }
-    for (const c of hs.cards) this.sprites.splice(this.sprites.indexOf(c), 1);
-    if (hs.hearth) this.torches.splice(this.torches.indexOf(hs.hearth), 1);
+    if (hs.hearth && this.torches.includes(hs.hearth)) this.torches.splice(this.torches.indexOf(hs.hearth), 1);
     for (const s of hs.shells) this.shells.splice(this.shells.indexOf(s), 1);
     this.houses.splice(this.houses.indexOf(hs), 1);
     if (this.wasIn === hs) this.wasIn = null;
@@ -1551,21 +1545,6 @@ export class SpikeWorld {
     fig.moving = moving;
   }
 
-  /**
-   * Turn a house's standing furniture cards to the side of the house nearest the camera, so a card is never seen
-   * edge-on: at most 45° off, stretched sideways to keep its pixels square. (Front-painted art seen from another
-   * side still reads wrong; low-poly models, plan item A2, fix that.)
-   */
-  private alignCards(hs: HouseInst): void {
-    const d = this.yaw - hs.built.place.rot;
-    const q = Math.round(d / (Math.PI / 2)) * (Math.PI / 2);
-    const stretch = 1 / Math.cos(d - q);
-    for (const m of hs.upright) {
-      m.rotation.y = q;
-      m.scale.x = stretch;
-    }
-  }
-
   private placeCamera(): void {
     const yaw = this.yaw;
     const dir = new THREE.Vector3(Math.sin(yaw) * Math.cos(PITCH), Math.sin(PITCH), Math.cos(yaw) * Math.cos(PITCH));
@@ -1726,6 +1705,69 @@ export class SpikeWorld {
     this.camps.push({ p, st, smoke: { x: p.x, y: y + (smoke?.y ?? 0.9), z: p.z, seed: 40 + this.camps.length * 11 } });
     this.syncFires();
     return true;
+  }
+
+  /** Is this thing burning? (A thing whose kind cannot be lit or out always is.) */
+  private fireLit(of: { id: string; kind: string } | null | undefined): boolean {
+    return !of || !this.states.has(of.kind, 'lit') || this.states.get(of.id, of.kind, 'lit') === true;
+  }
+
+  /** A standing house's hearth as its fire's `lit` state says: lit, it glows, smokes and lights the room round it; out, none of these. */
+  private showFire(hs: HouseInst): void {
+    const lit = this.fireLit(hs.fireOf);
+    hs.hearthAt = lit ? hs.fireSpots?.hearthAt ?? null : null;
+    hs.chimney = lit ? hs.fireSpots?.chimney ?? null : null;
+    if (!hs.hearth) return;
+    const listed = this.torches.includes(hs.hearth);
+    if (lit && !listed) this.torches.push(hs.hearth);
+    if (!lit && listed) {
+      this.torches.splice(this.torches.indexOf(hs.hearth), 1);
+      hs.hearth.light.visible = false;
+    }
+  }
+
+  /** The house fires near the hero (standing houses, within `r` metres), nearest first: their ids and kinds, and whether each is lit. */
+  firesNear(r = 25): { id: string; kind: string; house: string; lit: boolean; d: number }[] {
+    const out: { id: string; kind: string; house: string; lit: boolean; d: number }[] = [];
+    for (const hs of this.houses) {
+      if (!hs.fireOf || !hs.fireSpots) continue;
+      const d = Math.hypot(hs.fireSpots.hearthAt.x - this.hero.x, hs.fireSpots.hearthAt.z - this.hero.z);
+      if (d <= r && this.states.has(hs.fireOf.kind, 'lit')) out.push({ ...hs.fireOf, house: hs.built.place.id, lit: this.fireLit(hs.fireOf), d });
+    }
+    return out.sort((a, b) => a.d - b.d);
+  }
+
+  /** Put the hero down at a spot (a loaded game): on storey `level` if the spot is in a house that has one. */
+  placeHeroAt(x: number, z: number, level = 0): void {
+    const h = this.hero;
+    h.x = x;
+    h.z = z;
+    h.legs = [];
+    h.house = null;
+    h.level = 0;
+    h.foot = null;
+    h.stair = null;
+    this.moves.settle(h);
+    const b = this.moves.house(h);
+    if (b && level > 0 && level < b.model.levels.length) h.level = level;
+    this.focus.x = x;
+    this.focus.z = z;
+    this.placeHero();
+  }
+
+  /** What the save keeps of the world (the page adds the map and writes it: `core/world3d/save.ts`). */
+  saveState(): { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON } {
+    const h = this.hero;
+    return { hour: this.weather.hour ?? 12, hero: { x: h.x, z: h.z, level: h.stair ? 0 : h.level }, explored: this.explored.toJSON(), things: this.states.toJSON() };
+  }
+
+  /** Take a save back: the clock, the hero, what was seen, the things' states. */
+  loadState(s: { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON }): void {
+    this.weather.setHour(s.hour);
+    this.explored.assign(s.explored);
+    this.exploredWin.dirty = true;
+    this.states.assign(s.things);
+    this.placeHeroAt(s.hero.x, s.hero.z, s.hero.level);
   }
 
   /** Put out every campfire that was lit by hand. */
@@ -1899,9 +1941,6 @@ export class SpikeWorld {
     const dt = Math.min(0.1, dtMs / 1000);
     this.time += dt;
     if (this.turnInput) this.turn(this.turnInput * TURN_SPEED * dt);
-    // When the view has turned, the furniture cards that are left turn with it.
-    const turned = this.yaw !== this.facedYaw;
-    if (turned) this.facedYaw = this.yaw;
     const w = this.weather;
     if (this.dayMinutes > 0) w.advance((dt * 24) / (this.dayMinutes * 60));
     w.update(dtMs);
@@ -2012,7 +2051,6 @@ export class SpikeWorld {
     for (const hs of this.houses) {
       hs.cutT += ((hs.open ? 1 : 0) - hs.cutT) * cutK;
       // The outer walls that face the camera go (from any side); the far ones stay.
-      if (turned) this.alignCards(hs);
       for (const c of hs.cut) {
         const gone = hs.open && (hs.view <= c.level || (c.side !== null && hs.view <= c.facing && facesCamera(c.side, hs.built.place.rot, this.yaw)));
         c.t += ((gone ? 1 : 0) - c.t) * cutK;
@@ -2031,7 +2069,6 @@ export class SpikeWorld {
       this.focus.x += (this.hero.x - this.focus.x) * k;
       this.focus.z += (this.hero.z - this.focus.z) * k;
     }
-    for (const s of this.sprites) s.tick(this.time);
     this.stepFigures(dt);
 
     this.placeCamera();

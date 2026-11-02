@@ -114,9 +114,9 @@ const things: ThingDef[] = [
     { piece: 'broom', rule: side('left', 0.9) },
     { piece: 'basket', rule: free },
   ]),
-  // One horse in its stall, on straw, with a hay rack on the wall and a bucket in the corner.
+  // A horse's stall, on straw, with a hay rack on the wall and a bucket in the corner. (Empty until horses come back
+  // as a kind of creature, plan item C3.)
   room('horsestall', 'room', 'A horse’s stall, on straw.', [
-    { piece: 'horse', vary: true, rule: center(0, 0.1) },
     { piece: 'straw', rule: center(0, 0.1) },
     { piece: 'hayRack', rule: back(0.5), lift: 22 },
     { piece: 'broom', rule: corner('backRight') },
