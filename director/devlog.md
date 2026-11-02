@@ -2,6 +2,14 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-02 — Furniture models: four examples and a how-to for Sonnet
+
+- **Your notes on the bodies, fixed:** the walk no longer pauses where the legs pass (the motion was easing to a stop at every pose; now it flows through them); every torso has sloping shoulders, so the tirak aren't pointy; the gallery opens without the outline.
+- **Furniture as models:** the **table, keg, bed and shelf** are 3D now, in every house. Each turns to face out from the wall it stands against (cards always faced the front). Beds being models means an inn may face any way now.
+- **The gallery's Furniture view** (the first button switches People / Furniture): each model turning beside its old card, with its size and triangle count. Drag to look around; `?only=bed` shows one piece.
+- **For Sonnet:** [how to make a furniture model](design/models-authoring.md): one file per piece, a kit of shapes, real sizes, colours, a budget, and a checklist. A test holds every model to the rules (on the floor, inside its footprint, under 450 triangles) and a browser test takes two pictures of each next to its old card. The other ~40 pieces are listed in six batches.
+- **Next:** the batches.
+
 ## 2026-11-02 — A2 begins: a 3D body for every people
 
 - **Try it:** the new **Models** page (from the start page): eight people on turning stands, one of each people and the tirak in their three sizes, with the old flat card beside the farmer. Buttons: turning, walking or standing, shells 0–2, the old card, the outline. In the 3D world, the **Bodies** button (Look row in the panel, or `?bodies` in the address) puts everyone on the map in their body.

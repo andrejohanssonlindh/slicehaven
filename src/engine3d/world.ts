@@ -24,9 +24,7 @@ import { Explored } from '../core/world3d/explored';
 import { PlacedIndex } from '../core/world3d/placed';
 import { footprints } from '../core/world3d/roomplan';
 import { type HouseEntry, HouseIndex } from '../core/world3d/houses';
-import type { MeshData } from '../core/world3d/mesh';
-import { LAUNDRY_HANG, type PlacedProp } from '../core/world3d/props';
-import type { ThingMaterial } from '../core/world3d/things';
+import type { PlacedProp } from '../core/world3d/props';
 import { THINGS } from '../content/things';
 import { cloudDrift, cloudThreshold } from '../core/world3d/sky';
 import { type Actor, Walking, newActor } from '../core/world3d/actors';
@@ -49,6 +47,7 @@ import { Rain } from './rain';
 import { type Chimney, Smoke } from './smoke';
 import { type SpriteCard, type WalkCard, blobShadow, spriteCard, walkCard } from './sprites';
 import { type BodyRig, makeBodyRig } from './body';
+import { geometryOf, thingGroup, thingMaterial } from './things';
 import { bodySpecOf } from '../content/people/bodies';
 import { IDLE, IDLE_SECONDS, WALK } from '../content/people/poses';
 import { buildBody } from '../core/world3d/body';
@@ -78,18 +77,7 @@ export interface WorldSettings {
 
 const tex = (p: Pix, flip = true, ppm: number | undefined = TEXELS_PER_M): THREE.DataTexture => pixTexture(p.data, p.w, p.h, { flip, ppm });
 
-export function geometryOf(m: MeshData): THREE.BufferGeometry {
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(m.positions, 3));
-  g.setAttribute('normal', new THREE.Float32BufferAttribute(m.normals, 3));
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(m.uvs, 2));
-  const c = new Float32Array(m.ao.length * 3);
-  m.ao.forEach((a, i) => c.set([a, a, a], i * 3));
-  g.setAttribute('color', new THREE.BufferAttribute(c, 3));
-  if (m.hollow) g.setAttribute('aHollow', new THREE.Float32BufferAttribute(m.hollow, 1));
-  g.setIndex(m.indices);
-  return g;
-}
+export { geometryOf };
 
 interface CutPart {
   mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial>;
@@ -748,6 +736,18 @@ export class SpikeWorld {
       const floorY = model.levels[room.level].floorY;
       for (const it of room.plan.pieces) {
         const prop = room.props.get(it.id);
+        const mp = room.models.get(it.id);
+        if (mp) {
+          // A model (`content/things/models/`): real 3D, turned to face out from its wall, right from every side.
+          const g = thingGroup(THINGS.get(mp.kind).furniture!.model!.draw(mp.seed, mp.variant));
+          g.position.set(it.x, floorY + it.lift, it.z);
+          g.rotation.y = it.rot;
+          inst.group.add(g);
+          inst.furniture.push(g);
+          inst.furnLevel.push(room.level);
+          if (it.fire) fire = { x: it.x, z: it.z, level: room.level };
+          continue;
+        }
         if (!prop) continue;
         const flat = it.kind === 'flat';
         // Everything follows the house's alignment cross (see roomplan.ts): a standing card is turned to one of the
@@ -888,63 +888,13 @@ export class SpikeWorld {
     this.addShells(leaves, leaf.opts, { density: 0.55, tint: 1.18, step: 0.12 }, null, st.shells);
   }
 
-  private stoneMat: THREE.MeshLambertMaterial | null = null;
-  private logMat: THREE.MeshLambertMaterial | null = null;
-  private shrubMat: THREE.MeshLambertMaterial | null = null;
-  private clothMats = new Map<string, THREE.MeshLambertMaterial>();
-  private plank: THREE.MeshLambertMaterial | null = null;
-  private hayM: THREE.MeshLambertMaterial | null = null;
-
-  /** Sawn timber for gates, palisades and stalls. */
-  private plankMat(): THREE.MeshLambertMaterial {
-    return (this.plank ??= lit({ map: tex(timberTex(6)), ao: true, wettable: true, seeThrough: true }));
-  }
-
-  private hayMat(): THREE.MeshLambertMaterial {
-    return (this.hayM ??= lit({ map: tex(thatchTex(8)), ao: true, wettable: true, seeThrough: true }));
-  }
-
-  /** Cloth in a flat colour, shared by colour; `hang` swings from the top (a line of washing). */
-  private clothMat(colour: number, hang: boolean): THREE.MeshLambertMaterial {
-    const key = `${colour}:${hang}`;
-    let mat = this.clothMats.get(key);
-    if (!mat) {
-      mat = lit({ map: tex(plasterTex(5)), color: colour, ao: true, wettable: true, ...(hang ? { sway: { from: LAUNDRY_HANG.top, amount: 0.22, hang: true } } : {}) });
-      this.clothMats.set(key, mat);
-    }
-    return mat;
-  }
-  private wellWater: THREE.MeshLambertMaterial | null = null;
-
-  /** The material a part of a thing is drawn with (see `ThingMaterial`); made once, shared by everything drawn with it. */
-  private thingMat(m: ThingMaterial, colour = 0): THREE.MeshLambertMaterial {
-    switch (m) {
-      case 'bark': return (this.logMat ??= lit({ map: tex(barkTex(4)), ao: true, wettable: true, seeThrough: true }));
-      case 'stone': return (this.stoneMat ??= lit({ map: tex(stoneTex(3)), ao: true, wettable: true, seeThrough: true }));
-      case 'plank': return this.plankMat();
-      case 'hay': return this.hayMat();
-      case 'water': return (this.wellWater ??= new THREE.MeshLambertMaterial({ color: 0x2f6a8a, emissive: 0x0b2434 }));
-      case 'cloth': return this.clothMat(colour, false);
-      case 'clothHang': return this.clothMat(colour, true); // the cloth swings from the line
-      // Bushes are low, so they sway from the ground up (trees keep their trunks still), and nobody hides behind them.
-      case 'bush': return (this.shrubMat ??= lit({ map: tex(leafTex(5)), ao: true, sway: { from: 0, amount: 0.05 }, seeThrough: true }));
-    }
-  }
-
   /** A placed thing, drawn as its kind says (`content/things/kinds/`), standing on the ground where it is placed. */
   private buildProp(p: PlacedProp, st: Standing, y = this.store.heightAt(p.x, p.z)): void {
-    const group = new THREE.Group();
     const kind = THINGS.get(p.kind), parts = THINGS.parts(p);
-    for (const part of parts.meshes) {
-      const m = new THREE.Mesh(geometryOf(part.mesh), this.thingMat(part.material, part.colour));
-      // (Water lies flat in its ring: it takes shadow, it casts none.)
-      m.castShadow = part.material !== 'water';
-      m.receiveShadow = true;
-      group.add(m);
-    }
+    const group = thingGroup(parts);
     if (parts.lumps) {
       const { lumps, material } = parts.lumps;
-      const m = new THREE.Mesh(lumpGeometry(lumps.clumps, lumps.height, 1), this.thingMat(material));
+      const m = new THREE.Mesh(lumpGeometry(lumps.clumps, lumps.height, 1), thingMaterial(material));
       m.castShadow = m.receiveShadow = true;
       group.add(m);
     }

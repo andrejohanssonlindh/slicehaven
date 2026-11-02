@@ -84,17 +84,35 @@ export interface PieceIn {
   rule: Rule;
   /** This piece is the room's fire (hearth, oven, forge): the light and the filament source go here. */
   fire?: boolean;
+  /**
+   * It is a model, not a card: it turns to face out from the wall it stands against (its `w` along the wall, its `d`
+   * out into the room), and front-wall pieces face back into the room. Cards always face the room's front.
+   */
+  turns?: boolean;
 }
 
 export interface PlacedPiece {
   id: string;
   x: number;
   z: number;
+  /** The footprint as placed, along the room's x and z (a turned piece's `w` and `d` swap on a side wall). */
   w: number;
   d: number;
   kind: PieceIn['kind'];
   lift: number;
   fire: boolean;
+  /** Which way it faces, turned about the vertical in the room's frame (0: toward the front, +z; see `turnFor`). */
+  rot: number;
+}
+
+/** The way a turning piece faces for its rule, and whether its footprint lies across (on a side wall). */
+export function turnFor(rule: Rule): { rot: number; across: boolean } {
+  switch (rule.at) {
+    case 'front': return { rot: Math.PI, across: false };
+    case 'side': return rule.wall === 'left' ? { rot: Math.PI / 2, across: true } : { rot: -Math.PI / 2, across: true };
+    case 'corner': return { rot: rule.corner.startsWith('front') ? Math.PI : 0, across: false };
+    default: return { rot: 0, across: false };
+  }
 }
 
 export interface RoomPlan {
@@ -170,9 +188,9 @@ export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn
   let standing = true; // is the piece being placed a floor piece (which must keep the room connected)?
   let pad = 0; // how much further sideways than its footprint the piece being placed is drawn (kept inside the walls too)
   const fits = (r: RoomRect): boolean => inside(r) && !zones.some((z) => overlap(r, z)) && !solid.some((s) => overlap(r, s.r, GAP)) && (!standing || connectedWith(r));
-  const take = (p: PieceIn, x: number, z: number): void => {
+  const take = (p: PieceIn, x: number, z: number, rot = 0): void => {
     const lift = p.lift ?? 0;
-    placed.push({ id: p.id, x, z, w: p.w, d: p.d, kind: p.kind, lift, fire: !!p.fire });
+    placed.push({ id: p.id, x, z, w: p.w, d: p.d, kind: p.kind, lift, fire: !!p.fire, rot });
     if (p.kind === 'floor') solid.push({ id: p.id, r: rectAt(x, z, p.w, p.d) });
     if (p.kind === 'hung') hungSpans.push({ x0: x - p.w / 2, x1: x + p.w / 2, lift, top: lift + 0.5 });
   };
@@ -264,7 +282,10 @@ export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn
     }
   };
 
-  for (const p of pieces) {
+  for (const piece of pieces) {
+    // A model turns to its wall; on a side wall its footprint lies across the room's axes.
+    const turn = piece.turns && piece.kind !== 'hung' ? turnFor(piece.rule) : { rot: 0, across: false };
+    const p: PieceIn = turn.across ? { ...piece, w: piece.d, d: piece.w, vw: piece.d } : piece;
     if (p.kind === 'hung') {
       // On the back wall: no floor, but not on top of another hung piece at the same height.
       const r = p.rule;
@@ -305,7 +326,7 @@ export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn
       unplaced.push(p.id);
       continue;
     }
-    take(p, spot.x, spot.z);
+    take(p, spot.x, spot.z, turn.rot);
   }
   return { pieces: placed, unplaced };
 }

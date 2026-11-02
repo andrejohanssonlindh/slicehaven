@@ -8,7 +8,8 @@
 - ✅ **The gallery** `/models/`: the eight bodies on turning stands, the old card beside the first; toggles for turning, walking, shells and the outline.
 - ✅ **In the world, on trial:** the **Bodies** button (Look row, or `?bodies` in the address) puts every person on the map in their body instead of their card.
 - ⬜ To judge on the phone, then: held things, faces, more poses (sit, work, fight, fall), and the cards go.
-- ⬜ **Furniture:** 3–4 examples by Claude and a how-to, then Sonnet in batches (below).
+- ✅ **Furniture, the pattern and four examples:** `table`, `keg`, `bed`, `shelf` are models; they turn to face out from their wall; [the how-to](models-authoring.md) lists the rest in six batches.
+- ⬜ **Furniture, the other ~40:** Sonnet in batches, reviewed by Claude.
 - ⬜ **Horses** and other animals with kinds of creature (C3).
 
 ## The bodies
@@ -28,8 +29,8 @@ Each person varies ±4% in height by their seed, and their weight makes them bro
 - **Engine:** `engine3d/body.ts` (`makeBodyRig`: a group per joint, colours in the vertices, one material for every body, two shells over cloth and hair).
 - **A new people with a body of its own:** a new entry in `BODY_PLANS` under its family kind. A new movement: a new loop in `poses.ts`.
 
-## Furniture (next)
-Barrels, wells and carts are already 3D: their kind has a `draw` that returns meshes. Furniture moves to the same pattern: **one kind, one `draw`, in its own file**. Claude makes 3–4 examples covering the shapes (a table, a keg, a bed, a shelf with things on it) and a how-to page; **Sonnet** makes the other ~40 in batches, each checked in the gallery, reviewed by Claude before it is pushed.
+## Furniture
+**One file per kind** in `content/things/models/` (found by itself), its default export a `FurnitureModel` (`core/world3d/things.ts`: a footprint `w` × `d` and a `draw(seed, variant)`), built with the kit in `core/world3d/modelkit.ts`. A model replaces its kind's card everywhere. The room solver turns a model to face out from its wall (`turnFor` in `roomplan.ts`); cards still face the front. The materials of things are shared by the world and the gallery (`engine3d/things.ts`; `iron` is new). Guarded by `tests/furniture-models.test.ts` (on the floor, inside its footprint, under 450 triangles, the same for a seed) and `e2e/models.e2e.ts` (two pictures of each, beside its card). **How to make one: [models-authoring.md](models-authoring.md).**
 
 ## What it costs
 About 400 triangles a body before shells; 50 people on screen is fewer triangles than a stand of trees. The cards and their front-painted art (`facesView`) go once everything has switched over.

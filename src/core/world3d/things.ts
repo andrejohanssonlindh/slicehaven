@@ -17,8 +17,21 @@ import type { TreeModel } from './tree';
  * rules (feet, sight, filaments) and the renderer (`engine3d/world.ts`) read the same answers.
  */
 
-/** What a part of a thing is drawn with; the renderer has one material for each. `bush` is leafy and sways from the ground. */
-export type ThingMaterial = 'bark' | 'plank' | 'stone' | 'hay' | 'water' | 'cloth' | 'clothHang' | 'bush';
+/** What a part of a thing is drawn with; the renderer has one material for each. `bush` is leafy and sways from the ground. `iron` is dark worked metal (hoops, hinges, tools); give it a `colour` for brass or copper. */
+export type ThingMaterial = 'bark' | 'plank' | 'stone' | 'hay' | 'water' | 'cloth' | 'clothHang' | 'bush' | 'iron';
+
+/**
+ * A piece of furniture as a 3D model (plan item A2). Local metres: the floor at y = 0, the piece centred on x and z,
+ * its front (the side people use) toward +z, its back against the wall at z = -d/2. The room solver turns it to its wall.
+ */
+export interface FurnitureModel {
+  /** Footprint along its front, metres. */
+  w: number;
+  /** Footprint from back to front, metres. */
+  d: number;
+  /** The meshes, for a seed (so two of a kind can differ) and a recipe line's variant (which counter, which shelf). */
+  draw(seed: number, variant?: string): ThingParts;
+}
 
 export interface ThingParts {
   /** Meshes, each with its material (cloth in a colour, sRGB hex). Local metres, x along the thing's length. */
@@ -95,6 +108,8 @@ export interface ThingDef {
     maxW?: number;
     /** Its card is painted as seen from the room's front (a bed's head at the back wall, a horse from behind): in a house that faces away from the view it reads wrong, and the map compiler says so. */
     facesView?: boolean;
+    /** A 3D model instead of the card (`content/things/models/`, one file each; see `director/design/models-authoring.md`). */
+    model?: FurnitureModel;
   };
   /** A kind of building: how it is put together (`buildHouse` reads this). */
   building?: BuildingPlan;

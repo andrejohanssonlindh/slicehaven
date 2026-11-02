@@ -172,9 +172,15 @@ export function buildBody(s: BodySpec): BodyModel {
   // --- trunk ---
   const torsoTop = shoulderY - waistY + limb * 0.35;
   const tD0 = hipW * 0.58, tD1 = shoulderW * 0.5;
+  // The chest is widest at the armpits; above them the shoulders slope in to the neck (no square corners up top).
+  const chest = shoulderY - waistY - limb * 0.6;
+  const trunk = (colour: string, shell: boolean, grow: number, from: number, to: number): void => {
+    addTaper(part('spine', colour, shell), 0, 0, from, chest, hipW * 0.92 * grow, tD0 * grow, shoulderW * grow, tD1 * grow, 0.85, 1);
+    addTaper(part('spine', colour, shell), 0, 0, chest - 0.001, to, shoulderW * grow, tD1 * grow, shoulderW * 0.6 * grow, tD1 * 0.85 * grow, 1, 1);
+  };
   addTaper(part('root', C.legs, true), 0, 0, -0.05 * H, waistY - hipY, hipW, hipW * 0.6, hipW * 0.95, tD0, 0.7, 1);
-  addTaper(part('spine', C.top, true), 0, 0, 0, torsoTop, hipW * 0.92, tD0, shoulderW, tD1, 0.85, 1);
-  if (C.vest) addTaper(part('spine', C.vest, C.vest !== C.top), 0, 0, 0.01 * H, torsoTop - limb * 0.15, hipW * 0.98, tD0 * 1.1, shoulderW * 1.04, tD1 * 1.12, 0.85, 1);
+  trunk(C.top, true, 1, 0, torsoTop);
+  if (C.vest) trunk(C.vest, C.vest !== C.top, 1.06, 0.01 * H, torsoTop - limb * 0.15);
   if (s.belt) addTaper(part('root', C.belt, false), 0, 0, waistY - hipY - 0.018 * H, waistY - hipY + 0.012 * H, hipW * 1.0, hipW * 0.63, hipW * 0.99, tD0 * 1.06);
   if (C.cloak) {
     const zb = -tD1 / 2 - 0.02;

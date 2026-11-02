@@ -74,10 +74,19 @@ const makePiece = (key: string, line: RoomLine): Prop => {
   return p;
 };
 
+/** A placed piece drawn as a 3D model: its kind, and the seed and variant its model is drawn with. */
+export interface ModelPiece {
+  kind: string;
+  seed: number;
+  variant?: string;
+}
+
 export interface Furnished {
   plan: RoomPlan;
-  /** The art of each placed piece, by id. */
+  /** The art of each placed piece drawn as a card, by id. */
   props: Map<string, Prop>;
+  /** The pieces drawn as models (`content/things/models/`), by id. */
+  models: Map<string, ModelPiece>;
   /** What the placed pieces give off to the filament field, in the house's frame. */
   sources: { x: number; z: number; kind: SourceKind; weight: number }[];
 }
@@ -101,10 +110,22 @@ export function furnish(kind: RoomKind, room: RoomRect, doorX: number, seed = 0,
     props.set(id, prop);
     ins.push({ id, w, vw, d, kind: def.kind, lift: def.kind === 'hung' ? (line.lift ?? 22) / TEXELS_PER_M : undefined, rule: line.rule, fire: line.fire });
   };
+  const models = new Map<string, ModelPiece>();
   for (const line of THINGS.recipe(kind)) {
     for (let i = 0; i < (line.n ?? 1); i++) {
       const id = (line.n ?? 1) > 1 ? `${line.piece}#${i}` : line.piece;
       const unique = `${id}${line.variant ? `:${line.variant}` : ''}${line.tag ? `@${line.tag}` : ''}`;
+      const model = THINGS.get(line.piece).furniture?.model;
+      const pieceSeed = (line.seed ?? 0) + i + (line.vary ? opts.art ?? 0 : 0);
+      if (model) {
+        // A model is measured by its own footprint and turns to its wall.
+        const mount = sitting(line.piece).kind;
+        const source = line.books ? { kind: 'book' as const, weight: line.books } : givenBy(line.piece);
+        if (source) gives.set(unique, source);
+        models.set(unique, { kind: line.piece, seed: pieceSeed, ...(line.variant ? { variant: line.variant } : {}) });
+        ins.push({ id: unique, w: model.w, d: model.d, kind: mount, lift: mount === 'hung' ? (line.lift ?? 22) / TEXELS_PER_M : undefined, rule: line.rule, fire: line.fire, turns: true });
+        continue;
+      }
       add(unique, makePiece(line.piece, { ...line, seed: (line.seed ?? 0) + i + (line.vary ? opts.art ?? 0 : 0) }), sitting(line.piece), line,
         line.books ? { kind: 'book', weight: line.books } : givenBy(line.piece));
     }
@@ -114,7 +135,7 @@ export function furnish(kind: RoomKind, room: RoomRect, doorX: number, seed = 0,
     const g = gives.get(p.id);
     return g ? [{ x: p.x, z: p.z, ...g }] : [];
   });
-  return { plan, props, sources };
+  return { plan, props, models, sources };
 }
 
 /** The kind of a building's room: by its role, as the kind of building says (`rooms`); its `main` room is the map's kind. */

@@ -37,13 +37,27 @@ export function blendPose(a: Pose, b: Pose, t: number): Pose {
   return { joints, lift: (a.lift ?? 0) + ((b.lift ?? 0) - (a.lift ?? 0)) * t };
 }
 
-/** Where a loop is at `phase` (any number; whole numbers are the first key), eased between the keys. */
+/** A smooth curve through b (t = 0) to c (t = 1), shaped by the keys either side (Catmull-Rom). */
+const curve = (a: number, b: number, c: number, d: number, t: number): number =>
+  0.5 * (2 * b + (c - a) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (3 * b - a - 3 * c + d) * t * t * t);
+
+/**
+ * Where a loop is at `phase` (any number; whole numbers are the first key). The motion flows through the keys without
+ * stopping at them (easing in and out of every key made a walk pause where the legs pass).
+ */
 export function cyclePose(c: Cycle, phase: number): Pose {
   const n = c.keys.length;
   const f = (((phase % 1) + 1) % 1) * n;
   const i = Math.floor(f) % n;
   const t = f - Math.floor(f);
-  return blendPose(c.keys[i], c.keys[(i + 1) % n], (1 - Math.cos(t * Math.PI)) / 2);
+  const [a, b, cc, d] = [c.keys[(i + n - 1) % n], c.keys[i], c.keys[(i + 1) % n], c.keys[(i + 2) % n]];
+  const joints: Partial<Record<Joint, Turn>> = {};
+  for (const j of JOINTS) {
+    if (!a.joints[j] && !b.joints[j] && !cc.joints[j] && !d.joints[j]) continue;
+    const k = (p: Pose, x: number): number => p.joints[j]?.[x] ?? 0;
+    joints[j] = [0, 1, 2].map((x) => curve(k(a, x), k(b, x), k(cc, x), k(d, x), t)) as unknown as Turn;
+  }
+  return { joints, lift: curve(a.lift ?? 0, b.lift ?? 0, cc.lift ?? 0, d.lift ?? 0, t) };
 }
 
 /** The same pose with left and right swapped (a walk's second step is the first one mirrored). */

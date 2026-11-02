@@ -10,7 +10,11 @@ import { cyclePose } from '../core/world3d/pose';
 import { BODY_SHELLS, type BodyRig, makeBodyRig } from '../engine3d/body';
 import { WORLD, lit } from '../engine3d/materials';
 import { Pipeline } from '../engine3d/pipeline';
-import { walkCard } from '../engine3d/sprites';
+import { spriteCard, walkCard } from '../engine3d/sprites';
+import { thingGroup } from '../engine3d/things';
+import { THINGS } from '../content/things';
+import { MODELS } from '../content/things/models';
+import { PIECE_ART } from '../content/things/kinds/furniture';
 import { t } from '../i18n';
 
 /**
@@ -21,7 +25,8 @@ import { t } from '../i18n';
 const PITCH = 0.68;
 const stage = document.getElementById('stage')!;
 const canvas = document.getElementById('view') as HTMLCanvasElement;
-const pipeline = new Pipeline(canvas, { pixelCss: 2, outline: 0.85, palette: 0.6 });
+// No outline by default, as in the world (the director: it makes most of the graphics worse).
+const pipeline = new Pipeline(canvas, { pixelCss: 2, outline: 0, palette: 0.6 });
 
 /** Who stands in the gallery: one of each people (the tirak in their three sizes), in a few callings. */
 const CAST: { label: string; who: PersonSpec }[] = [
@@ -59,10 +64,12 @@ const state = { turning: true, walking: false, shells: 2, card: true, angle: 0, 
 const ZOOMS = [24, 32, 48, 64];
 const list = document.getElementById('cast')!;
 
+const peopleList: string[] = [];
+
 function build(): void {
   rigs.forEach((r) => r.rig.dispose());
   rigs = [];
-  list.replaceChildren();
+  peopleList.length = 0;
   CAST.forEach((c, i) => {
     const r = PERSON_KINDS.resolve(c.who);
     const model = buildBody(bodySpecOf(r, c.who.seed ?? 1));
@@ -72,10 +79,92 @@ function build(): void {
     rig.setShells(state.shells);
     scene.add(rig.group);
     rigs.push({ rig, ...at });
-    const li = document.createElement('li');
-    li.textContent = `${c.label}: ${model.height.toFixed(2)} m`;
-    list.appendChild(li);
+    peopleList.push(`${c.label}: ${model.height.toFixed(2)} m`);
   });
+}
+
+// --- furniture: every model in `content/things/models/`, its old card beside it ---
+const params = new URLSearchParams(location.search);
+/** `?only=table` shows just that model (for checking one piece); `?show=furniture` opens on the furniture. */
+const only = params.get('only');
+let show: 'people' | 'furniture' = only || params.get('show') === 'furniture' ? 'furniture' : 'people';
+const furn = new THREE.Group();
+scene.add(furn);
+const furnItems: { model: THREE.Group; card: THREE.Mesh | null }[] = [];
+/** Pieces that come in variants are shown in a few of them. */
+const VARIANTS: Record<string, (string | undefined)[]> = { shelf: [undefined, 'loaves', 'bottles', 'bolts'] };
+
+function buildFurniture(): void {
+  furn.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
+  furn.clear();
+  furnItems.length = 0;
+  const lines: string[] = [];
+  const ids = Object.keys(MODELS).filter((id) => !only || id === only).sort();
+  const entries = ids.flatMap((id) => (VARIANTS[id] ?? [undefined]).map((v) => [id, v] as const));
+  // Laid out in rows by real width: each model, then its old card, then a gap; a new row when a row is full.
+  const ROW = 7, GAP = 0.6;
+  let x = 0, row = 0;
+  const rows: THREE.Object3D[][] = [[]];
+  entries.forEach(([id, variant]) => {
+    const kind = THINGS.get(id);
+    const model = kind.furniture!.model!;
+    const parts = model.draw(1, variant);
+    const g = thingGroup(parts);
+    const art = PIECE_ART[id]?.(variant, 1);
+    const cardW = art ? art.frames[0].w / 21 : 0;
+    // A turning model sweeps a circle as wide as its diagonal.
+    const sweep = Math.hypot(model.w, model.d);
+    if (x > 0 && x + sweep + cardW > ROW) {
+      x = 0;
+      row++;
+      rows.push([]);
+    }
+    const z = 1 - row * 2.4;
+    // Hung pieces float at about the height they hang.
+    const y = kind.furniture!.mount === 'hung' ? 1.0 : 0;
+    g.position.set(x + sweep / 2, y, z);
+    furn.add(g);
+    rows[row].push(g);
+    let card: THREE.Mesh | null = null;
+    if (art) {
+      const c = spriteCard(art, PITCH, { flat: kind.furniture!.mount === 'flat' });
+      c.mesh.position.set(x + sweep + 0.15 + cardW / 2, y, z);
+      furn.add(c.mesh);
+      rows[row].push(c.mesh);
+      card = c.mesh;
+    }
+    x += sweep + (art ? cardW + 0.15 : 0) + GAP;
+    furnItems.push({ model: g, card });
+    const tris = parts.meshes.reduce((n, p) => n + p.mesh.indices.length / 3, 0);
+    lines.push(`${id}${variant ? ` (${variant})` : ''}: ${model.w} × ${model.d} m, ${tris} triangles`);
+  });
+  furnMidZ = 1 - (row * 2.4) / 2;
+  // Centre each row.
+  for (const r of rows) {
+    if (!r.length) continue;
+    const box = new THREE.Box3();
+    r.forEach((o) => box.expandByPoint(o.position));
+    const mid = (box.min.x + box.max.x) / 2;
+    r.forEach((o) => { o.position.x -= mid; });
+  }
+  furnList.length = 0;
+  furnList.push(...lines);
+}
+const furnList: string[] = [];
+/** The middle of the furniture rows, front to back (the view centres on it). */
+let furnMidZ = 0;
+/** Look at the middle of what is shown. */
+const centre = (): void => { target.set(0, 0.8, show === 'furniture' ? furnMidZ : 0); };
+
+/** The list under the stage: who or what stands there. */
+function fillList(): void {
+  list.replaceChildren();
+  const lines = show === 'people' ? peopleList : furnList;
+  for (const l of lines) {
+    const li = document.createElement('li');
+    li.textContent = l;
+    list.appendChild(li);
+  }
 }
 
 // Today's card beside the first body, to compare.
@@ -89,12 +178,31 @@ function fit(): void {
   const hw = pipeline.rw / 2 / ppm, hh = pipeline.rh / 2 / ppm;
   Object.assign(camera, { left: -hw, right: hw, top: hh, bottom: -hh });
   camera.updateProjectionMatrix();
-  // Looking from +z, down at the world's pitch, at the middle of the stands.
-  const target = new THREE.Vector3(0, 0.8, 0);
+  placeCamera();
+}
+
+/** What the camera looks at: the middle of the stands, moved by dragging. */
+const target = new THREE.Vector3(0, 0.8, 0);
+
+function placeCamera(): void {
+  // Looking from +z, down at the world's pitch.
   camera.position.copy(target).add(new THREE.Vector3(0, Math.sin(PITCH), Math.cos(PITCH)).multiplyScalar(30));
   camera.lookAt(target);
-  WORLD.uPixWorld.value = 1 / ppm;
+  WORLD.uPixWorld.value = 1 / ZOOMS[state.zoom];
 }
+
+// Drag to look around the stands (there are many pieces of furniture).
+let drag: { x: number; y: number } | null = null;
+canvas.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY }; canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener('pointerup', () => { drag = null; });
+canvas.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  const k = (window.devicePixelRatio || 1) / pipeline.factor / ZOOMS[state.zoom];
+  target.x -= (e.clientX - drag.x) * k;
+  target.z -= ((e.clientY - drag.y) * k) / Math.sin(PITCH);
+  drag = { x: e.clientX, y: e.clientY };
+  placeCamera();
+});
 
 // --- controls ---
 const row = document.getElementById('row-show')!;
@@ -108,6 +216,12 @@ function toggle(label: () => string, on: () => boolean, click: () => void): void
   refresh();
   row.appendChild(b);
 }
+toggle(() => (show === 'people' ? t('models.people', 'People') : t('models.furniture', 'Furniture')), () => true, () => {
+  show = show === 'people' ? 'furniture' : 'people';
+  centre();
+  placeCamera();
+  fillList();
+});
 toggle(() => t('models.turn', 'Turning'), () => state.turning, () => { state.turning = !state.turning; });
 toggle(() => (state.walking ? t('models.walk', 'Walking') : t('models.stand', 'Standing')), () => state.walking, () => { state.walking = !state.walking; });
 toggle(() => t('models.shells', 'Shells {n}', { n: state.shells }), () => state.shells > 0, () => {
@@ -132,7 +246,13 @@ function loop(now: number): void {
   WORLD.uTime.value = time;
   if (state.turning) state.angle += dt * 0.6;
   const speed = 1.6;
+  furn.visible = show === 'furniture';
+  for (const f of furnItems) {
+    f.model.rotation.y = state.angle;
+    if (f.card) f.card.visible = state.card;
+  }
   for (const r of rigs) {
+    r.rig.group.visible = show === 'people';
     r.rig.group.rotation.y = state.angle;
     if (state.walking) r.rig.pose(cyclePose(WALK, state.phase * (rigs[0].rig.model.stride / r.rig.model.stride)));
     else r.rig.pose(cyclePose(IDLE, time / IDLE_SECONDS));
@@ -140,7 +260,7 @@ function loop(now: number): void {
   if (state.walking) state.phase += (speed * dt) / rigs[0].rig.model.stride;
   // The card stands beside the first body, facing the camera, showing the view that matches the turn.
   const a = spot(0);
-  card.mesh.visible = state.card;
+  card.mesh.visible = state.card && show === 'people';
   card.mesh.position.set(a.x + 0.75, 0, a.z + 0.3);
   const v = viewFor(Math.sin(state.angle), Math.cos(state.angle), 0, card.view, Math.cos(card.mesh.rotation.y) < 0);
   card.pose(v.view, state.walking, speed);
@@ -151,7 +271,10 @@ function loop(now: number): void {
 }
 
 build();
+buildFurniture();
+fillList();
+centre();
 fit();
 new ResizeObserver(fit).observe(stage);
-(window as unknown as { models: unknown }).models = { rigs, state, build, BODY_SHELLS, pipeline };
+(window as unknown as { models: unknown }).models = { rigs, furnItems, state, build, BODY_SHELLS, pipeline, get show() { return show; } };
 requestAnimationFrame((n) => { last = n; loop(n); });

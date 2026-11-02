@@ -10,10 +10,13 @@ describe('houses against the view (review item 10)', () => {
   });
   const problems = (s: MapSpec): string[] => compileMap(s, THINGS, { pieces: housePieces }).problems;
 
-  it('a stable or an inn turned away from the view is reported (its horses and beds are painted from the front)', () => {
+  it('a stable turned away from the view is reported (its horses are painted from the front)', () => {
     expect(problems(spec('south', 'stable'))).toEqual([expect.stringMatching(/house h faces away from the view, and its horse/)]);
-    expect(problems(spec('south', 'inn'))).toEqual([expect.stringMatching(/house h faces away from the view, and its bed/)]);
     expect(problems(spec('north', 'stable'))).toEqual([]);
+  });
+
+  it('an inn may face any way now its beds are 3D models (right from every side)', () => {
+    expect(problems(spec('south', 'inn'))).toEqual([]);
   });
 
   it('a cottage may face any way (nothing in it is painted for one way of looking)', () => {

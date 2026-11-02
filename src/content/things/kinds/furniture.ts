@@ -12,6 +12,7 @@ import {
 import { makeHayBale, makeHayRack, makeHorse } from '../../../art/stable';
 import type { SourceKind } from '../../../core/world3d/filaments3d';
 import type { ThingDef } from '../../../core/world3d/things';
+import { MODELS } from '../models';
 
 /**
  * What stands in a room: the pieces the room recipes (`content/furnish.ts`) call for. Each is a kind of thing like
@@ -100,7 +101,10 @@ export default [
     id,
     is: p.is,
     look: p.look,
-    furniture: { mount: p.mount, d: p.d, maxW: p.maxW, ...(p.facesView ? { facesView: true } : {}) },
+    // A model in `things/models/` replaces the card (and a model is right from every side, so it needs no `facesView`).
+    furniture: MODELS[id]
+      ? { mount: p.mount, d: p.d, maxW: p.maxW, model: MODELS[id] }
+      : { mount: p.mount, d: p.d, maxW: p.maxW, ...(p.facesView ? { facesView: true } : {}) },
     ...(p.gives ? { filament: p.gives } : {}),
   })),
 ] satisfies ThingDef[];
