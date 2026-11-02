@@ -79,10 +79,15 @@ export interface HousePart {
   cut: boolean;
   /** Cut parts only: fades while the viewer's storey is at or below this. */
   level?: number;
-  /** The back wall only: fades too while the viewer is on this storey or below, if the house faces away from the camera. */
-  away?: number;
+  /** Outer walls (and what is on them: timbers, windows, the door): which side of the house they are on. */
+  side?: WallSide;
+  /** With `side`: also fades while the viewer is on this storey or below and that side faces the camera (`facesCamera` in `view.ts`). */
+  facing?: number;
   mesh: MeshData;
 }
+
+/** The four sides of a house, in its own space: the front faces +z, the right +x. */
+export type WallSide = 'front' | 'back' | 'left' | 'right';
 
 export interface Rect {
   x0: number;
@@ -179,31 +184,37 @@ export function buildHouse(spec: House3DSpec, plan: BuildingPlan): HouseModel {
   const wallMat: HouseMaterial = wallKind === 'plank' ? 'timber' : wallKind === 'stone' ? 'stone' : 'plaster';
   const partMap = new Map<string, HousePart>();
   /** The part for a material and fade level (`level` undefined: never cut). */
-  const part = (material: HouseMaterial, level?: number, name: string = material): HousePart => {
-    const key = `${name}|${material}|${level ?? 'x'}|${name === 'backWall' ? 'b' : ''}`;
+  const part = (material: HouseMaterial, level?: number, name: string = material, side?: WallSide, facing?: number): HousePart => {
+    const key = `${name}|${material}|${level ?? 'x'}|${side ?? ''}|${facing ?? ''}`;
     let p = partMap.get(key);
-    if (!p) partMap.set(key, (p = { name, material, cut: level !== undefined, level, mesh: emptyMesh() }));
+    if (!p) {
+      p = { name, material, cut: level !== undefined || facing !== undefined, level, mesh: emptyMesh() };
+      if (side) Object.assign(p, { side, facing });
+      partMap.set(key, p);
+    }
     return p;
   };
-  /** Parts of storey k that are not on its front: shown always on the ground storey, hidden from below for the ones above. */
+  /** Parts of storey k seen from outside: shown always on the ground storey, hidden from below for the ones above. */
   const upperLevel = (k: number): number | undefined => (k === 0 ? undefined : k - 1);
+  /**
+   * Something on the outside of storey k, on one side (`Wall`, `Timber`, `Windows`, `Shutters`): hidden from below like
+   * the rest of the storey, and cut away while you are on it or below when that side faces the camera. So from any angle
+   * the walls between the camera and the room go, and the far ones stay.
+   */
+  const outer = (material: HouseMaterial, k: number, side: WallSide, what: string): HousePart => part(material, upperLevel(k), `${side}${what}`, side, k);
 
   // Footing: a stone plinth a little wider than the walls.
   addBox(part('stone', undefined, 'footing').mesh, [-hw - 0.08, 0, -hd - 0.08], [hw + 0.08, FOOT, hd + 0.08], { aoBottom: 0.55, aoTop: 0.9, skip: ['ny'] });
   // Floor: beaten earth, just inside the walls.
   addFace(part('floor').mesh, [[ix0, FOOT + 0.01, iz1], [ix1, FOOT + 0.01, iz1], [ix1, FOOT + 0.01, iz0], [ix0, FOOT + 0.01, iz0]], [0.7, 0.7, 0.55, 0.55]);
 
-  // Walls, a storey at a time: back and sides stay, the front is cut away.
+  // Walls, a storey at a time, one part per side: the sides facing the camera are cut away, the others stay.
   const wallOpts = { aoBottom: 0.7, aoTop: 0.72 };
   for (let k = 0; k < nL; k++) {
-    const w = part(wallMat, upperLevel(k), 'walls').mesh;
-    // The back wall is its own part: it also fades, when the house is turned so that it faces the camera.
-    const back = part(wallMat, k === 0 ? -1 : k - 1, 'backWall');
-    back.away = k;
-    addBox(back.mesh, [-hw, wallBot[k], -hd], [hw, wallTop[k], -hd + WALL_T], wallOpts);
-    addBox(w, [-hw, wallBot[k], -hd + WALL_T], [-hw + WALL_T, wallTop[k], hd - WALL_T], wallOpts);
-    addBox(w, [hw - WALL_T, wallBot[k], -hd + WALL_T], [hw, wallTop[k], hd - WALL_T], wallOpts);
-    addBox(part(wallMat, k, 'frontWall').mesh, [-hw, wallBot[k], hd - WALL_T], [hw, wallTop[k], hd], wallOpts);
+    addBox(outer(wallMat, k, 'back', 'Wall').mesh, [-hw, wallBot[k], -hd], [hw, wallTop[k], -hd + WALL_T], wallOpts);
+    addBox(outer(wallMat, k, 'left', 'Wall').mesh, [-hw, wallBot[k], -hd + WALL_T], [-hw + WALL_T, wallTop[k], hd - WALL_T], wallOpts);
+    addBox(outer(wallMat, k, 'right', 'Wall').mesh, [hw - WALL_T, wallBot[k], -hd + WALL_T], [hw, wallTop[k], hd - WALL_T], wallOpts);
+    addBox(outer(wallMat, k, 'front', 'Wall').mesh, [-hw, wallBot[k], hd - WALL_T], [hw, wallTop[k], hd], wallOpts);
   }
 
   // Roof shape: gable along x, ridge over the middle.
@@ -289,9 +300,8 @@ export function buildHouse(spec: House3DSpec, plan: BuildingPlan): HouseModel {
     }
   };
   for (let k = 0; k < nL; k++) {
-    const ft = part('timber', k, 'frontTimber').mesh;
-    const sideLevel = upperLevel(k);
-    const st = part('timber', sideLevel, 'timber').mesh;
+    const ft = outer('timber', k, 'front', 'Timber').mesh;
+    const rt = outer('timber', k, 'right', 'Timber').mesh, lt = outer('timber', k, 'left', 'Timber').mesh;
     const yb = wallBot[k], yt = wallTop[k];
     const winY = windowsAt(k);
     const midY = winY - 0.45; // sill rail just under the windows
@@ -314,45 +324,46 @@ export function buildHouse(spec: House3DSpec, plan: BuildingPlan): HouseModel {
       }
       beam(ft, [-hw, yt - BEAM / 2, zf], [hw, yt - BEAM / 2, zf], frontFace);
     }
-    // The right side wall (the one the camera sees), and the left (seen when the camera turns, and from inside).
+    // The right side wall and the left.
     for (let i = 0; i <= sideBays; i++) {
       if (!framed && i > 0 && i < sideBays) continue;
       const z = hd - BEAM / 2 - (D - BEAM) * (i / sideBays);
-      beam(st, [xr, yb, z], [xr, yt, z], sideFace);
-      beam(st, [-xr, yb, z], [-xr, yt, z], [-1, 0, 0]);
+      beam(rt, [xr, yb, z], [xr, yt, z], sideFace);
+      beam(lt, [-xr, yb, z], [-xr, yt, z], [-1, 0, 0]);
     }
     if (framed) {
       for (const y of [yb + BEAM / 2, midY, yt - BEAM / 2]) {
-        beam(st, [xr, y, hd], [xr, y, -hd], sideFace);
-        beam(st, [-xr, y, hd], [-xr, y, -hd], [-1, 0, 0]);
+        beam(rt, [xr, y, hd], [xr, y, -hd], sideFace);
+        beam(lt, [-xr, y, hd], [-xr, y, -hd], [-1, 0, 0]);
       }
-      if (k === 0 && plan.braced) beam(st, [xr, midY, -hd + 0.1], [xr, yt - 0.1, -hd + D * 0.35], sideFace);
+      if (k === 0 && plan.braced) beam(rt, [xr, midY, -hd + 0.1], [xr, yt - 0.1, -hd + D * 0.35], sideFace);
     }
 
     // Windows: one in every front bay that has no door, and on the side walls (the cottage has one each, the bigger plans one per bay).
-    const fw = part('window', k, 'frontWindows').mesh, fs = part('shutter', k, 'frontShutters').mesh;
+    const fw = outer('window', k, 'front', 'Windows').mesh, fs = outer('shutter', k, 'front', 'Shutters').mesh;
     for (let i = 0; i < bays; i++) {
       const x = -hw + bay * (i + 0.5);
       if (k === 0 && Math.abs(x - dx) < doorW / 2 + 0.9) continue;
       win(fw, fs, [x, winY, hd + 0.02], [0, 0, 1]);
       winList.push({ at: [x, winY, hd + 0.1], normal: [0, 0, 1] });
     }
-    const sw = part('window', sideLevel, 'windows').mesh, ss = part('shutter', sideLevel, 'shutters').mesh;
+    const rw = outer('window', k, 'right', 'Windows').mesh, rs = outer('shutter', k, 'right', 'Shutters').mesh;
+    const lw = outer('window', k, 'left', 'Windows').mesh, ls = outer('shutter', k, 'left', 'Shutters').mesh;
     const nSide = plan.sideWindows === 'one' ? 1 : sideBays;
     for (let i = 0; i < nSide; i++) {
       const sz = hd - D / sideBays * (i + 0.5);
-      win(sw, ss, [hw + 0.02, winY, sz], [1, 0, 0]);
+      win(rw, rs, [hw + 0.02, winY, sz], [1, 0, 0]);
       winList.push({ at: [hw + 0.1, winY, sz], normal: [1, 0, 0] });
-      win(sw, ss, [-hw - 0.02, winY, sz], [-1, 0, 0]);
+      win(lw, ls, [-hw - 0.02, winY, sz], [-1, 0, 0]);
       winList.push({ at: [-hw - 0.1, winY, sz], normal: [-1, 0, 0] });
     }
   }
   // Door frame: jambs and a heavy lintel.
-  const dt = part('timber', 0, 'frontTimber').mesh;
+  const dt = outer('timber', 0, 'front', 'Timber').mesh;
   for (const s of [-1, 1]) beam(dt, [dx + s * (doorW / 2 + BEAM / 2), FOOT, zf], [dx + s * (doorW / 2 + BEAM / 2), FOOT + doorH + 0.1, zf], frontFace);
   addBeam(dt, [dx - doorW / 2 - BEAM - 0.1, FOOT + doorH + 0.12, zf + 0.02], [dx + doorW / 2 + BEAM + 0.1, FOOT + doorH + 0.12, zf + 0.02], BEAM * 1.3, frontFace);
   // Door: a plank door in its frame. Steps up to it.
-  addBox(part('door', 0).mesh, [dx - doorW / 2, FOOT, hd], [dx + doorW / 2, FOOT + doorH, hd + 0.07], { aoBottom: 0.7, unitUV: true });
+  addBox(outer('door', 0, 'front', 'Door').mesh, [dx - doorW / 2, FOOT, hd], [dx + doorW / 2, FOOT + doorH, hd + 0.07], { aoBottom: 0.7, unitUV: true });
   addBox(part('stone', undefined, 'footing').mesh, [dx - doorW / 2 - 0.2, 0, hd + 0.08], [dx + doorW / 2 + 0.2, FOOT * 0.5, hd + 0.55], { aoBottom: 0.6, skip: ['ny'] });
 
   // --- inside: stairs, floors, partitions, rooms ---------------------------------------------------------------------
@@ -378,9 +389,9 @@ export function buildHouse(spec: House3DSpec, plan: BuildingPlan): HouseModel {
       if (d - DOOR_OPEN > x + 0.02) partition(k, rectOf(x, d - DOOR_OPEN, z0, z1));
       // The lintel over the doorway.
       addBox(part('plaster', k, 'partition').mesh, [d - DOOR_OPEN, floorY[k] + 2.05, z0], [d + DOOR_OPEN, wallTop[k], z1], { aoBottom: 0.8 });
-      addBeam(part('timber', k, 'frontTimber').mesh, [d - DOOR_OPEN - 0.05, floorY[k] + 2.0, z1 + 0.04], [d + DOOR_OPEN + 0.05, floorY[k] + 2.0, z1 + 0.04], 0.1, frontFace);
+      addBeam(part('timber', k, 'innerTimber').mesh, [d - DOOR_OPEN - 0.05, floorY[k] + 2.0, z1 + 0.04], [d + DOOR_OPEN + 0.05, floorY[k] + 2.0, z1 + 0.04], 0.1, frontFace);
       // Jambs, and the room door standing open against the wall inside.
-      for (const s of [-1, 1]) addBeam(part('timber', k, 'frontTimber').mesh, [d + s * (DOOR_OPEN + 0.03), floorY[k], z1 + 0.04], [d + s * (DOOR_OPEN + 0.03), floorY[k] + 2.05, z1 + 0.04], 0.1, frontFace);
+      for (const s of [-1, 1]) addBeam(part('timber', k, 'innerTimber').mesh, [d + s * (DOOR_OPEN + 0.03), floorY[k], z1 + 0.04], [d + s * (DOOR_OPEN + 0.03), floorY[k] + 2.05, z1 + 0.04], 0.1, frontFace);
       addBox(part('door', k).mesh, [d - DOOR_OPEN - 0.01, floorY[k], z0 - 0.85], [d - DOOR_OPEN + 0.05, floorY[k] + 1.95, z0], { aoBottom: 0.7, unitUV: true });
       x = d + DOOR_OPEN;
     }

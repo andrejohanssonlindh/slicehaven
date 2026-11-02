@@ -309,10 +309,12 @@ function buildAdmin(): void {
   cog.addEventListener('click', toggle);
   // Steering by keys: WASD or the arrows (screen up, left, down, right); the world reads `input` every frame.
   const held = new Set<string>();
-  const KEYS: Record<string, string> = { w: 'up', arrowup: 'up', s: 'down', arrowdown: 'down', a: 'left', arrowleft: 'left', d: 'right', arrowright: 'right' };
+  // Q and E turn the view.
+  const KEYS: Record<string, string> = { w: 'up', arrowup: 'up', s: 'down', arrowdown: 'down', a: 'left', arrowleft: 'left', d: 'right', arrowright: 'right', q: 'turnl', e: 'turnr' };
   const steer = (): void => {
     world.input.right = (held.has('right') ? 1 : 0) - (held.has('left') ? 1 : 0);
     world.input.up = (held.has('up') ? 1 : 0) - (held.has('down') ? 1 : 0);
+    world.turnInput = (held.has('turnr') ? 1 : 0) - (held.has('turnl') ? 1 : 0);
   };
   window.addEventListener('keydown', (e) => {
     const k = KEYS[e.key.toLowerCase()];
@@ -353,11 +355,40 @@ function setTier(name: TierName): void {
 
 function bindInput(): void {
   let down: { x: number; y: number; id: number; moved: number } | null = null;
+  // Two fingers twist the view round what it looks at (and the gesture is never a tap or a pan).
+  const touches = new Map<number, { x: number; y: number }>();
+  let twist: number | null = null;
+  const twistAngle = (): number => {
+    const [a, b] = [...touches.values()];
+    return Math.atan2(b.y - a.y, b.x - a.x);
+  };
+  const endTouch = (e: PointerEvent): void => {
+    touches.delete(e.pointerId);
+    if (touches.size < 2) twist = null;
+  };
   canvas.addEventListener('pointerdown', (e) => {
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touches.size === 2) {
+      twist = twistAngle();
+      down = null;
+      return;
+    }
+    if (touches.size > 2) return;
     down = { x: e.clientX, y: e.clientY, id: e.pointerId, moved: 0 };
     canvas.setPointerCapture(e.pointerId);
   });
+  canvas.addEventListener('pointercancel', endTouch);
   canvas.addEventListener('pointermove', (e) => {
+    if (touches.has(e.pointerId)) touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (twist !== null && touches.size === 2) {
+      const a = twistAngle();
+      let d = a - twist;
+      if (d > Math.PI) d -= Math.PI * 2;
+      if (d < -Math.PI) d += Math.PI * 2;
+      world.turn(d);
+      twist = a;
+      return;
+    }
     if (!down || e.pointerId !== down.id) return;
     const k = (window.devicePixelRatio || 1) / pipeline.factor; // CSS px to rendered px
     const dx = (e.clientX - down.x) * k, dy = (e.clientY - down.y) * k;
@@ -367,6 +398,7 @@ function bindInput(): void {
     world.pan(dx, dy);
   });
   canvas.addEventListener('pointerup', (e) => {
+    endTouch(e);
     if (!down || e.pointerId !== down.id) return;
     if (down.moved < 8) {
       const r = canvas.getBoundingClientRect();
@@ -394,6 +426,17 @@ function bindInput(): void {
   };
   for (const b of document.querySelectorAll<HTMLButtonElement>('#zoom button')) {
     b.addEventListener('click', () => zoom(Number(b.dataset.zoom)));
+  }
+  // The turn buttons turn the view while held.
+  for (const b of document.querySelectorAll<HTMLButtonElement>('#turn button')) {
+    const dir = Number(b.dataset.turn);
+    b.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      b.setPointerCapture(e.pointerId);
+      world.turnInput = dir;
+    });
+    for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture'] as const) b.addEventListener(ev, () => { if (world.turnInput === dir) world.turnInput = 0; });
+    b.addEventListener('contextmenu', (e) => e.preventDefault());
   }
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();

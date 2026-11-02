@@ -39,6 +39,10 @@
 
 #zoom { position: absolute; right: 6px; top: 6px; display: flex; flex-direction: column; gap: 6px; z-index: 3; }
 #zoom button { width: 40px; height: 40px; font-size: 20px; padding: 0; }
+/* Turning the view: held to turn, under the zoom buttons. */
+#turn { position: absolute; right: 6px; top: 104px; display: flex; flex-direction: column; gap: 6px; z-index: 3; }
+#turn button { width: 40px; height: 40px; font-size: 22px; padding: 0; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+#view { touch-action: none; }
 
 #loading {
   position: absolute;

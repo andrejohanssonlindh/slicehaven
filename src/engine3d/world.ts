@@ -37,7 +37,8 @@ import { type Ground3D, groundHeight, lakeDist, splatAt } from '../core/world3d/
 import { TEXELS_PER_M } from '../core/world3d/tiers';
 import type { Clump } from '../core/world3d/tree';
 import { fbm } from '../core/noise';
-import { VIEW_YAW } from '../core/world3d/view';
+import { VIEW_YAW, facesCamera, wrapAngle } from '../core/world3d/view';
+import type { WallSide } from '../core/world3d/house';
 import { Weather } from '../core/world3d/weather';
 import { type Flame, makeFlame, makeOrb } from './fire';
 import { EXPLORED_WINDOW, type LitOpts, SEE_SLOTS, WORLD, exploredTexture, lit, pixTexture, shellOf, sightTexture } from './materials';
@@ -55,7 +56,8 @@ import { type Water, makeWater } from './water';
  * then runs it (weather, light, the walking villager, the cut-away).
  */
 
-export const YAW = VIEW_YAW;
+/** How fast the view turns while a turn button or key is held, radians a second (about 80°). */
+const TURN_SPEED = 1.4;
 /** About 39°: ground is squashed to ~0.63, as in the old hex art (20 px rows on 32 px tiles). */
 export const PITCH = 0.68;
 const CAM_DIST = 60;
@@ -88,8 +90,9 @@ interface CutPart {
   mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial>;
   /** Fades while the viewer's storey is at or below this. */
   level: number;
-  /** The back wall: also fades up to this storey when the house faces away from the camera (-1: not a back wall). */
-  away: number;
+  /** An outer wall's side: it also fades up to storey `facing` while that side faces the camera. */
+  side: WallSide | null;
+  facing: number;
   /** 0 shown, 1 gone; eases. */
   t: number;
 }
@@ -187,6 +190,8 @@ interface HouseInst {
   furniture: THREE.Object3D[];
   /** The storey each furniture card stands on. */
   furnLevel: number[];
+  /** The standing furniture cards (not rugs): turned to whichever of the house's sides is nearest the camera (`alignCards`). */
+  upright: THREE.Object3D[];
   cut: CutPart[];
   box: Shape;
   floorHeat: Heat | null;
@@ -466,6 +471,12 @@ export class SpikeWorld {
   private marker: THREE.Mesh;
   /** The camera follows the hero while it walks, until the player drags the view. */
   follow = false;
+  /** The view's turn about the vertical, radians (see `core/world3d/view.ts`). Turn it with `turn` or `turnInput`. */
+  yaw = VIEW_YAW;
+  /** Held turn buttons or keys: -1 turns the world anticlockwise on screen, 1 clockwise. Set by the page. */
+  turnInput = 0;
+  /** The yaw the cards and the hero were last turned for. */
+  private facedYaw = NaN;
   private wet = 0;
   /** How full the hollows are with rain, 0..1 (`WORLD.uPool`). */
   private pool = 0;
@@ -590,7 +601,7 @@ export class SpikeWorld {
     this.heroCard = personCard(HERO_PERSON);
     this.people.push({ id: 'hero', card: this.heroCard, reveals: true });
     this.heroBlob = blobShadow(0.32);
-    this.heroCard.mesh.rotation.y = YAW;
+    this.heroCard.mesh.rotation.y = this.yaw;
     this.placeHero();
     this.scene.add(this.heroCard.mesh, this.heroBlob);
     this.sprites.push(this.heroCard);
@@ -702,7 +713,7 @@ export class SpikeWorld {
   private standHouse(entry: HouseEntry<FurnishedRoom[]>, st: Standing): void {
     const { built, room: rooms } = entry;
     const h = built.place, model = built.model;
-    const inst: HouseInst = { built, mats: [], cards: [], hearth: null, hearthAt: null, chimney: null, shells: [], group: new THREE.Group(), furniture: [], furnLevel: [], cut: [], box: entry.box, floorHeat: null, cutT: 0, open: false, view: 0 };
+    const inst: HouseInst = { built, mats: [], cards: [], hearth: null, hearthAt: null, chimney: null, shells: [], group: new THREE.Group(), furniture: [], furnLevel: [], upright: [], cut: [], box: entry.box, floorHeat: null, cutT: 0, open: false, view: 0 };
     const matFor = (m: HouseMaterial, cut: boolean): { mat: THREE.MeshLambertMaterial; opts: LitOpts } => this.houseMat(m, cut, inst.mats);
     for (const p of model.parts) {
       const geo = geometryOf(p.mesh);
@@ -712,7 +723,7 @@ export class SpikeWorld {
       mesh.castShadow = !p.cut;
       inst.group.add(mesh);
       if (p.cut) {
-        inst.cut.push({ mesh, level: p.level ?? 0, away: p.away ?? -1, t: 0 });
+        inst.cut.push({ mesh, level: p.level ?? -1, side: p.side ?? null, facing: p.facing ?? -1, t: 0 });
         // The roof keeps shading the room when it is cut away: a shadow-only twin on layer 1.
         const proxy = new THREE.Mesh(geo, this.shadowOnly);
         proxy.layers.set(1);
@@ -729,12 +740,12 @@ export class SpikeWorld {
         const prop = room.props.get(it.id);
         if (!prop) continue;
         const flat = it.kind === 'flat';
-        // Everything follows the house's alignment cross (see roomplan.ts): the card is turned with the house,
-        // stretched sideways a little to keep one art pixel to one screen pixel.
+        // Everything follows the house's alignment cross (see roomplan.ts): a standing card is turned to one of the
+        // house's sides (`alignCards`), stretched sideways a little to keep one art pixel to one screen pixel.
         const card = spriteCard(prop, PITCH, { flat, shadow: false });
         card.mesh.position.set(it.x, floorY + 0.02 + it.lift, it.z);
         card.mesh.rotation.y = 0;
-        if (!flat) card.mesh.scale.x = 1 / Math.cos(YAW - h.rot);
+        if (!flat) inst.upright.push(card.mesh);
         inst.group.add(card.mesh);
         inst.furniture.push(card.mesh);
         inst.furnLevel.push(room.level);
@@ -762,6 +773,7 @@ export class SpikeWorld {
     }
     inst.group.position.set(h.x, y, h.z);
     inst.group.rotation.y = h.rot;
+    this.alignCards(inst);
     this.scene.add(inst.group);
     this.houses.push(inst);
     st.houses.push(inst);
@@ -1294,8 +1306,8 @@ export class SpikeWorld {
   pan(dxPx: number, dyPx: number): void {
     this.follow = false;
     const px = 1 / this.ppm;
-    const right = new THREE.Vector3(Math.cos(YAW), 0, -Math.sin(YAW));
-    const fwd = new THREE.Vector3(-Math.sin(YAW), 0, -Math.cos(YAW));
+    const right = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
+    const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
     // Moving up the screen covers more ground (the view is foreshortened by sin(pitch)).
     this.focus.addScaledVector(right, -dxPx * px).addScaledVector(fwd, (dyPx * px) / Math.sin(PITCH));
     const lim = this.ground.size / 2 - 4;
@@ -1522,7 +1534,7 @@ export class SpikeWorld {
     this.steering = true;
     this.marker.visible = false;
     this.follow = true;
-    const sY = Math.sin(YAW), cY = Math.cos(YAW);
+    const sY = Math.sin(this.yaw), cY = Math.cos(this.yaw);
     // Screen up is away from the camera, screen right is along the camera's right.
     const wx = (up * -sY + right * cY) / mag, wz = (up * -cY + right * -sY) / mag;
     const speed = HERO_SPEED * this.speedMul;
@@ -1563,16 +1575,32 @@ export class SpikeWorld {
    */
   private faceWalker(card: WalkCard, dirX: number, dirZ: number, moving: boolean, speed: number): void {
     const m = card.mesh;
-    const wasLeft = Math.cos(m.rotation.y - YAW) < 0;
-    const v = viewFor(dirX, dirZ, YAW, card.view, wasLeft);
+    const wasLeft = Math.cos(m.rotation.y - this.yaw) < 0;
+    const v = viewFor(dirX, dirZ, this.yaw, card.view, wasLeft);
     card.pose(v.view, moving, speed);
-    m.rotation.y = v.left ? YAW + Math.PI : YAW;
+    m.rotation.y = v.left ? this.yaw + Math.PI : this.yaw;
+  }
+
+  /**
+   * Turn a house's standing furniture cards to the side of the house nearest the camera, so a card is never seen
+   * edge-on: at most 45° off, stretched sideways to keep its pixels square. (Front-painted art seen from another
+   * side still reads wrong; low-poly models, plan item A2, fix that.)
+   */
+  private alignCards(hs: HouseInst): void {
+    const d = this.yaw - hs.built.place.rot;
+    const q = Math.round(d / (Math.PI / 2)) * (Math.PI / 2);
+    const stretch = 1 / Math.cos(d - q);
+    for (const m of hs.upright) {
+      m.rotation.y = q;
+      m.scale.x = stretch;
+    }
   }
 
   private placeCamera(): void {
-    const dir = new THREE.Vector3(Math.sin(YAW) * Math.cos(PITCH), Math.sin(PITCH), Math.cos(YAW) * Math.cos(PITCH));
-    const R = new THREE.Vector3(Math.cos(YAW), 0, -Math.sin(YAW));
-    const U = new THREE.Vector3(-Math.sin(PITCH) * Math.sin(YAW), Math.cos(PITCH), -Math.sin(PITCH) * Math.cos(YAW));
+    const yaw = this.yaw;
+    const dir = new THREE.Vector3(Math.sin(yaw) * Math.cos(PITCH), Math.sin(PITCH), Math.cos(yaw) * Math.cos(PITCH));
+    const R = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+    const U = new THREE.Vector3(-Math.sin(PITCH) * Math.sin(yaw), Math.cos(PITCH), -Math.sin(PITCH) * Math.cos(yaw));
     // Snap the view to whole rendered pixels, so textures do not swim when panning.
     const px = 1 / this.ppm;
     const tr = this.focus.dot(R), tu = this.focus.dot(U);
@@ -1871,9 +1899,21 @@ export class SpikeWorld {
     this.field.setSources([]); // the field asks `fieldExtras` again
   }
 
+  /** Turn the view by `rad` (positive: the world turns clockwise on screen), round what it looks at. */
+  turn(rad: number): void {
+    this.yaw = wrapAngle(this.yaw + rad);
+  }
+
   update(dtMs: number): void {
     const dt = Math.min(0.1, dtMs / 1000);
     this.time += dt;
+    if (this.turnInput) this.turn(this.turnInput * TURN_SPEED * dt);
+    // When the view has turned, the people's cards and the furniture turn with it (the hero, standing, too).
+    const turned = this.yaw !== this.facedYaw;
+    if (turned) {
+      this.facedYaw = this.yaw;
+      this.faceWalker(this.heroCard, this.heroDir.x, this.heroDir.z, false, 0);
+    }
     const w = this.weather;
     if (this.dayMinutes > 0) w.advance((dt * 24) / (this.dayMinutes * 60));
     w.update(dtMs);
@@ -1983,10 +2023,10 @@ export class SpikeWorld {
     const cutK = 1 - Math.exp(-dt / 0.12);
     for (const hs of this.houses) {
       hs.cutT += ((hs.open ? 1 : 0) - hs.cutT) * cutK;
-      // Does the house's back face the camera? (The camera is toward (sin YAW, cos YAW); the house's local z is its front.)
-      const away = Math.sin(YAW) * Math.sin(hs.built.place.rot) + Math.cos(YAW) * Math.cos(hs.built.place.rot) < 0;
+      // The outer walls that face the camera go (from any side); the far ones stay.
+      if (turned) this.alignCards(hs);
       for (const c of hs.cut) {
-        const gone = hs.open && (hs.view <= c.level || (away && hs.view <= c.away));
+        const gone = hs.open && (hs.view <= c.level || (c.side !== null && hs.view <= c.facing && facesCamera(c.side, hs.built.place.rot, this.yaw)));
         c.t += ((gone ? 1 : 0) - c.t) * cutK;
         c.mesh.material.opacity = 1 - c.t;
         c.mesh.visible = c.t < 0.98;

@@ -6,6 +6,7 @@ import { cloudDensity, cloudThreshold, skyLight } from '../src/core/world3d/sky'
 import { WATER_Y, buildTerrain, groundHeight, heightAt, lakeDist, splatAt } from '../src/core/world3d/terrain';
 import { TIERS, adjust, pickTier, pixelFactor, viewSpan } from '../src/core/world3d/tiers';
 import { TREE_KINDS, buildTree } from '../src/core/world3d/tree';
+import { facesCamera } from '../src/core/world3d/view';
 
 describe('mesh', () => {
   it('a box has 6 outward faces with matching attribute lengths', () => {
@@ -33,7 +34,7 @@ describe('house generator', () => {
 
   it('wall kinds: planks and stone use their own material and carry less frame than the framed default', () => {
     const kinds = (['framed', 'plank', 'stone'] as const).map((walls) => buildHouse({ ...SPIKE_HOUSE.spec, walls }));
-    const mat = (m: typeof h) => m.parts.find((p) => p.name === 'walls')!.material;
+    const mat = (m: typeof h) => m.parts.find((p) => p.name === 'leftWall')!.material;
     expect(kinds.map(mat)).toEqual(['plaster', 'timber', 'stone']);
     const timberTris = (m: typeof h) => m.parts.filter((p) => p.name.toLowerCase().includes('timber')).reduce((n, p) => n + p.mesh.indices.length, 0);
     expect(timberTris(kinds[1])).toBeLessThan(timberTris(kinds[0]));
@@ -56,12 +57,29 @@ describe('house generator', () => {
     expect(all.indices.length).toBeGreaterThan(0);
   });
 
-  it('cuts away the roof and front wall but keeps the back and side walls and the floor', () => {
+  it('cuts away the roof, and each outer wall when it faces the camera, but never the floor', () => {
     const cut = new Set(h.parts.filter((p) => p.cut).map((p) => p.name));
     expect(cut.has('roof')).toBe(true);
-    expect(cut.has('frontWall')).toBe(true);
-    expect(cut.has('walls')).toBe(false);
+    for (const side of ['front', 'back', 'left', 'right'] as const) {
+      const wall = h.parts.find((p) => p.name === `${side}Wall`)!;
+      expect(wall.side).toBe(side);
+      expect(wall.facing).toBe(0);
+    }
     expect(cut.has('floor')).toBe(false);
+  });
+
+  it('the side that faces the camera is the one turned toward it, from any angle', () => {
+    // Unturned, looking from the front: the front faces the camera, the back does not.
+    expect(facesCamera('front', 0, 0)).toBe(true);
+    expect(facesCamera('back', 0, 0)).toBe(false);
+    // The camera gone round to the house's right (+x): the right wall faces it.
+    expect(facesCamera('right', 0, Math.PI / 2)).toBe(true);
+    expect(facesCamera('left', 0, Math.PI / 2)).toBe(false);
+    // A house turned half round, seen from the default side: its back faces the camera.
+    expect(facesCamera('back', Math.PI, 0)).toBe(true);
+    // On a diagonal, two walls face the camera; at every angle at least one does.
+    expect(facesCamera('front', 0, Math.PI / 4) && facesCamera('right', 0, Math.PI / 4)).toBe(true);
+    for (let a = 0; a < Math.PI * 2; a += 0.1) expect((['front', 'back', 'left', 'right'] as const).some((s) => facesCamera(s, 0.3, a))).toBe(true);
   });
 
   it('has a room inside its walls, a door on the front, and a smoke point above the roof', () => {

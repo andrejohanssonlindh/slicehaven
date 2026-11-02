@@ -13,7 +13,7 @@
 
 ## The look (how a frame is made)
 - **Low-resolution render**, scaled up nearest-neighbour at a whole number; an **outline** from depth, in a darker tone of the local colour; a **palette pull** in post (`engine3d/pipeline.ts`).
-- **Orthographic camera, fixed pitch and yaw** today, snapped to whole render pixels when it pans (no texture crawl). Turning it freely is plan item A1.
+- **Orthographic camera, fixed pitch, free yaw** (`world.yaw`, `world.turn(rad)`, `world.turnInput` held by the ⟲ ⟳ buttons, Q/E and a two-finger twist), snapped to whole render pixels at any yaw (no texture crawl once it stops). Yaw 0 looks from +z; the start is `VIEW_YAW`.
 - **Textures painted by code** (`art/textures3d.ts`, about 21 texels a metre, nearest filtering).
 - **Shells**: one or two layers pushed out along the normal (6–24 cm), with sparse alpha-tested pixels for a rough edge (`shellOf()` in `engine3d/materials.ts`), per material.
 - **People and furniture are flat camera-facing cards** from an atlas (`engine3d/sprites.ts`, `atlas.ts`), painted from the front. Plan item A2 replaces them with low-poly models with shells.
@@ -44,8 +44,9 @@
 - **Lights:** never create a `PointLight` switched on inside `update` (a stall); create with `visible = false` and let the pool switch it on.
 - **Faces:** double-sided lit faces flip their normal on the back and go dark; turn the mesh instead of a negative scale. Materials with `ao: true` need a `color` attribute or render black.
 - **Shells** 1–2 px out only sparkle; they are offset in metres.
-- **Cut-away:** a house's cut parts fade while the hero is on that storey or below; the back wall fades when the house faces away. It is written for the one fixed view (A1 changes this).
-- **Front-painted art:** beds and horses are painted from the room's front (`facesView`); the compiler reports a house turned away that holds one. Goes away with A2.
+- **Cut-away:** a house's cut parts fade while the hero is on that storey or below. Outer parts carry a `side` (front/back/left/right) and fade on their storey when that side faces the camera (`facesCamera` in `core/world3d/view.ts`, past ~63°), so it works from any angle. Interior partitions fade on their storey always.
+- **Furniture cards** turn to the house side nearest the camera (`alignCards`), at most 45° off, stretched to keep pixels square.
+- **Front-painted art:** beds and horses are painted from the room's front (`facesView`); the compiler reports a house turned away from the *start* view that holds one. From other angles they read wrong until A2.
 - `renderer.info.autoReset = false`, reset per frame.
 - **Tests:** unit tests check that a path exists, not that it looks right. Check visual work in Chrome. The browser tests (`npm run test:e2e`, about 8 minutes) run against a live dev server: don't edit files the 3D page imports while they run; read the summary line (`N passed`), not the exit code.
 
