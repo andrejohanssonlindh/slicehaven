@@ -6,10 +6,12 @@ import { PIPS, type Stage } from '.';
 
 /**
  * The top level: dice thrown on glass over the game. The glass is a table seen from above, the edges of the screen
- * its walls. The dice are thrown in from the bottom, tumble, bounce off the walls and each other, and come to rest
- * (rigid-body physics, `cannon-es`). The rules have already rolled, so the show works backwards: the whole throw is
- * simulated first, then each die's faces are laid on so that the face that ends up on top is the one rolled (a D6
- * is turned inside its body; a D10's numbers are shifted round it), and then the throw is played back.
+ * its walls. The dice are dropped in from a height along the longer side, bounce, tumble, knock into the walls and
+ * each other, and come to rest (rigid-body physics, `cannon-es`). As at a table, a die that stops on another or
+ * leaning is thrown again. The rules have already rolled (seeded, `core/dice.ts`), so the show works backwards: the
+ * whole throw is simulated first, then each die's faces are laid on so that the face that ends up on top is the one
+ * rolled (a D6 is turned inside its body; a D10's numbers are shifted round it), and then the throw is played back.
+ * The movement is real physics; only which number is painted where is chosen.
  *
  * A D6 is a rounded cube with pips; a D10 a ten-sided die; a D100 is two D10s, tens (00–90) and ones (0–9), with
  * 00 and 0 making 100. A six that splits glows as it settles, stays put, and its two new dice drop out of it.
@@ -19,6 +21,8 @@ const STEP = 1 / 60;
 /** The longest a throw may take, seconds (anything still moving near the end stays where it is). */
 const MAX_TIME = 9;
 const GRAVITY = 70;
+/** The lid over the glass (die units): nothing flies off the screen. */
+const LID = 12;
 
 /** The faces of a cube die by the cube's material slots (+x, −x, +y, −y, +z, −z): opposite faces make seven. */
 const CUBE_FACES = [3, 4, 1, 6, 2, 5];
@@ -182,11 +186,41 @@ function faceTexture(skin: DiceSkin, kind: 'pips' | 'kite', value: number | stri
 
 const rand = (a: number, b: number): number => a + Math.random() * (b - a);
 
-/** Simulate the whole throw: when each die comes in, how it moves, when and which way up it comes to rest. */
-function simulate(dice: Thrown[], bounds: { x: number; y0: number; y1: number }): { p: Float32Array; q: Float32Array; frames: number } {
+/** A die at rest must lie this flat (its top face's tilt, cos) and on the glass, not on another die; else it is thrown again. */
+const FLAT = Math.cos((8 * Math.PI) / 180);
+/** How many times one die may be thrown again before it is taken as it lies (and the whole throw is tried anew). */
+const RETHROWS = 3;
+/** How many whole throws are tried, out of sight, for one where every die ends flat on the glass. */
+const TRIES = 4;
+
+interface Bounds {
+  x: number;
+  y0: number;
+  y1: number;
+}
+
+interface Sim {
+  p: Float32Array;
+  q: Float32Array;
+  frames: number;
+  /** Dice taken as they lay though not flat on the glass (after their rethrows ran out). */
+  bad: number;
+}
+
+/**
+ * Simulate the whole throw: when each die comes in, how it moves, when and which way up it comes to rest. A die
+ * that stops on top of another, or leaning, is picked up and thrown again, as at a table.
+ */
+function simulate(dice: Thrown[], bounds: Bounds): Sim {
+  for (const d of dice) {
+    delete d.body;
+    delete d.spawn;
+    delete d.settle;
+    delete d.up;
+  }
   const world = new CANNON.World({ gravity: new CANNON.Vec3(0, 0, -GRAVITY) });
   const diceMat = new CANNON.Material('die'), glassMat = new CANNON.Material('glass');
-  world.addContactMaterial(new CANNON.ContactMaterial(diceMat, glassMat, { friction: 0.35, restitution: 0.35 }));
+  world.addContactMaterial(new CANNON.ContactMaterial(diceMat, glassMat, { friction: 0.35, restitution: 0.5 }));
   world.addContactMaterial(new CANNON.ContactMaterial(diceMat, diceMat, { friction: 0.2, restitution: 0.45 }));
   // The glass, a wall at each edge of the screen, and a lid so nothing leaves.
   const wall = (pos: [number, number, number], axis: [number, number, number], angle: number): void => {
@@ -196,7 +230,7 @@ function simulate(dice: Thrown[], bounds: { x: number; y0: number; y1: number })
     world.addBody(b);
   };
   wall([0, 0, 0], [1, 0, 0], 0);
-  wall([0, 0, 9], [1, 0, 0], Math.PI);
+  wall([0, 0, LID], [1, 0, 0], Math.PI);
   wall([-bounds.x, 0, 0], [0, 1, 0], Math.PI / 2);
   wall([bounds.x, 0, 0], [0, 1, 0], -Math.PI / 2);
   wall([0, bounds.y0, 0], [1, 0, 0], -Math.PI / 2);
@@ -204,6 +238,8 @@ function simulate(dice: Thrown[], bounds: { x: number; y0: number; y1: number })
 
   const d10 = d10Shape();
   const normals10 = normalsOf(d10);
+  /** How high a die's middle is when it lies flat on the glass. */
+  const restZ = { d6: 0.5, d10: normals10[0].dot(d10.verts[d10.faces[0][0]]) };
   const make = (d: Thrown): CANNON.Body => new CANNON.Body({
     mass: 1,
     material: diceMat,
@@ -213,7 +249,8 @@ function simulate(dice: Thrown[], bounds: { x: number; y0: number; y1: number })
     linearDamping: 0.08,
     angularDamping: 0.12,
   });
-  const upOf = (d: Thrown, b: CANNON.Body): number => {
+  /** The face on top, and how flat it lies (1 = flat). */
+  const upOf = (d: Thrown, b: CANNON.Body): { face: number; flat: number } => {
     const quat = new THREE.Quaternion(b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w);
     const list = d.shape === 'd6' ? CUBE_NORMALS.map((n) => new THREE.Vector3(...n)) : normals10;
     let best = 0, bestZ = -2;
@@ -224,7 +261,27 @@ function simulate(dice: Thrown[], bounds: { x: number; y0: number; y1: number })
         best = i;
       }
     });
-    return best;
+    return { face: best, flat: bestZ };
+  };
+
+  // Thrown in along the longer side of the glass (from the left or right on a wide screen, from the bottom on a
+  // tall one), from a height, so they drop, bounce and tumble before they roll out.
+  const cy = (bounds.y0 + bounds.y1) / 2, hy = (bounds.y1 - bounds.y0) / 2, hx = bounds.x;
+  const wide = hx > hy;
+  const speed = Math.max(8, Math.min(16, 2 * Math.max(hx, hy) * 0.9));
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const toss = (b: CANNON.Body): void => {
+    if (wide) {
+      b.position.set(-side * (hx - 0.9), cy + rand(-hy, hy) * 0.5, rand(3.5, 5.5));
+      b.velocity.set(side * speed * rand(0.8, 1.15), rand(-3, 3), rand(-1, 2));
+    } else {
+      b.position.set(rand(-hx, hx) * 0.5, bounds.y0 + 0.9, rand(3.5, 5.5));
+      b.velocity.set(rand(-3, 3), speed * rand(0.8, 1.15), rand(-1, 2));
+    }
+  };
+  const spin = (b: CANNON.Body): void => {
+    b.quaternion.setFromEuler(rand(0, 6.3), rand(0, 6.3), rand(0, 6.3));
+    b.angularVelocity.set(rand(-25, 25), rand(-25, 25), rand(-25, 25));
   };
 
   // The first throw comes in a few frames apart; a split six's dice when it settles.
@@ -234,10 +291,23 @@ function simulate(dice: Thrown[], bounds: { x: number; y0: number; y1: number })
   const n = dice.length;
   const p = new Float32Array(maxFrames * n * 3), q = new Float32Array(maxFrames * n * 4);
   const still = new Array<number>(n).fill(0);
+  /** When each die was last thrown (it must move a while before it can be at rest), and how often it was thrown again. */
+  const thrownAt = new Array<number>(n).fill(0);
+  const again = new Array<number>(n).fill(0);
+  let bad = 0;
+  /** Picked up and thrown again: lifted and tossed back toward the middle of the glass. */
+  const rethrow = (i: number, f: number): void => {
+    const b = dice[i].body!;
+    again[i]++;
+    thrownAt[i] = f;
+    still[i] = 0;
+    b.velocity.set((-b.position.x / Math.max(1, hx)) * rand(4, 8) + rand(-2, 2), ((cy - b.position.y) / Math.max(1, hy)) * rand(4, 8) + rand(-2, 2), rand(14, 18));
+    b.angularVelocity.set(rand(-25, 25), rand(-25, 25), rand(-25, 25));
+  };
   const settle = (i: number, f: number): void => {
     const d = dice[i], b = d.body!;
     d.settle = f;
-    d.up = upOf(d, b);
+    d.up = upOf(d, b).face;
     // A settled die stays put: what lands after it bounces off it, and its face can no longer change.
     b.type = CANNON.Body.STATIC;
     b.mass = 0;
@@ -251,18 +321,17 @@ function simulate(dice: Thrown[], bounds: { x: number; y0: number; y1: number })
     dice.forEach((d) => {
       if (d.spawn !== f) return;
       const b = make(d);
-      if (d.parent === null) {
-        b.position.set(rand(-bounds.x * 0.5, bounds.x * 0.5), bounds.y0 + 0.9, rand(1.2, 2.2));
-        b.velocity.set(rand(-4, 4), rand(11, 17), rand(1, 4));
-      } else {
+      if (d.parent === null) toss(b);
+      else {
+        // Out of the split six, from above it, so they drop onto it and off.
         const from = dice[d.parent].body!.position, nth = dice.filter((c) => c.parent === d.parent).indexOf(d);
-        b.position.set(from.x + rand(-0.3, 0.3), from.y + rand(-0.3, 0.3), from.z + 1.3 + nth * 1.1);
+        b.position.set(from.x + rand(-0.3, 0.3), from.y + rand(-0.3, 0.3), from.z + 2.2 + nth * 1.2);
         b.velocity.set(rand(-5, 5), rand(-5, 5), rand(1, 3));
       }
-      b.quaternion.setFromEuler(rand(0, 6.3), rand(0, 6.3), rand(0, 6.3));
-      b.angularVelocity.set(rand(-25, 25), rand(-25, 25), rand(-25, 25));
+      spin(b);
       world.addBody(b);
       d.body = b;
+      thrownAt[dice.indexOf(d)] = f;
     });
     world.step(STEP);
     dice.forEach((d, i) => {
@@ -275,25 +344,59 @@ function simulate(dice: Thrown[], bounds: { x: number; y0: number; y1: number })
       p.set([b.position.x, b.position.y, b.position.z], o * 3);
       q.set([b.quaternion.x, b.quaternion.y, b.quaternion.z, b.quaternion.w], o * 4);
       if (d.settle !== undefined) return;
-      const slow = b.velocity.length() < 0.25 && b.angularVelocity.length() < 0.5 && b.position.z < 1.8; // (a die may rest leaning on another)
+      const slow = b.velocity.length() < 0.25 && b.angularVelocity.length() < 0.5;
       still[i] = slow ? still[i] + 1 : 0;
-      if (still[i] >= 10 && f - d.spawn! > 20) settle(i, f);
+      if (still[i] < 10 || f - thrownAt[i] <= 20) return;
+      // At rest: it counts only lying flat on the glass. On another die, or leaning, it is thrown again.
+      const ok = upOf(d, b).flat >= FLAT && b.position.z < restZ[d.shape] + 0.12;
+      if (ok || again[i] >= RETHROWS) {
+        if (!ok) bad++;
+        settle(i, f);
+      } else rethrow(i, f);
     });
     if (dice.every((d) => d.settle !== undefined)) break;
     // Running out of time: whatever still moves stays where it is (and a split six's dice still come out).
-    if (f === maxFrames - 90) dice.forEach((d, i) => { if (d.body && d.settle === undefined) settle(i, f); });
+    if (f === maxFrames - 90) dice.forEach((d, i) => {
+      if (d.body && d.settle === undefined) {
+        bad++;
+        settle(i, f);
+      }
+    });
   }
-  return { p, q, frames: Math.min(maxFrames, f + 1) };
+  return { p, q, frames: Math.min(maxFrames, f + 1), bad };
+}
+
+/** Throws tried out of sight until one ends with every die flat on the glass (or the best of a few). */
+function bestThrow(dice: Thrown[], bounds: Bounds): Sim {
+  let best: { sim: Sim; at: Pick<Thrown, 'spawn' | 'settle' | 'up'>[] } | null = null;
+  for (let i = 0; i < TRIES; i++) {
+    const sim = simulate(dice, bounds);
+    if (!best || sim.bad < best.sim.bad) best = { sim, at: dice.map((d) => ({ spawn: d.spawn, settle: d.settle, up: d.up })) };
+    if (sim.bad === 0) break;
+  }
+  best!.at.forEach((a, i) => Object.assign(dice[i], a));
+  return best!.sim;
+}
+
+/**
+ * The glass on this screen: die units (a D6 is 1 across, `S` pixels) and the walls. Room is kept for the page's top
+ * bar and the result line, less on a short screen; the dice are smaller on a small screen and when many are thrown,
+ * so they have room to roll out side by side (a wide phone has little height).
+ */
+export function glassSize(W: number, H: number, count: number): { S: number; bounds: Bounds } {
+  const top = Math.max(40, Math.min(110, H * 0.13)), bottom = Math.max(36, Math.min(80, H * 0.1));
+  const w = W, h = H - top - bottom;
+  // About 8 dice across the shorter side, and about 9 dice' worth of glass for every die thrown.
+  const S = Math.max(22, Math.min(58, Math.min(w, h) / 8, Math.sqrt((w * h) / (9 * Math.max(4, count)))));
+  return { S, bounds: { x: w / 2 / S - 0.05, y0: -H / 2 / S + bottom / S, y1: H / 2 / S - top / S } };
 }
 
 export async function throwOnGlass(stage: Stage): Promise<void> {
   const { root, skin } = stage;
   const W = window.innerWidth, H = window.innerHeight;
-  // Die units: a D6 is 1 across, and this many screen pixels on the glass.
-  const S = Math.max(38, Math.min(58, W / 8.5));
-  const bounds = { x: W / 2 / S - 0.05, y0: -H / 2 / S + 80 / S, y1: H / 2 / S - 110 / S };
   const dice = bodiesOf(stage);
-  const sim = simulate(dice, bounds);
+  const { S, bounds } = glassSize(W, H, dice.length);
+  const sim = bestThrow(dice, bounds);
 
   const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));

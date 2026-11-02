@@ -2,11 +2,11 @@ import { type Sky, WIND_DIRS, clockText } from '../core/environment';
 import { ASPECTS, LEVEL_NAMES } from '../core/filaments';
 import { MAPS, mapNamed } from '../content/maps';
 import { clearWorld, loadWorld, saveWorld } from '../core/world3d/save';
-import { rollTable, rollTest } from '../core/dice';
+import { rollPool, rollTable, rollTest } from '../core/dice';
 import { Rng } from '../core/rng';
 import { DICE_SKINS } from '../content/dice/skins';
 import { showRolls } from '../ui/dice';
-import { DICE_LEVELS, loadSettings, saveSettings } from '../ui/settings';
+import { DICE_CLOSES, DICE_LEVELS, loadSettings, saveSettings } from '../ui/settings';
 import { Governor, TIERS, type DeviceInfo, type Tier, type TierName, pickTier, qualityAt } from '../core/world3d/tiers';
 import { Pipeline } from '../engine3d/pipeline';
 import { SpikeWorld } from '../engine3d/world';
@@ -188,8 +188,12 @@ function buildControls(): void {
   button('row-game', () => t('spike.dice.skin', 'Skin: {name}', { name: t(`dice.skin.${loadSettings().diceSkin}`, DICE_SKINS[loadSettings().diceSkin]?.name ?? '?') }), () => false, () => {
     saveSettings({ diceSkin: cycle(skins, loadSettings().diceSkin) });
   });
+  const closeName = { ok: t('spike.dice.closeok', 'Rolls: press OK'), auto: t('spike.dice.closeauto', 'Rolls: go by themselves') };
+  button('row-game', () => closeName[loadSettings().diceClose], () => false, () => { saveSettings({ diceClose: cycle(DICE_CLOSES, loadSettings().diceClose) }); });
   const diceRng = Rng.fromSeed(Date.now() >>> 0);
   button('row-game', () => t('spike.roll4d6', 'Roll 4D6 vs 14'), () => false, () => { void showRolls([rollTest({ n: 4, mod: 0 }, 14, diceRng, t('spike.testroll', 'Test'))]); });
+  button('row-game', () => t('spike.roll10d6', 'Roll 10D6+2'), () => false, () => { void showRolls([rollTest({ n: 10, mod: 2 }, 35, diceRng, t('spike.testroll', 'Test'))]); });
+  button('row-game', () => t('spike.rolld10', 'Roll D10+2'), () => false, () => { void showRolls([rollPool({ n: 1, mod: 2 }, diceRng, t('spike.sumroll', 'Sum'), 10)]); });
   button('row-game', () => t('spike.rolld100', 'Roll D100'), () => false, () => { void showRolls([rollTable(100, diceRng, t('spike.tableroll', 'Table'))]); });
   const times: [number, string][] = [[6, t('spike.dawn', 'Dawn')], [12, t('spike.day', 'Day')], [18.5, t('spike.dusk', 'Dusk')], [0, t('spike.night', 'Night')]];
   const nearHour = (h: number): boolean => w.hour !== null && Math.abs(((w.hour - h + 36) % 24) - 12) < 1.5 && world.dayMinutes === 0;

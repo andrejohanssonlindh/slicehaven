@@ -4,6 +4,7 @@ Only decisions that still stand. Ones that were replaced are removed (git histor
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-02 | **The rules roll, the glass shows it**: results come from the seeded rules, and the physics throw is real but only chooses where each number is painted. A die that stops on another die or tilted is thrown again. **The result stays until OK** by default (a setting can make it go by itself) | Director asked whether reading the dice would be better. The rules have to give the same result without the glass (the icons and result-only displays, NPC rolls, skipping the throw, replays from a seed), and physics can't be repeated exactly across devices. Since the whole throw is worked out before it plays, it looks exactly the same either way. |
 | 2026-11-02 | **Dice: on glass by default, with real physics** (they tumble, bounce off the screen's edges and each other, then settle on what the rules rolled); **a D100 is two D10s**, tens and ones. A physics library (`cannon-es`) is used for it, loaded only for the glass dice | Director (Q32). |
 | 2026-11-02 | **B3 (actions on things) waits for a talk first**; B1 is the state system, to be built outward as things get states | Director. |
 | 2026-11-02 | **A2 done; the flat cards are gone**: every person and piece of furniture is a 3D model. The horse waits for kinds of creature (C3), so the stalls stand empty until then | Director: checked everything, pretty enough; horses come later as decided. |

@@ -9,7 +9,7 @@ import type { Rng } from './rng';
  * Three ways to roll, all from the tabletop rules:
  * - **open** (skills and attributes): nD6+mod, and every 6 is taken away and rolls two new dice in its place (which
  *   may be sixes again). Sixes never count themselves.
- * - **pool** (a plain sum): nD6+mod with no splitting.
+ * - **pool** (a plain sum): nD6+mod, or any other die (D10+2), with no splitting.
  * - **table** (the character creator's tables): one die of any size, a D100 or a D10, read off a table.
  */
 
@@ -72,10 +72,10 @@ export function rollOpen(d: Dice, rng: Rng, label?: string): Roll {
   return make('open', d, 6, rolled, label);
 }
 
-/** A plain pool: nD6+mod, summed, sixes count as six. */
-export function rollPool(d: Dice, rng: Rng, label?: string): Roll {
-  const rolled: Die[] = Array.from({ length: Math.max(0, d.n) }, () => ({ sides: 6, face: rollDie(6, rng), from: null, counts: true }));
-  return make('pool', d, 6, rolled, label);
+/** A plain pool: nDs+mod (nD6+2, D10+3), summed; nothing splits, a six counts as six. */
+export function rollPool(d: Dice, rng: Rng, label?: string, sides = 6): Roll {
+  const rolled: Die[] = Array.from({ length: Math.max(0, d.n) }, () => ({ sides, face: rollDie(sides, rng), from: null, counts: true }));
+  return make('pool', d, sides, rolled, label);
 }
 
 /** A table roll: one die of `sides` sides (D100 for most of the creator's tables). */

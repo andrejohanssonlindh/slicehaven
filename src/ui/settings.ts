@@ -7,15 +7,20 @@
 export type DiceLevel = 'glass' | 'icons' | 'result';
 export const DICE_LEVELS: readonly DiceLevel[] = ['glass', 'icons', 'result'];
 
+/** When a roll's show goes away: when the player presses OK, or by itself after a moment. */
+export type DiceClose = 'ok' | 'auto';
+export const DICE_CLOSES: readonly DiceClose[] = ['ok', 'auto'];
+
 export interface Settings {
   v: number;
   dice: DiceLevel;
   diceSkin: string;
+  diceClose: DiceClose;
 }
 
 const VERSION = 1;
 const KEY = 'slicehaven.settings';
-const DEFAULTS: Settings = { v: VERSION, dice: 'glass', diceSkin: 'bone' };
+const DEFAULTS: Settings = { v: VERSION, dice: 'glass', diceSkin: 'bone', diceClose: 'ok' };
 
 /** What this page has set, if storage would not keep it. */
 let memo: Settings | null = null;

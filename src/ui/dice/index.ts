@@ -2,13 +2,14 @@ import { type DiceSkin, skinOf } from '../../content/dice/skins';
 import { diceText } from '../../core/chargen/tables';
 import type { Die, Roll } from '../../core/dice';
 import { t } from '../../i18n';
-import { type DiceLevel, loadSettings } from '../settings';
+import { type DiceClose, type DiceLevel, loadSettings } from '../settings';
 import './dice.css';
 
 /**
  * Showing rolls (plan item B2), at the level the player picks in the settings: dice thrown on glass over the game
  * (`glass.ts`, three.js, loaded when first needed), small spinning dice (`icons.ts`), or just the result. Every level
  * lands on the faces the rules rolled (`core/dice.ts`): the show never decides anything. A tap skips to the end.
+ * Then the result stays until the player presses OK, or goes by itself (a setting).
  */
 
 /** Where the pips sit on a face of a D6, on a 3 × 3 grid (0..2, 0..2). */
@@ -23,7 +24,7 @@ export const PIPS: Record<number, [number, number][]> = {
 
 /** One line saying what a roll came to: "Search 3D6+1 vs 10: 14, success (1 advantage)"; a table roll "Homeland D100: 37". */
 export function resultText(r: Roll): string {
-  const what = r.kind === 'table' ? `D${r.sides}` : diceText(r.dice);
+  const what = r.kind === 'table' ? `D${r.sides}` : diceText(r.dice, r.sides);
   const head = `${r.label ? `${r.label} ` : ''}${what}${r.target !== undefined ? ` ${t('dice.vs', 'vs')} ${r.target}` : ''}`;
   let out = `${head}: ${r.total}`;
   if (r.success !== undefined) {
@@ -60,6 +61,7 @@ export function schedule(rolls: Roll[], first = 700, child = 560, stagger = 90):
 export interface ShowOpts {
   level?: DiceLevel;
   skin?: string;
+  close?: DiceClose;
 }
 
 /** What a level's show needs: the rolls, the skin, the overlay to draw in, and a signal that the player tapped to skip. */
@@ -129,8 +131,21 @@ export async function showRolls(rolls: Roll[], opts: ShowOpts = {}): Promise<voi
       }
     }
     root.append(lines);
-    // A tap during the throw lands the dice; the next one closes the result.
-    await wait(level === 'result' ? 2200 : 1600, nextTap());
+    if ((opts.close ?? set.diceClose) === 'ok') {
+      // Stays until the player presses OK (floating at the right, above the result); a tap elsewhere does nothing.
+      const ok = document.createElement('button');
+      ok.className = 'dice-ok';
+      ok.type = 'button';
+      ok.textContent = t('dice.ok', 'OK');
+      ok.style.bottom = `calc(${lines.offsetHeight + 36}px + env(safe-area-inset-bottom))`;
+      ok.addEventListener('pointerdown', (e) => e.stopPropagation());
+      root.append(ok);
+      ok.focus({ preventScroll: true });
+      await new Promise<void>((r) => ok.addEventListener('click', () => r(), { once: true }));
+    } else {
+      // A tap during the throw lands the dice; the next one closes the result.
+      await wait(level === 'result' ? 2200 : 1600, nextTap());
+    }
     root.classList.add('leaving');
     await new Promise((r) => setTimeout(r, 250));
   } finally {

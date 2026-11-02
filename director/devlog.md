@@ -2,6 +2,16 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-02 — Dice: dropped from higher, rethrown when they land badly, OK to close; D10+n
+
+- **Dropped from a height** along the longer side of the screen (from the side on a wide phone, from the bottom when it's tall), so they bounce more before they roll out.
+- **A die that stops on another die, or tilted, is thrown again**, as at a table: it hops up and is tossed back toward the middle. Before you see anything, the game tries up to four throws and picks one where every die ends flat on the glass.
+- **The dice fit the screen:** they're smaller on a small or wide screen and when many are thrown, so a wide phone with ten dice has room for them all side by side.
+- **OK or auto:** a new setting. By default the result stays until you press **OK**, which floats at the right in the game's button style. The other choice is to let the result go by itself, as before.
+- **Sums of other dice:** a roll like D10+2 now works next to 3D6+2 (`rollPool` takes the die size). The panel has *Roll D10+2* and *Roll 10D6+2* to try them.
+- **Why the result is rolled first and then the faces are painted on**, instead of reading the dice: see the decision of the same date.
+- **Try it:** 3D world panel → Game row: *Rolls: press OK / go by themselves*, and the test rolls.
+
 ## 2026-11-02 — Dice on glass with physics; D100 as two D10s
 
 - **The glass dice are physical now:** they are thrown in from the bottom, tumble, bounce off the edges of the screen and off each other, and roll to a stop, with soft shadows on the glass. The rules still decide: the whole throw is worked out first, then each die's faces are laid on so that it comes to rest on what was rolled. A six that splits glows when it settles and stays put; its two dice drop out of it and bounce off it.

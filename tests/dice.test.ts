@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { rollOn, newChar } from '../src/core/chargen/state';
+import { diceText } from '../src/core/chargen/tables';
 import { test as check } from '../src/core/checks';
 import { rollOpen, rollPool, rollTable, rollTest, rollText } from '../src/core/dice';
 import { Rng } from '../src/core/rng';
@@ -48,6 +49,16 @@ describe('the one roll system (B2)', () => {
     const r = rollPool({ n: 3, mod: 2 }, loaded(6, 6, 1));
     expect(r.faces).toEqual([6, 6, 1]);
     expect(r.total).toBe(15);
+  });
+
+  it('plain pools of other dice: D10+2, 2D10', () => {
+    const r = rollPool({ n: 1, mod: 2 }, loaded(7), 'Damage', 10);
+    expect(r).toMatchObject({ kind: 'pool', sides: 10, total: 9 });
+    expect(r.rolled[0]).toMatchObject({ sides: 10, face: 7, counts: true });
+    expect(diceText({ n: 1, mod: 2 }, 10)).toBe('D10+2');
+    expect(diceText({ n: 2, mod: 0 }, 10)).toBe('2D10');
+    expect(diceText({ n: 1, mod: 3 })).toBe('1D6+3');
+    expect(rollPool({ n: 2, mod: 0 }, loaded(10, 10), undefined, 10).total).toBe(20);
   });
 
   it('table rolls are one die of any size', () => {

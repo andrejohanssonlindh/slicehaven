@@ -5,9 +5,10 @@ export interface Dice {
   mod: number;
 }
 
-export function diceText(d: Dice): string {
+/** "3D6+2"; with `sides`, another die ("D10+2", a single die written without the 1). */
+export function diceText(d: Dice, sides = 6): string {
   if (d.n <= 0 && d.mod <= 0) return '0';
-  const base = d.n > 0 ? `${d.n}D6` : '';
+  const base = d.n > 0 ? `${sides === 6 || d.n > 1 ? d.n : ''}D${sides}` : '';
   if (!d.mod) return base;
   return `${base}${base ? '+' : ''}${d.mod}`;
 }
