@@ -16,7 +16,8 @@ Grounded fantasy campaign game in a live 3D pixel world (measured in metres, no 
   - **Commit and push after every meaningful step.** Pushing to `main` deploys to Pages, so the user can try it on the phone.
   - Run `npm test` and `npm run build` before pushing. Never push a broken build to `main`.
 - Anything that isn't game code but the user should see (proposals, questions, art studies, story drafts, devlog) goes in `director/` as markdown. It renders at `/slicehaven/director/`.
-  - Open questions for the user → `director/questions.md` (newest on top, mark answered ones).
+  - **What to build, in order → `director/todo.md`** (the one plan; update status as items move, put new asks in it).
+  - Open questions for the user → `director/questions.md` (newest on top; tie each to a plan item). When answered, move it to `director/archive/questions-answered.md` and record the decision.
   - Decisions the user made → `director/decisions.md` (date + decision + why).
   - What was done each session → `director/devlog.md`.
   - The director's own vision notes → `director/vision/` (original text kept verbatim, plus an English digest). **Read these before designing anything.** They're ambitions to build on, not a checklist to do right away.

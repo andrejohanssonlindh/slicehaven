@@ -1,5 +1,13 @@
 # Devlog
 
+## 2026-11-02 — One plan, and a pattern check before building
+
+- **Why:** two large refactors in October came from adding feature after feature without deciding how they should be built.
+- **[How we build things](design/architecture.md):** the layers, every established pattern (where it lives, how to add one, what test guards it), and the foundations still missing. Before any new ask, Claude checks it against this page; if no pattern fits, the foundation is designed and agreed first.
+- **[The plan](todo.md):** the director's weekend notes ([kept here](vision/2026-11-02-director-notes.md)) and the missing foundations in one list, ordered by what shapes the most: A (turning the view, people's bodies, time and rounds), B (state, one roll system, actions, perception, items, effects, combat, magic), C (farms, crops, pasture, mounts, map maker), D (overworld, quests, the first village by a lake).
+- **Questions:** Q27, Q25 answered, Q21 dropped, Q20 and Q11 parked; all moved to the [archive](archive/questions-answered.md). New: Q28 (how far the view turns), Q29 (live world and rounds), Q30 (people's bodies).
+- **Next:** A1, turning the view.
+
 ## 2026-10-31 — Rooms are kinds; sheets for kinds of person, and a page to see them
 
 - **Rooms as kinds ✅:** every kind of room is an entry in `content/things/kinds/rooms.ts`, like furniture and buildings. A kind can take its parent's recipe and change it (a fisher's home is a home without the sacks, with nets). A building says what kind each of its rooms is (a stable's stall is a `horsestall`). The smithy's forge, anvil and the rest are furniture like any other piece, so the smithy is an ordinary room now. A map that names a room nobody defined is told so. Two renames: the inn's common room is `taproom` (the building is `inn`), the stall room `horsestall`. Checked: all 164 rooms (every kind, three seeds, three sizes, and every house in every map) furnish exactly as before.

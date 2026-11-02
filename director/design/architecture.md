@@ -34,7 +34,7 @@ State is plain JSON (it goes into the save). A kind is never an instance: the ki
 | **Filament field** (magic strength read from what stands where) | Magic sources and their strength | `core/filaments.ts`, `core/world3d/filaments3d.ts`; kinds say `filament` | A `filament` property on the kind | filament tests |
 
 ## Missing foundations (don't build features on these until the base exists)
-Each needs a short design, agreed with the director, before any feature that rests on it.
+Each needs a short design, agreed with the director, before any feature that rests on it. **The order they are built in is [the plan](../todo.md).** Added from the director's notes of 2026-11-02, besides the rows below: a turning view (A1), people as bodies rather than cards (A2), one roll system shown at three levels (B2), perception (B5), kinds of creature (animals, mounts), a calendar for growing crops, and quest flags.
 
 | Foundation | Needed by | What it would be (first sketch, not agreed) |
 |---|---|---|

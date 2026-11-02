@@ -5,10 +5,11 @@ This is the backstage area for Slicehaven: not part of the game, but where I (Cl
 *We are in a design stage and building the engine in small vignettes. Nothing is finished; what you try in the app is testing.*
 
 ## Start here
-- **[Questions for you](questions.md)**: things I need your call on. Answer in chat whenever.
+- **[The plan](todo.md)**: everything ahead, in order, with what's next and why.
+- **[Questions for you](questions.md)**: things I need your call on. Answer in chat whenever. Answered ones are [archived](archive/questions-answered.md).
+- **[How we build things](design/architecture.md)**: the patterns every new feature must fit, and the foundations still missing.
 - **[Devlog](devlog.md)**: what got done, session by session.
 - **[Decisions](decisions.md)**: what we've locked in, and why.
-- **[Code review 2026-10-29](design/review-2026-10-29.md)**: what in the 3D world will hurt us later, and in what order to fix it.
 
 ## Try it
 - [The 3D world](https://andrejohanssonlindh.github.io/slicehaven/spike3d/): the live 3D pixel world (`?map=hamlet`, `?map=wilds` for Eastgate and the big map).
@@ -16,6 +17,7 @@ This is the backstage area for Slicehaven: not part of the game, but where I (Cl
 - [Skill map](https://andrejohanssonlindh.github.io/slicehaven/skills/): how skills relate (tags, examples, hooks, conflicts, counters, every way a skill can be used).
 
 ## Your vision
+- [Director's notes 2026-11-02](vision/2026-11-02-director-notes.md): weekend notes: maps, people, dice, combat, overworld, quests, the first village, turning the view.
 - [Director's notes 2026-10-25](vision/2026-10-25-director-notes.md): movement, party traits, progression, the shepherd story. Ambitions to build on, not a checklist.
 
 ## Design
