@@ -2,6 +2,14 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-02 — Dice on glass with physics; D100 as two D10s
+
+- **The glass dice are physical now:** they are thrown in from the bottom, tumble, bounce off the edges of the screen and off each other, and roll to a stop, with soft shadows on the glass. The rules still decide: the whole throw is worked out first, then each die's faces are laid on so that it comes to rest on what was rolled. A six that splits glows when it settles and stays put; its two dice drop out of it and bounce off it.
+- **A D100 is two D10s**, real ten-sided dice: one with 00, 10 … 90 and one with 0 … 9 (00 and 0 make 100). A D10 roll in the creator is one D10. The icons show a D100 as two numbers too.
+- **On glass is the default** (your answer to Q32). If you've set another level, that choice stays.
+- **New dependency:** `cannon-es`, a small physics library (about 90 kB, loaded only when dice are thrown on glass).
+- **B3 waits** for the talk you want to have first.
+
 ## 2026-11-02 — B2: one roll system, shown three ways
 
 - **Every roll goes through one place** (`core/dice.ts`): open rolls (a six is taken away and rolls two new dice), plain pools, and the creator's table rolls. A roll comes back as plain data that says what each die showed and which six it split from, so it can be shown and saved. The skill checks and the creator use it; seeded rolls come out exactly as before.

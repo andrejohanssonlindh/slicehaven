@@ -4,6 +4,8 @@ Only decisions that still stand. Ones that were replaced are removed (git histor
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-02 | **Dice: on glass by default, with real physics** (they tumble, bounce off the screen's edges and each other, then settle on what the rules rolled); **a D100 is two D10s**, tens and ones. A physics library (`cannon-es`) is used for it, loaded only for the glass dice | Director (Q32). |
+| 2026-11-02 | **B3 (actions on things) waits for a talk first**; B1 is the state system, to be built outward as things get states | Director. |
 | 2026-11-02 | **A2 done; the flat cards are gone**: every person and piece of furniture is a 3D model. The horse waits for kinds of creature (C3), so the stalls stand empty until then | Director: checked everything, pretty enough; horses come later as decided. |
 | 2026-11-02 | **A3 settled: only combat runs in turns.** Everything else (sneaking past a guard included) plays live, with the movement we have | Director: it should feel live outside combat. |
 | 2026-11-02 | **B1 and B2 are base work with clear ways to test, so they are built without a design round first** | Director. |
