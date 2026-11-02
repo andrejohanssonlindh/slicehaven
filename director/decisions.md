@@ -4,7 +4,8 @@ Only decisions that still stand. Ones that were replaced are removed (git histor
 
 | Date | Decision | Why |
 |---|---|---|
-| 2026-11-02 | **Actions are one pipeline** (offer → gates → resolve → outcome), built in slices B3a–d in the order: B3a, B6 + B3b, B4, B5, B3c, B3d, B7, B10, B8, B9. About 10–20 % first, then grown from the director's **action notes**, each becoming a data file ([sketch](design/actions.md)) | Director (Q33): B3 is bigger than one step; a frame lets it grow as data. |
+| 2026-11-03 | **New order after B3a: B4, B3d, B5, B3c, B3b, B6, B7, B10, B8, B9.** People before things: taking is mostly talking (argue, borrow, buy, threaten), and what follows depends on who sees it and who you are. Inventory waits for the carried-weight rule; carrying in the hands comes with B3b without it | Director: B6 is not critical; notes of [2026-11-03](vision/2026-11-03-director-notes.md). |
+| 2026-11-02 | **Actions are one pipeline** (offer → gates → resolve → outcome), built in slices B3a–d (order changed 2026-11-03, above). About 10–20 % first, then grown from the director's **action notes**, each becoming a data file ([sketch](design/actions.md)) | Director (Q33): B3 is bigger than one step; a frame lets it grow as data. |
 | 2026-11-02 | **Inventory**: shaped items in grids (pockets, bag, add-ons that are items), placed by tap, turn and auto-pack. **Over-encumbered → base fatigue** (a form of damage), from the ruleset. **Lifting heavy things is a Physique roll** | Director (Q34). |
 | 2026-11-02 | **Sight is rolled** against 8 at key moments (a new area, every 6 hours, waking); each advantage widens and lengthens it, a failure gives a poor half cone and short range. **Shown on easy, hidden otherwise** | Director (Q35). |
 | 2026-11-02 | **Inside a house, its own chimney smoke and door torch are hidden** (others stay) | Director (Q36): not logical, but it looks better. |

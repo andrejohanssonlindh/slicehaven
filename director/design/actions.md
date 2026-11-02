@@ -46,12 +46,38 @@ The director's proposal, building 10–20 % and then sending in notes to grow it
 
 When a note asks for a gate, a resolve mode or an outcome that doesn't exist yet, that is when the frame grows by one file, and it is agreed first (the pattern check).
 
-## Where it would live
-`core/world3d/actions.ts` (the pipeline: offer → gates → resolve → outcome), `content/actions/gates/` and `content/actions/verbs/` (one file each, found by themselves), outcomes beside the skill hooks' effects. The page: tap a thing → a sheet at the bottom with its look and what can be tried.
+## Taking things, and what follows (the director's notes, [2026-11-03](../vision/2026-11-03-director-notes.md))
+*A sketch to grow B3b–B3d from. Not agreed in its details; the open points are Q37 and Q38. Nothing here is built yet.*
 
-## Slices (in [the plan](../todo.md))
-- **B3a The frame**: tap, look, offer, state and place gates, no-roll and one-roll resolve, state/time/say outcomes. Actions: light / put out a fire (roll, 10 min), sit, the existing reads (study, size up). An NPC lights the hearth at dawn through the same action.
-- **B3b Take and carry** (with B6): size classes, pocket vs. in the hands, items leave the map and stay gone.
-- **B3c Owners and transgressions** (with B4, B5): whose a thing is, using without leave, being seen.
-- **B3d Talking in 3D**: the social conflicts we have, started by tapping a person; permission ("may I use the forge?") as an outcome.
+**Taking is several offers on one thing, not one verb.** It holds for most objects, not just the stair, and each way uses a resolve mode the rules already have:
+
+| Way | How it resolves | What follows |
+|---|---|---|
+| **Argue** it's yours to take, or **threaten** | A social conflict with the owner (B3d) | Won: it's yours (or you have leave). Lost: it stays, and they think less of you |
+| **Borrow** | A social try for leave; the leave says *until when* | Not back in time: it counts as theft. Giving it back is an offer on the owner. Found lying about: people who like order (a leaning in the people library) bring it home themselves (a behaviour) |
+| **Move** it | No roll inside the room; a try to take it further | The owner minds more the further it goes (out of the house: a lot) |
+| **Buy** | A trade: the price from its value, haggling as a social try | It's yours |
+| **Just take** it ("a weapon, now") | No roll | A plain transgression, for whoever sees it (B5) |
+| **Steal** it unseen | A hide roll: harder the bigger it is, easier with a cloak or a sack to pack it in; easy when no one is near | Something carried openly can be **recognised** later by its owner and their household (their chair, down the street). Something in a pocket can't |
+
+**What it does to people: one scale per person.** Each person's view of the hero runs from about −100 to +100. The mood we have today (−3 to +3, from the 2D skill map) becomes bands on it. A transgression moves the scale by a **weight**:
+- **the kind of act** (use, move, take, steal, harm);
+- the thing's **value** against **the owner's wealth** (a lord won't miss a hen; the `rich` and `poor` tags already exist);
+- its **importance** (a guard's sword, an heirloom): a property of the thing, or of the owner's calling.
+
+The value also makes the action itself harder.
+
+**What they do about it: consequences on the same scale.** Each consequence starts at a point on the scale: grumble → demand it back → a slap → fetch the guards or willing neighbours → fight → everyone wants you dead. **The place's culture** (setting and people facets, as the people library already leans) says how much each kind of act weighs and where each consequence starts. **Who you are** shifts it: rank (a noble gets off lightly), how your people are seen (the relations table exists: a tirak starts worse), and fear (a trukh everyone is afraid of).
+
+**Fetch help, fight, or let it go?** Their own leaning (a tirak likely fights, a human less so) against how dangerous you look. That comes from your physique, the weapons you show and traits such as scars, read passively the way a threat is read actively today.
+
+**What already exists to build on:** mood and patience, the relations between peoples, the people library's leanings and facets (calling, setting, state), social conflicts and challenges (`core/social.ts`, `core/challenge.ts`), the `rich`/`poor` tags, and the owner gate as a stub in the frame (a permission that marks a transgression and never blocks).
+
+**The order this asks for:** people need sheets (B4) before you can talk to them (B3d: the portrait, the log, choices laid over it). Witnesses need perception (B5). Then the scale and owners (B3c), and only then the ways to take (B3b). Carrying in the hands doesn't need the inventory grid; pockets wait for B6.
+
+## Slices (in [the plan](../todo.md), in the order they're built)
+- **B3a The frame** ✅: tap, look, offer, state and place gates, no-roll and one-roll resolve, state/time/say outcomes; light, put out, sit, make a fire; an NPC lights the hearth at dawn.
+- **B3d Talking in 3D** (after B4): tap a person → their **portrait**, the conversation **log**, the choices **laid over it** (Q37). The social tries and conflicts we have, against their sheet. Leave ("you may use the forge, today") is an outcome.
+- **B3c Owners, the scale and consequences** (after B5): whose a thing is, the per-person scale (Q38), the weight of acts, consequences by culture and by who you are, recognising your things.
+- **B3b The ways to take** (after B3c): argue, threaten, borrow and give back, move, buy, just take, steal unseen; carrying in the hands. Pocketing joins with B6.
 - **Later:** crafting (a challenge plus tools plus materials → an item), improvised weapons (B8).

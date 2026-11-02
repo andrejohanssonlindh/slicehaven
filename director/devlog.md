@@ -2,6 +2,14 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-03 — Your notes on people, taking things and consequences, sorted into the plan
+
+- **Your notes** are kept as written in [vision](vision/2026-11-03-director-notes.md), with a digest. Nothing was built from them yet, as you asked.
+- **New order** ([decisions](decisions.md)): **B4** sheets on people → **B3d** talking (portrait, log, choices over it) → **B5** perception (owners recognising their things) → **B3c** owners, the scale and consequences → **B3b** the ways to take. **Inventory (B6) moves later**, until you've found the carried-weight rule.
+- **The design sketch** is in [actions](design/actions.md), under "Taking things, and what follows". The stair's six ways (argue or threaten, borrow, move, buy, just take, steal unseen), each mapped to a roll mode we already have. One scale per person, moved by the kind of act, the value against the owner's wealth, and importance. Consequences that start at different points by culture and by who you are. Fight or fetch help, by their leaning against how dangerous you look. Most of it rests on parts the 2D skill map already has (mood, relations between peoples, leanings, social conflicts).
+- **Two questions** for later: Q37 (what the portrait is) and Q38 (who holds the scale).
+- **Next:** B4, sheets on map people.
+
 ## 2026-11-02 — B3a: tap a thing, and do something with it
 
 - **Tap a thing** in the 3D world (or close to it: thin torches are easy to hit) and a sheet comes up with what it is and what you can try. Choose, and the hero walks up to it and does it; if it takes a roll, the dice show it. Tap the **hero** for what you can do where you stand.
