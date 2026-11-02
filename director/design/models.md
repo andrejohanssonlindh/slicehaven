@@ -1,38 +1,35 @@
-# Low-poly models (plan item A2): the design, for the director's OK
+# Low-poly models (plan item A2)
 
-*2026-11-02. A sketch, not built yet. It replaces the flat cards (people, about 45 kinds of furniture, horses) with small 3D models that look right from every side and can move. Answer in [Q31](../questions.md).*
+*2026-11-02. Agreed in Q31, with the director's change: **each people has its own body**. People are built; furniture is next. Small 3D models replace the flat cards (people, about 45 kinds of furniture, horses), so they look right from every side and can move.*
 
-## What changes for you
-- People, furniture and horses look right from any angle when you turn the view.
-- People **move their bodies**: legs and arms swing as they walk; later sit, work, fight, fall.
-- The look stays **pixel art**: low resolution, outlines, code-painted textures, and shells for a rough pixel edge, the same as houses and trees today.
+## Where it stands
+- ✅ **People: one builder, five bodies.** Every people family has its own proportions, and every people its own size from the creator's typical height and weight for women and men. Dressed from the looks the kinds of person already have (no person is made by hand).
+- ✅ **Movement as data:** a walk and a standing breath, as poses in a loop.
+- ✅ **The gallery** `/models/`: the eight bodies on turning stands, the old card beside the first; toggles for turning, walking, shells and the outline.
+- ✅ **In the world, on trial:** the **Bodies** button (Look row, or `?bodies` in the address) puts every person on the map in their body instead of their card.
+- ⬜ To judge on the phone, then: held things, faces, more poses (sit, work, fight, fall), and the cards go.
+- ⬜ **Furniture:** 3–4 examples by Claude and a how-to, then Sonnet in batches (below).
+- ⬜ **Horses** and other animals with kinds of creature (C3).
 
-## The three parts
+## The bodies
+| Family | Shape (`BODY_PLANS` in `content/people/bodies.ts`) | Size (from the creator's figures) |
+|---|---|---|
+| Human | the reference: head about 1/7.5 of the height, hips at half | by people: most 1.55–1.75 m, the kragg-eyrens over 1.9 m |
+| Elf | longer legs and arms, narrower, pointed ears, a little bigger eyes | by tribe: 1.3 m (Henéa) to 1.9 m (Thism) |
+| Dwarf | a big head, short legs, broad shoulders, big hands and feet; the women bearded too | 1.05–1.25 m |
+| Tirak | heavy-set, a jaw standing forward, claws, red eyes | by size: gurder 1.1 m, tiraker 1.8 m, trukher 2.2 m |
+| Missla | a big head and big eyes, short legs | 1.2 m |
 
-### 1. People: one body, dressed from the look we already have (Claude builds this)
-- **One body builder** for everyone (`core/world3d/body.ts`): about 12 low-poly parts (hips, chest, head, upper and lower arms and legs, hands, feet) on a simple skeleton. Its size comes from `build` (lean, average, stout, child).
-- **Dressed from the existing look** (`Look` in `core/persons.ts`: garment, top, legs, boots, apron, vest, cloak, hair, beard, hat, things held). No person is authored by hand: every kind of person you have made gets a body automatically, as they get a card today.
-- **Shells for clothes**, as you said: one shell over the body in the clothes' colour, a second overlapping one with sparse pixels for the ragged edge, strongest on the limbs.
-- **Movement is data**: a pose is a set of joint angles; a walk is a few poses in a loop. Rules stay in `core/` (deterministic, tested); the engine only shows the pose.
+Each person varies ±4% in height by their seed, and their weight makes them broader or narrower (the build, lean to stout, on top).
 
-### 2. Furniture and horses: each kind draws its own model (the pattern we already have)
-Barrels, wells, carts and fences are **already 3D**: their kind has a `draw` that returns meshes, built from a few helpers (`addBox`, `addBeam`, `addOrientedBox`). Furniture just moves to the same pattern: **one kind, one `draw`, in its own file**. No new kind of thing, and the room solver and footprints don't change.
+## How a body is made (for whoever extends it)
+- **Rules:** `core/world3d/body.ts` (`buildBody(spec)`: about 25 tapered boxes on 11 joints, ~400 triangles) and `core/world3d/pose.ts` (poses, loops, mirroring). Pure and tested (`tests/body.test.ts`).
+- **Data:** `content/people/bodies.ts` (the families' proportions; `bodySpecOf` turns a person into a spec), `content/people/poses.ts` (the walk and the standing breath).
+- **Engine:** `engine3d/body.ts` (`makeBodyRig`: a group per joint, colours in the vertices, one material for every body, two shells over cloth and hair).
+- **A new people with a body of its own:** a new entry in `BODY_PLANS` under its family kind. A new movement: a new loop in `poses.ts`.
 
-### 3. A model gallery page (`/models/`)
-Every kind on a slowly turning stand, in the real pixel pipeline, next to its old card. You judge them on the phone, and whoever builds a model checks it there (with a screenshot from the browser tests) before calling it done.
-
-## Who does what (your question about Sonnet)
-**Yes, I think that works, for the furniture.** It's the right kind of job: many small files that all follow one pattern, each checkable against a picture.
-- **Claude (me):** the body and its movement, the gallery page, the shell look, and **3–4 example pieces** that cover the shapes (a table: boxes and legs; a barrel or keg: round; a bed: frame plus soft cloth; a shelf with things on it). Plus a short **how-to page** (`models-authoring.md`): the helpers, sizes in metres, how many faces, colours from the palette, the shells, the checklist, how to screenshot it in the gallery.
-- **Sonnet:** the other ~40 furniture kinds, a batch at a time, following the how-to. I can run Sonnet myself as helpers and review what comes back before it's pushed, so you only see finished batches. Or you can start a Sonnet session and point it at the how-to page; both work.
-- **Not for Sonnet:** the body, the animation and the horse (an animal body is the same foundation as people; it comes with kinds of creature, C3).
-
-## Order
-1. One person body next to today's card, standing and walking, in the gallery and in the world, **for you to judge on the phone**. If the look is wrong, we change it before anything else is built on it.
-2. The rest of the people (all looks), then the people in the world switch over.
-3. The furniture examples and the how-to, then Sonnet's batches.
-4. Horses with kinds of creature.
+## Furniture (next)
+Barrels, wells and carts are already 3D: their kind has a `draw` that returns meshes. Furniture moves to the same pattern: **one kind, one `draw`, in its own file**. Claude makes 3–4 examples covering the shapes (a table, a keg, a bed, a shelf with things on it) and a how-to page; **Sonnet** makes the other ~40 in batches, each checked in the gallery, reviewed by Claude before it is pushed.
 
 ## What it costs
-- Frame rate: ~200–400 triangles a person is cheap; 50 people on screen is fewer triangles than one tree clump. Furniture is only built for houses near the view, as today.
-- The flat-card code (`sprites.ts` walk cards, the front-painted art and the `facesView` check) goes once everything has switched over.
+About 400 triangles a body before shells; 50 people on screen is fewer triangles than a stand of trees. The cards and their front-painted art (`facesView`) go once everything has switched over.

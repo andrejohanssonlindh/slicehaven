@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#1a1420" />
+    <title>Slicehaven · Models</title>
+    <link rel="stylesheet" href="/src/ui/style.css" />
+    <link rel="stylesheet" href="/src/models/models.css" />
+  </head>
+  <body>
+    <div id="topbar">
+      <a class="btn" href="../" aria-label="Back to the start">←</a>
+      <span class="logo">SLICEHAVEN</span>
+      <span class="tag">models</span>
+      <span class="spacer"></span>
+      <a class="btn" href="../director/">Director</a>
+    </div>
+    <div id="stage">
+      <canvas id="view"></canvas>
+      <div id="zoom">
+        <button type="button" data-zoom="1" aria-label="Zoom in">+</button>
+        <button type="button" data-zoom="-1" aria-label="Zoom out">−</button>
+      </div>
+    </div>
+    <div id="panel">
+      <div class="row" id="row-show"></div>
+      <ol id="cast"></ol>
+    </div>
+    <script type="module" src="/src/models/main.ts"></script>
+  </body>
+</html>

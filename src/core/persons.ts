@@ -20,6 +20,10 @@ import { Rng } from './rng';
 
 /** How a person is drawn: names of the folk art's ramps and parts (`art/folk.ts`, `folkOf`). Plain data, for the save. */
 export interface Look {
+  /** `f` or `m`: picks the people's typical height for women or men (the 3D body, `content/people/bodies.ts`). */
+  sex?: string;
+  /** Peoples that come in sizes (the tirak: `gurder`, `tiraker`, `trukher`): which one. */
+  size?: string;
   build?: string;
   skin?: string;
   hair?: string;
@@ -74,7 +78,7 @@ export interface Resolved {
 /** The people everyone is when nothing says otherwise. */
 const DEFAULT_PEOPLE = 'human';
 
-const LOOK_KEYS: (keyof Look)[] = ['build', 'skin', 'hair', 'style', 'beard', 'garment', 'top', 'legs', 'boots', 'head', 'sleeves', 'apron', 'vest', 'cloak', 'belt', 'right', 'left'];
+const LOOK_KEYS: (keyof Look)[] = ['sex', 'size', 'build', 'skin', 'hair', 'style', 'beard', 'garment', 'top', 'legs', 'boots', 'head', 'sleeves', 'apron', 'vest', 'cloak', 'belt', 'right', 'left'];
 
 export class PersonKinds {
   private readonly defs = new Map<string, PersonKindDef>();

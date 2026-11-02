@@ -14,7 +14,7 @@ describe('pages', () => {
   it('the hub links only to pages that open', async () => {
     const { page, errors } = await openPage(env, '/');
     const links = await page.locator('.hub a').evaluateAll((as) => as.map((a) => (a as HTMLAnchorElement).getAttribute('href')));
-    expect(links).toEqual(['spike3d/', 'chargen/', 'npcs/', 'skills/', 'director/']);
+    expect(links).toEqual(['spike3d/', 'models/', 'chargen/', 'npcs/', 'skills/', 'director/']);
     expect(errors).toEqual([]);
     await page.context().close();
   });
@@ -27,6 +27,15 @@ describe('pages', () => {
       await page.context().close();
     });
   }
+
+  it('the model gallery stands every body up, without errors (screenshot in e2e/out)', async () => {
+    const { page, errors } = await openPage(env, '/models/');
+    await page.waitForFunction(() => (window as unknown as { models?: { rigs: unknown[] } }).models?.rigs.length === 8);
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: 'e2e/out/models.png' });
+    expect(errors).toEqual([]);
+    await page.context().close();
+  });
 
   it('the archive page shows its pictures', async () => {
     const { page, errors } = await openPage(env, '/director/#archive/2d-art');

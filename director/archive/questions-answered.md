@@ -3,6 +3,7 @@
 *Archive of the questions in [questions](../questions.md) once answered or dropped. Newest on top. What they decided, if it still stands, is in the [decisions](../decisions.md).*
 
 ## 2026-11-02
+- **Q31 Low-poly models: is this the plan?** → **yes, with one change:** the peoples need **different bodies**, or at least different sizes, not one body for all. Furniture by Sonnet from examples and a how-to: yes. The gallery: yes.
 - **Q28 Turning the view: how far?** → **free turning.** The trouble from other angles only comes from things painted as flat cards (people, furniture, horses); low-poly 3D models fix it (plan A1, A2).
 - **Q29 The live world and rounds** → the game runs in **free time**. A fight stops time and plays in rounds, each **4 seconds** of world time (an old definition), run very slowly. A **slow day and night** cycle: games with a fast one feel rushed. How the clock scales is not decided (plan A3).
 - **Q30 People's bodies** → my reading was right: a simple 3D body, one shell for the clothes' colour, one overlapping for a pixel edge. The 3D path should also give animations, fighting included (plan A2).

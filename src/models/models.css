@@ -1,0 +1,12 @@
+/* The model gallery: the stage on top, toggles and the list of who stands there below. */
+body { display: flex; flex-direction: column; height: 100dvh; margin: 0; }
+#stage { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #1a1420; }
+#view { display: block; image-rendering: pixelated; touch-action: none; }
+#zoom { position: absolute; right: 6px; top: 6px; display: flex; flex-direction: column; gap: 6px; z-index: 3; }
+#zoom button { width: 40px; height: 40px; font-size: 20px; padding: 0; }
+#panel { padding: 6px 8px 10px; background: var(--panel, #241c2c); max-height: 38dvh; overflow-y: auto; }
+#panel .row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+#panel button { padding: 6px 10px; font-size: 13px; }
+#panel button.on { background: var(--accent, #c8a444); color: #1a1420; }
+#cast { margin: 0; padding-left: 22px; font-size: 13px; color: var(--muted, #b8ab90); columns: 2; }
+@media (max-width: 480px) { #cast { columns: 1; } }

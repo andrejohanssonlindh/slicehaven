@@ -48,6 +48,11 @@ import { Leaves } from './leaves';
 import { Rain } from './rain';
 import { type Chimney, Smoke } from './smoke';
 import { type SpriteCard, type WalkCard, blobShadow, spriteCard, walkCard } from './sprites';
+import { type BodyRig, makeBodyRig } from './body';
+import { bodySpecOf } from '../content/people/bodies';
+import { IDLE, IDLE_SECONDS, WALK } from '../content/people/poses';
+import { buildBody } from '../core/world3d/body';
+import { cyclePose } from '../core/world3d/pose';
 import { type Heat, makeFloorHeat, makeHeat } from './heat';
 import { type Water, makeWater } from './water';
 
@@ -167,7 +172,12 @@ interface Shell {
 
 export interface Person {
   id: string;
+  /** Who they are (their body is built from it). */
+  spec: PersonSpec;
+  /** Where they stand and whether they are drawn: the card is the person's place even when a body is shown instead. */
   card: WalkCard;
+  /** Their 3D body, while bodies are on (`SpikeWorld.bodies`): it stands where the card is and walks as it moves. */
+  body?: { rig: BodyRig; phase: number; yaw: number; x: number; z: number; still: number };
   /** Cuts a see-through oval in whatever (trees) stands between them and the camera. False for the hidden. */
   reveals: boolean;
 }
@@ -593,13 +603,13 @@ export class SpikeWorld {
       card.mesh.visible = blob.visible = false;
       this.cast.push({ who, card, blob, mind: newMind(who.id, who.start[0], who.start[1], who.seed ?? 1, who.slot, who.home) });
       // Only the hero shows through what stands in front of them: anyone else behind a tree or a wall is hidden by it.
-      this.people.push({ id: who.id, card, reveals: false });
+      this.people.push({ id: who.id, spec: who, card, reveals: false });
       this.scene.add(card.mesh, blob);
       this.sprites.push(card);
     }
     // The hero. Tap the ground and they walk there.
     this.heroCard = personCard(HERO_PERSON);
-    this.people.push({ id: 'hero', card: this.heroCard, reveals: true });
+    this.people.push({ id: 'hero', spec: HERO_PERSON, card: this.heroCard, reveals: true });
     this.heroBlob = blobShadow(0.32);
     this.heroCard.mesh.rotation.y = this.yaw;
     this.placeHero();
@@ -1899,6 +1909,60 @@ export class SpikeWorld {
     this.field.setSources([]); // the field asks `fieldExtras` again
   }
 
+  // --- 3D bodies instead of cards (plan item A2, on trial beside the cards) ---
+  private bodiesOn = false;
+
+  get bodies(): boolean {
+    return this.bodiesOn;
+  }
+
+  /**
+   * Show people as 3D bodies (`core/world3d/body.ts`) instead of flat cards. The cards stay where they are and keep
+   * deciding who is drawn; they are only moved to a layer no camera looks at.
+   */
+  set bodies(on: boolean) {
+    if (on === this.bodiesOn) return;
+    this.bodiesOn = on;
+    for (const p of this.people) {
+      p.card.mesh.layers.set(on ? 2 : 0);
+      if (on) {
+        const rig = makeBodyRig(buildBody(bodySpecOf(PERSON_KINDS.resolve(p.spec), p.spec.seed ?? 1)));
+        const m = p.card.mesh;
+        this.scene.add(rig.group);
+        p.body = { rig, phase: 0, yaw: Math.atan2(this.heroDir.x, this.heroDir.z), x: m.position.x, z: m.position.z, still: 1 };
+      } else {
+        p.body?.rig.dispose();
+        delete p.body;
+      }
+    }
+  }
+
+  /** Each body stands where its person's card is, turns the way they move, and walks while they do. */
+  private stepBodies(dt: number): void {
+    if (!this.bodiesOn) return;
+    for (const p of this.people) {
+      const b = p.body;
+      if (!b) continue;
+      const m = p.card.mesh, g = b.rig.group;
+      g.visible = m.visible;
+      if (!m.visible) continue;
+      const dx = m.position.x - b.x, dz = m.position.z - b.z, d = Math.hypot(dx, dz);
+      b.x = m.position.x;
+      b.z = m.position.z;
+      // A jump (a load, a teleport) is not a step.
+      if (d > 0.001 && d < 1) {
+        const want = Math.atan2(dx, dz);
+        b.yaw += wrapAngle(want - b.yaw) * (1 - Math.exp(-dt / 0.08));
+        b.phase += d / b.rig.model.stride;
+        b.still = 0;
+      } else b.still += dt;
+      g.position.copy(m.position);
+      g.rotation.y = b.yaw;
+      b.rig.pose(b.still < 0.15 ? cyclePose(WALK, b.phase) : cyclePose(IDLE, this.time / IDLE_SECONDS));
+      b.rig.setShells(Math.min(2, this.settings.shells));
+    }
+  }
+
   /** Turn the view by `rad` (positive: the world turns clockwise on screen), round what it looks at. */
   turn(rad: number): void {
     this.yaw = wrapAngle(this.yaw + rad);
@@ -2044,6 +2108,7 @@ export class SpikeWorld {
       this.focus.z += (this.hero.z - this.focus.z) * k;
     }
     for (const s of this.sprites) s.tick(this.time);
+    this.stepBodies(dt);
 
     this.placeCamera();
     this.updateSee();

@@ -2,10 +2,7 @@
 
 Newest on top. Answer in chat (just reference the number, e.g. "Q31: A"). Answered questions move to the [archive](archive/questions-answered.md); what they decided goes to the [decisions](decisions.md). Each question names the [plan](todo.md) item it holds up.
 
-## Q31 · Low-poly models: is this the plan? (A2)
-The design is in [low-poly models](design/models.md). In short: one body for every person, dressed from the looks we already have, with shells and movement; furniture switches to the "each kind draws its own model" pattern that barrels and wells already use; a `/models/` gallery to judge them; Claude makes the body and a few example pieces plus a how-to, and Sonnet does the other ~40 furniture kinds in batches that Claude reviews.
-- **A:** Yes, start with one person next to today's card.
-- **B:** Change something first (say what).
+*No open questions right now.*
 
 ---
 

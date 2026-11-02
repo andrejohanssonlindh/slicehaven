@@ -4,6 +4,7 @@ Only decisions that still stand. Ones that were replaced are removed (git histor
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-02 | **Each people has its own 3D body**: its own proportions (a dwarf's big head and short legs, an elf's long limbs and pointed ears, the tirak's jaw and claws, a missla's big head and eyes) and its own size from the creator's typical height and weight per people and sex (the tirak in three sizes). Furniture becomes models made mostly by Sonnet from Claude's examples and a how-to; a `/models/` gallery to judge them | Director (Q31): not one body for all peoples. |
 | 2026-11-02 | **Cut-away: two walls down** from almost every angle; only one when looking within 5° of square onto a wall | Director, after trying the turning view: needing ~20° off before the second wall went felt wrong. |
 | 2026-11-02 | **Browser tests: run only the files a change can affect**, not the whole suite each time | Director: the full run is ~10 minutes of waiting and rarely fails. |
 | 2026-11-02 | **The view turns freely; flat cards become low-poly 3D models with shells** (people first, then furniture and animals), which also gives animation (walking, fighting) | Director (Q28, Q30): the trouble from other angles only comes from flat cards. |

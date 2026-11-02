@@ -30,6 +30,7 @@ export default defineConfig({
         skills: 'skills/index.html',
         spike3d: 'spike3d/index.html',
         npcs: 'npcs/index.html',
+        models: 'models/index.html',
       },
     },
   },

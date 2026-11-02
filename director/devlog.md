@@ -2,6 +2,15 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-02 — A2 begins: a 3D body for every people
+
+- **Try it:** the new **Models** page (from the start page): eight people on turning stands, one of each people and the tirak in their three sizes, with the old flat card beside the farmer. Buttons: turning, walking or standing, shells 0–2, the old card, the outline. In the 3D world, the **Bodies** button (Look row in the panel, or `?bodies` in the address) puts everyone on the map in their body.
+- **Each people its own body** (your answer to Q31): humans the reference; elves longer-limbed and narrower with pointed ears; dwarves a big head, short legs, broad shoulders and big hands (bearded women too); tirak heavy-set with a jaw, claws and red eyes; misslor a big head and big eyes. **Sizes come from the rules' typical height and weight** for each people and for women and men (the same table the character creator uses): a dwarf 1.14 m, a human 1.6–1.7 m, the tirak 1.08, 1.87 and 2.26 m.
+- **Dressed from the looks the kinds of person already have** (clothes, colours, hair, hats, aprons, cloaks, held tools): no person is made by hand. Two shells over cloth and hair for the ragged pixel edge. Walking and standing are poses stored as data.
+- **Not yet:** faces are simple (eyes, a nose, a jaw); held things are rough; people walking through each other's skirts; no sitting or working yet. The cards stay until you're happy.
+- **Fixed:** the graphics-memory browser test (it counted shapes made once and reused as a leak; nothing leaked).
+- **Next:** your verdict on the bodies, then furniture examples and the how-to for Sonnet.
+
 ## 2026-11-02 — A1: turning the view
 
 - **Try it:** in the 3D world, hold **⟲ / ⟳** (under the zoom buttons) or twist two fingers on the map. On a keyboard: Q and E. The camera turns round what it looks at, at any angle.
