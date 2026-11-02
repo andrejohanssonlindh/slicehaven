@@ -10,8 +10,12 @@ export const VIEW_YAW = 0.42;
 /** How far (as the cosine of the angle) a house may turn from facing the view before front-painted cards read wrong: 60°. */
 export const FACING_MIN = 0.5;
 
-/** A wall faces the camera (and is cut away) when it is turned toward it by more than this (the cosine; about 63°). */
-export const FACES_CAMERA = 0.45;
+/**
+ * A wall faces the camera (and is cut away) when it is turned toward it at all, beyond a sliver: the cosine of 85°.
+ * So two walls are down from almost every angle, and only one when you look within 5° of square onto a wall
+ * (the director, 2026-11-02).
+ */
+export const FACES_CAMERA = Math.sin((5 * Math.PI) / 180);
 
 /** How much a side of a house turned by `rot` faces a camera at `yaw`: 1 straight at it, -1 straight away. */
 export function sideToward(side: WallSide, rot: number, yaw: number): number {

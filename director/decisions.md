@@ -4,6 +4,8 @@ Only decisions that still stand. Ones that were replaced are removed (git histor
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-02 | **Cut-away: two walls down** from almost every angle; only one when looking within 5° of square onto a wall | Director, after trying the turning view: needing ~20° off before the second wall went felt wrong. |
+| 2026-11-02 | **Browser tests: run only the files a change can affect**, not the whole suite each time | Director: the full run is ~10 minutes of waiting and rarely fails. |
 | 2026-11-02 | **The view turns freely; flat cards become low-poly 3D models with shells** (people first, then furniture and animals), which also gives animation (walking, fighting) | Director (Q28, Q30): the trouble from other angles only comes from flat cards. |
 | 2026-11-02 | **Free time, with fights in rounds**: the world runs freely; a fight stops it and plays in rounds of 4 seconds of world time, slowly. A slow day and night; how the clock scales is open | Director (Q29): fast day and night feels rushed. |
 | 2026-11-02 | **The Director's Room stays sparse:** the plan, questions, decisions, devlog, how we build things, one handover per area, vision notes. Finished or replaced pages go to the archive, which agents don't read unless sent there | Director: too many overlapping pages; an agent restarting cold must not pick up old plans. |

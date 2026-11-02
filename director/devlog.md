@@ -10,6 +10,8 @@
 - **To judge on the phone:** does the pixel look shimmer while turning? It settles crisp as soon as you stop (the view snaps to whole pixels at every angle). If turning feels too fast or slow, say so (now about 80° a second).
 - **Pattern:** the view's turn is engine state (`world.yaw`); the rule for "which wall faces the camera" lives in `core/world3d/view.ts` and is tested.
 - **Next:** A2, a low-poly person next to today's card, once you've judged the turning.
+- **After your first try:** two walls are now down from almost every angle; only within 5° of square onto a wall is it just one. On a computer, a sideways two-finger swipe on the trackpad turns the view (Safari also takes the trackpad twist; Chrome doesn't pass it to pages).
+- **Browser tests:** from now on only the files a change can affect are run, not the whole 9-minute suite.
 
 ## 2026-11-02 — One plan, a pattern check, and a sparse Director's Room
 

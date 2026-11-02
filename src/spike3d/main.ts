@@ -440,8 +440,23 @@ function bindInput(): void {
   }
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
-    zoom(e.deltaY < 0 ? 1 : -1);
+    // A sideways two-finger swipe on a trackpad turns the view (Chrome never passes the trackpad's own twist to a page).
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      world.turn(e.deltaX * 0.004);
+      return;
+    }
+    if (e.deltaY !== 0) zoom(e.deltaY < 0 ? 1 : -1);
   }, { passive: false });
+  // Safari does pass the trackpad's twist, as a gesture with a rotation in degrees.
+  let gestureAt = 0;
+  type Gesture = Event & { rotation: number };
+  canvas.addEventListener('gesturestart', (e) => { e.preventDefault(); gestureAt = (e as Gesture).rotation; });
+  canvas.addEventListener('gesturechange', (e) => {
+    e.preventDefault();
+    const r = (e as Gesture).rotation;
+    world.turn(((r - gestureAt) * Math.PI) / 180);
+    gestureAt = r;
+  });
 }
 
 // --- the loop and the numbers -------------------------------------------------

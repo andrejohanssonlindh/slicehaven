@@ -79,6 +79,13 @@ describe('house generator', () => {
     expect(facesCamera('back', Math.PI, 0)).toBe(true);
     // On a diagonal, two walls face the camera; at every angle at least one does.
     expect(facesCamera('front', 0, Math.PI / 4) && facesCamera('right', 0, Math.PI / 4)).toBe(true);
+    // Two walls are down unless the view is within 5° of square onto one.
+    const sides = ['front', 'back', 'left', 'right'] as const;
+    const down = (yaw: number) => sides.filter((s) => facesCamera(s, 0, yaw)).length;
+    expect(down(0)).toBe(1);
+    expect(down((4 * Math.PI) / 180)).toBe(1);
+    expect(down((7 * Math.PI) / 180)).toBe(2);
+    expect(down(Math.PI / 2 + (7 * Math.PI) / 180)).toBe(2);
     for (let a = 0; a < Math.PI * 2; a += 0.1) expect((['front', 'back', 'left', 'right'] as const).some((s) => facesCamera(s, 0.3, a))).toBe(true);
   });
 
