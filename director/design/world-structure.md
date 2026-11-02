@@ -69,4 +69,6 @@ const well: ThingDef = {
 6. **Locations**: how maps join (exits, arrivals, a map's own weather and hour). A design question first: see `questions.md`.
 
 ## The habit, for every new thing asked for
+*(For every kind of ask, not only things in the world, see [how we build things](architecture.md): the established patterns and the foundations still missing.)*
+
 Before building something new, place it in the tree first: *what is it a kind of, and what does it inherit?* If it needs something no kind can say yet (a door that opens, a thing that burns), add that as a **property any kind can have** (like `deck` for a bridge or `blocksSight` for a wall), not as an `if` on its name. If the right family does not exist, make the family, so the next thing like it is one line.

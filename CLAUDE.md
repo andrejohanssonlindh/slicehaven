@@ -22,6 +22,9 @@ Grounded fantasy campaign game in a live 3D pixel world (measured in metres, no 
   - The director's own vision notes → `director/vision/` (original text kept verbatim, plus an English digest). **Read these before designing anything.** They're ambitions to build on, not a checklist to do right away.
 - The Eon 5 PDFs in the project root are **copyrighted reference for the world only** (ignore the RPG rules). Never commit them, never paste their text into the repo. Write our own prose. See `director/world/eon-notes.md`.
 
+## Before building anything: the pattern check
+Every new ask gets a senior-dev check **before any code**: which established pattern does it fit? The patterns, and the foundations still missing, are in **`director/design/architecture.md`** (read it first, keep it current). If it fits, say so in one line and build. If it doesn't (a fireball today: no actions, effects or combat yet), stop, sketch the foundation and agree it with the director first. Never an `if` on a name or a one-off in the renderer.
+
 ## The ruleset
 - The director turned the project toward recreating the tabletop ruleset. **Never write the brand name** of the ruleset in the repo, UI or commits. World names are fine (decision Q1). Data is mechanics plus our own short summaries, never copied prose.
 - Extracted book text lives in `reference/` (gitignored; never commit it or paste it in).
