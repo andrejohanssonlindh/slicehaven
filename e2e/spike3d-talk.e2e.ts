@@ -62,4 +62,35 @@ describe('spike3d talking', () => {
     expect(await w('w.talkingWith')).toBeNull();
     expect(errors).toEqual([]);
   });
+
+  it('the guard\'s portrait shows his face, not the tip of his spear; the log stays clear of the choices', async () => {
+    const { page, errors } = await openPage(env, '/spike3d/?nogov&map=hamlet', { storage: quick('fine') });
+    await ready(page);
+    const w = evalIn(page);
+    await w('(w.dayMinutes = 0, w.weather.setHour(10), 0)');
+    const g = (await w(`(() => { const m = w.minds.find((m) => m.id === 'guard'); return { x: m.x, z: m.z }; })()`)) as { x: number; z: number };
+    await w(`(w.placeHeroAt(${g.x - 3.5}, ${g.z}), 0)`);
+    await page.waitForTimeout(800);
+    const p = (await page.evaluate(`(() => {
+      const w = window.spike.world, c = w.cast.find((c) => c.who.id === 'guard');
+      const v = c.fig.place.getWorldPosition(w.camera.position.clone()); v.y += 0.9; v.project(w.camera);
+      const r = document.getElementById('view').getBoundingClientRect();
+      return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+    })()`)) as { x: number; y: number };
+    await page.mouse.click(p.x, p.y);
+    await page.waitForSelector('#talk:not([hidden])', { timeout: 45_000 });
+    await page.waitForTimeout(600);
+    for (let i = 0; i < 3; i++) {
+      await page.locator('#talk .choices button', { hasText: /^(Ask|Size up)/ }).first().click();
+      await page.waitForSelector('.dice-show', { state: 'detached', timeout: 15_000 });
+    }
+    await page.screenshot({ path: `${OUT}talk-guard.png` });
+    // The last thing said ends above the choices.
+    const last = await page.locator('#talk .log p').last().boundingBox();
+    const log = await page.locator('#talk .log').boundingBox();
+    const choices = await page.locator('#talk .choices').boundingBox();
+    expect(last!.y + last!.height).toBeLessThanOrEqual(choices!.y + 12);
+    expect(log!.height).toBeGreaterThan(60);
+    expect(errors).toEqual([]);
+  });
 });

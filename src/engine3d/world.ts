@@ -1894,17 +1894,19 @@ export class SpikeWorld {
     const c = this.cast.find((x) => x.who.id === id);
     if (!c) return null;
     const f = c.fig;
-    // Aim at the head: the top of the body as it stands, a head's height down; from the way the body really faces.
+    // Aim between the shoulders and the crown, from the body's own joints (not what it holds: a spear held upright
+    // reaches far above the head); from the way the body really faces.
     f.place.updateMatrixWorld(true);
-    const box = new THREE.Box3().setFromObject(f.rig.group);
+    const J = f.rig.model.joints, H = f.rig.model.height;
+    const shoulders = J.root.at[1] + J.spine.at[1] + J.neck.at[1];
     const at = f.place.getWorldPosition(new THREE.Vector3());
-    const headH = Math.max(0.2, (box.max.y - box.min.y) * 0.13);
-    const aim = new THREE.Vector3(at.x, box.max.y - headH * 1.1, at.z);
+    const headH = Math.max(0.15, (H - shoulders) * 0.8);
+    const aim = new THREE.Vector3(at.x, at.y + shoulders + (H - shoulders) * 0.4, at.z);
     const q = f.rig.group.getWorldQuaternion(new THREE.Quaternion());
     const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(q).setY(0).normalize();
     const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
     // Head and shoulders fill the frame; a little to one side and above, so the face reads as a face.
-    const fov = 26, dist = (headH * 1.45) / Math.tan((fov * Math.PI) / 360);
+    const fov = 26, dist = (headH * 1.6) / Math.tan((fov * Math.PI) / 360);
     const cam = new THREE.PerspectiveCamera(fov, 1, 0.05, 40);
     cam.position.copy(aim).addScaledVector(fwd, dist).addScaledVector(side, dist * 0.18).add(new THREE.Vector3(0, dist * 0.12, 0));
     cam.lookAt(aim);

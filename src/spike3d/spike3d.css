@@ -92,26 +92,25 @@
 #talk .who .what { font-size: 12px; opacity: 0.75; }
 #talk .who .mood { font-size: 12px; font-style: italic; }
 #talk .close { width: 36px; height: 36px; padding: 0; font-size: 16px; flex-shrink: 0; }
-#talk .log { flex: 1; overflow-y: auto; padding: 4px 10px 40%; font-size: 13px; line-height: 1.4; }
+#talk .log { flex: 1; min-height: 72px; overflow-y: auto; padding: 4px 10px 14px; font-size: 13px; line-height: 1.4; }
 #talk .log p { margin: 0 0 6px; }
 #talk .log p.you { color: #e0b050; }
 #talk .log p.you::before { content: '› '; }
 #talk .log p.info { opacity: 0.6; font-size: 12px; }
 #talk .log p.good { color: #b8d890; }
 #talk .log p.bad { color: #e09a80; }
-/* The choices float over the bottom of the log. */
+/* The choices sit under the log (never over what was said), overlapping it only by a soft fade. */
 #talk .choices {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  max-height: 42%;
+  flex-shrink: 0;
+  max-height: 40%;
   overflow-y: auto;
-  padding: 18px 8px 8px;
+  margin-top: -12px;
+  padding: 14px 8px 8px;
   display: flex;
   flex-direction: column;
   gap: 5px;
-  background: linear-gradient(to bottom, #0e0a1400, #0e0a14f0 18px);
+  background: linear-gradient(to bottom, #0e0a1400, #0e0a14f4 12px);
+  position: relative;
 }
 #talk .choices button { min-height: 40px; text-align: left; font-size: 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 #talk .choices button small { opacity: 0.7; font-size: 11px; }

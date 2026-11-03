@@ -2,6 +2,13 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-03 — Talk fixes; openings for talk, for discussion
+
+- **The log no longer hides behind the choices:** they sit under it, overlapping only by a soft fade.
+- **The guard's portrait shows his face.** The camera aimed at the top of what he carried (a spear held upright); it now aims between his shoulders and crown, from the body's own joints.
+- **Your notes on hooks** are kept as written ([vision](vision/2026-11-03-director-notes-2.md)) and worked into a proposal for discussion: [openings](design/talk-openings.md). Every try gets an *opening*, the reason it's on the table: **always** (a few things with anyone), **their state** (grieving → comfort), **a situation** (caught with their chair → law, argue, threaten), **a lead** (the hooks you collect: something found, heard, given by a talk or a quest), or **what you know** (your Law notices it's theft). Nothing built yet.
+- **Two questions:** Q40 (what's open with anyone) and Q41 (how leads are held and seen).
+
 ## 2026-11-03 — Fires easier indoors and on embers; B3d: talking to people
 
 - **Lighting a fire** (your note): **easier indoors** (−2: dry, sheltered, kindling at hand) and **much easier on embers** (−4). A fire you put out keeps its embers; once lit, they're gone. A villager's hearth at dawn is now a 4 (or a 2 on embers) instead of a 6. Embers don't cool with time yet: that waits for days on the clock (C2).
