@@ -8,8 +8,9 @@ const BRACKET_HEIGHT = 2.25;
 
 /** Things that burn on purpose. `fire` is also a kind in the skill library, so its hooks reach every flame below. */
 const things: ThingDef[] = [
-  // The family (`fire` is a feature in the skill library's tree too): every fire is lit or out, and starts lit.
-  { id: 'fire', is: 'feature', abstract: true, states: { lit: { default: true } } },
+  // The family (`fire` is a feature in the skill library's tree too): every fire is lit or out, and starts lit; one
+  // smothered keeps embers, which make it easier to light again.
+  { id: 'fire', is: 'feature', abstract: true, states: { lit: { default: true }, embers: { default: false } } },
   {
     id: 'torchpost',
     is: 'fire',

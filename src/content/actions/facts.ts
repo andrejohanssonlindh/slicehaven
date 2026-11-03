@@ -29,6 +29,15 @@ export const FACTS: FactDef[] = [
     whenFalse: 'Only among the houses.',
   },
   {
+    // A fire put out by smothering keeps embers (`embers`, set by `putout`); lit again, they're gone. They don't cool
+    // with time yet: that waits for days on the clock (the calendar, plan C2).
+    id: 'embers',
+    about: 'The fire acted on still has embers in it.',
+    holds: (_at, _view, target, world) => !!target && !!world && world.states.has(target.kind, 'embers') && world.states.get(target.id, target.kind, 'embers') === true,
+    whenTrue: 'Not while there are embers.',
+    whenFalse: 'Only where there are embers.',
+  },
+  {
     id: 'dark',
     about: 'Night (before six or after eight in the evening).',
     holds: (_at, view) => view.hour < 6 || view.hour >= 20,

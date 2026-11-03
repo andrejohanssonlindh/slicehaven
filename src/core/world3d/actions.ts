@@ -77,7 +77,8 @@ export interface ActWorld {
 export interface FactDef {
   id: string;
   about: string;
-  holds(at: Spot, view: WorldView): boolean;
+  /** `target` is the thing acted on, if any (embers in a hearth are a fact about the hearth). */
+  holds(at: Spot, view: WorldView, target?: ActTarget | null, world?: Pick<ActWorld, 'states'>): boolean;
   /** Said when a gate needs it false and it is true ("You are among the houses."), and the other way round. */
   whenTrue: string;
   whenFalse: string;
@@ -127,7 +128,7 @@ export type Outcome =
 export interface ActRoll {
   skills: string[];
   difficulty: number;
-  /** Harder (or easier) where a fact holds: rain on an outdoor fire. */
+  /** Harder where a fact holds (rain on an outdoor fire), or easier with a negative `add` (indoors, embers still in it). */
   harder?: { fact: string; add: number; note: string }[];
   /**
    * The attribute that fits (`attr:Förflyttning`), for someone with none of the skills: the rules let anyone use an
@@ -318,15 +319,17 @@ export function perform(offer: string, target: ActTarget | null, at: Spot, doer:
   if (v.roll) {
     const best = bestSkill(doer, v.roll.skills);
     let difficulty = v.roll.difficulty;
-    const notes: string[] = [];
+    const harder: string[] = [], easier: string[] = [];
     for (const h of v.roll.harder ?? []) {
       const f = lib.facts[h.fact];
       if (!f) throw new Error(`verb ${v.id}: no fact called ${h.fact}`);
-      if (f.holds(at, world.view)) {
+      if (f.holds(at, world.view, target, world)) {
         difficulty += h.add;
-        notes.push(h.note);
+        (h.add > 0 ? harder : easier).push(h.note);
       }
     }
+    // (Never below 2, the easiest a roll gets in the rules.)
+    difficulty = Math.max(2, difficulty);
     // No fitting skill: the fitting attribute, two dice down (the rules' fallback).
     const fallback = !best && v.roll.attr && doer.dice(v.roll.attr).n > 0 ? { skill: v.roll.attr, dice: modify(doer.dice(v.roll.attr), -2) } : null;
     const use = best ?? fallback;
@@ -335,7 +338,8 @@ export function perform(offer: string, target: ActTarget | null, at: Spot, doer:
       roll = rollTest(use.dice, difficulty, world.rng);
       success = !!roll.success;
       if (fallback) events.push({ kind: 'say', line: { text: 'No fitting skill: an attribute instead, at −2D6.', tone: 'info' } });
-      if (notes.length) events.push({ kind: 'say', line: { text: `Harder: ${notes.join(', ')}.`, tone: 'info' } });
+      if (easier.length) events.push({ kind: 'say', line: { text: `Easier: ${easier.join(', ')}.`, tone: 'info' } });
+      if (harder.length) events.push({ kind: 'say', line: { text: `Harder: ${harder.join(', ')}.`, tone: 'info' } });
     } else {
       success = false;
       events.push({ kind: 'say', line: { text: 'You have no skill for this.', tone: 'info' } });

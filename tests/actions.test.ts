@@ -66,12 +66,24 @@ describe('the action frame', () => {
     expect(lit).toBeGreaterThan(30);
   });
 
-  it('is harder in the rain out of doors, and not indoors', () => {
+  it('is harder in the rain out of doors, and easier indoors whatever the weather', () => {
     const wet = world({ rain: 0.8 });
     wet.states.set(torch.id, torch.kind, 'lit', false);
     wet.states.set(hearth.id, hearth.kind, 'lit', false);
     expect(perform('verb:light', torch, torch, doer, wet, ACTIONS).roll?.target).toBe(10);
-    expect(perform('verb:light', hearth, hearth, doer, wet, ACTIONS).roll?.target).toBe(6);
+    const r = perform('verb:light', hearth, hearth, doer, wet, ACTIONS);
+    expect(r.roll?.target).toBe(4);
+    expect(r.events.some((e) => e.kind === 'say' && /Easier: indoors/.test(e.line.text))).toBe(true);
+  });
+
+  it('a fire put out keeps its embers, which make it much easier to light; lit, they are gone', () => {
+    const w = world();
+    perform('verb:putout', hearth, hearth, doer, w, ACTIONS);
+    expect(w.states.get(hearth.id, 'hearth', 'embers')).toBe(true);
+    let r = perform('verb:light', hearth, hearth, doer, w, ACTIONS);
+    for (let k = 0; !r.success && k < 10; k++) r = perform('verb:light', hearth, hearth, doer, w, ACTIONS);
+    expect(r.roll?.target).toBe(2);
+    expect(w.states.get(hearth.id, 'hearth', 'embers')).toBe(false);
   });
 
   it('fails without the skill, and says so', () => {
