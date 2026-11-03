@@ -1,6 +1,6 @@
 # Openings: why a thing can be said (for discussion)
 
-*2026-11-03. From the director's [notes of the same day](../vision/2026-11-03-director-notes-2.md). **Partly agreed** (Q40, Q41 answered; the "always" openings are built); leads are still for discussion (Q42). Belongs to B3d (talking) and reaches into B3c (situations), D2 (quests) and D4 (found things).*
+*2026-11-03. From the director's [notes of the same day](../vision/2026-11-03-director-notes-2.md). **Agreed** (Q40–Q42). The "always" openings are built; leads are plan item **B11**, built as data files (below). Belongs to B3d (talking) and reaches into B3c (situations), D2 (quests) and D4 (found things).*
 
 ## The problem
 Today a talk offers **every** social try the skill library has for who someone is: fourteen for a farmer, court manners included. That has two faults:
@@ -30,7 +30,7 @@ An opening is what puts a try on the table. A try shows only while one of its op
 - **Q40, open with anyone:** sizing them up, asking what they know, and their work (asking about it needs no skill). Also **distracting** them and **threatening** them (robbing someone starts there). **Stealing** (picking a pocket) is started from **sneaking up on them**, never from a talk. *Built 2026-11-03:* only these are offered; everything else waits for an opening of its own.
 - **Q41, leads:** several ways in. **Quests are leads.** There are **free leads** too: find a curious statue outside a town, and "Lead added". Thought through below, for the next round.
 
-## Leads, thought through (for discussion)
+## Leads, thought through (agreed, Q41–Q42)
 **What a lead is.** Something the hero knows that gives a reason to act: *a weathered statue of a woman holding a key, on the north road*. It isn't an item (a letter can carry one, but you know it even if the letter burns). It has three parts:
 - **what you know:** a few lines, which grow as you learn more;
 - **who might care:** anyone here, a kind of person (the old, the clergy, guards), one person, or a place;
@@ -58,8 +58,28 @@ An opening is what puts a try on the table. A try shows only while one of its op
 
 **The first slice, if this is the shape:** a lead record in the save, the journal, "Lead added". One curiosity on the Hamlet map (the statue, by the road out), two people who know about it (an elder and the innkeeper), and *ask about it* opened by the lead. Through the frame: a lead is an outcome (`{ lead: 'statue-north' }`) and an opening (`{ lead: 'statue-north' }`).
 
+## Adding leads: one file each, and a lead note (agreed shape, Q42)
+Leads are built so the tenth is as easy as the first: **a lead is a data file** (`content/leads/<id>.ts`, found by itself like kinds and verbs). Nothing about a particular lead is ever code. A file says:
+
+| Part | What it says | Example (the statue) |
+|---|---|---|
+| `title` | What the journal calls it | The statue on the north road |
+| `know` | What you know when you get it | A weathered statue of a woman holding a key, by the north road |
+| `from` | Ways in: looking at or studying a kind of thing or one placed thing, a good *ask* with someone who knows it, a line overheard at a place, an item read, a creator life event, a quest given | Looking at the `statue` by the north road |
+| `cares` | Who might care: anyone here, a kind or facet of person (elders, clergy, guards), one person, a place | Elders; the innkeeper |
+| `answers` | What each of them says when asked: lines added to what you know, and maybe a **next lead** or a flag | The old woman: "Saint Hesma. She kept the well." → next lead: *the well under the statue* |
+| `opens` | Tries it puts on the table, on people or things, through the frame (verbs and skill hooks as they are) | *Search the statue's base* |
+| `ends` | When it's solved, spent or gone cold: a flag, everyone asked, an hour passed | Solved when the door is opened |
+
+**What a lead needs from the engine is small and fixed:** a lead record in the save and the journal. *Gives a lead* is an outcome (`{ lead: id }`, beside `flag`) and *has a lead* is an opening (`{ lead: id }`), so any verb, hook, talk answer or quest can give one or need one. Curiosities to find are kinds of thing (a statue, a cairn, a ruin), placed by hand or scattered by a map rule. A new *way in* (overheard lines, say) is added once and then every lead can use it.
+
+**A lead note** (what you send in, and I make it a file), like the action note:
+
+> **Lead:** the statue on the north road · **You learn it by:** looking at it · **You know:** a woman holding a key, worn by weather · **Who cares:** old people, the innkeeper · **They say:** she's Saint Hesma, who kept the well · **It opens:** search the base · **Next:** a key, and a door it fits · **Ends:** when the door is opened
+
+When a note needs a way in, an opening or an outcome the engine doesn't have yet, that one piece is added first (the pattern check).
+
 ## Open points (talk them through)
-- **Q42:** is the lead shape above right, and is the first slice the right one?
 - **Do failed tries close?** Today some do (out of tries). With openings, a try could stay open but cost more patience.
 - **Does a lead run out?** Asking about the mill twice, or once everyone knows.
 - **Are leads shared with the hooks on things?** A lead could also open a try on a thing (*search the mill's ashes*). Probably yes: the same opening works for things and people.

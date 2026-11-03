@@ -4,11 +4,7 @@ Newest on top. Answer in chat (just reference the number, e.g. "Q31: A"). Answer
 
 *A small ask for B6 too: the page of the carried-weight rule, when you've looked.*
 
-### Q42 · Leads: is this the shape? (B3d, D2; [leads, thought through](design/talk-openings.md#leads-thought-through-for-discussion))
-I've thought leads through on the openings page: what a lead is (what you know, who might care, what it opens), the six ways in (found, told, overheard, carried, your past, asked of you: a quest), how one grows into the next, how it ends, and how you see them ("Lead added", a journal, choices that appear by themselves). Then a first slice: one curious statue on the Hamlet road, two people who know about it, and *ask about it*.
-- **A, yes: build that first slice** (recommended), and we judge it in the game.
-- **B, change the shape first** (tell me what's off).
-- **C, later:** perception (B5) first, leads after.
+*No open questions right now.*
 
 ---
 
