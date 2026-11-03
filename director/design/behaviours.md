@@ -41,12 +41,18 @@
 | `home` | goes into their house (or a named one) and stays in its back room | `house` |
 | `rounds` | goes the rounds of a house: each storey, up, down, out to the door | `house` (`home` = their own) |
 | `tendfire` | sees to a house's fire: if it is out, walks to it and lights it through the action frame (`verb:light`, the same gates and roll as the hero; a failed try is tried again 20 s later), then stays by it | `house` (default their own) |
+| `watch` | stops and faces whoever they see (the hero unless named), or else where the last noise came from | `who` |
+| `investigate` | walks to where the last noise came from (of a kind, if named), then looks about | `of`, `look` (s), `speed` |
 
 | Condition | Holds | Value |
 |---|---|---|
 | `hours` | between two hours (`[20, 6]` runs past midnight) | `[from, to]` |
 | `event` | while an event runs | its id |
 | `notEvent` | while it does not | its id |
+| `sees` / `notSees` | while they see (or don't) someone: in their cone and range, on their side of the walls, nothing in the way | `"hero"` or a person's id |
+| `heard` | for 30 s after hearing a noise of that kind | `"steps"`, `"shout"`, `"fire"`, `"any"`, or a list |
+
+**Perception (B5)** is in `core/world3d/perceive.ts`. Everyone near looks and listens four times a second. Their sight is rolled from their own sheet (Alertness against 8, every six world hours): a failure halves it, advantages stretch it. The night shortens it unless they have darkvision, and a flame the hero carries is seen from far. Noises: the hero's footsteps (5 m), a verb's `noise` (lighting a fire 8 m, call out 40 m); a wall muffles a sound to 40% of its reach. What they notice is on their mind (`mind.senses`).
 
 Places (`MapSpec.places`): `{ "at": [x, z] }`, `{ "area": … }` (circle, rect, ring), `{ "path": [[x, z], …], "loop": true }`, `{ "road": 0, "from": m, "to": m }`, `{ "around": area, "margin": m }`.
 
@@ -69,9 +75,10 @@ A schedule that names a behaviour, condition, place or house that is not there, 
 - A guard patrols a loop round the green from 06:00 to 22:00, then stands at its middle.
 - The villager walks the road; the innkeeper goes the rounds of the inn.
 - At dawn (06:00–08:00, the innkeeper 06:00–07:00) each sees to their hearth: one that was put out in the night is lit again.
+- At night (22:00–06:00) the guard watches the hero if they see them, and goes to look at anything they hear. By day a shout sends them over, and the townsfolk on the green turn to it.
 
 ## Not done yet (natural next steps)
-- **Reacting to the hero**: a condition like `sees: "hero"` or an `alarm` event, and behaviours `chase`, `flee`, `talk`. The structure takes them as new files; enemies need these.
+- **Reacting to the hero, the rest**: `sees` and `heard` are built (B5), with `watch` and `investigate`; still to come are an `alarm` event and the behaviours `chase` and `flee`, each a new file. Enemies need them.
 - **Doing things at places**: sitting on a bench, working at a counter (a behaviour that uses a thing's kind).
 - **Days**: the clock has hours only; events can't yet say "day 3".
 - People far from both the view and the hero (140 m) wait, so a big city does not run everyone. They don't yet catch up on time missed.

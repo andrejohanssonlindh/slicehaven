@@ -1,3 +1,5 @@
+import { DEFAULT_DIFFICULTY, type GameDifficulty } from '../core/difficulty';
+
 /**
  * The player's settings, shared by every page (kept in the browser). Versioned like every save: settings of another
  * version are dropped for the defaults.
@@ -16,11 +18,13 @@ export interface Settings {
   dice: DiceLevel;
   diceSkin: string;
   diceClose: DiceClose;
+  /** How hard the game is (`core/difficulty.ts`): on easy, more is shown (sight rolls, who sees you). */
+  difficulty: GameDifficulty;
 }
 
 const VERSION = 1;
 const KEY = 'slicehaven.settings';
-const DEFAULTS: Settings = { v: VERSION, dice: 'glass', diceSkin: 'bone', diceClose: 'ok' };
+const DEFAULTS: Settings = { v: VERSION, dice: 'glass', diceSkin: 'bone', diceClose: 'ok', difficulty: DEFAULT_DIFFICULTY };
 
 /** What this page has set, if storage would not keep it. */
 let memo: Settings | null = null;

@@ -49,6 +49,8 @@ describe('spike3d vision and the explored map', () => {
     await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 90_000 });
     const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; return ${fn}; })()`);
     await w('(w.weather.setHour(0), w.weather.set("clear"), w.dayMinutes = 0, 0)');
+    // (Plain sight, not whatever the sight roll gave: B5.)
+    await w('(w.holdSight({ success: true, advantages: 0 }), 0)');
     // Stand 42 m out in front of the door torch, facing it (the house is behind the torch, not in the way).
     const torch = (await w('(({ x, z }) => ({ x, z }))(w.layout.props.find((p) => p.kind === "walltorch"))')) as { x: number; z: number };
     // (The palisade across the village at z = 18 has one opening, the open gate at x = 4: look through it.)

@@ -22,7 +22,9 @@ import { Explored } from '../core/world3d/explored';
 import { type StatesJSON, ThingStates, pieceId, placedId } from '../core/world3d/state';
 import { type ActResult, type ActTarget, type ActWorld, type Doer, type Offer, type Spot, offers, perform } from '../core/world3d/actions';
 import { ACTIONS } from '../content/actions';
-import { sheetDice } from '../core/npcsheet';
+import { sheetDice, unitsDice } from '../core/npcsheet';
+import type { Roll } from '../core/dice';
+import { HEARD_FOR, type Noise, type Senses, type SightRoll, type Where, canSee, fadeSenses, hears, lastHeard, newSenses, noteHeard, rollSight, sightBoost, sightDue } from '../core/world3d/perceive';
 import { type TalkCase, type TalkMemory, type TalkPerson, type TalkResult, newTalkMemory, talk } from '../core/world3d/talk';
 import type { Visitor } from '../core/skillweb';
 import { personName } from '../content/people/naming';
@@ -106,6 +108,35 @@ interface CastCard {
   fig: Figure;
   blob: THREE.Mesh;
   mind: Mind;
+  /** The way they face (radians, atan2(z, x)): where their eyes look (plan B5). */
+  facing: number;
+  /** On easy, what they notice of the hero, over their head: an eye (they see you), a question (they heard something). */
+  mark: THREE.Sprite;
+}
+
+/** How often the map's people look and listen, seconds. */
+const PERCEIVE_EVERY = 0.25;
+/** The hero's footsteps: heard this far by an ordinary ear, metres; one every so many metres walked. */
+const STEPS_LOUD = 5;
+const STEP_EVERY = 0.8;
+/** A noise heard shows its question mark (on easy) for its first 8 seconds: while it has more than this left. */
+const HEARD_SHOWN = HEARD_FOR - 8;
+
+/** The marks over people's heads (on easy): drawn per pixel, 12 × 12. */
+function markTexture(kind: 'eye' | 'heard'): THREE.Texture {
+  const c = document.createElement('canvas');
+  c.width = c.height = 12;
+  const g = c.getContext('2d')!;
+  const px = (x: number, y: number, col: string): void => { g.fillStyle = col; g.fillRect(x, y, 1, 1); };
+  const rows = kind === 'eye'
+    ? ['', '', '   ######   ', ' ##wwwwww## ', '#wwww##wwww#', '#www#pp#www#', '#wwww##wwww#', ' ##wwwwww## ', '   ######   ']
+    : ['    ####    ', '   #yyyy#   ', '  #yy##yy#  ', '   ## #yy#  ', '     #yy#   ', '    #yy#    ', '    #yy#    ', '     ##     ', '    #yy#    ', '    #yy#    ', '     ##     '];
+  const col: Record<string, string> = { '#': '#1b1410', w: '#f4ecd6', p: '#2a62c9', y: '#ffd24a' };
+  rows.forEach((r, y) => [...r].forEach((ch, x) => { if (col[ch]) px(x, y, col[ch]); }));
+  const t = new THREE.CanvasTexture(c);
+  t.magFilter = t.minFilter = THREE.NearestFilter;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
 /**
@@ -362,9 +393,8 @@ export class SpikeWorld {
     return false;
   }
 
-  /** What stops the eye near the hero: trunks and boulders, other houses whole, and the walls of the house they stand in. */
-  private blockers(range: number): Shape[] {
-    const h = this.hero;
+  /** What stops the eye near someone (the hero unless said): trunks and boulders, other houses whole, and the walls of the house they stand in. */
+  private blockers(range: number, h: Actor = this.hero): Shape[] {
     const out: Shape[] = [...this.placed.sightNear(h.x - range, h.z - range, h.x + range, h.z + range)];
     // (Asked of the index, not of the standing houses: sight reaches past what has been stood up.)
     for (const l of this.houseIndex.liteNear(h.x - range, h.z - range, h.x + range, h.z + range)) out.push(...(l.built.place.id === h.house ? [...houseWalls(l.built, h.level === 0), ...sightWalls(l.built, h.level)] : [l.box]));
@@ -508,6 +538,22 @@ export class SpikeWorld {
   readonly people: Person[] = [];
   /** The map's people, each following their schedule (see `stepCast`). */
   private cast: CastCard[] = [];
+  private readonly markMats = {
+    eye: new THREE.SpriteMaterial({ map: markTexture('eye'), depthTest: false, transparent: true }),
+    heard: new THREE.SpriteMaterial({ map: markTexture('heard'), depthTest: false, transparent: true }),
+  };
+  /**
+   * Perception (plan B5, `core/world3d/perceive.ts`). The hero's senses: their sight roll (rolled on entering the map
+   * and every six world hours; `rerollSight` for waking). Their Alertness is `alertness`; darkvision 0..1 is `darkSight`.
+   */
+  readonly heroSenses: Senses = newSenses();
+  darkSight = 0;
+  /** Told of every sight roll made (the hero's and the people's), for the page to show on easy. */
+  onSightRoll: ((who: string, roll: Roll, sight: SightRoll) => void) | null = null;
+  /** Show over people's heads what they notice of the hero (on easy). */
+  showSenses = false;
+  private perceiveIn = 0;
+  private stepFrom: P2 | null = null;
   private places: Record<string, Place> = {};
   private mapEvents: MapEvent[] = [];
   /** Events started (true) or stopped (false) by hand, over what the map's hours say. */
@@ -645,7 +691,13 @@ export class SpikeWorld {
     for (const who of map.cast) {
       const fig = personFigure(who, this.yaw), blob = blobShadow(0.32);
       fig.place.visible = blob.visible = false;
-      this.cast.push({ who, fig, blob, mind: newMind(who.id, who.start[0], who.start[1], who.seed ?? 1, who.slot, who.home) });
+      const mark = new THREE.Sprite(this.markMats.eye);
+      mark.scale.set(0.8, 0.8, 1);
+      mark.renderOrder = 6;
+      mark.visible = false;
+      this.scene.add(mark);
+      const mind = newMind(who.id, who.start[0], who.start[1], who.seed ?? 1, who.slot, who.home);
+      this.cast.push({ who, fig, blob, mind, facing: Math.atan2(mind.actor.dir.z, mind.actor.dir.x), mark });
       // Only the hero shows through what stands in front of them: anyone else behind a tree or a wall is hidden by it.
       this.people.push({ id: who.id, spec: who, fig, reveals: false });
       this.scene.add(fig.place, blob);
@@ -2059,8 +2111,84 @@ export class SpikeWorld {
       if (e.kind === 'time' && hero && this.weather.hour !== null) this.weather.advance(e.minutes / 60);
       else if (e.kind === 'make' && e.thing === 'campfire') this.lightFire();
       else if (e.kind === 'sit' && hero) this.sitHero(e.target);
+      else if (e.kind === 'noise') this.makeNoise({ ...e.at, loud: e.loud, kind: e.sound, by: doer.id });
     }
     return r;
+  }
+
+  // --- perception (plan B5): sight rolls, who sees whom, noises heard ---
+
+  /** World time in hours, counting days (for "every six hours"). */
+  get worldHours(): number {
+    const w = this.weather;
+    return w.day * 24 + (w.hour ?? 12);
+  }
+
+  /** Roll the hero's sight again now (entering a map, six hours on, waking): Alertness against 8. */
+  rerollSight(): SightRoll {
+    const { roll, sight } = rollSight(unitsDice(this.alertness), this.actRng, 'Sight');
+    this.heroSenses.sight = sight;
+    this.heroSenses.rolledAt = this.worldHours;
+    this.castAt = null;
+    this.onSightRoll?.('hero', roll, sight);
+    return sight;
+  }
+
+  /** Set the hero's sight as if just rolled (for tests: plain sight, whatever the dice would say). */
+  holdSight(sight: SightRoll): void {
+    this.heroSenses.sight = { ...sight };
+    this.heroSenses.rolledAt = this.worldHours;
+    this.castAt = null;
+  }
+
+  /** A sound in the world: everyone near enough to hear it (and not the one who made it) notes it. */
+  makeNoise(n: Noise): void {
+    for (const c of this.cast) {
+      const a = c.mind.actor;
+      if (c.who.id === n.by || Math.hypot(a.x - this.hero.x, a.z - this.hero.z) > MIND_REACH) continue;
+      if (hears(this.whereOf(a), c.who.sheet?.attrs.Vaksamhet ?? 10, n)) noteHeard(c.mind.senses, n);
+    }
+  }
+
+  private whereOf(a: Actor): Where {
+    return { x: a.x, z: a.z, house: a.house, level: a.stair ? 0 : a.level };
+  }
+
+  /** The hero's footsteps, a soft noise every few steps (not while sitting). */
+  private stepFootsteps(): void {
+    const h = this.hero, f = this.stepFrom;
+    if (!f || this.seated) {
+      this.stepFrom = { x: h.x, z: h.z };
+      return;
+    }
+    if (Math.hypot(h.x - f.x, h.z - f.z) < STEP_EVERY) return;
+    this.stepFrom = { x: h.x, z: h.z };
+    this.makeNoise({ ...this.whereOf(h), loud: STEPS_LOUD, kind: 'steps', by: 'hero' });
+  }
+
+  /** What each of the map's people notices (for tests and the debug hook): their sight, whom they see, what they heard. */
+  get senses(): { id: string; sight: SightRoll; sees: string[]; heard: string[] }[] {
+    return this.cast.map((c) => ({ id: c.who.id, sight: { ...c.mind.senses.sight }, sees: [...c.mind.senses.sees], heard: c.mind.senses.heard.map((h) => h.kind) }));
+  }
+
+  /** One of the map's people looks (their sight rolled when due; the hero seen or not) and lets what they heard fade. */
+  private perceive(c: CastCard, dt: number, night: number): void {
+    const s = c.mind.senses, a = c.mind.actor, sheet = c.who.sheet;
+    if (sightDue(s, this.worldHours)) {
+      const rng = new Rng(c.mind.rng);
+      const { roll, sight } = rollSight(sheet ? sheetDice(sheet, 'attr:Vaksamhet') : unitsDice(10), rng, 'Sight');
+      c.mind.rng = rng.seed;
+      s.sight = sight;
+      s.rolledAt = this.worldHours;
+      this.onSightRoll?.(c.who.id, roll, sight);
+    }
+    fadeSenses(s, dt);
+    const spec = visionOf({ alertness: sheet?.attrs.Vaksamhet ?? 10, night, boost: sightBoost(s.sight), darkSight: Math.min(1, (sheet?.skills['F:Mörkersyn'] ?? 0) / 12) });
+    const me = this.whereOf(a), hero = this.whereOf(this.hero);
+    // (A carried light is made out at most three times plain range: `lightReach`.)
+    const near = Math.hypot(hero.x - me.x, hero.z - me.z) <= spec.range * 3;
+    const sees = near && canSee(me, c.facing, spec, hero, this.blockers(Math.min(spec.range * 3, 110), a), night, !!(this.orb || this.hand));
+    s.sees = sees ? ['hero'] : [];
   }
 
   /** What the map's people may do to things: their behaviours act through the same frame as the hero, rolling with their own sheets (plan B4). */
@@ -2136,6 +2264,7 @@ export class SpikeWorld {
     this.flags = { ...s.flags };
     this.talkMemory = s.talk ? structuredClone(s.talk) : newTalkMemory();
     this.weather.setHour(s.hour);
+    this.heroSenses.rolledAt = null; // (back in the map: sight is rolled again)
     this.explored.assign(s.explored);
     this.exploredWin.dirty = true;
     this.states.assign(s.things);
@@ -2369,9 +2498,11 @@ export class SpikeWorld {
     // With vision on, what lies past it is black, not sky.
     this.scene.background = this.bgColor.copy(this.fog.color).multiplyScalar(this.vision.outer > 0 ? 0.05 : 1);
     // Sight is the hero's, not the camera's: a cone ahead, a circle round, the dark shortening it, solid things in the way.
+    // Sight is rolled (plan B5): on entering the map, and every six world hours.
+    if (sightDue(this.heroSenses, this.worldHours)) this.rerollSight();
     if (this.vision.outer > 0) {
       this.facing = turnToward(this.facing, Math.atan2(this.heroDir.z, this.heroDir.x), 7 * dt);
-      this.spec = visionOf({ alertness: this.alertness, night: env.night, cap: this.vision.outer, light: this.orb || this.hand ? 1 : 0 });
+      this.spec = visionOf({ alertness: this.alertness, night: env.night, cap: this.vision.outer, light: this.orb || this.hand ? 1 : 0, boost: sightBoost(this.heroSenses.sight), darkSight: this.darkSight });
       this.castRays();
       this.refreshLights(env.night);
       const sp = this.spec;
@@ -2445,8 +2576,9 @@ export class SpikeWorld {
     // What is fixed to the outside of the house the hero is in (its door torch) goes with the cut-away: not logical, but the room reads better.
     for (const [o, id] of this.fixedTo) o.visible = !this.outFlames.has(o) && !this.houses.some((hs) => hs.open && hs.built.place.id === id);
 
-    this.stepCast(dt);
+    this.stepCast(dt, env.night);
     this.stepHero(dt);
+    this.stepFootsteps();
     this.focus.y = 0.5 + this.focusLift;
     if (this.follow) {
       const k = 1 - Math.exp(-dt / 0.25);
@@ -2550,20 +2682,31 @@ export class SpikeWorld {
    * by a behaviour from `content/behaviours`. Someone far from both the view and the hero waits. Someone is drawn only
    * when the hero could see them: outdoors by sight, indoors when the hero is in the same house on the same storey.
    */
-  private stepCast(dt: number): void {
+  private stepCast(dt: number, night: number): void {
     const sees = (x: number, z: number): boolean => this.vision.outer <= 0 || this.seen(x, z) >= 0.25;
-    const ctx = { walking: this.moves, places: this.places, clock: this.clock, acts: this.acts };
+    const whereIs = (id: string): { x: number; z: number } | null => {
+      if (id === 'hero') return { x: this.hero.x, z: this.hero.z };
+      const o = this.cast.find((x) => x.who.id === id);
+      return o ? { x: o.mind.actor.x, z: o.mind.actor.z } : null;
+    };
+    const ctx = { walking: this.moves, places: this.places, clock: this.clock, acts: this.acts, whereIs };
+    // (People look and listen a few times a second, not every frame.)
+    this.perceiveIn -= dt;
+    const look = this.perceiveIn <= 0;
+    if (look) this.perceiveIn = PERCEIVE_EVERY;
     for (const c of this.cast) {
       const a = c.mind.actor;
       const far = Math.hypot(a.x - this.focus.x, a.z - this.focus.z) > MIND_REACH && Math.hypot(a.x - this.hero.x, a.z - this.hero.z) > MIND_REACH;
       if (far) {
-        c.fig.place.visible = c.blob.visible = false;
+        c.fig.place.visible = c.blob.visible = c.mark.visible = false;
         continue;
       }
+      if (look) this.perceive(c, PERCEIVE_EVERY, night);
       // Someone the hero is talking to stands and faces them; their day waits until the talk ends.
       const pose = c.who.id === this.talkingWith
         ? { dx: this.hero.x - a.x, dz: this.hero.z - a.z, moving: false }
         : stepMind(c.mind, c.who.does, BEHAVIOURS, ctx, dt);
+      if (Math.abs(pose.dx) + Math.abs(pose.dz) > 1e-6) c.facing = turnToward(c.facing, Math.atan2(pose.dz, pose.dx), 7 * dt);
       const y = this.footY(a);
       this.faceWalker(c.fig, pose.dx, pose.dz, pose.moving);
       c.fig.place.position.set(a.x, y, a.z);
@@ -2572,6 +2715,14 @@ export class SpikeWorld {
       const hs = a.house ? this.standingOf(a.house) : null;
       const shown = a.house ? !!hs && hs.open && hs.view === a.level : sees(a.x, a.z);
       c.fig.place.visible = c.blob.visible = shown;
+      // On easy: an eye over whoever sees the hero, a question mark over whoever heard something lately.
+      const s = c.mind.senses, heard = lastHeard(s, 'any');
+      const mark = !this.showSenses || !shown ? null : s.sees.includes('hero') ? this.markMats.eye : heard && heard.left > HEARD_SHOWN ? this.markMats.heard : null;
+      c.mark.visible = mark !== null;
+      if (mark) {
+        c.mark.material = mark;
+        c.mark.position.set(a.x, y + 2.4, a.z);
+      }
     }
   }
 }

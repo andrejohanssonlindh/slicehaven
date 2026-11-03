@@ -2,6 +2,17 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-03 — B5: people see and hear you
+
+- **Sight is rolled** (your Q35): Alertness against 8 when you enter a map and every six hours of world time. A failure gives a narrow, short view; each advantage reaches farther and wider. Waking will roll it too once there's sleep; until then the panel has a **Roll sight** button.
+- **Everyone in a map rolls too**, with their own sheet, and **sees** you: in their cone and range, on their side of the walls. Night shortens it, unless they're a tirak with darkvision (that goes for you too). A flame you carry shows you from far.
+- **They hear you:** your footsteps (a few metres), lighting or putting out a fire, and **Call out**, new when you tap the hero (about 40 m). Walls muffle sound.
+- **They react** (new behaviour files): **watch** (stop and face you) and **investigate** (go and look where the noise was). In the Hamlet: at night the guard watches you if they see you and goes to look at what they hear. By day a shout turns the villagers on the green and brings the guard over.
+- **On easy** (new **Game: easy** button in the panel): the sight roll shows, with a word for how sharp your sight is, and an **eye** or a **question mark** floats over whoever sees or heard you. On normal and hard it's all rolled unseen. **Q43** asks whether the marks should show on people you can't see yourself.
+- **Moved on:** owners recognising their things carried openly needs carrying and owners, so it's now part of B3c/B3b.
+- **Try it:** Hamlet map, panel → Game: easy. Set Night and walk up to the guard by the green. By day, tap the hero → Call out.
+- **Next:** B11, leads (the statue on the Hamlet road).
+
 ## 2026-11-03 — Leads agreed and in the plan (B11)
 
 - **Q42 answered: the shape is agreed.** Leads are built to be easy to add to: **each lead is one data file** (title, what you know, ways in, who cares, what they say, what it opens, when it ends). You can send in a **lead note**, like the action notes, and I make it a file. Template and table: [openings → adding leads](design/talk-openings.md#adding-leads-one-file-each-and-a-lead-note-agreed-shape-q42).

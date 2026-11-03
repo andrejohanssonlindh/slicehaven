@@ -152,6 +152,8 @@ export interface VerbDef {
   roll?: ActRoll;
   /** World minutes it takes, done or not (lighting a fire: 10). */
   takes?: number;
+  /** The sound it makes, done or not (plan B5): how far an ordinary ear hears it in the open, metres, and what it is ("fire", "shout"). */
+  noise?: { loud: number; kind: string };
   success: Outcome[];
   failure?: Outcome[];
 }
@@ -180,7 +182,8 @@ export type ActEvent =
   | { kind: 'flag'; flag: string; on: boolean }
   | { kind: 'time'; minutes: number }
   | { kind: 'make'; thing: string; at: Spot }
-  | { kind: 'sit'; target: ActTarget };
+  | { kind: 'sit'; target: ActTarget }
+  | { kind: 'noise'; at: Spot; loud: number; sound: string };
 
 export interface ActResult {
   /** It was tried (false: a requirement said no, and `reason` says why). */
@@ -347,6 +350,7 @@ export function perform(offer: string, target: ActTarget | null, at: Spot, doer:
   }
   apply(success ? v.success : v.failure ?? [], target, at, name, world, events);
   if (v.takes) events.push({ kind: 'time', minutes: v.takes });
+  if (v.noise) events.push({ kind: 'noise', at, loud: v.noise.loud, sound: v.noise.kind });
   return { done: true, ...(roll ? { roll } : {}), ...(skill ? { skill } : {}), success, events, transgressions: g.broken };
 }
 

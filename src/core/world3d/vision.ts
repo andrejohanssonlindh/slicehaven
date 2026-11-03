@@ -31,22 +31,26 @@ export interface VisionInput {
   cap?: number;
   /** 0..1: a flame carried in the hand (a torch, a lantern, a magic light) lights the dark close by. */
   light?: number;
+  /** The last sight roll's stretch (`sightBoost` in `core/world3d/perceive.ts`): range and width multipliers. */
+  boost?: { range: number; fov: number };
+  /** 0..1: darkvision (a tirak's gift) takes back what the dark takes. */
+  darkSight?: number;
 }
 
 const deg = (d: number): number => (d * Math.PI) / 180;
 
-/** Alertness (and the light) to the shape of sight. */
-export function visionOf({ alertness, night = 0, cap = Infinity, light = 0 }: VisionInput): VisionSpec {
+/** Alertness (and the light, and the last sight roll) to the shape of sight. */
+export function visionOf({ alertness, night = 0, cap = Infinity, light = 0, boost = { range: 1, fov: 1 }, darkSight = 0 }: VisionInput): VisionSpec {
   const a = Math.max(0, alertness);
-  const n = Math.max(0, Math.min(1, night)), l = Math.max(0, Math.min(1, light));
+  const n = Math.max(0, Math.min(1, night)), l = Math.max(0, Math.min(1, light)), dv = Math.max(0, Math.min(1, darkSight));
   // A carried flame wins back most of what the dark takes from the range, and lights a wider circle all round.
-  const dark = 1 - 0.4 * n * (1 - 0.65 * l);
-  const fov = deg(Math.max(70, Math.min(150, 110 + 4 * (a - 10))));
+  const dark = 1 - 0.4 * n * (1 - 0.65 * l) * (1 - dv);
+  const fov = deg(Math.max(35, Math.min(170,Math.max(70, Math.min(150, 110 + 4 * (a - 10))) * boost.fov)));
   // What is right round you is noticed (a small circle: you do not see behind you); the cone starts as wide as that
   // circle, so the two meet without a notch. A carried flame lights a little more round you at night.
   const near = Math.max(1.6, Math.min(2.6, 1.3 + 0.1 * a)) + 2.5 * n * l;
   return {
-    range: Math.min(cap, Math.max(10, 6 + 2.4 * a) * dark),
+    range: Math.min(cap, Math.max(5, Math.max(10, 6 + 2.4 * a) * boost.range * dark)),
     fov,
     near,
     edge: deg(24),

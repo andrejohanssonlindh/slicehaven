@@ -20,6 +20,8 @@ const light: VerbDef = {
     ],
   },
   takes: 10,
+  // (Flint on steel, blowing on tinder: heard across a room, not across a green.)
+  noise: { loud: 8, kind: 'fire' },
   success: [{ state: 'lit', value: true }, { state: 'embers', value: false }, { say: 'The {name} catches and burns.', tone: 'good' }],
   failure: [{ say: 'The tinder smokes, glows and dies. The {name} stays cold.', tone: 'bad' }],
 };

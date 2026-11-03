@@ -7,6 +7,9 @@ import { Rng } from '../core/rng';
 import { DICE_SKINS } from '../content/dice/skins';
 import { showRolls } from '../ui/dice';
 import { DICE_CLOSES, DICE_LEVELS, loadSettings, saveSettings } from '../ui/settings';
+import { DIFFICULTIES } from '../core/difficulty';
+import { diceOf } from '../core/hero';
+import { sightWord } from '../core/world3d/perceive';
 import { Governor, TIERS, type DeviceInfo, type Tier, type TierName, pickTier, qualityAt } from '../core/world3d/tiers';
 import { Pipeline } from '../engine3d/pipeline';
 import { SpikeWorld } from '../engine3d/world';
@@ -182,6 +185,14 @@ function buildControls(): void {
   button('row-game', () => t('spike.dice.skin', 'Skin: {name}', { name: t(`dice.skin.${loadSettings().diceSkin}`, DICE_SKINS[loadSettings().diceSkin]?.name ?? '?') }), () => false, () => {
     saveSettings({ diceSkin: cycle(skins, loadSettings().diceSkin) });
   });
+  // How hard the game is: on easy, sight rolls are shown and who sees or heard you is marked over their head (B5).
+  const diffName = { easy: t('spike.diff.easy', 'Game: easy'), normal: t('spike.diff.normal', 'Game: normal'), hard: t('spike.diff.hard', 'Game: hard') };
+  button('row-game', () => diffName[loadSettings().difficulty], () => loadSettings().difficulty === 'easy', () => {
+    saveSettings({ difficulty: cycle(DIFFICULTIES, loadSettings().difficulty) });
+    world.showSenses = loadSettings().difficulty === 'easy';
+  });
+  // Sight is rolled on entering the map and every six world hours; this rolls it now (as waking will).
+  button('row-game', () => t('spike.rollsight', 'Roll sight'), () => false, () => { world.rerollSight(); });
   const closeName = { ok: t('spike.dice.closeok', 'Rolls: press OK'), auto: t('spike.dice.closeauto', 'Rolls: go by themselves') };
   button('row-game', () => closeName[loadSettings().diceClose], () => false, () => { saveSettings({ diceClose: cycle(DICE_CLOSES, loadSettings().diceClose) }); });
   const diceRng = Rng.fromSeed(Date.now() >>> 0);
@@ -611,6 +622,23 @@ setTimeout(() => {
   const size = Number(params.get('world')) || map.ground.size;
   world = new SpikeWorld({ shells: Math.min(2, tier.shells), lights: Math.min(3, tier.lights), shadowMap: tier.shadowMap }, TIERS.high.grass, { ...map, ground: { ...map.ground, size } });
   world.setGrass(tier.grass);
+  // Perception (B5): the hero sees with their own Alertness (and a tirak's darkvision); sight is rolled against 8,
+  // shown on easy (the dice, and how sharp it is), rolled unseen otherwise.
+  const units = (id: string): number => { const d = diceOf(hero, id); return d.n * 4 + d.mod; };
+  if (units('attr:Vaksamhet') > 0) world.alertness = units('attr:Vaksamhet');
+  world.darkSight = Math.min(1, units('F:Mörkersyn') / 12);
+  world.showSenses = loadSettings().difficulty === 'easy';
+  world.onSightRoll = (who, roll, sight) => {
+    if (who !== 'hero' || loadSettings().difficulty !== 'easy') return;
+    void showRolls([{ ...roll, label: t('spike.sight', 'Sight') }]).then(() => {
+      notify(t(`spike.sight.${sightWord(sight)}`, {
+        poor: 'Your sight is poor for now: a narrow, short view.',
+        clear: 'Your sight is clear.',
+        sharp: 'Your sight is sharp: you see farther and wider.',
+        keen: 'Your sight is keen: you see far and wide.',
+      }[sightWord(sight)]));
+    });
+  };
   if (!params.has('novision')) world.setVision(...VISION[tier.name]);
   pipeline.renderer.info.autoReset = false;
   fit();

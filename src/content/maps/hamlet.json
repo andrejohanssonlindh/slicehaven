@@ -33,6 +33,7 @@
       "does": [
         { "when": { "event": "gathering" }, "do": "attend", "at": "speaker", "ring": 3 },
         { "when": { "hours": [6, 8] }, "do": "tendfire" },
+        { "when": { "hours": [8, 19], "heard": "shout" }, "do": "watch" },
         { "when": { "hours": [8, 19] }, "do": "wander", "in": "green" },
         { "do": "home" }
       ]
@@ -51,6 +52,11 @@
   "people": [
     { "id": "villager", "is": ["human", "job-miller"], "seed": 2, "does": [{ "do": "beat", "path": "lane" }] },
     { "id": "keeper", "is": ["human", "job-innkeeper"], "seed": 6, "home": "inn", "does": [{ "when": { "hours": [6, 7] }, "do": "tendfire" }, { "do": "rounds", "house": "inn" }] },
-    { "id": "guard", "is": ["human", "job-guard"], "seed": 9, "does": [{ "when": { "hours": [6, 22] }, "do": "patrol", "path": "round the green", "wait": 1.5 }, { "do": "stay", "at": "speaker" }] }
+    { "id": "guard", "is": ["human", "job-guard"], "seed": 9, "does": [
+      { "when": { "sees": "hero", "hours": [22, 6] }, "do": "watch" },
+      { "when": { "heard": "any", "hours": [22, 6] }, "do": "investigate" },
+      { "when": { "heard": "shout" }, "do": "investigate", "of": "shout" },
+      { "when": { "hours": [6, 22] }, "do": "patrol", "path": "round the green", "wait": 1.5 },
+      { "do": "stay", "at": "speaker" }] }
   ]
 }

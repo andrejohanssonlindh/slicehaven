@@ -2,6 +2,7 @@ import { Rng } from '../rng';
 import type { ActResult, ActTarget } from './actions';
 import { type Actor, type Pose, type Walking, newActor } from './actors';
 import { houseToWorld } from './layout';
+import { type Senses, newSenses } from './perceive';
 import type { Area } from './mapgen';
 import type { XZ } from './terrain';
 
@@ -45,10 +46,12 @@ export interface Mind {
   home?: string;
   /** Their number among those sharing a schedule: spreads a crowd round what it attends. */
   slot: number;
+  /** What they see and have heard (plan B5, `core/world3d/perceive.ts`); the conditions `sees` and `heard` ask it. */
+  senses: Senses;
 }
 
 export const newMind = (id: string, x: number, z: number, seed: number, slot = 0, home?: string): Mind => ({
-  id, actor: newActor(x, z), entry: -1, state: null, rng: Rng.fromSeed(`${id}:${seed}`).seed, slot, ...(home ? { home } : {}),
+  id, actor: newActor(x, z), entry: -1, state: null, rng: Rng.fromSeed(`${id}:${seed}`).seed, slot, ...(home ? { home } : {}), senses: newSenses(),
 });
 
 /**
@@ -64,11 +67,16 @@ export interface Acts {
   act(mind: Mind, offer: string, t: ActTarget): ActResult;
 }
 
+/** Where someone the mind knows of stands now (the hero, for `watch` to face); null if they are not about. */
+export type WhereIs = (id: string) => { x: number; z: number } | null;
+
 /** What a behaviour may use while it runs. */
 export interface BehaveContext {
   walking: Walking;
   places: Record<string, Place>;
   clock: Clock;
+  /** Where the people a mind sees stand (absent in tests of walking alone). */
+  whereIs?: WhereIs;
   /** The mind's own generator for this step (its state is written back after). */
   rng: Rng;
   /** Acting on things; absent where nothing can be done (tests of walking alone). */

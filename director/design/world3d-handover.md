@@ -31,7 +31,7 @@
 | `core/world3d/placed.ts`, `layout.ts`, `props.ts`, `propsMore.ts`, `tree.ts` | Placed things by chunk (`PlacedIndex`), and the shared mesh builders kinds point at |
 | `core/world3d/space.ts` | Distance, shapes, sparse `NavGrid` (0.5 m), `findPath` |
 | `core/world3d/actions.ts` | The action frame ([actions](actions.md)): `offers`, `perform`; data in `content/actions/`. The world: `tapped(ndc, slack)` (a thing, the hero, or nothing; things are tagged with `userData.thing`), `act`, `offersFor`, `fireOf(house)`, `sitting`; the page: `src/spike3d/actsheet.ts` |
-| `core/world3d/vision.ts` | Sight: a cone, a near circle and a range from Alertness, stopped by houses, trunks, boulders; `lineOfSight` for the rules (the hero's only, today) |
+| `core/world3d/vision.ts` | Sight: a cone, a near circle and a range from Alertness, stopped by houses, trunks, boulders; `lineOfSight` for the rules. Everyone else's sight and hearing: `core/world3d/perceive.ts` (B5) |
 | `core/world3d/filaments3d.ts` | The filament field, lazy, by cell |
 | `core/world3d/weather.ts`, `environment3d.ts`, `sky.ts` | Weather and the clock (`Weather.hour`, `advance`), one read of sky, fog, wind, wetness, cloud shadow |
 | `core/world3d/tiers.ts` | Quality tiers and the `Governor` that steps quality down and up |
