@@ -1,6 +1,6 @@
 import type { LeadDef } from '../../core/world3d/leads';
 
-/** The first lead (B11): a statue by the road out of the Hamlet, found by looking at it. */
+/** The first lead (B11): a statue by the road out of the Hamlet, found by looking at it. A TEST LEAD (director, 2026-11-03), with `hesma-well`: there to try the machinery, not part of any story. */
 const lead: LeadDef = {
   id: 'statue-north',
   title: 'The statue by the west road',

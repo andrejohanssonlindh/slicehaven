@@ -1,6 +1,9 @@
 import type { LeadDef } from '../../core/world3d/leads';
 
-/** Told by the innkeeper about the statue (B11): Saint Hesma's lost well. Nothing solves it yet; it ends when the well is found. */
+/**
+ * Told by the innkeeper about the statue (B11): Saint Hesma's lost well. A TEST LEAD (director, 2026-11-03): it has no
+ * ending in the world on purpose (nothing sets `hesma-well-found`); it goes grey once everyone who knows has spoken.
+ */
 const lead: LeadDef = {
   id: 'hesma-well',
   title: 'Saint Hesma\'s well',

@@ -4,6 +4,8 @@
 
 ## 2026-11-03 — Leads: ask anyone, coax the reluctant, study the statue
 
+*Recorded:* the statue and Saint Hesma's well are **test leads** (your call): the well has no ending on purpose.
+
 *Fix, same day:* studying first fell back on **Wisdom** at −2D6 for heroes with no knowledge skill. Wisdom is never rolled (your note), so now **Study the statue only shows if you have one of the knowledge skills**. The checks now flag any verb or lead that tries to roll Wisdom.
 
 Your three notes on leads, built:
