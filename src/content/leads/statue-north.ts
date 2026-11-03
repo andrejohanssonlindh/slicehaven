@@ -25,8 +25,8 @@ const lead: LeadDef = {
   // (The director, 2026-11-03: occult or cultural knowledge can tell more, and it's fairly hard. A hidden read.)
   study: {
     label: 'Study the {name}',
+    // (No attribute to fall back on: knowledge needs the skill. Wisdom is not a roll.)
     skills: ['Ockultism', 'Kulturkännedom', 'Teologi', 'Historia', 'E:Legender & myter'],
-    attr: 'attr:Visdom',
     difficulty: 14,
     know: [
       'The key is a well-key, the kind once hung on a well-cap to lock it in hard times: a keeper\'s sign, not a saint\'s.',

@@ -266,8 +266,9 @@ export function offers(target: ActTarget | null, at: Spot, doer: Doer, world: Ac
   }
   if (t) for (const h of hooksOf(t, world.library)) out.push({ id: `hook:${h.id}`, label: fill(h.label, name), skills: [...h.skills], from: 'skill' });
   // What a lead says a skill can tell about this very thing (plan B11): a knowledge roll, one try.
+  // (Only with a skill that can read it: a hidden read with no skill would hand you the wrong answer as if you'd tried.)
   const s = target ? world.leadStudy?.(target) : null;
-  if (s) out.push({ id: `study:${s.lead}`, label: fill(s.study.label, name), skills: [...s.study.skills], from: 'skill' });
+  if (s && bestSkill(doer, s.study.skills)) out.push({ id: `study:${s.lead}`, label: fill(s.study.label, name), skills: [...s.study.skills], from: 'skill' });
   return out;
 }
 
@@ -275,7 +276,7 @@ export function offers(target: ActTarget | null, at: Spot, doer: Doer, world: Ac
 function studyVerb(lead: string, s: LeadStudy, kind: string): VerbDef {
   return {
     id: `study-${lead}`, label: s.label, on: { kind }, hidden: true, takes: s.takes ?? 10,
-    roll: { skills: s.skills, ...(s.attr ? { attr: s.attr } : {}), difficulty: s.difficulty },
+    roll: { skills: s.skills, difficulty: s.difficulty },
     success: [{ learn: lead, truth: true }], failure: [{ learn: lead, truth: false }],
   };
 }
@@ -340,7 +341,7 @@ export function perform(offer: string, target: ActTarget | null, at: Spot, doer:
   if (from === 'verb') v = lib.verbs[id];
   else if (from === 'study') {
     const s = target ? world.leadStudy?.(target) : null;
-    if (s && s.lead === id && target) v = studyVerb(s.lead, s.study, target.kind);
+    if (s && s.lead === id && target && bestSkill(doer, s.study.skills)) v = studyVerb(s.lead, s.study, target.kind);
   } else if (t && world.library) {
     const h = hooksOf(t, world.library).find((x) => x.id === id);
     if (h) v = hookVerb(h, target!, t, world.library);
@@ -400,6 +401,7 @@ export function libraryProblems(lib: ActionLibrary, things: Things): string[] {
       }
     }
     for (const h of v.roll?.harder ?? []) if (!lib.facts[h.fact]) out.push(`verb ${v.id}: no fact called ${h.fact}`);
+    if ([v.roll?.attr, ...(v.roll?.skills ?? [])].includes('attr:Visdom')) out.push(`verb ${v.id}: Wisdom is never rolled`);
     const states = v.on !== 'here' && v.on.kind && things.has(v.on.kind) ? things.get(v.on.kind).states ?? {} : null;
     for (const o of [...v.success, ...(v.failure ?? [])]) {
       if ('state' in o && states && !(o.state in states)) out.push(`verb ${v.id}: a ${v.on !== 'here' ? v.on.kind : ''} has no state ${o.state}`);

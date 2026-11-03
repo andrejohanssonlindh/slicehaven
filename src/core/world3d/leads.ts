@@ -42,9 +42,8 @@ export interface LeadAnswer {
 export interface LeadStudy {
   /** The offer on the thing ("Study the statue"). */
   label: string;
+  /** The knowledge skills that can read it. Without one of them it isn't offered: there is no attribute to fall back on (Wisdom is never rolled). */
   skills: string[];
-  /** Without any of the skills: this attribute at −2D6 (the rules' fallback). */
-  attr?: string;
   difficulty: number;
   know: string[];
   wrong: string[];
@@ -227,6 +226,7 @@ export function leadProblems(defs: Record<string, LeadDef>): string[] {
       if (a.coax && !a.coax.reluctant) out.push(`lead ${d.id}: answer ${i + 1} holds back but says nothing while it does`);
     });
     if (d.study) {
+      if (d.study.skills.some((s) => s.startsWith('attr:'))) out.push(`lead ${d.id}: a study rolls knowledge skills, not attributes (Wisdom is never rolled)`);
       if (!d.study.skills.length || !d.study.know.length || !d.study.wrong.length) out.push(`lead ${d.id}: a study needs skills, what is known, and a plausible wrong read`);
       if (d.study.next && !defs[d.study.next]) out.push(`lead ${d.id}: the study hands over ${d.study.next}, which is not a lead`);
     }

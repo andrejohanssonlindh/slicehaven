@@ -4,6 +4,8 @@
 
 ## 2026-11-03 — Leads: ask anyone, coax the reluctant, study the statue
 
+*Fix, same day:* studying first fell back on **Wisdom** at −2D6 for heroes with no knowledge skill. Wisdom is never rolled (your note), so now **Study the statue only shows if you have one of the knowledge skills**. The checks now flag any verb or lead that tries to roll Wisdom.
+
 Your three notes on leads, built:
 - **Ask anyone.** Talking to anyone now offers **Ask about something you know…**, which lists every open lead. Most people say they don't know ("Can't help you there, sorry"), so the menu no longer gives away who cares.
 - **Some need coaxing.** The miller on the lane knows about Saint Hesma's well but holds back ("Old stories. Best left where they are."). Then **Press him about Saint Hesma's well** appears: a persuading or charming roll, easier if he likes you, and a failure sours him a little.
