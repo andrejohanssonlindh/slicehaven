@@ -6,6 +6,7 @@ import type { Effect } from '../scene';
 import { type HookDef, type Library, hooksFor, instantiate } from '../skillweb';
 import type { StateValue, ThingStates } from './state';
 import type { Thing, ThingDef, Things } from './things';
+import type { LeadStudy } from './leads';
 
 /**
  * Actions on things (plan item B3, the frame: B3a). Whatever is tried, a hearth, a stool, later the smith's furnace or
@@ -73,6 +74,8 @@ export interface ActWorld {
   library?: Library;
   /** The leads the hero has, by id (plan B11): the `lead` gate asks it. */
   leads?: Readonly<Record<string, unknown>>;
+  /** A study a lead offers on this thing, if the hero has the lead and hasn't studied it yet. */
+  leadStudy?: (t: ActTarget) => { lead: string; study: LeadStudy } | null;
 }
 
 /** A fact about a spot: true or false there (indoors, raining, among houses). One entry in `content/actions/facts.ts`. */
@@ -126,7 +129,9 @@ export type Outcome =
   /** The doer sits on the thing. */
   | { sit: true }
   /** Gives the hero a lead (`content/leads/`, plan B11): studying an inscription, searching a coat. */
-  | { lead: string };
+  | { lead: string }
+  /** What a study of the thing taught about a lead: its true read, or the plausible wrong one (the lead's file has both). */
+  | { learn: string; truth: boolean };
 
 /** A roll to resolve an action: the doer's best of these skills, against a difficulty. */
 export interface ActRoll {
@@ -156,6 +161,8 @@ export interface VerbDef {
   roll?: ActRoll;
   /** World minutes it takes, done or not (lighting a fire: 10). */
   takes?: number;
+  /** A hidden read (knowledge, insight): the doer isn't shown the dice or told how it went. */
+  hidden?: boolean;
   /** The sound it makes, done or not (plan B5): how far an ordinary ear hears it in the open, metres, and what it is ("fire", "shout"). */
   noise?: { loud: number; kind: string };
   success: Outcome[];
@@ -188,7 +195,8 @@ export type ActEvent =
   | { kind: 'make'; thing: string; at: Spot }
   | { kind: 'sit'; target: ActTarget }
   | { kind: 'noise'; at: Spot; loud: number; sound: string }
-  | { kind: 'lead'; lead: string };
+  | { kind: 'lead'; lead: string }
+  | { kind: 'learn'; lead: string; truth: boolean };
 
 export interface ActResult {
   /** It was tried (false: a requirement said no, and `reason` says why). */
@@ -201,6 +209,8 @@ export interface ActResult {
   events: ActEvent[];
   /** Permission gates that failed: the act was a transgression of these (always empty until B3c). */
   transgressions: string[];
+  /** A hidden read: don't show the dice (the page), and the lines read the same either way. */
+  hidden?: boolean;
 }
 
 /** The verbs, gates and facts the frame runs on (`content/actions/`). */
@@ -255,7 +265,19 @@ export function offers(target: ActTarget | null, at: Spot, doer: Doer, world: Ac
     out.push({ id: `verb:${v.id}`, label: fill(v.label, name), skills: v.roll?.skills ?? [], from: 'verb' });
   }
   if (t) for (const h of hooksOf(t, world.library)) out.push({ id: `hook:${h.id}`, label: fill(h.label, name), skills: [...h.skills], from: 'skill' });
+  // What a lead says a skill can tell about this very thing (plan B11): a knowledge roll, one try.
+  const s = target ? world.leadStudy?.(target) : null;
+  if (s) out.push({ id: `study:${s.lead}`, label: fill(s.study.label, name), skills: [...s.study.skills], from: 'skill' });
   return out;
+}
+
+/** A lead's study as a verb: a hidden read with the doer's best knowledge skill; its outcome is what the lead says. */
+function studyVerb(lead: string, s: LeadStudy, kind: string): VerbDef {
+  return {
+    id: `study-${lead}`, label: s.label, on: { kind }, hidden: true, takes: s.takes ?? 10,
+    roll: { skills: s.skills, ...(s.attr ? { attr: s.attr } : {}), difficulty: s.difficulty },
+    success: [{ learn: lead, truth: true }], failure: [{ learn: lead, truth: false }],
+  };
 }
 
 /** The doer's best pool among some skills (most dice, then the bigger bonus), and which skill it is; null if they have none. */
@@ -302,6 +324,7 @@ function apply(outs: readonly Outcome[], target: ActTarget | null, at: Spot, nam
       if (!target) throw new Error('sitting needs a thing to sit on');
       events.push({ kind: 'sit', target });
     } else if ('lead' in o) events.push({ kind: 'lead', lead: o.lead });
+    else if ('learn' in o) events.push({ kind: 'learn', lead: o.learn, truth: o.truth });
   }
 }
 
@@ -310,16 +333,19 @@ function apply(outs: readonly Outcome[], target: ActTarget | null, at: Spot, nam
  * failed requirement leaves the world as it was (`done: false`, and why); anything tried takes its minutes.
  */
 export function perform(offer: string, target: ActTarget | null, at: Spot, doer: Doer, world: ActWorld, lib: ActionLibrary): ActResult {
-  const [from, id] = offer.split(':') as ['verb' | 'hook', string];
+  const [from, id] = offer.split(':') as ['verb' | 'hook' | 'study', string];
   const t = target ? world.things.get(target.kind) : null;
   const name = t ? thingName(t) : '';
   let v: VerbDef | undefined;
   if (from === 'verb') v = lib.verbs[id];
-  else if (t && world.library) {
+  else if (from === 'study') {
+    const s = target ? world.leadStudy?.(target) : null;
+    if (s && s.lead === id && target) v = studyVerb(s.lead, s.study, target.kind);
+  } else if (t && world.library) {
     const h = hooksOf(t, world.library).find((x) => x.id === id);
     if (h) v = hookVerb(h, target!, t, world.library);
   }
-  if (!v || (t ? !(from === 'hook' || verbFits(v, t)) : v.on !== 'here')) return { done: false, reason: 'That cannot be done here.', events: [], transgressions: [] };
+  if (!v || (t ? !(from === 'hook' || from === 'study' || verbFits(v, t)) : v.on !== 'here')) return { done: false, reason: 'That cannot be done here.', events: [], transgressions: [] };
   const g = runGates(v, target, at, doer, world, lib);
   if (g.blocked !== null) return { done: false, reason: fill(g.blocked, name), events: [], transgressions: [] };
   const events: ActEvent[] = [];
@@ -356,7 +382,7 @@ export function perform(offer: string, target: ActTarget | null, at: Spot, doer:
   apply(success ? v.success : v.failure ?? [], target, at, name, world, events);
   if (v.takes) events.push({ kind: 'time', minutes: v.takes });
   if (v.noise) events.push({ kind: 'noise', at, loud: v.noise.loud, sound: v.noise.kind });
-  return { done: true, ...(roll ? { roll } : {}), ...(skill ? { skill } : {}), success, events, transgressions: g.broken };
+  return { done: true, ...(roll ? { roll } : {}), ...(skill ? { skill } : {}), success, events, transgressions: g.broken, ...(v.hidden ? { hidden: true } : {}) };
 }
 
 /** What is wrong in an action library: verbs naming gates or facts that aren't there, or saying something a gate can't take. */

@@ -24,7 +24,7 @@ import { type ActResult, type ActTarget, type ActWorld, type Doer, type Offer, t
 import { ACTIONS } from '../content/actions';
 import { sheetDice, unitsDice } from '../core/npcsheet';
 import type { Roll } from '../core/dice';
-import { type Cares, type LeadStatus, type LeadsState, giveLead, leadStatus } from '../core/world3d/leads';
+import { type Cares, type LeadStatus, type LeadsState, giveLead, leadStatus, studied } from '../core/world3d/leads';
 import { LEADS } from '../content/leads';
 import { HEARD_FOR, type Noise, type Senses, type SightRoll, type Where, canSee, fadeSenses, hears, lastHeard, newSenses, noteHeard, rollSight, sightBoost, sightDue } from '../core/world3d/perceive';
 import { type TalkCase, type TalkMemory, type TalkPerson, type TalkResult, newTalkMemory, talk } from '../core/world3d/talk';
@@ -2125,6 +2125,10 @@ export class SpikeWorld {
     const w = this.weather, idx = this.houseIndex;
     return {
       things: THINGS, states: this.states, flags: this.flags, rng: this.actRng, library: LIBRARY, leads: this.leads,
+      leadStudy: (t) => {
+        const id = this.propLeads.get(t.id), def = id ? LEADS[id] : undefined, rec = id ? this.leads[id] : undefined;
+        return id && def?.study && rec && !rec.studied ? { lead: id, study: def.study } : null;
+      },
       view: {
         rain: w.rain, hour: w.hour ?? 12,
         housesNear: (x, z, r) => idx.liteNear(x - r, z - r, x + r, z + r).filter((e) => Math.hypot(e.built.place.x - x, e.built.place.z - z) <= r).length,
@@ -2157,6 +2161,12 @@ export class SpikeWorld {
     // A lead given is the hero's (someone else learning something waits for what people know).
     if (hero) {
       for (const e of [...r.events]) {
+        if (e.kind === 'learn') {
+          // What the study taught goes into the lead, true or not: you can't tell which.
+          const got = studied(this.leads, LEADS, e.lead, e.truth, this.worldHours);
+          for (const text of got?.lines ?? []) r.events.push({ kind: 'say', line: { text } });
+          if (got?.next) r.events.push({ kind: 'lead', lead: got.next }, { kind: 'say', line: { text: `Lead added: ${LEADS[got.next].title}.`, tone: 'good' } });
+        }
         const title = e.kind === 'lead' ? this.giveLead(e.lead) : null;
         if (title) r.events.push({ kind: 'say', line: { text: `Lead added: ${title}.`, tone: 'good' } });
       }

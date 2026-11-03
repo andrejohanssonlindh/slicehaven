@@ -56,7 +56,7 @@ An opening is what puts a try on the table. A try shows only while one of its op
 - **A journal** of leads, each with its lines.
 - **Choices that appear by themselves** in a talk when this person might care. On easy, the journal could also say who might care. Harder settings leave that to you.
 
-**Built 2026-11-03** (plan B11, first slice). Rules `core/world3d/leads.ts`; leads `content/leads/` (`statue-north.ts`, `hesma-well.ts`); a map's prop carries one with `"lead"`; the journal `src/spike3d/journal.ts`. The elder became a guard, and the next lead's answers are the miller and any dwarf. Asking is free (no roll, no patience), once per answer. **The first slice, as it was planned:** a lead record in the save, the journal, "Lead added". One curiosity on the Hamlet map (the statue, by the road out), two people who know about it (an elder and the innkeeper), and *ask about it* opened by the lead. Through the frame: a lead is an outcome (`{ lead: 'statue-north' }`) and an opening (`{ lead: 'statue-north' }`).
+**Built 2026-11-03** (plan B11, first slice). Rules `core/world3d/leads.ts`; leads `content/leads/` (`statue-north.ts`, `hesma-well.ts`); a map's prop carries one with `"lead"`; the journal `src/spike3d/journal.ts`. The elder became a guard, and the next lead's answers are the miller and any dwarf. Asking is free (no roll, no patience), once per answer. **Changed after trying it (director, 2026-11-03):** any lead can be asked of almost anyone, under *Ask about something you know…*, and most say they don't know (so the menu doesn't give away who cares); an answer can hold back (`coax`: a reluctant line, then *Press {name}*, a persuade or sweet-talk roll against its difficulty, two easier per step of their mood); and a lead can say what a skill reads from the thing that carries it (`study`: skills, difficulty, the true lines, a plausible wrong one; a hidden read, once). **The first slice, as it was planned:** a lead record in the save, the journal, "Lead added". One curiosity on the Hamlet map (the statue, by the road out), two people who know about it (an elder and the innkeeper), and *ask about it* opened by the lead. Through the frame: a lead is an outcome (`{ lead: 'statue-north' }`) and an opening (`{ lead: 'statue-north' }`).
 
 ## Adding leads: one file each, and a lead note (agreed shape, Q42)
 Leads are built so the tenth is as easy as the first: **a lead is a data file** (`content/leads/<id>.ts`, found by itself like kinds and verbs). Nothing about a particular lead is ever code. A file says:
@@ -67,7 +67,8 @@ Leads are built so the tenth is as easy as the first: **a lead is a data file** 
 | `know` | What you know when you get it | A weathered statue of a woman holding a key, by the north road |
 | `from` | Ways in: looking at or studying a kind of thing or one placed thing, a good *ask* with someone who knows it, a line overheard at a place, an item read, a creator life event, a quest given | Looking at the `statue` by the north road |
 | `cares` | Who might care: anyone here, a kind or facet of person (elders, clergy, guards), one person, a place | Elders; the innkeeper |
-| `answers` | What each of them says when asked: lines added to what you know, and maybe a **next lead** or a flag | The old woman: "Saint Hesma. She kept the well." → next lead: *the well under the statue* |
+| `answers` | What each of them says when asked: lines added to what you know, and maybe a **next lead** or a flag. An answer can **hold back** (`coax`): they must be pressed first | The old woman: "Saint Hesma. She kept the well." → next lead: *the well under the statue* |
+| `study` | What a knowledge skill reads from the thing itself: skills, how hard, what's true, and a plausible wrong read | Occultism or cultural knowledge, hard: the key is a well-key; she faces west |
 | `opens` | Tries it puts on the table, on people or things, through the frame (verbs and skill hooks as they are) | *Search the statue's base* |
 | `ends` | When it's solved, spent or gone cold: a flag, everyone asked, an hour passed | Solved when the door is opened |
 
@@ -75,7 +76,7 @@ Leads are built so the tenth is as easy as the first: **a lead is a data file** 
 
 **A lead note** (what you send in, and I make it a file), like the action note:
 
-> **Lead:** the statue on the north road · **You learn it by:** looking at it · **You know:** a woman holding a key, worn by weather · **Who cares:** old people, the innkeeper · **They say:** she's Saint Hesma, who kept the well · **It opens:** search the base · **Next:** a key, and a door it fits · **Ends:** when the door is opened
+> **Lead:** the statue on the north road · **You learn it by:** looking at it · **You know:** a woman holding a key, worn by weather · **Who cares:** old people, the innkeeper (**needs coaxing?** the miller, a little) · **They say:** she's Saint Hesma, who kept the well · **Studying it (skills, how hard):** occultism or cultural knowledge, hard: the key is a well-key · **Wrong read:** a common saint's sign, nothing more · **It opens:** search the base · **Next:** a key, and a door it fits · **Ends:** when the door is opened
 
 When a note needs a way in, an opening or an outcome the engine doesn't have yet, that one piece is added first (the pattern check).
 

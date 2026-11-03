@@ -62,7 +62,8 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
       notify(t(`act.no.${offer}`, r.reason ?? 'That cannot be done.'));
       return;
     }
-    if (r.roll) await showRolls([{ ...r.roll, label: r.skill ? rollableName(r.skill) : r.roll.label }]);
+    // (A hidden read shows no dice: you can't tell how it went.)
+    if (r.roll && !r.hidden) await showRolls([{ ...r.roll, label: r.skill ? rollableName(r.skill) : r.roll.label }]);
     const lines: string[] = [];
     r.events.forEach((e, i) => {
       if (e.kind === 'say') lines.push(t(`act.${offer}.${i}`, e.line.text));

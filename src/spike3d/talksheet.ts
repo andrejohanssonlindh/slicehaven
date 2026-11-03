@@ -2,7 +2,10 @@ import { FACETS } from '../content/people';
 import { rollableName } from '../content/rollables';
 import type { Hero } from '../core/hero';
 import type { Doer } from '../core/world3d/actions';
-import { moodOf, patienceLeft, talkOffers } from '../core/world3d/talk';
+import { ASK_LEADS, leadAsks, moodOf, patienceLeft, talkOffers } from '../core/world3d/talk';
+
+/** The way back from the list of leads. */
+const BACK = 'talk:back';
 import type { SpikeWorld } from '../engine3d/world';
 import { t } from '../i18n';
 import { showRolls } from '../ui/dice';
@@ -37,6 +40,8 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
   let who: string | null = null;
   let pending: string | null = null;
   let busy = false;
+  /** Showing the list of leads to ask about (B11). */
+  let askingLeads = false;
 
   function drawPortrait(): void {
     if (!who) return;
@@ -66,7 +71,9 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
     whatEl.textContent = [people, calling].filter(Boolean).map((id) => FACETS[id!].label).join(', ');
     moodEl.textContent = moodOf(p, c) ?? '';
     choicesEl.replaceChildren();
-    for (const o of talkOffers(p, c)) {
+    // "Ask about something you know…" opens the list of leads (B11), with a way back.
+    const list = askingLeads ? [...leadAsks(p, c), { id: BACK, label: t('talk.back', '← Something else'), skills: [] as string[] }] : talkOffers(p, c);
+    for (const o of list) {
       const b = document.createElement('button');
       b.type = 'button';
       const label = document.createElement('span');
@@ -85,6 +92,11 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
 
   async function choose(offer: string, label: string): Promise<void> {
     if (!who || busy) return;
+    if (offer === ASK_LEADS || offer === BACK) {
+      askingLeads = offer === ASK_LEADS;
+      return refresh();
+    }
+    askingLeads = false;
     busy = true;
     log(label, 'you');
     const r = world().talkTo(offer, who, doer, visitor);
@@ -103,6 +115,7 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
   function start(id: string): void {
     const w = world();
     who = id;
+    askingLeads = false;
     w.talkingWith = id;
     logEl.replaceChildren();
     el.hidden = false;

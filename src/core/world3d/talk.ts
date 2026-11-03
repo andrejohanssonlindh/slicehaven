@@ -4,7 +4,8 @@ import type { Rng } from '../rng';
 import { type CheckDef, type Memory, type ObjectDef, type SceneState, type Token, apply, attempt, moodLine, openChecks } from '../scene';
 import { type Library, type Setting, type Visitor, expandObject, limitOf, readPerson, situation, talksLeftWith } from '../skillweb';
 import { type Doer, type Line, type Offer, bestSkill } from './actions';
-import { type LeadDef, type LeadsState, askAbout, leadsToAsk } from './leads';
+import { type AskResult, type LeadDef, type LeadsState, askAbout, heldBack, openLeads, pressed } from './leads';
+import { rollTest } from '../dice';
 
 /**
  * Talking to someone in the 3D world (plan B3d): the action frame's social resolve. What can be tried on a person is
@@ -53,8 +54,20 @@ export interface TalkCase {
   leads?: { state: LeadsState; defs: Record<string, LeadDef>; hours: number };
 }
 
-/** An offer that asks about a lead: `lead:<id>`. No roll and no patience spent: they care, so they tell. */
+/** An offer that asks about a lead: `lead:<id>`. No roll and no patience spent; anyone can be asked (most don't know). */
 export const LEAD_ASK = 'lead:';
+/** The offer that opens the list of leads to ask about (the page shows `leadAsks` under it). */
+export const ASK_LEADS = 'talk:leads';
+/** An offer that presses someone who holds back about a lead: `leadpress:<id>`, a social roll. */
+export const LEAD_PRESS = 'leadpress:';
+/** What presses someone: making a case or charming it out of them (persuade and sweet-talk); else Presence at −2D6. */
+const COAX_SKILLS = ['Argumentera', 'Charm', 'Berättarkonst', 'E:Vädja', 'E:Diplomati', 'E:Behaga', 'E:Lova', 'K:Charmerande leende', 'K:Smort munläder'];
+
+/** The leads the hero can ask this person about (every open one), for the list under "Ask about something you know". */
+export function leadAsks(p: TalkPerson, c: TalkCase): Offer[] {
+  if (!c.leads) return [];
+  return openLeads(c.leads.state, c.leads.defs, c.flags).map((d) => ({ id: LEAD_ASK + d.id, label: d.ask.replaceAll('{name}', p.name), skills: [], from: 'verb' as const }));
+}
 
 /** The fitting attribute for any social try, for someone with no fitting skill (at −2D6). */
 const PRESENCE = 'attr:Intryck';
@@ -98,10 +111,12 @@ export function talkOffers(p: TalkPerson, c: TalkCase): Offer[] {
   const s = stateOf(c), o = objectOf(p, c);
   const left = talksLeftWith(o, s, c.library);
   const work: Offer[] = p.work ? [{ id: ASK_WORK, label: `Ask ${p.name} about their work`, skills: [], from: 'verb' }] : [];
-  const leads: Offer[] = c.leads
-    ? leadsToAsk(c.leads.state, c.leads.defs, c.flags, p).map((d) => ({ id: LEAD_ASK + d.id, label: d.ask.replaceAll('{name}', p.name), skills: [], from: 'verb' as const }))
+  const listens = left === undefined || left > 0;
+  const leads: Offer[] = c.leads && listens && leadAsks(p, c).length ? [{ id: ASK_LEADS, label: 'Ask about something you know…', skills: [], from: 'verb' }] : [];
+  const press: Offer[] = c.leads && listens
+    ? heldBack(c.leads.state, c.leads.defs, p).map(({ def }) => ({ id: LEAD_PRESS + def.id, label: `Press ${p.name} about ${def.ask.replace(/^Ask \{name\} about /, '')}`, skills: [...COAX_SKILLS], from: 'skill' as const }))
     : [];
-  return [...work, ...leads, ...openChecks(o, s)
+  return [...work, ...leads, ...press, ...openChecks(o, s)
     .filter((k) => opensNow(k, p, c) && (!k.talk || left === undefined || left > 0))
     .map((k) => ({ id: k.id, label: named(k.label, p), skills: [...k.skills], from: 'skill' as const }))];
 }
@@ -119,6 +134,13 @@ export interface TalkResult {
   lead?: string;
 }
 
+/** What a lead's answer looks like in the talk: the lines, and "Lead added" if it handed one over. */
+function leadReply(r: AskResult, c: TalkCase, before: Line[]): TalkResult {
+  const lines: Line[] = [...before, ...r.lines.map((text) => ({ text }))];
+  if (r.next) lines.push({ text: `Lead added: ${c.leads!.defs[r.next].title}.`, tone: 'good' });
+  return { done: true, hidden: false, success: r.kind === 'told', lines, ...(r.next ? { lead: r.next } : {}) };
+}
+
 /** Try one of the offers on them, as `doer`. Their memory of you changes; flags may be set. */
 export function talk(offer: string, p: TalkPerson, doer: Doer, c: TalkCase, rng: Rng): TalkResult {
   const s = stateOf(c), o = objectOf(p, c);
@@ -126,13 +148,36 @@ export function talk(offer: string, p: TalkPerson, doer: Doer, c: TalkCase, rng:
     const a = /^[aeiou]/i.test(p.work.calling) ? 'an' : 'a';
     return { done: true, hidden: false, success: true, lines: [{ text: `${p.name} works as ${a} ${p.work.calling.toLowerCase()}.` }, ...(p.work.about ? [{ text: p.work.about }] : [])] };
   }
-  if (offer.startsWith(LEAD_ASK)) {
-    const id = offer.slice(LEAD_ASK.length);
-    const r = c.leads ? askAbout(c.leads.state, c.leads.defs, id, p, c.flags, c.leads.hours) : null;
-    if (!r) return { done: false, reason: `${p.name} has nothing to say about that.`, hidden: false, success: false, lines: [] };
-    const lines: Line[] = r.lines.map((text) => ({ text }));
-    if (r.next) lines.push({ text: `Lead added: ${c.leads!.defs[r.next].title}.`, tone: 'good' });
-    return { done: true, hidden: false, success: true, lines, ...(r.next ? { lead: r.next } : {}) };
+  if (offer.startsWith(LEAD_ASK) && c.leads) {
+    const r = askAbout(c.leads.state, c.leads.defs, offer.slice(LEAD_ASK.length), p, c.flags, c.leads.hours);
+    if (!r) return { done: false, reason: 'You know nothing of that to ask about.', hidden: false, success: false, lines: [] };
+    return leadReply(r, c, r.kind === 'held' ? [{ text: `${p.name} knows something, but would need pressing.`, tone: 'info' }] : []);
+  }
+  if (offer.startsWith(LEAD_PRESS) && c.leads) {
+    const id = offer.slice(LEAD_PRESS.length);
+    const held = heldBack(c.leads.state, c.leads.defs, p).find((h) => h.def.id === id);
+    if (!held) return { done: false, reason: `${p.name} has nothing held back about that.`, hidden: false, success: false, lines: [] };
+    const left = talksLeftWith(o, s, c.library);
+    if (left !== undefined && left <= 0) return { done: false, reason: `${p.name} has had enough of you for now.`, hidden: false, success: false, lines: [] };
+    const mem = (c.memory.social[p.id] ??= { talks: 0, mood: 0 });
+    // A friendlier mood makes it easier: two a step.
+    const difficulty = Math.max(2, held.difficulty - 2 * mem.mood);
+    const best = bestSkill(doer, COAX_SKILLS);
+    const fallback = !best && doer.dice(PRESENCE).n > 0 ? { skill: PRESENCE, dice: modify(doer.dice(PRESENCE), -2) } : null;
+    const use = best ?? fallback;
+    if (!use) return { done: true, hidden: false, success: false, lines: [{ text: 'You have no way to go about it.', tone: 'info' }] };
+    const roll = rollTest(use.dice, difficulty, rng, `Press ${p.name}`);
+    mem.talks += 1;
+    const notes: Line[] = [];
+    if (fallback) notes.push({ text: 'No fitting skill: Presence instead, at −2D6.', tone: 'info' });
+    if (mem.mood) notes.push({ text: `(${mem.mood > 0 ? 'easier: they like you' : 'harder: they are cross with you'})`, tone: 'info' });
+    if (!roll.success) {
+      mem.mood = Math.max(-3, mem.mood - 1);
+      pressed(c.leads.state, c.leads.defs, id, p, false, c.flags, c.leads.hours);
+      return { done: true, roll, skill: use.skill, hidden: false, success: false, lines: [...notes, { text: `${p.name} shakes their head and won't be drawn.`, tone: 'bad' }] };
+    }
+    const r = pressed(c.leads.state, c.leads.defs, id, p, true, c.flags, c.leads.hours)!;
+    return { ...leadReply(r, c, [...notes, { text: `${p.name} gives in.`, tone: 'good' }]), roll, skill: use.skill };
   }
   const check: CheckDef | undefined = openChecks(o, s).find((k) => k.id === offer && opensNow(k, p, c));
   if (!check) return { done: false, reason: 'That is not something to try with them now.', hidden: false, success: false, lines: [] };

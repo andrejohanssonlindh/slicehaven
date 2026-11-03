@@ -2,6 +2,15 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-03 — Leads: ask anyone, coax the reluctant, study the statue
+
+Your three notes on leads, built:
+- **Ask anyone.** Talking to anyone now offers **Ask about something you know…**, which lists every open lead. Most people say they don't know ("Can't help you there, sorry"), so the menu no longer gives away who cares.
+- **Some need coaxing.** The miller on the lane knows about Saint Hesma's well but holds back ("Old stories. Best left where they are."). Then **Press him about Saint Hesma's well** appears: a persuading or charming roll, easier if he likes you, and a failure sours him a little.
+- **Study the statue.** Once you have its lead, tapping the statue offers **Study the statue**: occultism, cultural knowledge, theology, history or legends, against 14. It's a hidden read, as you decided for knowledge rolls: one try, no dice shown, and a failure gives a plausible wrong reading that goes into your journal as if it were true. Read right, it tells you the key is a well-key and that she faces west into the brambles, and it gives you the well lead.
+- **Quests next to leads:** recorded on D2. A quest is a lead with someone waiting for it, in the same journal.
+- **Lead notes** now have room for "needs coaxing" and "studying it" ([template](design/talk-openings.md#adding-leads-one-file-each-and-a-lead-note-agreed-shape-q42)).
+
 ## 2026-11-03 — B11, first slice: leads
 
 - **A statue stands by the Hamlet's west road**, a weathered stone woman holding out a key. **Tap it:** "Lead added: The statue by the west road."

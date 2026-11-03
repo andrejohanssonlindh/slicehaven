@@ -22,6 +22,19 @@ const lead: LeadDef = {
       say: ['"Older than the road, that one. Nobody moves her, nobody touches her. The flowers? Not mine to ask about."'],
     },
   ],
+  // (The director, 2026-11-03: occult or cultural knowledge can tell more, and it's fairly hard. A hidden read.)
+  study: {
+    label: 'Study the {name}',
+    skills: ['Ockultism', 'Kulturkännedom', 'Teologi', 'Historia', 'E:Legender & myter'],
+    attr: 'attr:Visdom',
+    difficulty: 14,
+    know: [
+      'The key is a well-key, the kind once hung on a well-cap to lock it in hard times: a keeper\'s sign, not a saint\'s.',
+      'She was set to face something. Not the road: she looks west, along the old track into the brambles.',
+    ],
+    wrong: ['A key held out is the common sign of a saint who keeps a gate. The flowers will be a harvest custom. There is nothing here past the usual.'],
+    next: 'hesma-well',
+  },
 };
 
 export default lead;

@@ -27,6 +27,11 @@ describe('spike3d leads', () => {
     expect(await page.textContent('#notice')).toContain('Lead added');
     expect(await w('w.journal.map((j) => j.id)')).toEqual(['statue-north']);
     await page.screenshot({ path: `${OUT}leads-statue.png` });
+    // Now that you know of it, the statue can be studied (a hidden knowledge read, once).
+    expect(await page.textContent('#act .offers')).toContain('Study the statue');
+    const t = '(() => { const o = w.layout.props.find((p) => p.lead); return { id: o.kind + "@" + Math.round(o.x * 10) + "," + Math.round(o.z * 10), kind: o.kind, x: o.x, z: o.z, level: 0, house: null }; })()';
+    const study = (await w(`w.offersFor(${t}, { id: "hero", dice: () => ({ n: 3, mod: 0 }) }).find((o) => o.id.startsWith("study:"))`)) as { id: string } | undefined;
+    expect(study?.id).toBe('study:statue-north');
     // The innkeeper cares: asking about it is offered, and tells you of the well.
     const hero = '{ kind: "human", tags: [] }';
     const r = (await w(`w.talkTo("lead:statue-north", "keeper", { id: "hero", dice: () => ({ n: 3, mod: 0 }) }, ${hero})`)) as { done: boolean; lead?: string };
