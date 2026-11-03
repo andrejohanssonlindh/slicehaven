@@ -15,7 +15,7 @@
 
 ## Built (B3d, first slice, 2026-11-03)
 - **Talking is the frame's social resolve:** `core/world3d/talk.ts` (`talkOffers`, `talk`, `moodOf`, `patienceLeft`) gives the 2D skill map's rules (`core/scene.ts` `attempt`/`apply`, `core/skillweb.ts` `expandObject`, `situation`, `readPerson`) a person of the map and a memory (`TalkMemory`, saved). No new social rules: the hooks, moods, patience, relations and leanings are the ones we had. No fitting skill: Presence at −2D6.
-- **The world:** `tapped` returns `{ person }`; `talkingWith` holds them still, facing the hero; `talkPerson`, `talkTo`, `portrait(renderer, id, px)` (their body rendered close up from the world as it is), `bodyOf` (for the painted one, `art/portrait.ts`). The page: `src/spike3d/talksheet.ts`. Tests: `tests/talk.test.ts`, `e2e/spike3d-talk.e2e.ts`.
+- **The world:** `tapped` returns `{ person }`; `talkingWith` holds them still, facing the hero; `talkPerson`, `talkTo`, `portrait(renderer, id, px)` (their body rendered close up from the world as it is, at 88 px: Q39). What is offered is only what has an opening (`HookDef.opens`, [openings](talk-openings.md)). The page: `src/spike3d/talksheet.ts`. Tests: `tests/talk.test.ts`, `e2e/spike3d-talk.e2e.ts`.
 - **Not yet:** social conflicts (rounds of control), opposed rolls against their sheet, leave and lending as outcomes, people talking first.
 
 ## Adding to it
