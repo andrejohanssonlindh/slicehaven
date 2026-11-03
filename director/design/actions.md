@@ -30,6 +30,16 @@
 - **On easy:** after a wrong, who saw it and by how much ("Seen by the guard −13"); in talk, their number.
 - **Not yet:** value against the owner's wealth, importance, weapons shown (with items, B3b/B6); witnesses who only hear; the people's own wrongs; paying for a room (money).
 
+## Built (B3b, first slice, 2026-11-03)
+- **Where:** rules `core/world3d/carry.ts` (sizes, loose things, how far a thing has gone, worth); gates `content/actions/gates/hands.ts` (`hands-free`, `holding`, `size`, `small`); verbs `pick-up`, `slip-away`, `put-down`; facts `bulky`, `watched`; sizes and values on the kinds (`size`, `value`, `importance` on `ThingDef`; furniture's in `content/things/kinds/furniture.ts`). The world: `SpikeWorld.carry` (saved, v6), `holding`, `checkCarry`; loose things are drawn where they lie, the held one in the hero's arms. Tests: `tests/carry.test.ts`, `e2e/spike3d-carry.e2e.ts`.
+- **Sizes:** pocket (herbs), bag (a basket), in the hands (stool, broom, keg, sacks, kindling, pallet, footlocker, nets, a hay bale), heavy (tables, benches, beds, the anvil, the loom, the counter…: offered, and too heavy alone). No size: part of the room (hearths, shelves, pegs). Until B6 everything is held, one thing at a time; held openly, you walk at 70 % and can't sit, light a fire or pick up another.
+- **Outcomes:** `{ carry: 'open' | 'hidden' }` (pick it up), `{ putDown: true }` (half a metre in front of you, turned your way). A verb can be `unseen`: done well, its wrong goes unanswered.
+- **The wrong is where it goes**, not the picking up: about its room, nothing; into another room of the house, *move*; out of it, *take*, for whoever sees it cross. Once out, its **household recognise it** whenever they see you with it (once each). Held out of sight, never.
+- **Steal unseen** (*Slip the {name} away unseen*): pocket or bag size; sleight of hand (Agility at −2D6 without), easy, +4 bag-sized, +4 with anyone watching. Done well: no one answers, never recognised. Fumbled: you have it, and whoever was looking saw a theft.
+- **Worth:** the act's weight × √(value ÷ what the owner's wealth calls a real loss) (country: poor 3, common 10, rich 60 coins), kept within 0.5–3, then +50 % a step of importance. Only for move, take, steal, harm. Wealth is read from the household's facets (`rich`, `poor`).
+- **Leave** ("make yourself at home") now covers entering, sitting, using, meddling and moving, not taking (the culture's `leaveCovers`).
+- **Not yet:** borrow and give back, argue, threaten, buy; people bringing found things home; weapons shown (no weapons yet); a carrying pose; a moved piece's old spot still blocks feet and its new one doesn't; outdoor things that can be taken.
+
 ## Adding to it
 - **A verb**: a file in `content/actions/verbs/` (`VerbDef`): what it is `on` (a kind, a property the kind has, or `here`), its `gates`, an optional `roll` (skills, difficulty, `harder` where a fact holds), `takes` minutes, `success` and `failure` outcomes.
 - **A gate**: a file in `content/actions/gates/` (`GateDef`): a requirement (blocks with a reason, or `hides` the offer) or a permission (never blocks: a transgression, B3c).
@@ -96,5 +106,5 @@ The value also makes the action itself harder.
 - **B3a The frame** ✅: tap, look, offer, state and place gates, no-roll and one-roll resolve, state/time/say outcomes; light, put out, sit, make a fire; an NPC lights the hearth at dawn.
 - **B3d Talking in 3D** (after B4): tap a person → their **portrait**, the conversation **log**, the choices **laid over it** (Q37). The social tries and conflicts we have, against their sheet. Leave ("you may use the forge, today") is an outcome.
 - **B3c Owners, the scale and consequences** (after B5): whose a thing is, the per-person scale (Q38), the weight of acts, consequences by culture and by who you are, recognising your things.
-- **B3b The ways to take** (after B3c): argue, threaten, borrow and give back, move, buy, just take, steal unseen; carrying in the hands. Pocketing joins with B6.
+- **B3b The ways to take** (after B3c): first slice ✅ (move, just take, steal unseen, carrying in the hands, worth); next the ways through talk: borrow and give back, argue, threaten; buy with money (B6). Pocketing joins with B6.
 - **Later:** crafting (a challenge plus tools plus materials → an item), improvised weapons (B8).

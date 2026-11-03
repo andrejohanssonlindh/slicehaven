@@ -2,6 +2,17 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-03 — B3b, first slice: picking things up, carrying, stealing unseen; Q43
+
+- **Pick things up.** Tap a stool, a broom, a keg, sacks, a basket, a footlocker… → *Pick up*. It's in the hero's arms (small for now, with no carrying pose yet). You walk slower and can't sit, light a fire or take something else until you **put it down** (tap the hero → *Put down the stool*). It stays where you put it, through a reload. Tables, benches, beds and the anvil are offered too, and are too heavy to carry alone. Hearths and shelves can't be taken.
+- **Where it goes decides what it is.** Moving a stool about its own room is fine. Carried into another room of the house, it's *moved*; out of the house, *taken*, for whoever sees it go. After that **its household know it** whenever they see you with it ("That's our stool!").
+- **Steal unseen.** Small things (herbs, a basket) can be *slipped away unseen*: a sleight-of-hand roll, easy alone, harder for something bag-sized or with anyone watching. Done well, no one ever knows, and it's never recognised on you. Fumbled, you still have it, but whoever was looking saw you steal it.
+- **What it's worth to them.** A wrong to a thing weighs more for its value against the owner's wealth (a poor family's keg matters; a rich house barely notices), and more again for its importance. Prices are a first guess until money comes (B6).
+- **Leave** to make yourself at home now covers moving things about, not taking them away.
+- **Q43 (your answer B):** on easy, the eye or question mark now floats over anyone within 30 m who noticed you, even in the dark or behind a wall.
+- **Still to come in B3b:** borrow and give back, argue it's yours, threaten for it, buy (needs money), people bringing found things home, and weapons you show (needs weapons). Known gap: a moved piece's old spot still stops your feet, and the new one doesn't.
+- **Try it:** Hamlet, panel → Game: easy. Walk into a house, tap a stool → *Pick up*, walk out past someone who lives there, then tap the hero → *Put down*.
+
 ## 2026-11-03 — B3c done: rooms off limits, fading, fight or fetch, whose is this; a door fixed
 
 - **Fix: a door seen from inside.** In the houses across the road from the inn, the door is in the far wall, and from inside you saw a blank wall. It was only drawn on the outside face. Now it's drawn on the inside too, with a frame.

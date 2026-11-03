@@ -1,5 +1,6 @@
 import type { Memory } from '../scene';
 import type { DoEntry } from './behave';
+import type { Wealth } from './carry';
 
 /**
  * Owners, the scale and consequences (plan B3c; design: director/design/actions.md, "Owners and the scale"). Pure
@@ -22,11 +23,11 @@ import type { DoEntry } from './behave';
  *   others fetch help; someone afraid of you (how dangerous you look against their own nerve) fetches help or keeps
  *   their distance where others would square up.
  *
- * Still to come (the plan): the thing's value against the owner's wealth and its importance, and weapons you show
- * (with items, B3b/B6).
+ * A wrong to a thing weighs more for what it is worth to its owner (`Wrong.worth`, from `carry.ts`: its value against
+ * their wealth, and its importance; plan B3b). Leave covers only what the culture says (not taking things).
  */
 
-/** Kinds of act a wrong can be, in rising weight. Moving, taking and stealing come with the ways to take (B3b). */
+/** Kinds of act a wrong can be, in rising weight. */
 export type ActKind = 'enter' | 'sit' | 'use' | 'meddle' | 'move' | 'take' | 'steal' | 'harm';
 export const ACT_KINDS: readonly ActKind[] = ['enter', 'sit', 'use', 'meddle', 'move', 'take', 'steal', 'harm'];
 
@@ -37,6 +38,8 @@ export type Owner = { house: string } | { town: true };
 export interface Wrong {
   act: ActKind;
   owner: Owner;
+  /** How much more it weighs for what the thing is worth to its owner (`worthOf` in `carry.ts`); 1 if left out. */
+  worth?: number;
 }
 
 /** The lowest and highest the scale goes. */
@@ -92,6 +95,12 @@ export interface CultureDef {
   fear: { gap: number; later: number };
   /** Bold from this temper up (`content/people/temper.ts`): they deal with you themselves. */
   boldAt: number;
+  /** What a household of each sort feels as a real loss, in the coins things' `value` is counted in (B3b). */
+  wealth: Record<Wealth, number>;
+  /** The least and most a thing's worth can scale a wrong (a hen to a lord; a family's one keg). */
+  worth: [number, number];
+  /** What leave to be in a house covers ("make yourself at home": sit, use the hearth, move things; not take them). */
+  leaveCovers: ActKind[];
 }
 
 /** What the people of a map think of the hero, and the leave they gave. Plain data, saved with the map. */
@@ -203,13 +212,14 @@ export interface MayCase {
 /** May it be done? True for a member, with leave, what the room welcomes in its hours, what the town lets anyone do. */
 export function mayDo(c: MayCase): boolean {
   if ('town' in c.owner) return c.culture.townMay.includes(c.act);
-  if (c.member || c.leave) return true;
+  if (c.member) return true;
+  if (c.leave && c.culture.leaveCovers.includes(c.act)) return true;
   return !!c.welcome && c.welcome.acts.includes(c.act) && withinHours(c.hour, c.welcome.hours);
 }
 
 /** How far a wrong moves the view of someone who saw it: the act's weight, as owner, bystander, or one of the town. */
 export function weightOf(w: Wrong, culture: CultureDef, isOwner: boolean): number {
-  const base = culture.acts[w.act];
+  const base = culture.acts[w.act] * (w.worth ?? 1);
   return base * ('town' in w.owner ? culture.town : isOwner ? culture.owner : culture.others);
 }
 

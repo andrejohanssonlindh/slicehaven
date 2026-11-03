@@ -20,7 +20,7 @@ import type { HouseMaterial } from '../core/world3d/house';
 import { type BuiltHouse, type Layout, type PlacedTree, furnitureObstacles, houseAt, houseBox, houseOuterBox, houseToLocal, houseToWorld, houseWalls, levelWalls, sightWalls } from '../core/world3d/layout';
 import { Explored } from '../core/world3d/explored';
 import { type StatesJSON, ThingStates, pieceId, placedId } from '../core/world3d/state';
-import { type ActResult, type ActTarget, type ActWorld, type Doer, type Offer, type Spot, offers, perform } from '../core/world3d/actions';
+import { type ActResult, type ActTarget, type ActWorld, type Doer, type Offer, type Spot, offers, perform, thingName } from '../core/world3d/actions';
 import { ACTIONS } from '../content/actions';
 import { sheetDice, unitsDice } from '../core/npcsheet';
 import type { Roll } from '../core/dice';
@@ -30,9 +30,10 @@ import { HEARD_FOR, type Noise, type Senses, type SightRoll, type Where, canSee,
 import { type TalkCase, type TalkMemory, type TalkPerson, type TalkResult, newTalkMemory, talk } from '../core/world3d/talk';
 import { type Visitor, disposition } from '../core/skillweb';
 import {
-  type AnswerStep, type CultureDef, type HeroLook, type Standing as HeroStanding, type Welcome, type WhoToThem, type Wrong, answerFor, answerLines,
+  type ActKind, type AnswerStep, type CultureDef, type HeroLook, type Standing as HeroStanding, type Welcome, type WhoToThem, type Wrong, answerFor, answerLines,
   fadeStanding, giveLeave, hasLeave, mayDo, meet, moodsFromScale, newStanding, regardOf, shiftRegard, sizeUp, talkOntoScale, weightOf, withinHours,
 } from '../core/world3d/standing';
+import { type CarryState, type Loose, type LooseSpot, type Stage, actOfStage, newCarry, stageOf, wealthOf, worthOf } from '../core/world3d/carry';
 import { temperOf } from '../content/people/temper';
 import { cultureOf } from '../content/cultures';
 import { personName } from '../content/people/naming';
@@ -108,6 +109,17 @@ interface CutPart {
 
 /** A stroll, metres a second. */
 const HERO_SPEED = 1.6;
+/** How fast the hero walks with something held in both hands (plan B3b): a share of their pace. */
+const CARRY_PACE = 0.7;
+/** On easy, the eye or question mark floats over anyone within this of the hero who noticed them, seen or not (Q43), metres. */
+const MARK_REACH = 30;
+/** How far in front of the hero a thing is put down, metres. */
+const PUT_DOWN_AHEAD = 0.45;
+/** A held thing is shrunk to at most this long, metres, and held this high (its foot above the hero's). */
+const HELD_SIZE = 0.6;
+const HELD_Y = 0.72;
+/** How far a carried thing has gone from home, in order. */
+const STAGE_RANK: Record<Stage, number> = { home: 0, room: 1, out: 2 };
 
 /** Someone who goes from room to room of a house on every storey, by the stairs, and out again (see `core/world3d/actors.ts`). */
 /** Someone from the map's cast, on screen: their figure, and their mind (where they are, what they are doing). */
@@ -567,6 +579,15 @@ export class SpikeWorld {
    * the hero, and the leave they gave. Saved. How the place weighs what is done in it is `culture` (the map's).
    */
   standing: HeroStanding = newStanding();
+  /** What the hero holds and where moved things lie (plan B3b, `core/world3d/carry.ts`). Saved. */
+  carry: CarryState = newCarry();
+  /** Loose things drawn now, by id: in a standing house's group (`inst`), or out of doors. */
+  private readonly looseDrawn = new Map<string, { g: THREE.Object3D; inst: HouseInst | null }>();
+  /** The model of what the hero holds, in their arms. */
+  private heldG: THREE.Object3D | null = null;
+  /** How far what the hero holds has gone from home, and who has already answered it (person ids). */
+  private carryStage: Stage = 'home';
+  private readonly sawCarry = new Set<string>();
   readonly culture: CultureDef;
   /** Who the hero is, as the people see them (their people, their facets): how cold or warm a witness starts. The page sets it. */
   heroWho: Visitor = {};
@@ -877,7 +898,8 @@ export class SpikeWorld {
       const floorY = model.levels[room.level].floorY;
       for (const it of room.plan.pieces) {
         const mp = room.models.get(it.id);
-        if (!mp) continue;
+        // (A piece once moved is loose: drawn where it lies now, below, not where the plan put it.)
+        if (!mp || this.carry.loose[pieceId(h.id, ri, it.id)]) continue;
         const g = thingGroup(THINGS.get(mp.kind).furniture!.model.draw(mp.seed, mp.variant));
         g.position.set(it.x, floorY + it.lift, it.z);
         g.rotation.y = it.rot;
@@ -915,6 +937,7 @@ export class SpikeWorld {
     inst.group.rotation.y = h.rot;
     this.scene.add(inst.group);
     this.houses.push(inst);
+    for (const [id, l] of Object.entries(this.carry.loose)) if (l.at?.house === h.id) this.drawLoose(id, l);
     st.houses.push(inst);
     if (this.heatAspect) this.floorHeatFor(inst);
   }
@@ -943,6 +966,8 @@ export class SpikeWorld {
     for (const s of hs.shells) this.shells.splice(this.shells.indexOf(s), 1);
     this.houses.splice(this.houses.indexOf(hs), 1);
     if (this.wasIn === hs) this.wasIn = null;
+    // (Loose things lying in it went with its group; they're drawn again when it stands.)
+    for (const [id, d] of this.looseDrawn) if (d.inst === hs) this.looseDrawn.delete(id);
   }
 
   /** Two shells: `step` metres out, then twice that, each sparser than the last. */
@@ -1663,7 +1688,7 @@ export class SpikeWorld {
     const sY = Math.sin(this.yaw), cY = Math.cos(this.yaw);
     // Screen up is away from the camera, screen right is along the camera's right.
     const wx = (up * -sY + right * cY) / mag, wz = (up * -cY + right * -sY) / mag;
-    const speed = HERO_SPEED * this.speedMul;
+    const speed = HERO_SPEED * this.speedMul * this.carryPace;
     const pose = this.moves.steer(this.hero, wx, wz, speed * dt);
     this.placeHero();
     if (pose) this.faceWalker(this.heroFig, pose.dx, pose.dz, pose.moving);
@@ -1692,7 +1717,7 @@ export class SpikeWorld {
     }
     if (this.steer(dt)) return;
     if (!h.legs.length) return;
-    const speed = HERO_SPEED * this.speedMul;
+    const speed = HERO_SPEED * this.speedMul * this.carryPace;
     const pose = this.moves.step(h, dt, speed);
     this.placeHero();
     if (pose) this.faceWalker(this.heroFig, pose.dx, pose.dz, pose.moving);
@@ -2263,6 +2288,7 @@ export class SpikeWorld {
     const groups: THREE.Object3D[] = [];
     if (inHouse) groups.push(...inHouse.furniture.filter((f) => f.visible));
     else {
+      for (const d of this.looseDrawn.values()) if (!d.inst) groups.push(d.g);
       for (const lc of this.chunks.values()) for (const o of lc.standing.objects) if (o.userData.thing) groups.push(o);
       for (const c of this.camps) groups.push(...c.st.objects.filter((o) => o.userData.thing));
     }
@@ -2336,13 +2362,16 @@ export class SpikeWorld {
         members: (house) => this.cast.filter((c) => c.who.home === house).map((c) => c.who.id),
         welcome: (at) => this.welcomeAt(at),
         leave: (doer, house) => doer === 'hero' && hasLeave(this.standing, house, this.worldHours),
+        wealth: (house) => this.houseWealth(house),
       },
+      holding: (doer) => (doer === 'hero' ? this.holding : null),
       leadStudy: (t) => {
         const id = this.propLeads.get(t.id), def = id ? LEADS[id] : undefined, rec = id ? this.leads[id] : undefined;
         return id && def?.study && rec && !rec.studied ? { lead: id, study: def.study } : null;
       },
       view: {
         rain: w.rain, hour: w.hour ?? 12,
+        watchers: this.cast.filter((c) => c.mind.senses.sees.includes('hero')).length,
         housesNear: (x, z, r) => idx.liteNear(x - r, z - r, x + r, z + r).filter((e) => Math.hypot(e.built.place.x - x, e.built.place.z - z) <= r).length,
       },
     };
@@ -2368,6 +2397,8 @@ export class SpikeWorld {
       if (e.kind === 'time' && hero && this.weather.hour !== null) this.weather.advance(e.minutes / 60);
       else if (e.kind === 'make' && e.thing === 'campfire') this.lightFire();
       else if (e.kind === 'sit' && hero) this.sitHero(e.target);
+      else if (e.kind === 'carry' && hero) this.pickUp(e.target, e.hidden);
+      else if (e.kind === 'putdown' && hero) this.putDown();
       else if (e.kind === 'noise') this.makeNoise({ ...e.at, loud: e.loud, kind: e.sound, by: doer.id });
     }
     // A wrong by the hero is answered by whoever saw it (B3c); what the map's people do wrong waits for them to be watched too.
@@ -2511,6 +2542,183 @@ export class SpikeWorld {
     return out;
   }
 
+  // --- taking and carrying (plan B3b, `core/world3d/carry.ts`) ---
+
+  /** How fast the hero walks: something held in both hands slows them. */
+  private get carryPace(): number {
+    return this.carry.held && !this.carry.hidden ? CARRY_PACE : 1;
+  }
+
+  /** What the hero holds (its kind), or null. */
+  get holding(): string | null {
+    const id = this.carry.held;
+    return id ? this.carry.loose[id]?.kind ?? null : null;
+  }
+
+  /** How well off a household is, from its people's facets (rich, poor). */
+  private houseWealth(house: string) {
+    return wealthOf(this.cast.filter((c) => c.who.home === house).flatMap((c) => this.talkPerson(c.who.id)?.tags ?? []));
+  }
+
+  /** A thing to pick up, as a loose thing: one already moved, or a piece of furniture (its model's seed and variant, and its home). */
+  private looseOf(t: ActTarget): Loose | null {
+    const have = this.carry.loose[t.id];
+    if (have) return have;
+    const [house, ri, piece] = t.id.split('/');
+    const place = house && piece ? this.houseIndex.byId(house) : null;
+    const mp = place ? this.houseIndex.entry(place).room[Number(ri)]?.models.get(piece) : undefined;
+    if (!mp) return null;
+    return { kind: t.kind, seed: mp.seed, ...(mp.variant ? { variant: mp.variant } : {}), home: { x: t.x, z: t.z, level: t.level, house: t.house, rot: t.rot ?? 0, room: Number(ri) }, at: null };
+  }
+
+  /** Where the hero is, as how far a carried thing has gone asks it. */
+  private carryStageNow(l: Loose): Stage {
+    const at = this.heroSpot();
+    return stageOf(l.home, { house: at.house, room: at.house ? this.roomAt(at)?.n ?? null : null });
+  }
+
+  /** The hero picks a thing up: it leaves where it was and is held (in their arms, or out of sight). */
+  private pickUp(t: ActTarget, hidden: boolean): boolean {
+    const l = this.looseOf(t);
+    if (!l) return false;
+    l.at = null;
+    this.carry.loose[t.id] = l;
+    this.carry.held = t.id;
+    this.carry.hidden = hidden;
+    this.sawCarry.clear();
+    this.carryStage = this.carryStageNow(l);
+    this.undraw(t.id);
+    this.removePiece(t.id);
+    this.showHeld();
+    return true;
+  }
+
+  /** The hero puts down what they hold, just in front of them, turned the way they face. */
+  private putDown(): boolean {
+    const id = this.carry.held, l = id ? this.carry.loose[id] : null;
+    if (!id || !l) return false;
+    const yaw = this.heroFig.want, s = this.heroSpot();
+    l.at = { x: s.x + Math.sin(yaw) * PUT_DOWN_AHEAD, z: s.z + Math.cos(yaw) * PUT_DOWN_AHEAD, level: s.level, house: s.house, rot: yaw };
+    this.carry.held = null;
+    this.carry.hidden = false;
+    this.showHeld();
+    this.drawLoose(id, l);
+    return true;
+  }
+
+  /** Draw a loose thing where it lies: in its house's group (if the house stands now), or on the ground. */
+  private drawLoose(id: string, l: Loose): void {
+    this.undraw(id);
+    const at: LooseSpot | null = l.at, model = THINGS.get(l.kind).furniture?.model;
+    if (!at || !model) return;
+    const g = thingGroup(model.draw(l.seed, l.variant));
+    g.userData.thing = { id, kind: l.kind, house: at.house, level: at.level, rot: at.rot } satisfies Tagged;
+    if (at.house) {
+      const inst = this.houses.find((hs) => hs.built.place.id === at.house);
+      if (!inst) return;
+      const h = inst.built.place, p = houseToLocal(h, at.x, at.z);
+      g.position.set(p.x, inst.built.model.levels[at.level]?.floorY ?? 0, p.z);
+      g.rotation.y = at.rot - h.rot;
+      inst.group.add(g);
+      inst.furniture.push(g);
+      inst.furnLevel.push(at.level);
+      this.looseDrawn.set(id, { g, inst });
+    } else {
+      g.position.set(at.x, this.store.heightAt(at.x, at.z), at.z);
+      g.rotation.y = at.rot;
+      this.scene.add(g);
+      this.looseDrawn.set(id, { g, inst: null });
+    }
+  }
+
+  /** Take a drawn piece of furniture out of the world (and out of its house's list). */
+  private dropPiece(g: THREE.Object3D, inst: HouseInst | null): void {
+    g.removeFromParent();
+    if (inst) {
+      const i = inst.furniture.indexOf(g);
+      if (i >= 0) {
+        inst.furniture.splice(i, 1);
+        inst.furnLevel.splice(i, 1);
+      }
+    }
+    g.traverse((o) => {
+      const geo = (o as THREE.Mesh).geometry as THREE.BufferGeometry | undefined;
+      if (geo && !geo.userData.shared) geo.dispose();
+    });
+  }
+
+  private undraw(id: string): void {
+    const d = this.looseDrawn.get(id);
+    if (!d) return;
+    this.looseDrawn.delete(id);
+    this.dropPiece(d.g, d.inst);
+  }
+
+  /** The piece as the room's plan placed it, if its house stands now (once moved, it is drawn as a loose thing instead). */
+  private removePiece(id: string): void {
+    for (const hs of this.houses) {
+      const g = hs.furniture.find((f) => (f.userData.thing as Tagged | undefined)?.id === id);
+      if (g) this.dropPiece(g, hs);
+    }
+  }
+
+  /** What the hero holds, in their arms: in front of the chest, smaller than life so the body still shows. Nothing if hidden. */
+  private showHeld(): void {
+    if (this.heldG) this.dropPiece(this.heldG, null);
+    this.heldG = null;
+    const id = this.carry.held, l = id ? this.carry.loose[id] : null;
+    const model = l ? THINGS.get(l.kind).furniture?.model : undefined;
+    if (!l || !model || this.carry.hidden) return;
+    const g = thingGroup(model.draw(l.seed, l.variant));
+    const s = Math.min(1, HELD_SIZE / Math.max(model.w, model.d));
+    g.scale.setScalar(s);
+    g.position.set(0, HELD_Y, 0.1 + (model.d * s) / 2);
+    this.heroFig.rig.group.add(g);
+    this.heldG = g;
+  }
+
+  /** Everything loose drawn again from `carry` (a loaded game): the plan's pieces that moved go, the loose ones come. */
+  private redrawLoose(): void {
+    for (const id of [...this.looseDrawn.keys()]) this.undraw(id);
+    for (const [id, l] of Object.entries(this.carry.loose)) {
+      this.removePiece(id);
+      this.drawLoose(id, l);
+    }
+    this.showHeld();
+    const id = this.carry.held, l = id ? this.carry.loose[id] : null;
+    this.carryStage = l ? this.carryStageNow(l) : 'home';
+    this.sawCarry.clear();
+  }
+
+  /**
+   * What the hero carries openly, as people see it (run when people look): carried out of its room is *move*, out of
+   * its house *take*, for whoever sees it cross; once it is out, its household know it whenever they see it with you.
+   * Something held out of sight is never noticed. Lines said go to the page.
+   */
+  private checkCarry(): void {
+    const id = this.carry.held, l = id ? this.carry.loose[id] : null;
+    if (!id || !l || this.carry.hidden || !l.home.house) return;
+    const house = l.home.house, kind = THINGS.get(l.kind);
+    const stage = this.carryStageNow(l), was = this.carryStage;
+    this.carryStage = stage;
+    const wrongs = (act: ActKind): Wrong[] =>
+      mayDo({ owner: { house }, act, member: false, leave: hasLeave(this.standing, house, this.worldHours), welcome: null, hour: this.weather.hour ?? 12, culture: this.culture })
+        ? []
+        : [{ act, owner: { house }, worth: worthOf(act, kind.value ?? 0, kind.importance ?? 0, this.houseWealth(house), this.culture) }];
+    const answer = (act: ActKind, only: (c: CastCard) => boolean, fallback: string | null): void => {
+      const ws = wrongs(act);
+      if (!ws.length) return;
+      for (const s of this.witness(ws, (c) => only(c) && !this.sawCarry.has(`${c.who.id}:${stage}`))) {
+        this.sawCarry.add(`${s.id}:${stage}`);
+        const says = s.says ?? fallback;
+        if (says) this.onSpeak?.(s.id, s.name, says);
+      }
+    };
+    const act = actOfStage(stage);
+    if (act && STAGE_RANK[stage] > STAGE_RANK[was]) answer(act, () => true, null);
+    if (stage === 'out') answer('take', (c) => c.who.home === house, `That's our ${thingName(kind)}!`);
+  }
+
   /** Put the hero down at a spot (a loaded game): on storey `level` if the spot is in a house that has one. */
   placeHeroAt(x: number, z: number, level = 0): void {
     const h = this.hero;
@@ -2530,14 +2738,15 @@ export class SpikeWorld {
   }
 
   /** What the save keeps of the world (the page adds the map and writes it: `core/world3d/save.ts`). */
-  saveState(): { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags: Record<string, boolean>; talk: TalkMemory; leads: LeadsState; standing: HeroStanding } {
+  saveState(): { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags: Record<string, boolean>; talk: TalkMemory; leads: LeadsState; standing: HeroStanding; carry: CarryState } {
     const h = this.hero;
-    return { hour: this.weather.hour ?? 12, hero: { x: h.x, z: h.z, level: h.stair ? 0 : h.level }, explored: this.explored.toJSON(), things: this.states.toJSON(), flags: { ...this.flags }, talk: structuredClone(this.talkMemory), leads: structuredClone(this.leads), standing: structuredClone(this.standing) };
+    return { hour: this.weather.hour ?? 12, hero: { x: h.x, z: h.z, level: h.stair ? 0 : h.level }, explored: this.explored.toJSON(), things: this.states.toJSON(), flags: { ...this.flags }, talk: structuredClone(this.talkMemory), leads: structuredClone(this.leads), standing: structuredClone(this.standing), carry: structuredClone(this.carry) };
   }
 
-  /** Take a save back: the clock, the hero, what was seen, the things' states, what they know. */
-  loadState(s: { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags?: Record<string, boolean>; talk?: TalkMemory; leads?: LeadsState; standing?: HeroStanding }): void {
+  /** Take a save back: the clock, the hero, what was seen, the things' states, what they know, what was moved. */
+  loadState(s: { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags?: Record<string, boolean>; talk?: TalkMemory; leads?: LeadsState; standing?: HeroStanding; carry?: CarryState }): void {
     this.flags = { ...s.flags };
+    this.carry = s.carry ? structuredClone(s.carry) : newCarry();
     this.standing = s.standing ? structuredClone(s.standing) : newStanding();
     this.talkMemory = s.talk ? structuredClone(s.talk) : newTalkMemory();
     this.leads = s.leads ? structuredClone(s.leads) : {};
@@ -2547,6 +2756,7 @@ export class SpikeWorld {
     this.exploredWin.dirty = true;
     this.states.assign(s.things);
     this.placeHeroAt(s.hero.x, s.hero.z, s.hero.level);
+    this.redrawLoose();
   }
 
   /** Put out every campfire that was lit by hand. */
@@ -2975,6 +3185,7 @@ export class SpikeWorld {
       this.perceiveIn = PERCEIVE_EVERY;
       this.gossip();
       this.checkTrespass();
+      this.checkCarry();
       // (Views fade back toward nothing, a little each world day: Q44.)
       fadeStanding(this.standing, this.weather.day, this.culture);
     }
@@ -3000,9 +3211,11 @@ export class SpikeWorld {
       const hs = a.house ? this.standingOf(a.house) : null;
       const shown = a.house ? !!hs && hs.open && hs.view === a.level : sees(a.x, a.z);
       c.fig.place.visible = c.blob.visible = shown;
-      // On easy: an eye over whoever sees the hero, a question mark over whoever heard something lately.
+      // On easy: an eye over whoever sees the hero, a question mark over whoever heard something lately. Over anyone
+      // near, even someone the hero can't see (in the dark, behind a wall): just the mark, floating (Q43).
       const s = c.mind.senses, heard = lastHeard(s, 'any');
-      const mark = !this.showSenses || !shown ? null : s.sees.includes('hero') ? this.markMats.eye : heard && heard.left > HEARD_SHOWN ? this.markMats.heard : null;
+      const near = shown || Math.hypot(a.x - this.hero.x, a.z - this.hero.z) <= MARK_REACH;
+      const mark = !this.showSenses || !near ? null : s.sees.includes('hero') ? this.markMats.eye : heard && heard.left > HEARD_SHOWN ? this.markMats.heard : null;
       c.mark.visible = mark !== null;
       if (mark) {
         c.mark.material = mark;

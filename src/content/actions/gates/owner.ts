@@ -1,4 +1,5 @@
 import type { GateCase, GateDef } from '../../../core/world3d/actions';
+import { worthOf } from '../../../core/world3d/carry';
 import { ACT_KINDS, type ActKind, type Owner, type Wrong, mayDo, ownerOf } from '../../../core/world3d/standing';
 
 /**
@@ -37,7 +38,12 @@ const owner: GateDef = {
   check: (c) => (allowed(c) ? null : 'house' in (whose(c) ?? {}) ? 'It is not yours: this is someone\'s home.' : 'That is the town\'s.'),
   wrong: (c): Wrong | null => {
     const w = whose(c);
-    return w ? { act: actOf(c), owner: w } : null;
+    if (!w) return null;
+    // What the thing is worth to them (B3b): its value against the household's wealth, and its importance.
+    const kind = c.target ? c.world.things.get(c.target.kind) : null, o = c.world.owners;
+    const wealth = 'house' in w && o?.wealth ? o.wealth(w.house) : 'common';
+    const worth = kind && o ? worthOf(actOf(c), kind.value ?? 0, kind.importance ?? 0, wealth, o.culture) : 1;
+    return { act: actOf(c), owner: w, ...(worth !== 1 ? { worth } : {}) };
   },
 };
 

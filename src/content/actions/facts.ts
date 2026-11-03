@@ -38,6 +38,20 @@ export const FACTS: FactDef[] = [
     whenFalse: 'Only where there are embers.',
   },
   {
+    id: 'bulky',
+    about: 'The thing acted on is bag-sized (not a pocket\'s worth): harder to hide (plan B3b).',
+    holds: (_at, _view, target, world) => !!target && !!world && world.things.get(target.kind).size === 'bag',
+    whenTrue: 'Not something this big.',
+    whenFalse: 'Only something bag-sized.',
+  },
+  {
+    id: 'watched',
+    about: 'Someone of the map sees the hero now.',
+    holds: (_at, view) => (view.watchers ?? 0) > 0,
+    whenTrue: 'Not while anyone is watching.',
+    whenFalse: 'Only with someone watching.',
+  },
+  {
     id: 'dark',
     about: 'Night (before six or after eight in the evening).',
     holds: (_at, view) => view.hour < 6 || view.hour >= 20,

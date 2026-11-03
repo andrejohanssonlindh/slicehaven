@@ -4,12 +4,7 @@ Newest on top. Answer in chat (just reference the number, e.g. "Q31: A"). Answer
 
 *A small ask for B6 too: the page of the carried-weight rule, when you've looked.*
 
-## Q43 — On easy, mark people who notice you even when you can't see them? (B5)
-On easy, an **eye** floats over anyone who sees you, a **question mark** over anyone who heard something. Right now the mark shows only on people **you can see too**. At night that means a guard can watch you from the dark with no warning.
-- **A (as now):** only on people you see. You learn you were seen when they act.
-- **B:** on anyone near who notices you, even in the dark (just the mark, floating). Much easier to sneak.
-
-*Pick A or B. Answering doesn't hold up building.*
+*No open questions right now.*
 
 ---
 

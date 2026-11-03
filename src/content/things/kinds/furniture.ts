@@ -1,3 +1,4 @@
+import type { Size } from '../../../core/world3d/carry';
 import type { SourceKind } from '../../../core/world3d/filaments3d';
 import type { ThingDef } from '../../../core/world3d/things';
 import { MODELS } from '../models';
@@ -70,6 +71,35 @@ const PIECES: Record<string, Piece> = {
 /** What can be sat on, and how high its seat is (metres): the verb `sit` (`content/actions/verbs/sit.ts`) is for these. */
 const SEATS: Record<string, number> = { stool: 0.45, innbench: 0.45, bed: 0.5 };
 
+/**
+ * What can be taken (plan B3b, `core/world3d/carry.ts`): how big it is and what it is worth, in coins (a first guess
+ * until prices come with B6). A piece not listed is part of the room (a hearth, a shelf, the pegs) and stays put.
+ * Heavy pieces can be tried, and are too heavy to carry alone.
+ */
+const TAKE: Record<string, { size: Size; value?: number; importance?: number }> = {
+  stool: { size: 'hands', value: 2 },
+  broom: { size: 'hands', value: 1 },
+  keg: { size: 'hands', value: 6 },
+  sacks: { size: 'hands', value: 4 },
+  basket: { size: 'bag', value: 1 },
+  kindling: { size: 'hands', value: 0.5 },
+  pallet: { size: 'hands', value: 1 },
+  footlocker: { size: 'hands', value: 8 },
+  nets: { size: 'hands', value: 3 },
+  haybale: { size: 'hands', value: 1 },
+  herbs: { size: 'pocket', value: 1 },
+  table: { size: 'heavy', value: 6 },
+  longTable: { size: 'heavy', value: 10 },
+  innbench: { size: 'heavy', value: 5 },
+  bed: { size: 'heavy', value: 12 },
+  anvil: { size: 'heavy', value: 40, importance: 1 },
+  loom: { size: 'heavy', value: 25, importance: 1 },
+  workbench: { size: 'heavy', value: 8 },
+  counter: { size: 'heavy', value: 8 },
+  aleKegs: { size: 'heavy', value: 20 },
+  cratestack: { size: 'heavy', value: 6 },
+};
+
 /** The family every piece of furniture is a kind of: an item in a room. */
 const family: ThingDef = { id: 'furniture', is: 'item', abstract: true };
 
@@ -78,6 +108,6 @@ export default [
   ...Object.entries(PIECES).map(([id, p]): ThingDef => {
     const model = MODELS[id];
     if (!model) throw new Error(`furniture ${id} has no model in content/things/models/${id}.ts`);
-    return { id, is: p.is, look: p.look, furniture: { mount: p.mount, model }, ...(p.gives ? { filament: p.gives } : {}), ...(SEATS[id] ? { seat: SEATS[id] } : {}) };
+    return { id, is: p.is, look: p.look, furniture: { mount: p.mount, model }, ...(p.gives ? { filament: p.gives } : {}), ...(SEATS[id] ? { seat: SEATS[id] } : {}), ...TAKE[id] };
   }),
 ] satisfies ThingDef[];

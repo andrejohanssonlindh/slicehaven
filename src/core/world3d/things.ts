@@ -1,4 +1,5 @@
 import type { Welcome } from './standing';
+import type { Size } from './carry';
 import type { FSource, SourceKind } from './filaments3d';
 import type { BuildingPlan } from './house';
 import type { MeshData } from './mesh';
@@ -78,6 +79,15 @@ export interface ThingDef {
   name?: string;
   /** It can be sat on: the seat's height above the floor, metres (the verb `sit`). */
   seat?: number;
+  /**
+   * How big it is to take (plan B3b, `core/world3d/carry.ts`): pocket, bag, strapped, in the hands, or heavy (not
+   * alone). No size: it is part of where it stands (a hearth, a shelf) and can't be taken.
+   */
+  size?: Size;
+  /** What it is worth, in coins (a first guess until prices come with B6): taking it weighs more against a poor owner. */
+  value?: number;
+  /** How much it matters to its owner beyond its price (a guard's sword, an heirloom): 0 to 3, each step half as much again. */
+  importance?: number;
   /**
    * The states its placed things can be in, and what each starts as (`core/world3d/state.ts`): a fire's `lit`, a
    * door's `open`. Merged down the tree: a kind adds to what it inherits, and may change a start.

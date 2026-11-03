@@ -8,6 +8,7 @@ import type { StateValue, ThingStates } from './state';
 import type { Thing, ThingDef, Things } from './things';
 import type { LeadStudy } from './leads';
 import type { CultureDef, Welcome, Wrong } from './standing';
+import type { Wealth } from './carry';
 
 /**
  * Actions on things (plan item B3, the frame: B3a). Whatever is tried, a hearth, a stool, later the smith's furnace or
@@ -61,6 +62,8 @@ export interface WorldView {
   hour: number;
   /** How many houses stand within `r` metres of a point. */
   housesNear(x: number, z: number, r: number): number;
+  /** How many of the map's people see the hero now (stealing under their eyes is harder; plan B3b). */
+  watchers?: number;
 }
 
 /** Everything an action may read and change. */
@@ -79,6 +82,8 @@ export interface ActWorld {
   leadStudy?: (t: ActTarget) => { lead: string; study: LeadStudy } | null;
   /** Who owns what, and who may (plan B3c; `core/world3d/standing.ts`). Left out, the owner gate lets everything through. */
   owners?: OwnerView;
+  /** What a doer holds now (its kind), or null: hands full can't take another or sit (plan B3b). Left out: hands are free. */
+  holding?: (doer: string) => string | null;
 }
 
 /** What the owner gate asks of the world (plan B3c). */
@@ -91,6 +96,8 @@ export interface OwnerView {
   welcome(at: Spot): Welcome | null;
   /** Has the doer leave to be in this house now? */
   leave(doer: string, house: string): boolean;
+  /** How well off a household is (what a thing taken from them is worth to them, B3b). Left out: common. */
+  wealth?(house: string): Wealth;
 }
 
 /** A fact about a spot: true or false there (indoors, raining, among houses). One entry in `content/actions/facts.ts`. */
@@ -98,7 +105,7 @@ export interface FactDef {
   id: string;
   about: string;
   /** `target` is the thing acted on, if any (embers in a hearth are a fact about the hearth). */
-  holds(at: Spot, view: WorldView, target?: ActTarget | null, world?: Pick<ActWorld, 'states'>): boolean;
+  holds(at: Spot, view: WorldView, target?: ActTarget | null, world?: Pick<ActWorld, 'states' | 'things'>): boolean;
   /** Said when a gate needs it false and it is true ("You are among the houses."), and the other way round. */
   whenTrue: string;
   whenFalse: string;
@@ -148,7 +155,11 @@ export type Outcome =
   /** Gives the hero a lead (`content/leads/`, plan B11): studying an inscription, searching a coat. */
   | { lead: string }
   /** What a study of the thing taught about a lead: its true read, or the plausible wrong one (the lead's file has both). */
-  | { learn: string; truth: boolean };
+  | { learn: string; truth: boolean }
+  /** The doer picks the thing up and holds it: openly, or out of sight (slipped away unseen). Plan B3b. */
+  | { carry: 'open' | 'hidden' }
+  /** The doer puts down what they hold, where they stand. */
+  | { putDown: true };
 
 /** A roll to resolve an action: the doer's best of these skills, against a difficulty. */
 export interface ActRoll {
@@ -182,6 +193,8 @@ export interface VerbDef {
   hidden?: boolean;
   /** The sound it makes, done or not (plan B5): how far an ordinary ear hears it in the open, metres, and what it is ("fire", "shout"). */
   noise?: { loud: number; kind: string };
+  /** Done well, no one notices (stealing unseen): a wrong it is goes unanswered; done badly, whoever sees it answers. */
+  unseen?: boolean;
   success: Outcome[];
   failure?: Outcome[];
 }
@@ -214,6 +227,9 @@ export type ActEvent =
   | { kind: 'noise'; at: Spot; loud: number; sound: string }
   | { kind: 'lead'; lead: string }
   | { kind: 'learn'; lead: string; truth: boolean }
+  /** The doer picked up the thing (held openly, or out of sight); they put down what they held, here. */
+  | { kind: 'carry'; target: ActTarget; hidden: boolean }
+  | { kind: 'putdown'; at: Spot }
   /** Who saw a wrong the hero did, and how far it moved their view of them (B3c; the page shows it on easy). */
   | { kind: 'seen'; by: { id: string; name: string; by: number }[] };
 
@@ -283,7 +299,7 @@ function runGates(v: VerbDef, target: ActTarget | null, at: Spot, doer: Doer, wo
 export function offers(target: ActTarget | null, at: Spot, doer: Doer, world: ActWorld, lib: ActionLibrary): Offer[] {
   const t = target ? world.things.get(target.kind) : null;
   const out: Offer[] = [];
-  const name = t ? thingName(t) : '';
+  const name = nameFor(t, doer, world);
   for (const v of Object.values(lib.verbs)) {
     if (t ? !verbFits(v, t) : v.on !== 'here') continue;
     if (runGates(v, target, at, doer, world, lib).hidden) continue;
@@ -351,7 +367,18 @@ function apply(outs: readonly Outcome[], target: ActTarget | null, at: Spot, nam
       events.push({ kind: 'sit', target });
     } else if ('lead' in o) events.push({ kind: 'lead', lead: o.lead });
     else if ('learn' in o) events.push({ kind: 'learn', lead: o.learn, truth: o.truth });
+    else if ('carry' in o) {
+      if (!target) throw new Error('carrying needs a thing to pick up');
+      events.push({ kind: 'carry', target, hidden: o.carry === 'hidden' });
+    } else if ('putDown' in o) events.push({ kind: 'putdown', at });
   }
+}
+
+/** What a line calls the thing: the one acted on, or (on the spot where the doer stands) what they hold. */
+function nameFor(t: Thing | null, doer: Doer, world: ActWorld): string {
+  if (t) return thingName(t);
+  const held = world.holding?.(doer.id);
+  return held && world.things.has(held) ? thingName(world.things.get(held)) : '';
 }
 
 /**
@@ -361,7 +388,7 @@ function apply(outs: readonly Outcome[], target: ActTarget | null, at: Spot, nam
 export function perform(offer: string, target: ActTarget | null, at: Spot, doer: Doer, world: ActWorld, lib: ActionLibrary): ActResult {
   const [from, id] = offer.split(':') as ['verb' | 'hook' | 'study', string];
   const t = target ? world.things.get(target.kind) : null;
-  const name = t ? thingName(t) : '';
+  const name = nameFor(t, doer, world);
   let v: VerbDef | undefined;
   if (from === 'verb') v = lib.verbs[id];
   else if (from === 'study') {
@@ -408,7 +435,9 @@ export function perform(offer: string, target: ActTarget | null, at: Spot, doer:
   apply(success ? v.success : v.failure ?? [], target, at, name, world, events);
   if (v.takes) events.push({ kind: 'time', minutes: v.takes });
   if (v.noise) events.push({ kind: 'noise', at, loud: v.noise.loud, sound: v.noise.kind });
-  return { done: true, ...(roll ? { roll } : {}), ...(skill ? { skill } : {}), success, events, transgressions: g.broken, ...(g.wrongs.length ? { wrongs: g.wrongs } : {}), ...(v.hidden ? { hidden: true } : {}) };
+  // (Done unseen: still a wrong, but no one noticed it to answer.)
+  const wrongs = v.unseen && success ? [] : g.wrongs;
+  return { done: true, ...(roll ? { roll } : {}), ...(skill ? { skill } : {}), success, events, transgressions: g.broken, ...(wrongs.length ? { wrongs } : {}), ...(v.hidden ? { hidden: true } : {}) };
 }
 
 /** What is wrong in an action library: verbs naming gates or facts that aren't there, or saying something a gate can't take. */

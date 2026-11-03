@@ -3,6 +3,7 @@
 *Archive of the questions in [questions](../questions.md) once answered or dropped. Newest on top. What they decided, if it still stands, is in the [decisions](../decisions.md).*
 
 ## 2026-11-03
+- **Q43 On easy, mark people who notice you even when you can't see them?** → **B**: "for easy that's reasonable." (Built: on easy the eye or question mark floats over anyone within 30 m who noticed you, seen or not.)
 - **Q44 Does a bad view fade with time?** → **yes**, but likely very differently by culture, and it should take **a lot of time: weeks**. (Built: each culture says points a day; country folk, a point a day.) Asked alongside: *are some parts of houses off limits, like the inn's upper floor without paying?* (Built: each kind of room says what it welcomes; the inn's guest rooms need a room from the keeper.)
 - **Q42 Leads: is this the shape?** → **yes.** Make sure they're designed so they're easy to add to (or to describe), and put them in the plan; not necessarily built now. (Leads are one data file each, with a "lead note" template; plan item B11, after B5.)
 - **Q41 How collected hooks (leads) are held and seen** → **several ways.** **Quests in themselves are leads.** There can also be **free leads**: find an interesting statue outside a town, and "Lead added". The director wants help thinking it through (done on the [openings](../design/talk-openings.md) page; Q42).

@@ -30,6 +30,10 @@ const country: CultureDef = {
   rank: { nobility: 20 },
   fear: { gap: 6, later: 15 },
   boldAt: 2,
+  // (Coins: a poor family feels three as a real loss, a rich one sixty. A first guess, tuned when prices come with B6.)
+  wealth: { poor: 3, common: 10, rich: 60 },
+  worth: [0.5, 3],
+  leaveCovers: ['enter', 'sit', 'use', 'meddle', 'move'],
 };
 
 export default country;

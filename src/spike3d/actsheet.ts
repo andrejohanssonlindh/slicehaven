@@ -120,6 +120,9 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
     // Whose it is (B3c): a tapped thing in someone's house or the town's; names on easy.
     const whose = target ? whoseText(w.whoseAt(target), loadSettings().difficulty === 'easy') : null;
     if (whose) lookEl.textContent = `${lookEl.textContent} ${whose}`.trim();
+    // What you carry (B3b), said where you stand.
+    const held = !target && w.holding && THINGS.has(w.holding) ? THINGS.get(w.holding) : null;
+    if (held) lookEl.textContent = `${lookEl.textContent} ${t('act.holding', 'You are carrying the {name}.', { name: t(`thing.${held.id}.name`, thingName(held)) })}`.trim();
     if (lead?.added) {
       notify(t('act.leadadded', 'Lead added: {title}.', { title: lead.title }));
       onLead();

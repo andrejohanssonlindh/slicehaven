@@ -9,7 +9,7 @@ const makeFire: VerbDef = {
   id: 'makefire',
   label: 'Make a fire here',
   on: 'here',
-  gates: [{ gate: 'place', not: ['indoors', 'inSettlement'] }],
+  gates: [{ gate: 'place', not: ['indoors', 'inSettlement'] }, { gate: 'hands-free' }],
   roll: { skills: ['Vildmarksvana'], attr: 'attr:Förflyttning', difficulty: DIFFICULTY.easy, harder: [{ fact: 'raining', add: 4, note: 'the rain' }] },
   takes: 10,
   // (Breaking sticks, striking a spark.)

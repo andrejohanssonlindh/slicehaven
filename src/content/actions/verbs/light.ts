@@ -9,7 +9,7 @@ const light: VerbDef = {
   id: 'light',
   label: 'Light the {name}',
   on: { kind: 'fire' },
-  gates: [{ gate: 'state', key: 'lit', is: false }, { gate: 'owner', act: 'use' }],
+  gates: [{ gate: 'state', key: 'lit', is: false }, { gate: 'hands-free' }, { gate: 'owner', act: 'use' }],
   // (Without Survival, Agility at −2D6: anyone can try to light a hearth.)
   roll: {
     skills: ['Vildmarksvana'], attr: 'attr:Förflyttning', difficulty: DIFFICULTY.easy,
