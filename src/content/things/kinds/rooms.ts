@@ -16,7 +16,11 @@ const corner = (c: 'backLeft' | 'backRight' | 'frontLeft' | 'frontRight'): Rule 
 const center = (dx = 0, dz = 0): Rule => ({ at: 'center', dx, dz });
 const free: Rule = { at: 'free' };
 
-const room = (id: string, is: string, look: string, lines: RoomLine[]): ThingDef => ({ id, is, look, room: { lines } });
+const room = (id: string, is: string, look: string, lines: RoomLine[], more: Partial<ThingDef> = {}): ThingDef => ({ id, is, look, room: { lines }, ...more });
+
+/** A shop or a common room lets anyone in to sit down in its hours (plan B3c): no wrong to take a seat. */
+const SHOP: Partial<ThingDef> = { welcome: { acts: ['sit'], hours: [8, 19] } };
+const INN: Partial<ThingDef> = { welcome: { acts: ['sit'], hours: [6, 24] } };
 
 const things: ThingDef[] = [
   // A room is a part of a building, to the skill hooks.
@@ -67,7 +71,7 @@ const things: ThingDef[] = [
     { piece: 'cratestack', rule: side('left', 0.15) },
     { piece: 'hanging', rule: back(0.75), lift: 30 },
     { piece: 'basket', rule: free },
-  ]),
+  ], INN),
   // The inn's guest rooms: a bed or two, a chest at the foot, a place to hang a cloak.
   room('guestroom', 'room', 'A guest room: a bed or two, a chest, pegs for a cloak.', [
     { piece: 'bed', vary: true, rule: back(0) },
@@ -143,7 +147,7 @@ const things: ThingDef[] = [
     { piece: 'basket', rule: free },
     { piece: 'broom', rule: side('left', 0.9) },
     { piece: 'stool', rule: free },
-  ]),
+  ], SHOP),
   room('herbalist', 'room', 'An herbalist’s: bottles and jars, herbs hung to dry, a mortar.', [
     { piece: 'hearth', rule: corner('backRight'), fire: true },
     { piece: 'pallet', rule: corner('backLeft') },
@@ -155,7 +159,7 @@ const things: ThingDef[] = [
     { piece: 'basket', rule: side('left', 0.5) },
     { piece: 'stool', rule: side('right', 0.5) },
     { piece: 'broom', rule: side('right', 0.9) },
-  ]),
+  ], SHOP),
   room('fishmonger', 'room', 'A fishmonger’s: fish drying on a rack, tubs of the day’s catch.', [
     { piece: 'hearth', rule: corner('backRight'), fire: true },
     { piece: 'nets', rule: corner('backLeft') },
@@ -166,7 +170,7 @@ const things: ThingDef[] = [
     { piece: 'counter', variant: 'fish', seed: 29, rule: center(0, 0.6) },
     { piece: 'keg', rule: side('right', 0.5) },
     { piece: 'broom', rule: side('left', 0.9) },
-  ]),
+  ], SHOP),
   room('general', 'room', 'A general store: wares on shelves, crates and sacks.', [
     { piece: 'shelf', variant: 'wares', seed: 32, rule: back(0.3), lift: 22, books: 1 },
     { piece: 'hooks', rule: back(0.72), lift: 8 },
@@ -177,7 +181,7 @@ const things: ThingDef[] = [
     { piece: 'counter', variant: 'general', seed: 38, rule: center(0, 0.6) },
     { piece: 'basket', rule: free },
     { piece: 'broom', rule: side('left', 0.9) },
-  ]),
+  ], SHOP),
   room('weaver', 'room', 'A weaver’s: a loom, bolts of cloth.', [
     { piece: 'hearth', rule: corner('backRight'), fire: true },
     { piece: 'pallet', rule: corner('backLeft') },
@@ -188,7 +192,7 @@ const things: ThingDef[] = [
     { piece: 'counter', variant: 'cloth', seed: 46, rule: center(-0.3, 0.6) },
     { piece: 'stool', rule: { at: 'around', of: 'loom' } },
     { piece: 'basket', rule: free },
-  ]),
+  ], SHOP),
   room('smithy', 'room', 'A smithy: forge, anvil, a tub for quenching.', [
     { piece: 'forge', rule: corner('backRight'), fire: true },
     { piece: 'workbench', rule: back(0.1) },
@@ -196,7 +200,7 @@ const things: ThingDef[] = [
     { piece: 'anvil', rule: center() },
     { piece: 'quenchtub', rule: side('left', 0.5) },
     { piece: 'coalbin', rule: corner('frontRight') },
-  ]),
+  ], SHOP),
 ];
 
 export default things;

@@ -29,7 +29,14 @@ export interface TalkPerson {
   tags: string[];
   /** Their work, if they have one: what they're called ("farmer") and a line about it. Asking about it needs no roll. */
   work?: { calling: string; about?: string };
+  /** Their home (a house id): they can give leave to be in it (plan B3c). */
+  home?: string;
 }
+
+/** The offer that asks leave to make yourself at home in their house, for the rest of the day (plan B3c). */
+export const ASK_LEAVE = 'talk:leave';
+/** How hard asking leave is at an even mood (two easier a step of liking you). */
+const LEAVE_DIFFICULTY = 10;
 
 /** The offer that asks about their work: no roll, no patience spent (Q40). */
 export const ASK_WORK = 'talk:work';
@@ -52,6 +59,8 @@ export interface TalkCase {
   library: Library;
   /** The hero's leads, the lead files, and the world's hours (plan B11): a lead opens asking about it. */
   leads?: { state: LeadsState; defs: Record<string, LeadDef>; hours: number };
+  /** Has the hero leave in this house now (plan B3c)? Left out, leave isn't asked for. */
+  hasLeave?: (house: string) => boolean;
 }
 
 /** An offer that asks about a lead: `lead:<id>`. No roll and no patience spent; anyone can be asked (most don't know). */
@@ -116,7 +125,10 @@ export function talkOffers(p: TalkPerson, c: TalkCase): Offer[] {
   const press: Offer[] = c.leads && listens
     ? heldBack(c.leads.state, c.leads.defs, p).map(({ def }) => ({ id: LEAD_PRESS + def.id, label: `Press ${p.name} about ${def.ask.replace(/^Ask \{name\} about /, '')}`, skills: [...COAX_SKILLS], from: 'skill' as const }))
     : [];
-  return [...work, ...leads, ...press, ...openChecks(o, s)
+  const leave: Offer[] = p.home && c.hasLeave && !c.hasLeave(p.home) && listens
+    ? [{ id: ASK_LEAVE, label: `Ask ${p.name} if you may make yourself at home`, skills: [...COAX_SKILLS], from: 'skill' }]
+    : [];
+  return [...work, ...leads, ...press, ...leave, ...openChecks(o, s)
     .filter((k) => opensNow(k, p, c) && (!k.talk || left === undefined || left > 0))
     .map((k) => ({ id: k.id, label: named(k.label, p), skills: [...k.skills], from: 'skill' as const }))];
 }
@@ -132,6 +144,8 @@ export interface TalkResult {
   lines: Line[];
   /** A lead it handed over (plan B11). */
   lead?: string;
+  /** Leave given to be in this house, for the rest of the day (plan B3c). */
+  leave?: string;
 }
 
 /** What a lead's answer looks like in the talk: the lines, and "Lead added" if it handed one over. */
@@ -147,6 +161,26 @@ export function talk(offer: string, p: TalkPerson, doer: Doer, c: TalkCase, rng:
   if (offer === ASK_WORK && p.work) {
     const a = /^[aeiou]/i.test(p.work.calling) ? 'an' : 'a';
     return { done: true, hidden: false, success: true, lines: [{ text: `${p.name} works as ${a} ${p.work.calling.toLowerCase()}.` }, ...(p.work.about ? [{ text: p.work.about }] : [])] };
+  }
+  if (offer === ASK_LEAVE && p.home && c.hasLeave) {
+    if (c.hasLeave(p.home)) return { done: false, reason: 'You already have leave.', hidden: false, success: false, lines: [] };
+    const left = talksLeftWith(o, s, c.library);
+    if (left !== undefined && left <= 0) return { done: false, reason: `${p.name} has had enough of you for now.`, hidden: false, success: false, lines: [] };
+    const mem = (c.memory.social[p.id] ??= { talks: 0, mood: 0 });
+    mem.talks += 1;
+    // Someone who likes you says yes; someone cross with you says no; anyone else needs asking well.
+    if (mem.mood >= 1) return { done: true, hidden: false, success: true, leave: p.home, lines: [{ text: `"Of course. Make yourself at home, today."`, tone: 'good' }] };
+    if (mem.mood <= -2) return { done: true, hidden: false, success: false, lines: [{ text: `"After what you did? No."`, tone: 'bad' }] };
+    const best = bestSkill(doer, COAX_SKILLS);
+    const fallback = !best && doer.dice(PRESENCE).n > 0 ? { skill: PRESENCE, dice: modify(doer.dice(PRESENCE), -2) } : null;
+    const use = best ?? fallback;
+    if (!use) return { done: true, hidden: false, success: false, lines: [{ text: 'You have no way to go about it.', tone: 'info' }] };
+    const roll = rollTest(use.dice, Math.max(2, LEAVE_DIFFICULTY - 2 * mem.mood), rng, 'Ask leave');
+    const notes: Line[] = fallback ? [{ text: 'No fitting skill: Presence instead, at −2D6.', tone: 'info' }] : [];
+    if (mem.mood) notes.push({ text: `(${mem.mood > 0 ? 'easier: they like you' : 'harder: they are wary of you'})`, tone: 'info' });
+    return roll.success
+      ? { done: true, roll, skill: use.skill, hidden: false, success: true, leave: p.home, lines: [...notes, { text: `"Go on, then. For today."`, tone: 'good' }] }
+      : { done: true, roll, skill: use.skill, hidden: false, success: false, lines: [...notes, { text: `"I'd rather you didn't."`, tone: 'bad' }] };
   }
   if (offer.startsWith(LEAD_ASK) && c.leads) {
     const r = askAbout(c.leads.state, c.leads.defs, offer.slice(LEAD_ASK.length), p, c.flags, c.leads.hours);

@@ -1,6 +1,7 @@
 import type { StatesJSON } from './state';
 import type { TalkMemory } from './talk';
 import type { LeadsState } from './leads';
+import type { Standing } from './standing';
 
 /**
  * The saved world (plan item B1): one versioned JSON record per map, in the browser's storage. What it holds is what
@@ -10,7 +11,7 @@ import type { LeadsState } from './leads';
  * No migrations while the design moves: a save of another version is dropped. Bump `WORLD_SAVE_VERSION` whenever
  * the shape changes or the maps change in a way that moves things (ids are where things stand).
  */
-export const WORLD_SAVE_VERSION = 4;
+export const WORLD_SAVE_VERSION = 5;
 
 export interface WorldSave {
   v: number;
@@ -28,6 +29,8 @@ export interface WorldSave {
   talk: TalkMemory;
   /** The leads the hero has (`core/world3d/leads.ts`, plan B11). */
   leads: LeadsState;
+  /** What the map's people think of the hero, and leave given (`core/world3d/standing.ts`, plan B3c). */
+  standing: Standing;
 }
 
 const key = (map: string): string => `slicehaven.world.${map}`;

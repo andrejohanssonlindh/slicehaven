@@ -1,3 +1,4 @@
+import type { Welcome } from './standing';
 import type { FSource, SourceKind } from './filaments3d';
 import type { BuildingPlan } from './house';
 import type { MeshData } from './mesh';
@@ -125,6 +126,11 @@ export interface ThingDef {
   rooms?: Record<string, string>;
   /** A kind of room: what it holds and where (read with `Things.recipe`, which applies what it inherits). */
   room?: RoomRecipe;
+  /**
+   * A kind of room that welcomes people (plan B3c): in a house whose main room is this kind, these acts are no wrong in
+   * these hours (an inn's taproom: sit down, 6 to 23). Inherited.
+   */
+  welcome?: Welcome;
   /** It sends up a column of smoke from this high above the ground. */
   smoke?: { y: number };
   /** Its look, built from the placement (meshes by material). Trees use `tree` instead. */

@@ -2,6 +2,22 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-03 — B3c, first slice: owners, how people see you, and what they do about it
+
+- **Things have owners now.** What stands in a house is its household's; what stands among the houses outdoors is the town's; the wild is no one's.
+- **Doing it anyway is never blocked.** But whoever **sees** you (from B5) thinks less of you. Each person holds **their own view of you, −100 to +100** (your Q38), and it's kept in the save. The owner minds most, a neighbour half as much.
+- **What they do depends on where their view lands.** The Hamlet's country folk **grumble** (they stop and stare), then **scold** (they walk up to you), then **fetch the guard** (they go to the nearest guard and tell them, and the guard comes to you). Past that they **square up**, which stands in for fighting until there's combat. Each says a line. **Who you are** counts: if their people are cold to yours (country folk and a tirak), they react sooner.
+- **Word spreads** when two people stand together, about once an hour, good or bad. You can be in trouble with someone who never saw you do anything.
+- **Not everything is a wrong.** You can sit down in the inn (6 to midnight) or a shop in its opening hours, sit on the town's benches and light its torches. Putting the torches out is a wrong.
+- **Ask leave:** talk to someone with a home → *Ask … if you may make yourself at home.* If they like you it's a yes; if they're cross, a no; otherwise you have to persuade them. It lasts until midnight.
+- **Advantages count** (Q38): a talk that wins someone over moves their view more, the more advantages you rolled.
+- **On easy:** after a wrong you see who saw it and by how much, and in talk their number ("Their view of you: −13").
+- **Each place has a culture file** (only *country* for now) with the weights and where each reaction starts. It's a first guess, so tell me what feels too harsh or too soft.
+- **Saves from before today are dropped.**
+- **Try it:** Hamlet, panel → Game: easy. In the inn, put out the hearth while the innkeeper is looking (they scold you), light it and put it out again. Or by night, in front of the guard by the green, put out a street torch.
+- **Q44:** should a bad view fade with time?
+- **Next:** B3c's second slice: fight or fetch by how dangerous you look (physique, weapons shown, scars) against their leaning; rank and fear (a trukh).
+
 ## 2026-11-03 — Leads: ask anyone, coax the reluctant, study the statue
 
 *Recorded:* the statue and Saint Hesma's well are **test leads** (your call): the well has no ending on purpose.

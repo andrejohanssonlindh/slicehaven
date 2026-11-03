@@ -8,6 +8,7 @@ import { type ActResult, type ActTarget, type Doer, thingName } from '../core/wo
 import type { SpikeWorld } from '../engine3d/world';
 import { t } from '../i18n';
 import { showRolls } from '../ui/dice';
+import { loadSettings } from '../ui/settings';
 
 /**
  * The page's side of actions (plan B3a): a tapped thing's sheet (what it is, what can be tried), walking up to it,
@@ -68,6 +69,10 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
     r.events.forEach((e, i) => {
       if (e.kind === 'say') lines.push(t(`act.${offer}.${i}`, e.line.text));
       if (e.kind === 'time' && e.minutes >= 5) lines.push(t('act.time', '({n} minutes pass.)', { n: e.minutes }));
+      // On easy: who saw a wrong, and how far it moved their view of you (B3c).
+      if (e.kind === 'seen' && loadSettings().difficulty === 'easy') {
+        lines.push(t('act.seen', '(Seen by {who}.)', { who: e.by.map((s) => `${s.name} −${s.by}`).join(', ') }));
+      }
     });
     if (lines.length) notify(lines.join(' '));
     if (r.events.some((e) => e.kind === 'lead')) onLead();

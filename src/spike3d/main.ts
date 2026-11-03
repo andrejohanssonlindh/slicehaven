@@ -631,6 +631,9 @@ setTimeout(() => {
   if (units('attr:Vaksamhet') > 0) world.alertness = units('attr:Vaksamhet');
   world.darkSight = Math.min(1, units('F:Mörkersyn') / 12);
   world.showSenses = loadSettings().difficulty === 'easy';
+  // Owners and the scale (B3c): who the hero is, as the people see them; and what they say unasked.
+  world.heroWho = { kind: hero.kind, people: hero.people, tags: hero.tags };
+  world.onSpeak = (_who, name, text) => notify(`${name}: "${text}"`);
   world.onSightRoll = (who, roll, sight) => {
     if (who !== 'hero' || loadSettings().difficulty !== 'easy') return;
     void showRolls([{ ...roll, label: t('spike.sight', 'Sight') }]).then(() => {

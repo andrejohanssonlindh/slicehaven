@@ -48,6 +48,18 @@ export interface Mind {
   slot: number;
   /** What they see and have heard (plan B5, `core/world3d/perceive.ts`); the conditions `sees` and `heard` ask it. */
   senses: Senses;
+  /**
+   * How they are answering something the hero did (plan B3c, `core/world3d/standing.ts`): the answer's name
+   * ("grumble", "fetch"), and how many seconds more. The condition `answering` asks it; the world sets it.
+   */
+  answer?: { id: string; left: number };
+}
+
+/** Let `dt` seconds pass on an answer: it ends when its time is up. */
+export function fadeAnswer(mind: Mind, dt: number): void {
+  if (!mind.answer) return;
+  mind.answer.left -= dt;
+  if (mind.answer.left <= 0) delete mind.answer;
 }
 
 export const newMind = (id: string, x: number, z: number, seed: number, slot = 0, home?: string): Mind => ({
@@ -67,8 +79,16 @@ export interface Acts {
   act(mind: Mind, offer: string, t: ActTarget): ActResult;
 }
 
-/** Where someone the mind knows of stands now (the hero, for `watch` to face); null if they are not about. */
-export type WhereIs = (id: string) => { x: number; z: number } | null;
+/** Where someone the mind knows of stands now (the hero, for `watch` to face), with their house and storey; null if they are not about. */
+export type WhereIs = (id: string) => { x: number; z: number; house?: string | null; level?: number } | null;
+
+/** Answering the hero (plan B3c): whom to fetch, and handing the matter over once there. Given by whoever runs the world. */
+export interface Answers {
+  /** The nearest person of this calling (`job-guard`) to fetch, else the nearest neighbour; null if there is no one. */
+  helperFor(mind: Mind, calling: string): string | null;
+  /** The fetcher has reached the helper and tells them: the helper comes to see about the hero. */
+  handOver(mind: Mind, helper: string): void;
+}
 
 /** What a behaviour may use while it runs. */
 export interface BehaveContext {
@@ -81,6 +101,8 @@ export interface BehaveContext {
   rng: Rng;
   /** Acting on things; absent where nothing can be done (tests of walking alone). */
   acts?: Acts;
+  /** Answering what the hero did (B3c); absent where no one answers. */
+  answers?: Answers;
 }
 
 export interface Behaviour {

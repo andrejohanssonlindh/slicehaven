@@ -43,6 +43,8 @@
 | `tendfire` | sees to a house's fire: if it is out, walks to it and lights it through the action frame (`verb:light`, the same gates and roll as the hero; a failed try is tried again 20 s later), then stays by it | `house` (default their own) |
 | `watch` | stops and faces whoever they see (the hero unless named), or else where the last noise came from | `who` |
 | `investigate` | walks to where the last noise came from (of a kind, if named), then looks about | `of`, `look` (s), `speed` |
+| `confront` | walks up to the hero (or `who`) and stands facing them, close, following as they move (scolding, a guard come to see; B3c) | `who`, `speed` |
+| `fetch` | walks to the nearest person of a calling (default the guard; else a neighbour), tells them, and they come for the hero (B3c) | `of`, `speed` |
 
 | Condition | Holds | Value |
 |---|---|---|
@@ -51,6 +53,9 @@
 | `notEvent` | while it does not | its id |
 | `sees` / `notSees` | while they see (or don't) someone: in their cone and range, on their side of the walls, nothing in the way | `"hero"` or a person's id |
 | `heard` | for 30 s after hearing a noise of that kind | `"steps"`, `"shout"`, `"fire"`, `"any"`, or a list |
+| `answering` | while they answer something the hero did wrong (B3c): set by the world from the place's culture | an answer's name (`"grumble"`, `"scold"`, `"fetch"`…) or `"any"` |
+
+**Answering a wrong (B3c)** needs nothing in the map: the culture's answers (`content/cultures/`) are put at the top of everyone's day as `{ "when": { "answering": "scold" }, "do": "confront" }` lines, so a schedule only says the ordinary day.
 
 **Perception (B5)** is in `core/world3d/perceive.ts`. Everyone near looks and listens four times a second. Their sight is rolled from their own sheet (Alertness against 8, every six world hours): a failure halves it, advantages stretch it. The night shortens it unless they have darkvision, and a flame the hero carries is seen from far. Noises: the hero's footsteps (5 m), a verb's `noise` (lighting a fire 8 m, call out 40 m); a wall muffles a sound to 40% of its reach. What they notice is on their mind (`mind.senses`).
 

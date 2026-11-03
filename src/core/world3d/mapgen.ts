@@ -217,6 +217,8 @@ export interface MapSpec {
   places?: Record<string, PlaceSpec>;
   /** What happens here, and when (schedules ask with `{ "when": { "event": "<id>" } }`). */
   events?: MapEvent[];
+  /** How the place weighs what is done in it: a culture's id (`content/cultures/`, plan B3c). Left out: the default one. */
+  culture?: string;
 }
 
 export interface CompiledMap {
@@ -229,6 +231,8 @@ export interface CompiledMap {
   cast: CastMember[];
   places: Record<string, Place>;
   events: MapEvent[];
+  /** The culture the map names (`MapSpec.culture`), or null for the default. */
+  culture: string | null;
   /** Everything that did not work out: a thing that would not fit, a house in the lake, an unreachable door. Empty for a good map. */
   problems: string[];
 }
@@ -352,7 +356,7 @@ export interface CompileOptions {
 
 /** The keys each part of a map may have: anything else is a typo, and is reported. */
 const KEYS = {
-  map: ['name', 'about', 'seed', 'size', 'roads', 'lake', 'rivers', 'mud', 'doorMud', 'houses', 'rules', 'wild', 'trees', 'props', 'hero', 'people', 'places', 'events'],
+  map: ['name', 'about', 'seed', 'size', 'roads', 'lake', 'rivers', 'mud', 'doorMud', 'houses', 'rules', 'wild', 'trees', 'props', 'hero', 'people', 'places', 'events', 'culture'],
   house: ['id', 'room', 'size', 'roof', 'walls', 'wallH', 'seed', 'plan', 'torch', 'at'],
   at: ['x', 'z', 'rot', 'road', 'm', 't', 'side', 'gap'],
   wild: ['trees', 'mix', 'shrubs', 'boulders', 'grain', 'area'],
@@ -572,7 +576,7 @@ export function compileMap(spec: MapSpec, things: Things, opts: CompileOptions =
   const index = new PlacedIndex(layout, things, generator);
   if (generator) ground.extraShade = (x, z) => index.shadeAt(x, z);
 
-  const compiled: CompiledMap = { name: spec.name, ground, layout, placed: index, hero, cast, places, events, problems };
+  const compiled: CompiledMap = { name: spec.name, ground, layout, placed: index, hero, cast, places, events, culture: spec.culture ?? null, problems };
   problems.push(...validate(ctx.houses, compiled, things, built.map((b, i) => ({ id: b.place.id, box: boxes[i], door: houseToWorld(b.place, b.model.door[0], b.model.door[2] - 0.9) }))));
   return compiled;
 }

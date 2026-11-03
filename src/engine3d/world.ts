@@ -28,7 +28,9 @@ import { type Cares, type LeadStatus, type LeadsState, giveLead, leadStatus, stu
 import { LEADS } from '../content/leads';
 import { HEARD_FOR, type Noise, type Senses, type SightRoll, type Where, canSee, fadeSenses, hears, lastHeard, newSenses, noteHeard, rollSight, sightBoost, sightDue } from '../core/world3d/perceive';
 import { type TalkCase, type TalkMemory, type TalkPerson, type TalkResult, newTalkMemory, talk } from '../core/world3d/talk';
-import type { Visitor } from '../core/skillweb';
+import { type Visitor, disposition } from '../core/skillweb';
+import { type AnswerStep, type CultureDef, type Standing as HeroStanding, type Wrong, answerFor, answerLines, giveLeave, hasLeave, meet, moodsFromScale, newStanding, regardOf, shiftRegard, talkOntoScale, weightOf } from '../core/world3d/standing';
+import { cultureOf } from '../content/cultures';
 import { personName } from '../content/people/naming';
 import { LIBRARY } from '../content/skillweb';
 import { PlacedIndex } from '../core/world3d/placed';
@@ -38,7 +40,7 @@ import type { PlacedProp } from '../core/world3d/props';
 import { THINGS } from '../content/things';
 import { cloudDrift, cloudThreshold } from '../core/world3d/sky';
 import { type Actor, Walking, newActor } from '../core/world3d/actors';
-import { type Acts, type Clock, type Mind, newMind, stepMind } from '../core/world3d/behave';
+import { type Acts, type Answers, type Clock, type Mind, fadeAnswer, newMind, stepMind } from '../core/world3d/behave';
 import { BEHAVIOURS } from '../content/behaviours';
 import { NavGrid, type P2, type Shape, shapeDist } from '../core/world3d/space';
 import { type Ground3D, groundHeight, lakeDist, splatAt } from '../core/world3d/terrain';
@@ -116,6 +118,8 @@ interface CastCard {
   mark: THREE.Sprite;
 }
 
+/** How close two people stand to talk of the hero, metres (plan B3c). */
+const MEET_DIST = 2.5;
 /** How often the map's people look and listen, seconds. */
 const PERCEIVE_EVERY = 0.25;
 /** The hero's footsteps: heard this far by an ordinary ear, metres; one every so many metres walked. */
@@ -554,6 +558,18 @@ export class SpikeWorld {
   onSightRoll: ((who: string, roll: Roll, sight: SightRoll) => void) | null = null;
   /** Show over people's heads what they notice of the hero (on easy). */
   showSenses = false;
+  /**
+   * Owners, the scale and consequences (plan B3c, `core/world3d/standing.ts`): what each of the map's people thinks of
+   * the hero, and the leave they gave. Saved. How the place weighs what is done in it is `culture` (the map's).
+   */
+  standing: HeroStanding = newStanding();
+  readonly culture: CultureDef;
+  /** Who the hero is, as the people see them (their people, their facets): how cold or warm a witness starts. The page sets it. */
+  heroWho: Visitor = {};
+  /** Told when one of the map's people says something to the hero unasked (a guard come to see), for the page to show. */
+  onSpeak: ((who: string, name: string, text: string) => void) | null = null;
+  /** When two people last talked of the hero (world hours), by the pair: word passes once an hour at most. */
+  private readonly metAt = new Map<string, number>();
   private perceiveIn = 0;
   private stepFrom: P2 | null = null;
   private places: Record<string, Place> = {};
@@ -609,7 +625,7 @@ export class SpikeWorld {
   private cloudOff = new THREE.Vector2();
   settings: WorldSettings;
 
-  constructor(settings: WorldSettings, grassCount: number, map: Pick<CompiledMap, 'ground' | 'layout' | 'hero' | 'cast' | 'places' | 'events'> & Partial<Pick<CompiledMap, 'placed'>> = mapNamed('spike')) {
+  constructor(settings: WorldSettings, grassCount: number, map: Pick<CompiledMap, 'ground' | 'layout' | 'hero' | 'cast' | 'places' | 'events'> & Partial<Pick<CompiledMap, 'placed' | 'culture'>> = mapNamed('spike')) {
     this.settings = settings;
     const { ground, layout } = map;
     const g = ground;
@@ -692,7 +708,11 @@ export class SpikeWorld {
     // The map's people, each with a mind that follows their schedule (see `stepCast`).
     this.places = map.places;
     this.mapEvents = map.events;
-    for (const who of map.cast) {
+    // Everyone answers what the hero does wrong as the place's culture says: its lines go at the top of every day (B3c).
+    this.culture = cultureOf(map.culture);
+    const answering = answerLines(this.culture);
+    for (const one of map.cast) {
+      const who = { ...one, does: [...answering, ...one.does] };
       const fig = personFigure(who, this.yaw), blob = blobShadow(0.32);
       fig.place.visible = blob.visible = false;
       const mark = new THREE.Sprite(this.markMats.eye);
@@ -1938,6 +1958,7 @@ export class SpikeWorld {
     return {
       id, name: personName(r.chain, `${id}:${c.who.seed ?? 0}`), kind: r.facets.people ?? 'human', tags: r.chain,
       ...(calling ? { work: { calling, ...(about ? { about } : {}) } } : {}),
+      ...(c.who.home ? { home: c.who.home } : {}),
     };
   }
 
@@ -2001,7 +2022,12 @@ export class SpikeWorld {
   talkTo(offer: string, id: string, doer: Doer, hero: Visitor): TalkResult {
     const p = this.talkPerson(id);
     if (!p) return { done: false, reason: 'No one is there.', hidden: false, success: false, lines: [] };
-    const r = talk(offer, p, doer, this.talkCase(hero), this.actRng);
+    const c = this.talkCase(hero);
+    const before = c.memory.social[id]?.mood ?? 0;
+    const r = talk(offer, p, doer, c, this.actRng);
+    // What it did to their mood goes onto their scale (scaled by the roll's advantages), and leave given is kept.
+    talkOntoScale(this.standing, id, before, c.memory.social[id]?.mood ?? 0, r.roll?.advantages ?? 0);
+    if (r.leave) giveLeave(this.standing, r.leave, this.worldHours);
     if (r.done) {
       this.recentActs.push({ who: doer.id, offer, target: id, skill: r.skill ?? null, success: r.success, hour: this.weather.hour ?? 0 });
       if (this.recentActs.length > 30) this.recentActs.shift();
@@ -2011,7 +2037,102 @@ export class SpikeWorld {
 
   /** What a talk is about: the hero, the world's flags, the memory, the library, the hero's leads. */
   talkCase(hero: Visitor): TalkCase {
-    return { hero, flags: this.flags, memory: this.talkMemory, library: LIBRARY, leads: { state: this.leads, defs: LEADS, hours: this.worldHours } };
+    // (The talk rules read each person's mood: a band of the view they hold, B3c.)
+    moodsFromScale(this.talkMemory.social, this.standing);
+    return {
+      hero, flags: this.flags, memory: this.talkMemory, library: LIBRARY, leads: { state: this.leads, defs: LEADS, hours: this.worldHours },
+      hasLeave: (house) => hasLeave(this.standing, house, this.worldHours),
+    };
+  }
+
+  // --- owners, the scale and consequences (plan B3c, `core/world3d/standing.ts`) ---
+
+  /** What a house welcomes without asking: its main room's kind says (an inn: sit down, 6 to 24). */
+  private welcomeOf(house: string): { acts: Wrong['act'][]; hours: [number, number] } | null {
+    const room = this.layout.houses.find((h) => h.id === house)?.room ?? 'home';
+    return THINGS.has(room) ? THINGS.get(room).welcome ?? null : null;
+  }
+
+  /** How someone's people see the hero's (−3..+3, the relations table): a cold one answers sooner. */
+  private relationOf(id: string): number {
+    const p = this.talkPerson(id);
+    return p ? disposition({ kind: p.kind, tags: p.tags }, this.heroWho, LIBRARY).v : 0;
+  }
+
+  /** Someone starts answering the hero: the behaviour the culture says, for a while; the line they say, if any. */
+  private startAnswer(c: CastCard, step: AnswerStep): string | null {
+    c.mind.answer = { id: step.id, left: step.for };
+    const says = step.says ?? [];
+    return says.length ? says[Math.floor(this.actRng.next() * says.length)] : null;
+  }
+
+  /**
+   * The hero did wrong (the owner gate said so): everyone who sees the hero now thinks less of them, the owner most,
+   * and answers as the culture says for where their view now stands. Returns who saw it, by how much, and what they said.
+   */
+  private witness(wrongs: readonly Wrong[]): { id: string; name: string; by: number; says: string | null }[] {
+    const out: { id: string; name: string; by: number; says: string | null }[] = [];
+    for (const c of this.cast) {
+      if (!c.mind.senses.sees.includes('hero')) continue;
+      let by = 0;
+      for (const w of wrongs) by += weightOf(w, this.culture, 'house' in w.owner && c.who.home === w.owner.house);
+      if (by <= 0) continue;
+      const now = shiftRegard(this.standing, c.who.id, -by);
+      const step = answerFor(now, this.culture, this.relationOf(c.who.id));
+      const says = step ? this.startAnswer(c, step) : null;
+      out.push({ id: c.who.id, name: this.talkPerson(c.who.id)?.name ?? c.who.id, by: Math.round(by), says });
+    }
+    return out;
+  }
+
+  /** What someone thinks of the hero now (for the page on easy, tests and the debug hook). */
+  regardOf(id: string): number {
+    return regardOf(this.standing, id);
+  }
+
+  /** What each of the map's people is answering now (for tests and the debug hook). */
+  get answers(): { id: string; answer: string | null }[] {
+    return this.cast.map((c) => ({ id: c.who.id, answer: c.mind.answer?.id ?? null }));
+  }
+
+  /** Fetching help and handing it over (the `fetch` behaviour): the guard, else the nearest neighbour. */
+  private readonly answerHooks: Answers = {
+    helperFor: (mind, calling) => {
+      const me = mind.actor;
+      let best: { id: string; d: number; fits: boolean } | null = null;
+      for (const c of this.cast) {
+        if (c.mind === mind) continue;
+        const fits = PERSON_KINDS.resolve(c.who).chain.includes(calling);
+        const d = Math.hypot(c.mind.actor.x - me.x, c.mind.actor.z - me.z);
+        if (!best || (fits && !best.fits) || (fits === best.fits && d < best.d)) best = { id: c.who.id, d, fits };
+      }
+      return best?.id ?? null;
+    },
+    handOver: (mind, helper) => {
+      const c = this.cast.find((x) => x.who.id === helper);
+      if (!c) return;
+      // The one fetched takes the fetcher's word for it, nearly in full.
+      const told = Math.round(regardOf(this.standing, mind.id) * 0.8);
+      if (told < regardOf(this.standing, helper)) shiftRegard(this.standing, helper, told - regardOf(this.standing, helper));
+      delete mind.answer;
+      const says = this.startAnswer(c, this.culture.fetched);
+      if (says) this.onSpeak?.(helper, this.talkPerson(helper)?.name ?? helper, says);
+    },
+  };
+
+  /** People standing together talk of the hero (once an hour a pair): word spreads, good or bad. */
+  private gossip(): void {
+    const near = this.cast.filter((c) => Math.hypot(c.mind.actor.x - this.hero.x, c.mind.actor.z - this.hero.z) <= MIND_REACH);
+    for (let i = 0; i < near.length; i++) {
+      for (let j = i + 1; j < near.length; j++) {
+        const a = near[i].mind.actor, b = near[j].mind.actor;
+        if (a.house !== b.house || (a.house !== null && a.level !== b.level) || Math.hypot(a.x - b.x, a.z - b.z) > MEET_DIST) continue;
+        const key = `${near[i].who.id}|${near[j].who.id}`;
+        if (this.worldHours - (this.metAt.get(key) ?? -Infinity) < 1) continue;
+        this.metAt.set(key, this.worldHours);
+        meet(this.standing, near[i].who.id, near[j].who.id);
+      }
+    }
   }
 
   // --- leads (plan B11, `core/world3d/leads.ts`): what the hero knows that gives a reason to act ---
@@ -2125,6 +2246,12 @@ export class SpikeWorld {
     const w = this.weather, idx = this.houseIndex;
     return {
       things: THINGS, states: this.states, flags: this.flags, rng: this.actRng, library: LIBRARY, leads: this.leads,
+      owners: {
+        culture: this.culture,
+        members: (house) => this.cast.filter((c) => c.who.home === house).map((c) => c.who.id),
+        welcome: (house) => this.welcomeOf(house),
+        leave: (doer, house) => doer === 'hero' && hasLeave(this.standing, house, this.worldHours),
+      },
       leadStudy: (t) => {
         const id = this.propLeads.get(t.id), def = id ? LEADS[id] : undefined, rec = id ? this.leads[id] : undefined;
         return id && def?.study && rec && !rec.studied ? { lead: id, study: def.study } : null;
@@ -2157,6 +2284,12 @@ export class SpikeWorld {
       else if (e.kind === 'make' && e.thing === 'campfire') this.lightFire();
       else if (e.kind === 'sit' && hero) this.sitHero(e.target);
       else if (e.kind === 'noise') this.makeNoise({ ...e.at, loud: e.loud, kind: e.sound, by: doer.id });
+    }
+    // A wrong by the hero is answered by whoever saw it (B3c); what the map's people do wrong waits for them to be watched too.
+    if (hero && r.wrongs?.length) {
+      const seen = this.witness(r.wrongs);
+      for (const s of seen) if (s.says) r.events.push({ kind: 'say', line: { text: `${s.name}: "${s.says}"`, tone: 'bad' } });
+      if (seen.length) r.events.push({ kind: 'seen', by: seen.map(({ id, name, by }) => ({ id, name, by })) });
     }
     // A lead given is the hero's (someone else learning something waits for what people know).
     if (hero) {
@@ -2312,14 +2445,15 @@ export class SpikeWorld {
   }
 
   /** What the save keeps of the world (the page adds the map and writes it: `core/world3d/save.ts`). */
-  saveState(): { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags: Record<string, boolean>; talk: TalkMemory; leads: LeadsState } {
+  saveState(): { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags: Record<string, boolean>; talk: TalkMemory; leads: LeadsState; standing: HeroStanding } {
     const h = this.hero;
-    return { hour: this.weather.hour ?? 12, hero: { x: h.x, z: h.z, level: h.stair ? 0 : h.level }, explored: this.explored.toJSON(), things: this.states.toJSON(), flags: { ...this.flags }, talk: structuredClone(this.talkMemory), leads: structuredClone(this.leads) };
+    return { hour: this.weather.hour ?? 12, hero: { x: h.x, z: h.z, level: h.stair ? 0 : h.level }, explored: this.explored.toJSON(), things: this.states.toJSON(), flags: { ...this.flags }, talk: structuredClone(this.talkMemory), leads: structuredClone(this.leads), standing: structuredClone(this.standing) };
   }
 
   /** Take a save back: the clock, the hero, what was seen, the things' states, what they know. */
-  loadState(s: { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags?: Record<string, boolean>; talk?: TalkMemory; leads?: LeadsState }): void {
+  loadState(s: { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags?: Record<string, boolean>; talk?: TalkMemory; leads?: LeadsState; standing?: HeroStanding }): void {
     this.flags = { ...s.flags };
+    this.standing = s.standing ? structuredClone(s.standing) : newStanding();
     this.talkMemory = s.talk ? structuredClone(s.talk) : newTalkMemory();
     this.leads = s.leads ? structuredClone(s.leads) : {};
     this.weather.setHour(s.hour);
@@ -2743,16 +2877,19 @@ export class SpikeWorld {
    */
   private stepCast(dt: number, night: number): void {
     const sees = (x: number, z: number): boolean => this.vision.outer <= 0 || this.seen(x, z) >= 0.25;
-    const whereIs = (id: string): { x: number; z: number } | null => {
-      if (id === 'hero') return { x: this.hero.x, z: this.hero.z };
+    const whereIs = (id: string): { x: number; z: number; house: string | null; level: number } | null => {
+      if (id === 'hero') return { x: this.hero.x, z: this.hero.z, house: this.hero.house, level: this.hero.stair ? 0 : this.hero.level };
       const o = this.cast.find((x) => x.who.id === id);
-      return o ? { x: o.mind.actor.x, z: o.mind.actor.z } : null;
+      return o ? { x: o.mind.actor.x, z: o.mind.actor.z, house: o.mind.actor.house, level: o.mind.actor.level } : null;
     };
-    const ctx = { walking: this.moves, places: this.places, clock: this.clock, acts: this.acts, whereIs };
+    const ctx = { walking: this.moves, places: this.places, clock: this.clock, acts: this.acts, whereIs, answers: this.answerHooks };
     // (People look and listen a few times a second, not every frame.)
     this.perceiveIn -= dt;
     const look = this.perceiveIn <= 0;
-    if (look) this.perceiveIn = PERCEIVE_EVERY;
+    if (look) {
+      this.perceiveIn = PERCEIVE_EVERY;
+      this.gossip();
+    }
     for (const c of this.cast) {
       const a = c.mind.actor;
       const far = Math.hypot(a.x - this.focus.x, a.z - this.focus.z) > MIND_REACH && Math.hypot(a.x - this.hero.x, a.z - this.hero.z) > MIND_REACH;
@@ -2761,6 +2898,7 @@ export class SpikeWorld {
         continue;
       }
       if (look) this.perceive(c, PERCEIVE_EVERY, night);
+      fadeAnswer(c.mind, dt);
       // Someone the hero is talking to stands and faces them; their day waits until the talk ends.
       const pose = c.who.id === this.talkingWith
         ? { dx: this.hero.x - a.x, dz: this.hero.z - a.z, moving: false }

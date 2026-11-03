@@ -4,6 +4,16 @@ Newest on top. Answer in chat (just reference the number, e.g. "Q31: A"). Answer
 
 *A small ask for B6 too: the page of the carried-weight rule, when you've looked.*
 
+## Q44 — Does a bad view of you fade with time? (B3c)
+Now each person's view of you stays where your deeds put it: a villager you crossed last week is as cross today. It could also fade back toward nothing, slowly.
+- **A (proposed):** it fades, a few points a day, and faster for small things. People forgive a stool sat on, not a theft.
+- **B:** it stays until you mend it (talk, a gift, an apology later).
+- **C:** good views stay, bad ones fade (or the other way round).
+
+*Pick one. Answering doesn't hold up building.*
+
+---
+
 ## Q43 — On easy, mark people who notice you even when you can't see them? (B5)
 On easy, an **eye** floats over anyone who sees you, a **question mark** over anyone who heard something. Right now the mark shows only on people **you can see too**. At night that means a guard can watch you from the dark with no warning.
 - **A (as now):** only on people you see. You learn you were seen when they act.

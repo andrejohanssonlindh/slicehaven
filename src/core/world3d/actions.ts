@@ -7,6 +7,7 @@ import { type HookDef, type Library, hooksFor, instantiate } from '../skillweb';
 import type { StateValue, ThingStates } from './state';
 import type { Thing, ThingDef, Things } from './things';
 import type { LeadStudy } from './leads';
+import type { CultureDef, Welcome, Wrong } from './standing';
 
 /**
  * Actions on things (plan item B3, the frame: B3a). Whatever is tried, a hearth, a stool, later the smith's furnace or
@@ -76,6 +77,20 @@ export interface ActWorld {
   leads?: Readonly<Record<string, unknown>>;
   /** A study a lead offers on this thing, if the hero has the lead and hasn't studied it yet. */
   leadStudy?: (t: ActTarget) => { lead: string; study: LeadStudy } | null;
+  /** Who owns what, and who may (plan B3c; `core/world3d/standing.ts`). Left out, the owner gate lets everything through. */
+  owners?: OwnerView;
+}
+
+/** What the owner gate asks of the world (plan B3c). */
+export interface OwnerView {
+  /** How the place weighs what is done in it. */
+  culture: CultureDef;
+  /** The household of a house: the people whose home it is. */
+  members(house: string): readonly string[];
+  /** What a house welcomes without asking (its main room's kind), or null. */
+  welcome(house: string): Welcome | null;
+  /** Has the doer leave to be in this house now? */
+  leave(doer: string, house: string): boolean;
 }
 
 /** A fact about a spot: true or false there (indoors, raining, among houses). One entry in `content/actions/facts.ts`. */
@@ -115,6 +130,8 @@ export interface GateDef {
   problem?(use: GateUse, facts: Record<string, FactDef>): string | null;
   /** Null if it lets the action through; otherwise why not (English, may use {name}). */
   check(c: GateCase): string | null;
+  /** A permission that failed: what wrong the act is (whose, what kind), for whoever sees it to answer (B3c). */
+  wrong?(c: GateCase): Wrong | null;
 }
 
 /** What an action does when it is done. */
@@ -196,7 +213,9 @@ export type ActEvent =
   | { kind: 'sit'; target: ActTarget }
   | { kind: 'noise'; at: Spot; loud: number; sound: string }
   | { kind: 'lead'; lead: string }
-  | { kind: 'learn'; lead: string; truth: boolean };
+  | { kind: 'learn'; lead: string; truth: boolean }
+  /** Who saw a wrong the hero did, and how far it moved their view of them (B3c; the page shows it on easy). */
+  | { kind: 'seen'; by: { id: string; name: string; by: number }[] };
 
 export interface ActResult {
   /** It was tried (false: a requirement said no, and `reason` says why). */
@@ -207,8 +226,10 @@ export interface ActResult {
   skill?: string;
   success?: boolean;
   events: ActEvent[];
-  /** Permission gates that failed: the act was a transgression of these (always empty until B3c). */
+  /** Permission gates that failed: the act was a transgression of these. */
   transgressions: string[];
+  /** What wrongs it was (the owner gate's: whose, and what kind of act), for whoever saw it to answer (B3c). */
+  wrongs?: Wrong[];
   /** A hidden read: don't show the dice (the page), and the lines read the same either way. */
   hidden?: boolean;
 }
@@ -241,17 +262,21 @@ function hooksOf(t: Thing, lib: Library | undefined): HookDef[] {
 }
 
 /** Every gate of a verb, run: the first failed requirement (and whether it hides the offer), and the failed permissions. */
-function runGates(v: VerbDef, target: ActTarget | null, at: Spot, doer: Doer, world: ActWorld, lib: ActionLibrary): { blocked: string | null; hidden: boolean; broken: string[] } {
-  const broken: string[] = [];
+function runGates(v: VerbDef, target: ActTarget | null, at: Spot, doer: Doer, world: ActWorld, lib: ActionLibrary): { blocked: string | null; hidden: boolean; broken: string[]; wrongs: Wrong[] } {
+  const broken: string[] = [], wrongs: Wrong[] = [];
   for (const use of v.gates ?? []) {
     const g = lib.gates[use.gate];
     if (!g) throw new Error(`verb ${v.id}: no gate called ${use.gate}`);
-    const why = g.check({ use, target, at, doer, world, facts: lib.facts });
+    const c: GateCase = { use, target, at, doer, world, facts: lib.facts };
+    const why = g.check(c);
     if (why === null) continue;
-    if (g.kind === 'permission') broken.push(g.id);
-    else return { blocked: why, hidden: !!g.hides, broken };
+    if (g.kind === 'permission') {
+      broken.push(g.id);
+      const w = g.wrong?.(c);
+      if (w) wrongs.push(w);
+    } else return { blocked: why, hidden: !!g.hides, broken, wrongs };
   }
-  return { blocked: null, hidden: false, broken };
+  return { blocked: null, hidden: false, broken, wrongs };
 }
 
 /** What can be tried on a thing (a target) or, with `target` null, on the spot where the doer stands. Verbs first. */
@@ -383,7 +408,7 @@ export function perform(offer: string, target: ActTarget | null, at: Spot, doer:
   apply(success ? v.success : v.failure ?? [], target, at, name, world, events);
   if (v.takes) events.push({ kind: 'time', minutes: v.takes });
   if (v.noise) events.push({ kind: 'noise', at, loud: v.noise.loud, sound: v.noise.kind });
-  return { done: true, ...(roll ? { roll } : {}), ...(skill ? { skill } : {}), success, events, transgressions: g.broken, ...(v.hidden ? { hidden: true } : {}) };
+  return { done: true, ...(roll ? { roll } : {}), ...(skill ? { skill } : {}), success, events, transgressions: g.broken, ...(g.wrongs.length ? { wrongs: g.wrongs } : {}), ...(v.hidden ? { hidden: true } : {}) };
 }
 
 /** What is wrong in an action library: verbs naming gates or facts that aren't there, or saying something a gate can't take. */

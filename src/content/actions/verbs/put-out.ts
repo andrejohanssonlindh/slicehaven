@@ -5,7 +5,7 @@ const putOut: VerbDef = {
   id: 'putout',
   label: 'Put out the {name}',
   on: { kind: 'fire' },
-  gates: [{ gate: 'state', key: 'lit', is: true }, { gate: 'owner' }],
+  gates: [{ gate: 'state', key: 'lit', is: true }, { gate: 'owner', act: 'meddle' }],
   takes: 1,
   noise: { loud: 6, kind: 'fire' },
   success: [{ state: 'lit', value: false }, { state: 'embers', value: true }, { say: 'You smother the {name}. It hisses and goes dark.' }],

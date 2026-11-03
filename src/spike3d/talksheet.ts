@@ -9,6 +9,7 @@ const BACK = 'talk:back';
 import type { SpikeWorld } from '../engine3d/world';
 import { t } from '../i18n';
 import { showRolls } from '../ui/dice';
+import { loadSettings } from '../ui/settings';
 import type * as THREE from 'three';
 
 /**
@@ -69,7 +70,9 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
     const calling = [...p.tags].reverse().find((id) => FACETS[id]?.dim === 'station' && FACETS[id]?.parent !== 'station');
     const people = [...p.tags].reverse().find((id) => FACETS[id]?.dim === 'people');
     whatEl.textContent = [people, calling].filter(Boolean).map((id) => FACETS[id!].label).join(', ');
-    moodEl.textContent = moodOf(p, c) ?? '';
+    // On easy, how they see you on their scale too (B3c).
+    const view = w.regardOf(p.id);
+    moodEl.textContent = [moodOf(p, c) ?? '', loadSettings().difficulty === 'easy' ? t('talk.view', '(Their view of you: {n})', { n: view > 0 ? `+${view}` : String(view) }) : ''].filter(Boolean).join(' ');
     choicesEl.replaceChildren();
     // "Ask about something you know…" opens the list of leads (B11), with a way back.
     const list = askingLeads ? [...leadAsks(p, c), { id: BACK, label: t('talk.back', '← Something else'), skills: [] as string[] }] : talkOffers(p, c);
@@ -105,6 +108,7 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
       if (r.roll && !r.hidden) await showRolls([{ ...r.roll, label: r.skill ? rollableName(r.skill) : r.roll.label }]);
       for (const l of r.lines) log(l.text, l.tone === 'good' ? 'good' : l.tone === 'bad' ? 'bad' : l.tone === 'info' ? 'info' : 'they');
       if (r.lead) onLead();
+      if (r.leave) log(t('talk.leave', 'You have leave in their house until midnight.'), 'good');
       save();
     }
     busy = false;
