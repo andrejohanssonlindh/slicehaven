@@ -11,7 +11,8 @@ import { Governor, TIERS, type DeviceInfo, type Tier, type TierName, pickTier, q
 import { Pipeline } from '../engine3d/pipeline';
 import { SpikeWorld } from '../engine3d/world';
 import { t } from '../i18n';
-import { makeSheet } from './actsheet';
+import { heroDoer, makeSheet, pageHero } from './actsheet';
+import { makeTalk } from './talksheet';
 
 /**
  * M0, the 3D spike: one house with a working cut-away, ground with stamped mud
@@ -395,8 +396,13 @@ function setTier(name: TierName): void {
 
 /** How far from a thing (CSS px) a tap still means it. */
 const TAP_SLACK = 22;
+/** The hero who acts and talks: the creator's character, or the shepherd. */
+const hero = pageHero();
+const doer = heroDoer(hero);
 /** The sheet a tapped thing opens (plan B3a). */
-const sheet = makeSheet(() => world, notify, save);
+const sheet = makeSheet(() => world, notify, save, doer);
+/** Talking to someone tapped (plan B3d). */
+const talk = makeTalk(() => world, () => pipeline.renderer, hero, doer, notify, save);
 
 function bindInput(): void {
   let down: { x: number; y: number; id: number; moved: number } | null = null;
@@ -451,12 +457,20 @@ function bindInput(): void {
       // A tap on a thing (or near enough, on a phone) shows what it is and what can be tried; on the hero, the spot they stand on.
       const slack = { x: TAP_SLACK / (r.width / 2), y: TAP_SLACK / (r.height / 2) };
       const hit = e.shiftKey ? null : world.tapped(nx, ny, slack);
+      if (hit && typeof hit === 'object' && 'person' in hit) {
+        sheet.close();
+        talk.open(hit.person);
+        down = null;
+        return;
+      }
       if (hit) {
+        talk.close();
         sheet.open(hit === 'hero' ? null : hit);
         down = null;
         return;
       }
       sheet.close();
+      talk.close();
       const house = e.shiftKey ? world.pick(nx, ny) : world.houseTapped(nx, ny);
       if (e.shiftKey && house !== null) {
         // Dev: shift-click lifts or lowers that roof by hand.
@@ -568,6 +582,7 @@ function loop(now: number): void {
     ].filter(Boolean).join('\n');
   }
   sheet.tick();
+  talk.tick();
   // The stairs buttons show what can be climbed from where the hero is.
   const hint = world.stairsHint;
   stairsEl.hidden = !hint.up && !hint.down;

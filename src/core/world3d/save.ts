@@ -1,4 +1,5 @@
 import type { StatesJSON } from './state';
+import type { TalkMemory } from './talk';
 
 /**
  * The saved world (plan item B1): one versioned JSON record per map, in the browser's storage. What it holds is what
@@ -8,7 +9,7 @@ import type { StatesJSON } from './state';
  * No migrations while the design moves: a save of another version is dropped. Bump `WORLD_SAVE_VERSION` whenever
  * the shape changes or the maps change in a way that moves things (ids are where things stand).
  */
-export const WORLD_SAVE_VERSION = 2;
+export const WORLD_SAVE_VERSION = 3;
 
 export interface WorldSave {
   v: number;
@@ -22,6 +23,8 @@ export interface WorldSave {
   things: StatesJSON;
   /** Flags set by actions (`core/world3d/actions.ts`). */
   flags: Record<string, boolean>;
+  /** What the map's people remember of the hero (`core/world3d/talk.ts`). */
+  talk: TalkMemory;
 }
 
 const key = (map: string): string => `slicehaven.world.${map}`;

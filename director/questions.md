@@ -2,7 +2,10 @@
 
 Newest on top. Answer in chat (just reference the number, e.g. "Q31: A"). Answered questions move to the [archive](archive/questions-answered.md); what they decided goes to the [decisions](decisions.md). Each question names the [plan](todo.md) item it holds up.
 
-*No open questions right now.* (A small ask for B6: the page of the carried-weight rule, when you've looked.)
+*A small ask for B6 too: the page of the carried-weight rule, when you've looked.*
+
+### Q39 · Which portrait? (B3d)
+Talk to someone on the Hamlet map and switch the portrait with the small button on it: **3D**, **3D, finer** or **Painted**. Which way do we go? If 3D, more detail means work on the bodies themselves (faces, hands), which helps the world as well; if painted, it becomes a painter per people.
 
 ---
 

@@ -13,6 +13,11 @@
 - **On the page:** tap a thing (or near it) → a sheet with its look and what can be tried; choosing walks you up to it and does it, with the dice. Tap the hero → *where you stand* (make a fire). Walking gets you up off a seat. A seat is sat on facing its own front (a stool by a table may face away from it: to tune).
 - **The hero who acts** is the character open in the creator, if it has skills yet; otherwise the default shepherd.
 
+## Built (B3d, first slice, 2026-11-03)
+- **Talking is the frame's social resolve:** `core/world3d/talk.ts` (`talkOffers`, `talk`, `moodOf`, `patienceLeft`) gives the 2D skill map's rules (`core/scene.ts` `attempt`/`apply`, `core/skillweb.ts` `expandObject`, `situation`, `readPerson`) a person of the map and a memory (`TalkMemory`, saved). No new social rules: the hooks, moods, patience, relations and leanings are the ones we had. No fitting skill: Presence at −2D6.
+- **The world:** `tapped` returns `{ person }`; `talkingWith` holds them still, facing the hero; `talkPerson`, `talkTo`, `portrait(renderer, id, px)` (their body rendered close up from the world as it is), `bodyOf` (for the painted one, `art/portrait.ts`). The page: `src/spike3d/talksheet.ts`. Tests: `tests/talk.test.ts`, `e2e/spike3d-talk.e2e.ts`.
+- **Not yet:** social conflicts (rounds of control), opposed rolls against their sheet, leave and lending as outcomes, people talking first.
+
 ## Adding to it
 - **A verb**: a file in `content/actions/verbs/` (`VerbDef`): what it is `on` (a kind, a property the kind has, or `here`), its `gates`, an optional `roll` (skills, difficulty, `harder` where a fact holds), `takes` minutes, `success` and `failure` outcomes.
 - **A gate**: a file in `content/actions/gates/` (`GateDef`): a requirement (blocks with a reason, or `hides` the offer) or a permission (never blocks: a transgression, B3c).

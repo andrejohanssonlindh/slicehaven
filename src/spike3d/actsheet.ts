@@ -40,12 +40,13 @@ export interface Sheet {
   tick(): void;
 }
 
-export function makeSheet(world: () => SpikeWorld, notify: (text: string) => void, save: () => void): Sheet {
+/** The hero as a doer: what they roll for a skill or an attribute. */
+export const heroDoer = (hero: Hero): Doer => ({ id: 'hero', dice: (s) => diceOf(hero, s) });
+
+export function makeSheet(world: () => SpikeWorld, notify: (text: string) => void, save: () => void, doer: Doer): Sheet {
   const el = document.getElementById('act')!;
   const nameEl = el.querySelector<HTMLElement>('.name')!, lookEl = el.querySelector<HTMLElement>('.look')!, offersEl = el.querySelector<HTMLElement>('.offers')!;
   const notice = document.getElementById('notice')!;
-  const hero = pageHero();
-  const doer: Doer = { id: 'hero', dice: (s) => diceOf(hero, s) };
   let pending: { offer: string; target: ActTarget | null } | null = null;
 
   const close = (): void => {

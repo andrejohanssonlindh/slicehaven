@@ -23,6 +23,10 @@ import { type StatesJSON, ThingStates, pieceId, placedId } from '../core/world3d
 import { type ActResult, type ActTarget, type ActWorld, type Doer, type Offer, type Spot, offers, perform } from '../core/world3d/actions';
 import { ACTIONS } from '../content/actions';
 import { sheetDice } from '../core/npcsheet';
+import { type TalkCase, type TalkMemory, type TalkPerson, type TalkResult, newTalkMemory, talk } from '../core/world3d/talk';
+import type { Visitor } from '../core/skillweb';
+import { personName } from '../content/people/naming';
+import type { BodySpec } from '../core/world3d/body';
 import { LIBRARY } from '../content/skillweb';
 import { PlacedIndex } from '../core/world3d/placed';
 import { footprints } from '../core/world3d/roomplan';
@@ -1823,15 +1827,135 @@ export class SpikeWorld {
    * on a phone. Indoors only the furniture of the hero's house on the storey in view counts, outdoors what stands in
    * sight; a house nearer than the thing (its wall in front) means nothing.
    */
-  tapped(ndcX: number, ndcY: number, slack: { x: number; y: number }): ActTarget | 'hero' | null {
+  tapped(ndcX: number, ndcY: number, slack: { x: number; y: number }): ActTarget | 'hero' | { person: string } | null {
     const ray = new THREE.Raycaster();
     ray.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
     const exact = this.thingAt(ndcX, ndcY, null);
     const onHero = ray.intersectObject(this.heroFig.place, true)[0];
-    if (onHero && (!exact || onHero.distance < exact.d)) return 'hero';
-    if (exact) return exact.t;
+    // Someone of the map, drawn now (seen), right under the finger, or near it.
+    let person: { id: string; d: number } | null = null;
+    for (const c of this.cast) {
+      if (!c.fig.place.visible) continue;
+      const h = ray.intersectObject(c.fig.place, true)[0];
+      if (h && (!person || h.distance < person.d)) person = { id: c.who.id, d: h.distance };
+    }
+    const nearest = Math.min(onHero?.distance ?? Infinity, exact?.d ?? Infinity, person?.d ?? Infinity);
+    if (nearest < Infinity) {
+      if (onHero && onHero.distance === nearest) return 'hero';
+      if (person && person.d === nearest) return { person: person.id };
+      return exact!.t;
+    }
     if (this.heroTapped(ndcX, ndcY, slack)) return 'hero';
+    const v = new THREE.Vector3();
+    for (const c of this.cast) {
+      if (!c.fig.place.visible) continue;
+      c.fig.place.getWorldPosition(v);
+      v.y += 0.8;
+      v.project(this.camera);
+      if (Math.hypot((v.x - ndcX) / slack.x, (v.y - ndcY) / slack.y) < 1) return { person: c.who.id };
+    }
     return this.thingAt(ndcX, ndcY, slack)?.t ?? null;
+  }
+
+  // --- talking (plan B3d) ---
+
+  /** Who the hero is talking to: they stop and face the hero until the talk ends. */
+  talkingWith: string | null = null;
+  /** What the people of this map remember of the hero (`core/world3d/talk.ts`). Saved. */
+  talkMemory: TalkMemory = newTalkMemory();
+
+  /** Where someone of the map stands, and their storey and house, as a spot; null if no one is called that. */
+  personSpot(id: string): Spot | null {
+    const c = this.cast.find((x) => x.who.id === id);
+    if (!c) return null;
+    const a = c.mind.actor;
+    return { x: a.x, z: a.z, level: a.level, house: a.house };
+  }
+
+  /** Someone of the map as the talk rules see them: their name, people and facets. */
+  talkPerson(id: string): TalkPerson | null {
+    const c = this.cast.find((x) => x.who.id === id);
+    if (!c) return null;
+    const r = PERSON_KINDS.resolve(c.who);
+    return { id, name: personName(r.chain, `${id}:${c.who.seed ?? 0}`), kind: r.facets.people ?? 'human', tags: r.chain };
+  }
+
+  /** A person's body spec (for a painted portrait) and seed. */
+  bodyOf(id: string): { spec: BodySpec; seed: number } | null {
+    const c = this.cast.find((x) => x.who.id === id);
+    return c ? { spec: bodySpecOf(PERSON_KINDS.resolve(c.who), c.who.seed ?? 1), seed: c.who.seed ?? 1 } : null;
+  }
+
+  /**
+   * A close-up of someone's head and shoulders, from in front of their face, rendered from the world as it is (their
+   * own body, lit where they stand): `px` square, as sRGB pixels, rows top first. Null if they aren't standing here.
+   */
+  portrait(renderer: THREE.WebGLRenderer, id: string, px: number, detail = 1): Uint8ClampedArray | null {
+    const c = this.cast.find((x) => x.who.id === id);
+    if (!c) return null;
+    const f = c.fig;
+    // Aim at the head: the top of the body as it stands, a head's height down; from the way the body really faces.
+    f.place.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(f.rig.group);
+    const at = f.place.getWorldPosition(new THREE.Vector3());
+    const headH = Math.max(0.2, (box.max.y - box.min.y) * 0.13);
+    const aim = new THREE.Vector3(at.x, box.max.y - headH * 1.1, at.z);
+    const q = f.rig.group.getWorldQuaternion(new THREE.Quaternion());
+    const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(q).setY(0).normalize();
+    const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
+    // Head and shoulders fill the frame; a little to one side and above, so the face reads as a face.
+    const fov = 26, dist = (headH * 1.45) / Math.tan((fov * Math.PI) / 360);
+    const cam = new THREE.PerspectiveCamera(fov, 1, 0.05, 40);
+    cam.position.copy(aim).addScaledVector(fwd, dist).addScaledVector(side, dist * 0.18).add(new THREE.Vector3(0, dist * 0.12, 0));
+    cam.lookAt(aim);
+    void detail;
+    const rt = new THREE.WebGLRenderTarget(px, px, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
+    // (The hero stands where the camera looks from: out of the shot.)
+    const was = f.place.visible, heroWas = this.heroFig.place.visible;
+    f.place.visible = true;
+    this.heroFig.place.visible = false;
+    const prev = renderer.getRenderTarget();
+    renderer.setRenderTarget(rt);
+    renderer.render(this.scene, cam);
+    const buf = new Uint8Array(px * px * 4);
+    renderer.readRenderTargetPixels(rt, 0, 0, px, px, buf);
+    renderer.setRenderTarget(prev);
+    f.place.visible = was;
+    this.heroFig.place.visible = heroWas;
+    rt.dispose();
+    // Linear light to sRGB, and the rows the right way up.
+    const out = new Uint8ClampedArray(px * px * 4);
+    const toS = (v: number): number => {
+      const l = v / 255;
+      return 255 * (l <= 0.0031308 ? l * 12.92 : 1.055 * l ** (1 / 2.4) - 0.055);
+    };
+    for (let y = 0; y < px; y++) {
+      for (let x = 0; x < px; x++) {
+        const i = ((px - 1 - y) * px + x) * 4, o = (y * px + x) * 4;
+        out[o] = toS(buf[i]);
+        out[o + 1] = toS(buf[i + 1]);
+        out[o + 2] = toS(buf[i + 2]);
+        out[o + 3] = 255;
+      }
+    }
+    return out;
+  }
+
+  /** Try something on someone, as the hero (their sheet is the page's): through the talk rules, kept in their memory. */
+  talkTo(offer: string, id: string, doer: Doer, hero: Visitor): TalkResult {
+    const p = this.talkPerson(id);
+    if (!p) return { done: false, reason: 'No one is there.', hidden: false, success: false, lines: [] };
+    const r = talk(offer, p, doer, this.talkCase(hero), this.actRng);
+    if (r.done) {
+      this.recentActs.push({ who: doer.id, offer, target: id, skill: r.skill ?? null, success: r.success, hour: this.weather.hour ?? 0 });
+      if (this.recentActs.length > 30) this.recentActs.shift();
+    }
+    return r;
+  }
+
+  /** What a talk is about: the hero, the world's flags, the memory, the library. */
+  talkCase(hero: Visitor): TalkCase {
+    return { hero, flags: this.flags, memory: this.talkMemory, library: LIBRARY };
   }
 
   /** The thing a tap points at: right on it (`slack` null), or else within `slack` of its middle; and how far along the ray. */
@@ -2002,14 +2126,15 @@ export class SpikeWorld {
   }
 
   /** What the save keeps of the world (the page adds the map and writes it: `core/world3d/save.ts`). */
-  saveState(): { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags: Record<string, boolean> } {
+  saveState(): { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags: Record<string, boolean>; talk: TalkMemory } {
     const h = this.hero;
-    return { hour: this.weather.hour ?? 12, hero: { x: h.x, z: h.z, level: h.stair ? 0 : h.level }, explored: this.explored.toJSON(), things: this.states.toJSON(), flags: { ...this.flags } };
+    return { hour: this.weather.hour ?? 12, hero: { x: h.x, z: h.z, level: h.stair ? 0 : h.level }, explored: this.explored.toJSON(), things: this.states.toJSON(), flags: { ...this.flags }, talk: structuredClone(this.talkMemory) };
   }
 
   /** Take a save back: the clock, the hero, what was seen, the things' states. */
-  loadState(s: { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags?: Record<string, boolean> }): void {
+  loadState(s: { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags?: Record<string, boolean>; talk?: TalkMemory }): void {
     this.flags = { ...s.flags };
+    this.talkMemory = s.talk ? structuredClone(s.talk) : newTalkMemory();
     this.weather.setHour(s.hour);
     this.explored.assign(s.explored);
     this.exploredWin.dirty = true;
@@ -2435,7 +2560,10 @@ export class SpikeWorld {
         c.fig.place.visible = c.blob.visible = false;
         continue;
       }
-      const pose = stepMind(c.mind, c.who.does, BEHAVIOURS, ctx, dt);
+      // Someone the hero is talking to stands and faces them; their day waits until the talk ends.
+      const pose = c.who.id === this.talkingWith
+        ? { dx: this.hero.x - a.x, dz: this.hero.z - a.z, moving: false }
+        : stepMind(c.mind, c.who.does, BEHAVIOURS, ctx, dt);
       const y = this.footY(a);
       this.faceWalker(c.fig, pose.dx, pose.dz, pose.moving);
       c.fig.place.position.set(a.x, y, a.z);

@@ -2,6 +2,19 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-03 — Fires easier indoors and on embers; B3d: talking to people
+
+- **Lighting a fire** (your note): **easier indoors** (−2: dry, sheltered, kindling at hand) and **much easier on embers** (−4). A fire you put out keeps its embers; once lit, they're gone. A villager's hearth at dawn is now a 4 (or a 2 on embers) instead of a 6. Embers don't cool with time yet: that waits for days on the clock (C2).
+- **Tap a villager to talk.** The hero walks up; they stop and turn to you. The panel shows their **portrait**, name, people and calling, and how they seem to feel about you, with the **log** below and the **choices laid over it**.
+- **The choices** are every social try the skill library has for who they are, the same rules as the 2D skill map: size up (hidden: you never know whether you read them right), ask, make your case, show you know the land, sweet-talk, frighten, lie, keep them busy, and more. Each is rolled with your sheet and made easier or harder by their mood, how their people see yours and what their calling leans to (the log says why). Their patience runs out, and **what each one remembers of you is saved**.
+- **Three portraits to compare** (Q37; the small button on the portrait switches them, and the choice is kept):
+  - **3D**: their own body close up, lit where they stand (so a face with the sun behind it is dark).
+  - **3D, finer**: the same at twice the pixels. It shows how blocky the bodies are up close.
+  - **Painted**: drawn per pixel from their look (skin, hair, beard, hat, clothes, a tirak's jaw and tusks, an elf's ears, a missla's big eyes).
+- **Try it:** Hamlet map, by day, tap someone on the green. **Saves from before today are dropped** (the save now keeps what people remember).
+- **Still to come in B3d:** social conflicts (the several-round kind), rolls opposed by their own sheet, and leave as an outcome (that joins B3c).
+- **Next:** your pick of portrait, then B5, perception.
+
 ## 2026-11-03 — B4: everyone in a map has their own character sheet
 
 - **Every person in a map has their own sheet**, rolled from who they are, the same every time. Their **level** is what the map says, or drawn: mostly capable, a quarter novices, a few skilled, a rare master.
