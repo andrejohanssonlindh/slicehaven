@@ -31,6 +31,11 @@ export interface TalkPerson {
   work?: { calling: string; about?: string };
   /** Their home (a house id): they can give leave to be in it (plan B3c). */
   home?: string;
+  /**
+   * How asking leave reads with them, if their house says ("Ask {name} for a room for the night": the inn); else asking
+   * if you may make yourself at home. A room is paid for once there is money: for now it is given as leave.
+   */
+  leaveAsk?: string;
 }
 
 /** The offer that asks leave to make yourself at home in their house, for the rest of the day (plan B3c). */
@@ -126,7 +131,7 @@ export function talkOffers(p: TalkPerson, c: TalkCase): Offer[] {
     ? heldBack(c.leads.state, c.leads.defs, p).map(({ def }) => ({ id: LEAD_PRESS + def.id, label: `Press ${p.name} about ${def.ask.replace(/^Ask \{name\} about /, '')}`, skills: [...COAX_SKILLS], from: 'skill' as const }))
     : [];
   const leave: Offer[] = p.home && c.hasLeave && !c.hasLeave(p.home) && listens
-    ? [{ id: ASK_LEAVE, label: `Ask ${p.name} if you may make yourself at home`, skills: [...COAX_SKILLS], from: 'skill' }]
+    ? [{ id: ASK_LEAVE, label: (p.leaveAsk ?? 'Ask {name} if you may make yourself at home').replaceAll('{name}', p.name), skills: [...COAX_SKILLS], from: 'skill' }]
     : [];
   return [...work, ...leads, ...press, ...leave, ...openChecks(o, s)
     .filter((k) => opensNow(k, p, c) && (!k.talk || left === undefined || left > 0))
@@ -168,7 +173,10 @@ export function talk(offer: string, p: TalkPerson, doer: Doer, c: TalkCase, rng:
     if (left !== undefined && left <= 0) return { done: false, reason: `${p.name} has had enough of you for now.`, hidden: false, success: false, lines: [] };
     const mem = (c.memory.social[p.id] ??= { talks: 0, mood: 0 });
     mem.talks += 1;
-    // Someone who likes you says yes; someone cross with you says no; anyone else needs asking well.
+    // Someone who likes you says yes; someone cross with you says no; anyone else needs asking well. A room at an inn
+    // is the keeper's trade: yes unless they're wary of you (paid for once there is money).
+    const room = !!p.leaveAsk;
+    if (room && mem.mood >= 0) return { done: true, hidden: false, success: true, leave: p.home, lines: [{ text: `"A room's yours for the night. Up the stairs."`, tone: 'good' }, { text: '(No coin changes hands yet: paying comes with money.)', tone: 'info' }] };
     if (mem.mood >= 1) return { done: true, hidden: false, success: true, leave: p.home, lines: [{ text: `"Of course. Make yourself at home, today."`, tone: 'good' }] };
     if (mem.mood <= -2) return { done: true, hidden: false, success: false, lines: [{ text: `"After what you did? No."`, tone: 'bad' }] };
     const best = bestSkill(doer, COAX_SKILLS);

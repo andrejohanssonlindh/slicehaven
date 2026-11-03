@@ -363,7 +363,14 @@ export function buildHouse(spec: House3DSpec, plan: BuildingPlan): HouseModel {
   for (const s of [-1, 1]) beam(dt, [dx + s * (doorW / 2 + BEAM / 2), FOOT, zf], [dx + s * (doorW / 2 + BEAM / 2), FOOT + doorH + 0.1, zf], frontFace);
   addBeam(dt, [dx - doorW / 2 - BEAM - 0.1, FOOT + doorH + 0.12, zf + 0.02], [dx + doorW / 2 + BEAM + 0.1, FOOT + doorH + 0.12, zf + 0.02], BEAM * 1.3, frontFace);
   // Door: a plank door in its frame. Steps up to it.
-  addBox(outer('door', 0, 'front', 'Door').mesh, [dx - doorW / 2, FOOT, hd], [dx + doorW / 2, FOOT + doorH, hd + 0.07], { aoBottom: 0.7, unitUV: true });
+  const doorMesh = outer('door', 0, 'front', 'Door').mesh;
+  addBox(doorMesh, [dx - doorW / 2, FOOT, hd], [dx + doorW / 2, FOOT + doorH, hd + 0.07], { aoBottom: 0.7, unitUV: true });
+  // The same door seen from inside, on the wall's inner face, with a frame round it (the wall itself is solid): a house
+  // whose door is on its far side from the camera shows it when you are in.
+  addBox(doorMesh, [dx - doorW / 2, FOOT, iz1 - 0.06], [dx + doorW / 2, FOOT + doorH, iz1], { aoBottom: 0.7, unitUV: true });
+  const inFrame = outer('timber', 0, 'front', 'Timber').mesh, fi = iz1 - 0.04;
+  for (const s of [-1, 1]) beam(inFrame, [dx + s * (doorW / 2 + BEAM / 2), FOOT, fi], [dx + s * (doorW / 2 + BEAM / 2), FOOT + doorH + 0.1, fi], [0, 0, -1]);
+  addBeam(inFrame, [dx - doorW / 2 - BEAM - 0.05, FOOT + doorH + 0.1, fi], [dx + doorW / 2 + BEAM + 0.05, FOOT + doorH + 0.1, fi], BEAM * 1.2, [0, 0, -1]);
   addBox(part('stone', undefined, 'footing').mesh, [dx - doorW / 2 - 0.2, 0, hd + 0.08], [dx + doorW / 2 + 0.2, FOOT * 0.5, hd + 0.55], { aoBottom: 0.6, skip: ['ny'] });
 
   // --- inside: stairs, floors, partitions, rooms ---------------------------------------------------------------------

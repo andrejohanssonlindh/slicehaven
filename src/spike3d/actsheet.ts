@@ -41,6 +41,23 @@ export interface Sheet {
   tick(): void;
 }
 
+/**
+ * Whose a place is, in a line (plan B3c): on easy the household by name, else just "someone's"; the room; whether it
+ * is open to you. Null in the wild.
+ */
+export function whoseText(w: ReturnType<SpikeWorld['whoseAt']>, names: boolean): string | null {
+  if (!w) return null;
+  if ('town' in w) return t('own.town', 'The town\'s.');
+  const who = names && w.members.length
+    ? t('own.home', '{names}\'s house', { names: w.members.length > 1 ? `${w.members.slice(0, -1).join(', ')} and ${w.members[w.members.length - 1]}` : w.members[0] })
+    : t('own.someone', 'Someone\'s house');
+  const room = w.room && THINGS.has(w.room) ? `: ${t(`thing.${w.room}.name`, thingName(THINGS.get(w.room)))}` : '';
+  const open = w.leave ? t('own.leave', 'You have leave here until midnight.')
+    : w.open ? t('own.open', 'Open to anyone, {a} to {b}.', { a: w.open[0], b: w.open[1] })
+    : t('own.closed', 'Not yours to be in without leave.');
+  return `${who}${room}. ${open}`;
+}
+
 /** The hero as a doer: what they roll for a skill or an attribute. */
 export const heroDoer = (hero: Hero): Doer => ({ id: 'hero', dice: (s) => diceOf(hero, s) });
 
@@ -100,6 +117,9 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
     // Looking at something that carries a lead gives it (plan B11): what you know of it, as the look.
     const lead = target ? w.lookAt(target) : null;
     if (lead) lookEl.textContent = lead.look;
+    // Whose it is (B3c): a tapped thing in someone's house or the town's; names on easy.
+    const whose = target ? whoseText(w.whoseAt(target), loadSettings().difficulty === 'easy') : null;
+    if (whose) lookEl.textContent = `${lookEl.textContent} ${whose}`.trim();
     if (lead?.added) {
       notify(t('act.leadadded', 'Lead added: {title}.', { title: lead.title }));
       onLead();

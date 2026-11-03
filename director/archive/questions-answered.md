@@ -3,6 +3,7 @@
 *Archive of the questions in [questions](../questions.md) once answered or dropped. Newest on top. What they decided, if it still stands, is in the [decisions](../decisions.md).*
 
 ## 2026-11-03
+- **Q44 Does a bad view fade with time?** → **yes**, but likely very differently by culture, and it should take **a lot of time: weeks**. (Built: each culture says points a day; country folk, a point a day.) Asked alongside: *are some parts of houses off limits, like the inn's upper floor without paying?* (Built: each kind of room says what it welcomes; the inn's guest rooms need a room from the keeper.)
 - **Q42 Leads: is this the shape?** → **yes.** Make sure they're designed so they're easy to add to (or to describe), and put them in the plan; not necessarily built now. (Leads are one data file each, with a "lead note" template; plan item B11, after B5.)
 - **Q41 How collected hooks (leads) are held and seen** → **several ways.** **Quests in themselves are leads.** There can also be **free leads**: find an interesting statue outside a town, and "Lead added". The director wants help thinking it through (done on the [openings](../design/talk-openings.md) page; Q42).
 - **Q40 What can be talked about with anyone** → **sizing up, what they know, and their work** (which can open without a skill: ask about it). Also **distract** them and **rob** them (threaten). **Stealing** (picking a pocket) should be **started when sneaking**, not by tapping to talk.

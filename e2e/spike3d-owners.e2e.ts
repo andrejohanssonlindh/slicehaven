@@ -56,4 +56,41 @@ describe('spike3d owners and the scale', () => {
     expect(((await w('w.saveState().standing.regard')) as Record<string, number>).guard).toBeLessThan(0);
     expect(errors).toEqual([]);
   });
+
+  it('the inn is open below and closed upstairs until you take a room; walking into a home at night is seen', async () => {
+    const { page, errors } = await openPage(env, '/spike3d/?map=hamlet&nogov', { storage: easy });
+    await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 90_000 });
+    const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; return ${fn}; })()`);
+    await page.waitForTimeout(1500);
+    await w('(w.weather.setHour(14), 0)');
+    // Into the inn: the taproom, the keeper's, open to anyone.
+    expect(await w('w.walkIn("inn")')).not.toBeNull();
+    await page.waitForFunction(() => (window as any).spike.world.hero.house === 'inn' && !(window as any).spike.world.hero.legs.length, undefined, { timeout: 20_000 });
+    const below = (await w('w.whoseAt(w.heroSpot())')) as { members: string[]; room: string; open: unknown; leave: boolean };
+    expect(below.room).toBe('taproom');
+    expect(below.open).toEqual([6, 24]);
+    expect(below.members.length).toBe(1);
+    // Up the stairs: not open to you.
+    expect(await w('w.climb(1)')).not.toBeNull();
+    await page.waitForFunction(() => (window as any).spike.world.hero.level === 1, undefined, { timeout: 20_000 });
+    const up = (await w('w.whoseAt(w.heroSpot())')) as { room: string; open: unknown; leave: boolean };
+    expect(up.open).toBeNull();
+    // A room for the night from the keeper: then you have leave.
+    const hero = '{ kind: "human", people: "asharier", tags: [] }';
+    const r = (await w(`w.talkTo('talk:leave', 'keeper', { id: 'hero', dice: () => ({ n: 4, mod: 0 }) }, ${hero})`)) as { leave?: string };
+    expect(r.leave).toBe('inn');
+    expect(((await w('w.whoseAt(w.heroSpot())')) as { leave: boolean }).leave).toBe(true);
+
+    // Night: the villagers are at home. Into one of their homes, in front of them: a wrong, answered.
+    await w('(w.weather.setHour(23), w.placeHeroAt(0, 14), 0)');
+    await page.waitForFunction(() => (window as any).spike.world.minds.some((m: { house: string | null }) => m.house && m.house.startsWith('home')), undefined, { timeout: 60_000 });
+    await page.waitForTimeout(3000);
+    const home = (await w('w.minds.find((m) => m.house && m.house.startsWith("home"))')) as { id: string; house: string; x: number; z: number } | undefined;
+    expect(home).toBeDefined();
+    await w(`(w.placeHeroAt(${home!.x}, ${home!.z} + 1.2), 0)`);
+    await page.waitForFunction((id) => (window as any).spike.world.regardOf(id) < 0, home!.id, { timeout: 15_000 });
+    expect(((await w(`w.answers.find((a) => a.id === ${JSON.stringify(home!.id)})`)) as { answer: string }).answer).toBe('grumble');
+    await page.screenshot({ path: `${OUT}owners-trespass.png` });
+    expect(errors).toEqual([]);
+  });
 });

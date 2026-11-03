@@ -6,24 +6,29 @@ import type { DoEntry } from './behave';
  * rules: no DOM, no names of people or places.
  *
  * - **Owners.** Whatever stands in a house is its household's (the people whose home it is); whatever stands among the
- *   houses outdoors is the town's; the wild is no one's. A house can welcome some acts at some hours (an inn's
- *   taproom: sit down), the town lets anyone do some things to its things (sit on a bench, light a torch), and a
- *   household can give leave (for the rest of the day). Anything else is a **wrong**: never blocked, only answered by
- *   whoever sees it.
+ *   houses outdoors is the town's; the wild is no one's. A room can welcome some acts at some hours (an inn's
+ *   taproom: come in, sit down; its guest rooms: no one without a room), the town lets anyone do some things to its
+ *   things (sit on a bench, light a torch), and a household can give leave (for the rest of the day). Anything else is
+ *   a **wrong**, being where you are not welcome included: never blocked, only answered by whoever sees it.
  * - **The scale (Q38).** Each person's view of the hero is one number, about −100 to +100, held by them alone. The
  *   talk rules' mood (−3..+3) is a band of it. A wrong moves it by its weight: the kind of act, as the place's culture
- *   weighs it, more for the owner than for a bystander. Advantages won on a roll scale what a roll does to it.
+ *   weighs it, more for the owner than for a bystander. Advantages won on a roll scale what a roll does to it. It
+ *   **fades** back toward nothing over weeks, at the culture's pace (Q44).
  * - **Word spreads** when people meet: each hears the other's view, at half strength, and takes it in only where it
  *   is stronger than their own. So word travels by who meets whom, good or bad, not all at once.
  * - **Consequences start at points on the scale** (`AnswerStep`, from the culture: grumble, scold, fetch the guard,
- *   fight…). **Who you are** moves those points: how their people see yours (the relations table).
+ *   fight…). **Who you are** moves those points: how their people see yours (the relations table), your rank, and
+ *   whether they are afraid of you. **Fight or fetch:** someone bold (their temper) deals with you themselves where
+ *   others fetch help; someone afraid of you (how dangerous you look against their own nerve) fetches help or keeps
+ *   their distance where others would square up.
  *
- * Still to come (the plan): the thing's value against the owner's wealth and its importance (with items), rank and
- * fear (a trukh), fighting or fetching by leaning against how dangerous you look.
+ * Still to come (the plan): the thing's value against the owner's wealth and its importance, and weapons you show
+ * (with items, B3b/B6).
  */
 
 /** Kinds of act a wrong can be, in rising weight. Moving, taking and stealing come with the ways to take (B3b). */
-export type ActKind = 'sit' | 'use' | 'meddle' | 'move' | 'take' | 'steal' | 'harm';
+export type ActKind = 'enter' | 'sit' | 'use' | 'meddle' | 'move' | 'take' | 'steal' | 'harm';
+export const ACT_KINDS: readonly ActKind[] = ['enter', 'sit', 'use', 'meddle', 'move', 'take', 'steal', 'harm'];
 
 /** Whose something is. */
 export type Owner = { house: string } | { town: true };
@@ -53,6 +58,10 @@ export interface AnswerStep {
   says?: string[];
   /** Whom they fetch: a person of a calling (`job-guard`); no one of it about, the nearest neighbour comes. Only for `fetch`. */
   fetches?: string;
+  /** What someone bold does instead (another step's id): deal with you themselves rather than fetch help. */
+  bold?: string;
+  /** What someone afraid of you does instead (another step's id): fetch help, or keep their distance. */
+  afraid?: string;
 }
 
 /**
@@ -67,7 +76,7 @@ export interface CultureDef {
   owner: number;
   others: number;
   town: number;
-  /** What anyone may do to the town's things without it being a wrong. */
+  /** What anyone may do to the town's things (and on its streets) without it being a wrong. */
   townMay: ActKind[];
   /** The consequences, from the mildest. */
   answers: AnswerStep[];
@@ -75,6 +84,14 @@ export interface CultureDef {
   fetched: AnswerStep;
   /** Points each step of how their people see yours moves where the answers start (a tirak meets them sooner). */
   perRelation: number;
+  /** Points a day a view fades back toward nothing: a bad one, a good one (Q44: weeks, not days). */
+  fade: { bad: number; good: number };
+  /** Facets of the hero (`nobility`) that move where the answers start, by points: rank gets off lightly. */
+  rank: Record<string, number>;
+  /** Fear: afraid once how dangerous you look is `gap` past their nerve; an afraid one's answers start `later` points lower. */
+  fear: { gap: number; later: number };
+  /** Bold from this temper up (`content/people/temper.ts`): they deal with you themselves. */
+  boldAt: number;
 }
 
 /** What the people of a map think of the hero, and the leave they gave. Plain data, saved with the map. */
@@ -83,9 +100,11 @@ export interface Standing {
   regard: Record<string, number>;
   /** Leave to be in a house, by house id: until this world hour (day × 24 + hour). */
   leave: Record<string, number>;
+  /** The last world day the views faded on (null before the first). */
+  fadedDay?: number | null;
 }
 
-export const newStanding = (): Standing => ({ regard: {}, leave: {} });
+export const newStanding = (): Standing => ({ regard: {}, leave: {}, fadedDay: null });
 
 const clamp = (v: number): number => Math.max(REGARD_MIN, Math.min(REGARD_MAX, Math.round(v)));
 
@@ -105,6 +124,25 @@ export const moodFor = (regard: number): number => Math.max(-3, Math.min(3, Math
 
 /** What a roll's advantages make of an effect on the scale: each a third more (nine of them: four times; Q38). */
 export const scaled = (base: number, advantages = 0): number => base * (1 + Math.max(0, advantages) / 3);
+
+/**
+ * Time passes: every view fades toward nothing by the culture's points a day, for each day since the last fading.
+ * The first call only notes the day. Returns how many days faded.
+ */
+export function fadeStanding(s: Standing, day: number, c: CultureDef): number {
+  if (s.fadedDay === undefined || s.fadedDay === null || day < s.fadedDay) {
+    s.fadedDay = day;
+    return 0;
+  }
+  const days = day - s.fadedDay;
+  if (days <= 0) return 0;
+  s.fadedDay = day;
+  for (const [id, v] of Object.entries(s.regard)) {
+    const step = (v < 0 ? c.fade.bad : c.fade.good) * days;
+    shiftRegard(s, id, v < 0 ? Math.min(step, -v) : -Math.min(step, v));
+  }
+  return days;
+}
 
 /**
  * Before a talk: every remembered mood set from the scale, so the talk rules (mood, patience, how hard a roll is)
@@ -136,13 +174,15 @@ export function giveLeave(s: Standing, house: string, worldHours: number): void 
   s.leave[house] = (Math.floor(worldHours / 24) + 1) * 24;
 }
 
-/** What a house welcomes without asking (from the kind of its main room): these acts, in these hours. */
+/** What a kind of room welcomes without asking: these acts, in these hours; and how leave is asked for there. */
 export interface Welcome {
   acts: ActKind[];
   hours: [number, number];
+  /** How the talk offer asking leave reads, where the house's main room is this kind ("Ask {name} for a room for the night"). */
+  ask?: string;
 }
 
-const within = (h: number, [a, b]: [number, number]): boolean => (a <= b ? h >= a && h < b : h >= a || h < b);
+export const withinHours = (h: number, [a, b]: [number, number]): boolean => (a <= b ? h >= a && h < b : h >= a || h < b);
 
 /** Whose a spot is: a house's household, the town's (among the houses), or no one's. */
 export const ownerOf = (house: string | null, inSettlement: boolean): Owner | null => (house ? { house } : inSettlement ? { town: true } : null);
@@ -151,19 +191,20 @@ export const ownerOf = (house: string | null, inSettlement: boolean): Owner | nu
 export interface MayCase {
   owner: Owner;
   act: ActKind;
-  /** Who does it, and whether they belong to the house (its household) */
+  /** Whether the doer belongs to the house (its household), and has leave there. */
   member: boolean;
   leave: boolean;
+  /** What the room it is done in welcomes. */
   welcome: Welcome | null;
   hour: number;
   culture: CultureDef;
 }
 
-/** May it be done? True for a member, with leave, what the house welcomes in its hours, what the town lets anyone do. */
+/** May it be done? True for a member, with leave, what the room welcomes in its hours, what the town lets anyone do. */
 export function mayDo(c: MayCase): boolean {
   if ('town' in c.owner) return c.culture.townMay.includes(c.act);
   if (c.member || c.leave) return true;
-  return !!c.welcome && c.welcome.acts.includes(c.act) && within(c.hour, c.welcome.hours);
+  return !!c.welcome && c.welcome.acts.includes(c.act) && withinHours(c.hour, c.welcome.hours);
 }
 
 /** How far a wrong moves the view of someone who saw it: the act's weight, as owner, bystander, or one of the town. */
@@ -172,16 +213,45 @@ export function weightOf(w: Wrong, culture: CultureDef, isOwner: boolean): numbe
   return base * ('town' in w.owner ? culture.town : isOwner ? culture.owner : culture.others);
 }
 
+/** How the hero looks to people, for fear: their physique (attribute units), fearsome marks (scars…), weapons shown. */
+export interface HeroLook {
+  physique: number;
+  marks: number;
+  weapons: number;
+  /** The hero's facets (rank: `nobility`). */
+  tags: readonly string[];
+}
+
+/** How dangerous someone looks: their physique, four a fearsome mark, three a weapon shown. */
+export const dangerOf = (h: Pick<HeroLook, 'physique' | 'marks' | 'weapons'>): number => h.physique + 4 * h.marks + 3 * h.weapons;
+
+/** Who the hero is to one person: how their people see yours, rank, fear, boldness. */
+export interface WhoToThem {
+  relation: number;
+  /** Points later the answers start (rank). */
+  rank: number;
+  afraid: boolean;
+  bold: boolean;
+}
+
+/** One person sizes the hero up: their physique and temper against how the hero looks, in this culture. */
+export function sizeUp(hero: HeroLook, them: { physique: number; temper: number }, relation: number, c: CultureDef): WhoToThem {
+  const afraid = dangerOf(hero) - (them.physique + 3 * them.temper) >= c.fear.gap;
+  const rank = hero.tags.reduce((n, t) => n + (c.rank[t] ?? 0), 0);
+  return { relation, rank, afraid, bold: !afraid && them.temper >= c.boldAt };
+}
+
 /**
  * How they answer, now that a wrong has brought their view to `regard`: the deepest consequence whose point is at or
- * above it, those points moved by how their people see yours (`relation`, −3..+3: a cold one meets them sooner).
- * Null: they let it go.
+ * above it. The points move by who you are to them: a cold people meets them sooner, rank and fear later. Then the
+ * bold deal with you themselves and the afraid keep their distance (the step's `bold` and `afraid`). Null: they let it go.
  */
-export function answerFor(regard: number, culture: CultureDef, relation = 0): AnswerStep | null {
-  const shift = -relation * culture.perRelation;
+export function answerFor(regard: number, culture: CultureDef, who: Partial<WhoToThem> = {}): AnswerStep | null {
+  const shift = -(who.relation ?? 0) * culture.perRelation - (who.rank ?? 0) - (who.afraid ? culture.fear.later : 0);
   let out: AnswerStep | null = null;
   for (const a of culture.answers) if (regard <= a.at + shift && (!out || a.at < out.at)) out = a;
-  return out;
+  const alt = out && (who.afraid ? out.afraid : who.bold ? out.bold : undefined);
+  return (alt && culture.answers.find((a) => a.id === alt)) || out;
 }
 
 /** What someone who hears another's view of the hero comes to think: half the other's, where it is stronger than their own. */
@@ -210,12 +280,16 @@ export function answerLines(c: CultureDef): DoEntry[] {
   return [...c.answers, c.fetched].map((a) => ({ when: { answering: a.id }, do: a.do, ...(a.fetches ? { of: a.fetches } : {}) }));
 }
 
-/** What is wrong in a culture: no answers, answers out of order, a fetch with no one to fetch. */
+/** What is wrong in a culture: no answers, answers out of order, a fetch with no one to fetch, an alternative that isn't there. */
 export function cultureProblems(c: CultureDef): string[] {
   const out: string[] = [];
   if (!c.answers.length) out.push(`culture ${c.id}: no answers`);
   for (let i = 1; i < c.answers.length; i++) if (c.answers[i].at >= c.answers[i - 1].at) out.push(`culture ${c.id}: answer ${c.answers[i].id} must start lower than ${c.answers[i - 1].id}`);
-  for (const a of c.answers) if (a.do === 'fetch' && !a.fetches) out.push(`culture ${c.id}: answer ${a.id} fetches no one (say whom: "fetches")`);
+  for (const a of c.answers) {
+    if (a.do === 'fetch' && !a.fetches) out.push(`culture ${c.id}: answer ${a.id} fetches no one (say whom: "fetches")`);
+    for (const alt of [a.bold, a.afraid]) if (alt && !c.answers.some((x) => x.id === alt)) out.push(`culture ${c.id}: answer ${a.id} names ${alt}, which is not one of its answers`);
+  }
   if (new Set([...c.answers, c.fetched].map((a) => a.id)).size !== c.answers.length + 1) out.push(`culture ${c.id}: two answers with one name`);
+  for (const k of ACT_KINDS) if (typeof c.acts[k] !== 'number') out.push(`culture ${c.id}: no weight for ${k}`);
   return out;
 }

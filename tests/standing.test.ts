@@ -13,8 +13,8 @@ import { type ActTarget, type ActWorld, type Doer, perform } from '../src/core/w
 import { scheduleProblems } from '../src/core/world3d/behave';
 import { ThingStates, pieceId } from '../src/core/world3d/state';
 import {
-  answerFor, answerLines, cultureProblems, giveLeave, hasLeave, hearsay, meet, moodFor, moodsFromScale, newStanding, regardOf,
-  scaled, shiftRegard, talkOntoScale, weightOf,
+  answerFor, answerLines, cultureProblems, dangerOf, fadeStanding, giveLeave, hasLeave, hearsay, meet, moodFor, moodsFromScale, newStanding, regardOf,
+  scaled, shiftRegard, sizeUp, talkOntoScale, weightOf,
 } from '../src/core/world3d/standing';
 import { ASK_LEAVE, type TalkCase, type TalkPerson, newTalkMemory, talk, talkOffers } from '../src/core/world3d/talk';
 
@@ -30,7 +30,8 @@ function world(hour = 12, leave = false): ActWorld {
     owners: {
       culture: country,
       members: (h) => (h === 'home' ? ['wenna'] : []),
-      welcome: (h) => (h === 'inn' ? { acts: ['sit'], hours: [6, 24] } : null),
+      // (The inn's ground floor is its taproom; upstairs, its guest rooms welcome no one.)
+      welcome: (at) => (at.house === 'inn' && at.level === 0 ? { acts: ['enter', 'sit'], hours: [6, 24] } : null),
       leave: (d, h) => leave && d === 'hero' && h === 'home',
     },
   };
@@ -53,6 +54,11 @@ describe('owners and wrongs (B3c)', () => {
   it('weighs what kind of act it is: putting out their hearth is meddling', () => {
     const r = perform('verb:putout', hearth, hearth, doer, world(), ACTIONS);
     expect(r.wrongs).toEqual([{ act: 'meddle', owner: { house: 'home' } }]);
+  });
+
+  it('the inn\'s guest rooms upstairs are not open to anyone: sitting there is a wrong', () => {
+    const up = { ...stool('inn'), level: 1 };
+    expect(perform('verb:sit', up, up, doer, world(20), ACTIONS).wrongs?.[0].act).toBe('sit');
   });
 
   it('an inn welcomes you to sit in its hours, not after', () => {
@@ -107,6 +113,18 @@ describe('the scale, one per person (B3c, Q38)', () => {
     expect(social).toEqual({ a: { talks: 0, mood: -2 }, b: { talks: 2, mood: 0 } });
   });
 
+  it('views fade toward nothing a point a day: weeks, not days (Q44)', () => {
+    const s = newStanding();
+    shiftRegard(s, 'a', -40);
+    shiftRegard(s, 'b', 3);
+    expect(fadeStanding(s, 10, country)).toBe(0); // (the first call notes the day)
+    expect(fadeStanding(s, 17, country)).toBe(7);
+    expect(regardOf(s, 'a')).toBe(-33);
+    expect(regardOf(s, 'b')).toBe(0);
+    fadeStanding(s, 60, country);
+    expect(s.regard).toEqual({});
+  });
+
   it('weighs a wrong more for the owner than a bystander', () => {
     const w = { act: 'meddle' as const, owner: { house: 'home' } };
     expect(weightOf(w, country, true)).toBeGreaterThan(weightOf(w, country, false));
@@ -128,9 +146,39 @@ describe('consequences start at points on the scale (B3c)', () => {
   });
 
   it('who you are moves the points: a people they are cold to meets them sooner', () => {
-    expect(answerFor(-12, country, 0)?.id).toBe('grumble');
-    expect(answerFor(-12, country, -2)?.id).toBe('scold');
-    expect(answerFor(-2, country, 1)).toBeNull();
+    expect(answerFor(-12, country, { relation: 0 })?.id).toBe('grumble');
+    expect(answerFor(-12, country, { relation: -2 })?.id).toBe('scold');
+    expect(answerFor(-2, country, { relation: 1 })).toBeNull();
+  });
+
+  it('rank gets off lightly: a noble\'s wrongs are answered much later', () => {
+    expect(answerFor(-25, country, { rank: 0 })?.id).toBe('scold');
+    expect(answerFor(-25, country, { rank: 20 })?.id).toBe('grumble');
+  });
+
+  it('fight or fetch: the bold square up where others fetch the guard; the afraid fetch help where others square up', () => {
+    expect(answerFor(-45, country)?.id).toBe('fetch');
+    expect(answerFor(-45, country, { bold: true })?.id).toBe('fight');
+    expect(answerFor(-80, country)?.id).toBe('fight');
+    expect(answerFor(-80, country, { afraid: true })?.id).toBe('fetch');
+    // (And someone afraid of you keeps their distance rather than walk up to scold.)
+    expect(answerFor(-38, country, { afraid: true })?.id).toBe('grumble');
+  });
+
+  it('how dangerous you look against their nerve: a trukh frightens a farmer, not a tirak; scars count', () => {
+    const look = (physique: number, marks = 0) => ({ physique, marks, weapons: 0, tags: [] });
+    const farmer = { physique: 10, temper: 0 }, tirak = { physique: 13, temper: 3 };
+    expect(dangerOf(look(10, 1))).toBe(14);
+    expect(sizeUp(look(16), farmer, 0, country).afraid).toBe(true);
+    expect(sizeUp(look(16), tirak, 0, country).afraid).toBe(false);
+    expect(sizeUp(look(16), tirak, 0, country).bold).toBe(true);
+    expect(sizeUp(look(12), farmer, 0, country).afraid).toBe(false);
+    expect(sizeUp(look(12, 1), farmer, 0, country).afraid).toBe(true);
+    expect(sizeUp({ ...look(10), tags: ['nobility'] }, farmer, 0, country).rank).toBe(20);
+  });
+
+  it('walking into someone\'s home uninvited, seen by them, earns a grumble', () => {
+    expect(answerFor(-weightOf({ act: 'enter', owner: { house: 'h' } }, country, true), country)?.id).toBe('grumble');
   });
 
   it('every culture is sound, and its answers are behaviours everyone can follow', () => {
@@ -191,6 +239,13 @@ describe('asking leave (B3c)', () => {
     const r = talk(ASK_LEAVE, person(), doer, ctx(0), Rng.fromSeed(1));
     expect(r.roll).toBeDefined();
     expect(!!r.leave).toBe(r.success);
+  });
+
+  it('at an inn it is a room for the night, the keeper\'s trade: yes unless they are wary of you', () => {
+    const keeper = { ...person(), leaveAsk: 'Ask {name} for a room for the night' };
+    expect(talkOffers(keeper, ctx(0)).find((o) => o.id === ASK_LEAVE)?.label).toBe('Ask Wenna for a room for the night');
+    expect(talk(ASK_LEAVE, keeper, doer, ctx(0), Rng.fromSeed(1))).toMatchObject({ success: true, leave: 'home' });
+    expect(talk(ASK_LEAVE, keeper, doer, ctx(-1), Rng.fromSeed(1)).roll).toBeDefined();
   });
 
   it('lasts until midnight', () => {

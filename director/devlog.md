@@ -2,6 +2,22 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-03 — B3c done: rooms off limits, fading, fight or fetch, whose is this; a door fixed
+
+- **Fix: a door seen from inside.** In the houses across the road from the inn, the door is in the far wall, and from inside you saw a blank wall. It was only drawn on the outside face. Now it's drawn on the inside too, with a frame.
+- **Whose is this.** Stepping into a house, or into another room of it, now tells you whose it is and whether it's open to you, e.g. "Someone's house: guest room. Not yours to be in without leave." On easy it names the household ("Adriel and Tam's house"). A tapped thing says it too.
+- **Parts of houses are off limits** (your question). Each kind of room says what it welcomes and when. In the inn, the taproom is open to anyone, 6 to midnight. The guest rooms and landing upstairs aren't, until you **ask the innkeeper for a room for the night**. That's a yes unless they're wary of you; no coin changes hands yet, since there's no money. Shops are open in their hours; a home is only its household's.
+- **Being where you aren't welcome is a wrong too**, for whoever sees you there, once a visit. Walk into a villager's home at night with them in and you get a grumble.
+- **Views fade** (your Q44): a point a day for country folk. Being fetched for is forgotten in about six weeks. Each culture sets its own pace.
+- **Who you are, and fight or fetch:**
+  - Rank gets off lightly: a noble's wrongs are answered much later.
+  - Fear: each witness weighs how dangerous you look (your physique, plus marks like scars or a frightening look) against their own nerve. A trukh frightens a farmer, but not a tirak. Someone afraid answers later; instead of walking up to scold they stare, and instead of squaring up they fetch help.
+  - The bold (a tirak, a guard) square up to you themselves instead of fetching the guard.
+  - Weapons you show come with items.
+- **B3c is done.** An item's value against the owner's wealth, and its importance, move to B3b, where taking things comes in.
+- **Try it:** Hamlet, panel → Game: easy. Go up the inn's stairs (it says it isn't yours), then ask the innkeeper for a room. Or by night, walk into a villager's home while they're in.
+- **Next:** B3b, the ways to take.
+
 ## 2026-11-03 — B3c, first slice: owners, how people see you, and what they do about it
 
 - **Things have owners now.** What stands in a house is its household's; what stands among the houses outdoors is the town's; the wild is no one's.

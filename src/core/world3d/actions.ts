@@ -87,8 +87,8 @@ export interface OwnerView {
   culture: CultureDef;
   /** The household of a house: the people whose home it is. */
   members(house: string): readonly string[];
-  /** What a house welcomes without asking (its main room's kind), or null. */
-  welcome(house: string): Welcome | null;
+  /** What the room at a spot welcomes without asking (its kind's `welcome`: an inn's taproom, not its guest rooms), or null. */
+  welcome(at: Spot): Welcome | null;
   /** Has the doer leave to be in this house now? */
   leave(doer: string, house: string): boolean;
 }

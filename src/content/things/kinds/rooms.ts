@@ -18,9 +18,13 @@ const free: Rule = { at: 'free' };
 
 const room = (id: string, is: string, look: string, lines: RoomLine[], more: Partial<ThingDef> = {}): ThingDef => ({ id, is, look, room: { lines }, ...more });
 
-/** A shop or a common room lets anyone in to sit down in its hours (plan B3c): no wrong to take a seat. */
-const SHOP: Partial<ThingDef> = { welcome: { acts: ['sit'], hours: [8, 19] } };
-const INN: Partial<ThingDef> = { welcome: { acts: ['sit'], hours: [6, 24] } };
+/**
+ * A shop or a common room lets anyone in to sit down in its hours (plan B3c): no wrong to come in or take a seat. A
+ * room without `welcome` (a home, the inn's guest rooms and landing, the keeper's room upstairs) is for the household
+ * and whoever has their leave; the inn's leave is asked for as a room for the night.
+ */
+const SHOP: Partial<ThingDef> = { welcome: { acts: ['enter', 'sit'], hours: [8, 19] } };
+const INN: Partial<ThingDef> = { welcome: { acts: ['enter', 'sit'], hours: [6, 24], ask: 'Ask {name} for a room for the night' } };
 
 const things: ThingDef[] = [
   // A room is a part of a building, to the skill hooks.

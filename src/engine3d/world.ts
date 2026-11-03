@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { Pix } from '../art/pix';
-import { type FurnishedRoom, furnishHouse } from '../content/furnish';
+import { type FurnishedRoom, furnishHouse, roomKindOf } from '../content/furnish';
 import {
   barkTex, doorTex, floorTex, groundChunkPainter, leafTex, plasterTex, roofUnderTex, shingleTex, shutterTex, sodTex, stoneTex, thatchTex,
   tileTex, timberTex, windowGlowTex, windowTex,
@@ -29,7 +29,11 @@ import { LEADS } from '../content/leads';
 import { HEARD_FOR, type Noise, type Senses, type SightRoll, type Where, canSee, fadeSenses, hears, lastHeard, newSenses, noteHeard, rollSight, sightBoost, sightDue } from '../core/world3d/perceive';
 import { type TalkCase, type TalkMemory, type TalkPerson, type TalkResult, newTalkMemory, talk } from '../core/world3d/talk';
 import { type Visitor, disposition } from '../core/skillweb';
-import { type AnswerStep, type CultureDef, type Standing as HeroStanding, type Wrong, answerFor, answerLines, giveLeave, hasLeave, meet, moodsFromScale, newStanding, regardOf, shiftRegard, talkOntoScale, weightOf } from '../core/world3d/standing';
+import {
+  type AnswerStep, type CultureDef, type HeroLook, type Standing as HeroStanding, type Welcome, type WhoToThem, type Wrong, answerFor, answerLines,
+  fadeStanding, giveLeave, hasLeave, mayDo, meet, moodsFromScale, newStanding, regardOf, shiftRegard, sizeUp, talkOntoScale, weightOf, withinHours,
+} from '../core/world3d/standing';
+import { temperOf } from '../content/people/temper';
 import { cultureOf } from '../content/cultures';
 import { personName } from '../content/people/naming';
 import { LIBRARY } from '../content/skillweb';
@@ -1959,6 +1963,7 @@ export class SpikeWorld {
       id, name: personName(r.chain, `${id}:${c.who.seed ?? 0}`), kind: r.facets.people ?? 'human', tags: r.chain,
       ...(calling ? { work: { calling, ...(about ? { about } : {}) } } : {}),
       ...(c.who.home ? { home: c.who.home } : {}),
+      ...(c.who.home && this.houseWelcome(c.who.home)?.ask ? { leaveAsk: this.houseWelcome(c.who.home)!.ask } : {}),
     };
   }
 
@@ -2047,16 +2052,96 @@ export class SpikeWorld {
 
   // --- owners, the scale and consequences (plan B3c, `core/world3d/standing.ts`) ---
 
-  /** What a house welcomes without asking: its main room's kind says (an inn: sit down, 6 to 24). */
-  private welcomeOf(house: string): { acts: Wrong['act'][]; hours: [number, number] } | null {
+  /** The room at a spot in a house: its number in the house, and its kind (the inn's taproom, a guest room); null outdoors. */
+  private roomAt(at: Spot): { n: number; kind: string } | null {
+    const place = at.house ? this.houseIndex.byId(at.house) : null;
+    if (!place) return null;
+    const rooms = this.houseIndex.entry(place).room;
+    const p = houseToLocal(place, at.x, at.z);
+    let best: { n: number; d: number } | null = null;
+    rooms.forEach((r, n) => {
+      if (r.level !== at.level) return;
+      const q = r.room.rect;
+      // (Outside every rect, on a wall or a stair: the nearest room.)
+      const d = Math.hypot(Math.max(q.x0 - p.x, 0, p.x - q.x1), Math.max(q.z0 - p.z, 0, p.z - q.z1));
+      if (!best || d < best.d) best = { n, d };
+    });
+    if (!best) return null;
+    const n = (best as { n: number }).n;
+    return { n, kind: roomKindOf(rooms[n].room.role, place.room ?? 'home', place.spec.plan) };
+  }
+
+  /** What the room at a spot welcomes without asking (its kind says: an inn's taproom, sit down, 6 to 24; its guest rooms nothing). */
+  private welcomeAt(at: Spot): Welcome | null {
+    const r = this.roomAt(at);
+    return r && THINGS.has(r.kind) ? THINGS.get(r.kind).welcome ?? null : null;
+  }
+
+  /** What a house's main room welcomes (how leave is asked there: a room for the night at the inn). */
+  private houseWelcome(house: string): Welcome | null {
     const room = this.layout.houses.find((h) => h.id === house)?.room ?? 'home';
     return THINGS.has(room) ? THINGS.get(room).welcome ?? null : null;
   }
 
-  /** How someone's people see the hero's (−3..+3, the relations table): a cold one answers sooner. */
-  private relationOf(id: string): number {
-    const p = this.talkPerson(id);
-    return p ? disposition({ kind: p.kind, tags: p.tags }, this.heroWho, LIBRARY).v : 0;
+  /** How the hero looks to people (physique, fearsome marks, weapons shown) and their rank: the page sets it from the sheet. */
+  heroLook: HeroLook = { physique: 10, marks: 0, weapons: 0, tags: [] };
+
+  /** Who the hero is to one of the map's people: how their people see yours, rank, whether they're afraid or bold. */
+  private whoToThem(c: CastCard): WhoToThem {
+    const p = this.talkPerson(c.who.id);
+    const relation = p ? disposition({ kind: p.kind, tags: p.tags }, this.heroWho, LIBRARY).v : 0;
+    return sizeUp(this.heroLook, { physique: c.who.sheet?.attrs.Kroppsbyggnad ?? 10, temper: temperOf(p?.tags ?? []) }, relation, this.culture);
+  }
+
+  /** Who the hero is to someone (for tests and the debug hook). */
+  whoTo(id: string): WhoToThem | null {
+    const c = this.cast.find((x) => x.who.id === id);
+    return c ? this.whoToThem(c) : null;
+  }
+
+  /**
+   * Whose a spot is, for the page to say (plan B3c): the town's, or a house's (its household by name, the kind of room,
+   * whether it is open to anyone now, whether the hero has leave); null in the wild.
+   */
+  whoseAt(at: Spot): { town: true } | { house: string; members: string[]; room: string | null; open: [number, number] | null; leave: boolean } | null {
+    if (!at.house) return this.acting.view.housesNear(at.x, at.z, 20) >= 3 ? { town: true } : null;
+    const w = this.welcomeAt(at);
+    return {
+      house: at.house,
+      members: this.cast.filter((c) => c.who.home === at.house).map((c) => this.talkPerson(c.who.id)?.name ?? c.who.id),
+      room: this.roomAt(at)?.kind ?? null,
+      open: w && w.acts.includes('enter') && withinHours(this.weather.hour ?? 12, w.hours) ? w.hours : null,
+      leave: hasLeave(this.standing, at.house, this.worldHours),
+    };
+  }
+
+  /** Told when the hero steps into another room or out of doors (for the page to say whose it is). */
+  onEnterPlace: ((at: Spot) => void) | null = null;
+  /** The room the hero is in now (house/storey/room), and who has already seen them there while they weren't welcome. */
+  private placeKey: string | null = null;
+  private readonly sawTrespass = new Set<string>();
+
+  /**
+   * Being where you aren't welcome is a wrong too (`enter`): whoever sees the hero in a room that isn't open to them,
+   * once a visit. Stepping into another room is told to the page. Run when people look.
+   */
+  private checkTrespass(): void {
+    const at = this.heroSpot(), room = this.roomAt(at);
+    const key = at.house && room ? `${at.house}/${at.level}/${room.n}` : null;
+    if (key !== this.placeKey) {
+      const was = this.placeKey;
+      this.placeKey = key;
+      this.sawTrespass.clear();
+      // (Out of one house's door or into another: not every step round the street.)
+      if (key !== null || was !== null) this.onEnterPlace?.(at);
+    }
+    if (!at.house || !key) return;
+    if (mayDo({ owner: { house: at.house }, act: 'enter', member: false, leave: hasLeave(this.standing, at.house, this.worldHours), welcome: this.welcomeAt(at), hour: this.weather.hour ?? 12, culture: this.culture })) return;
+    const seen = this.witness([{ act: 'enter', owner: { house: at.house } }], (c) => !this.sawTrespass.has(c.who.id));
+    for (const s of seen) {
+      this.sawTrespass.add(s.id);
+      if (s.says) this.onSpeak?.(s.id, s.name, s.says);
+    }
   }
 
   /** Someone starts answering the hero: the behaviour the culture says, for a while; the line they say, if any. */
@@ -2070,15 +2155,15 @@ export class SpikeWorld {
    * The hero did wrong (the owner gate said so): everyone who sees the hero now thinks less of them, the owner most,
    * and answers as the culture says for where their view now stands. Returns who saw it, by how much, and what they said.
    */
-  private witness(wrongs: readonly Wrong[]): { id: string; name: string; by: number; says: string | null }[] {
+  private witness(wrongs: readonly Wrong[], only?: (c: CastCard) => boolean): { id: string; name: string; by: number; says: string | null }[] {
     const out: { id: string; name: string; by: number; says: string | null }[] = [];
     for (const c of this.cast) {
-      if (!c.mind.senses.sees.includes('hero')) continue;
+      if (!c.mind.senses.sees.includes('hero') || (only && !only(c))) continue;
       let by = 0;
       for (const w of wrongs) by += weightOf(w, this.culture, 'house' in w.owner && c.who.home === w.owner.house);
       if (by <= 0) continue;
       const now = shiftRegard(this.standing, c.who.id, -by);
-      const step = answerFor(now, this.culture, this.relationOf(c.who.id));
+      const step = answerFor(now, this.culture, this.whoToThem(c));
       const says = step ? this.startAnswer(c, step) : null;
       out.push({ id: c.who.id, name: this.talkPerson(c.who.id)?.name ?? c.who.id, by: Math.round(by), says });
     }
@@ -2249,7 +2334,7 @@ export class SpikeWorld {
       owners: {
         culture: this.culture,
         members: (house) => this.cast.filter((c) => c.who.home === house).map((c) => c.who.id),
-        welcome: (house) => this.welcomeOf(house),
+        welcome: (at) => this.welcomeAt(at),
         leave: (doer, house) => doer === 'hero' && hasLeave(this.standing, house, this.worldHours),
       },
       leadStudy: (t) => {
@@ -2889,6 +2974,9 @@ export class SpikeWorld {
     if (look) {
       this.perceiveIn = PERCEIVE_EVERY;
       this.gossip();
+      this.checkTrespass();
+      // (Views fade back toward nothing, a little each world day: Q44.)
+      fadeStanding(this.standing, this.weather.day, this.culture);
     }
     for (const c of this.cast) {
       const a = c.mind.actor;
