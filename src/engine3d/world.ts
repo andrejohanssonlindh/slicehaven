@@ -24,6 +24,8 @@ import { type ActResult, type ActTarget, type ActWorld, type Doer, type Offer, t
 import { ACTIONS } from '../content/actions';
 import { sheetDice, unitsDice } from '../core/npcsheet';
 import type { Roll } from '../core/dice';
+import { type Cares, type LeadStatus, type LeadsState, giveLead, leadStatus } from '../core/world3d/leads';
+import { LEADS } from '../content/leads';
 import { HEARD_FOR, type Noise, type Senses, type SightRoll, type Where, canSee, fadeSenses, hears, lastHeard, newSenses, noteHeard, rollSight, sightBoost, sightDue } from '../core/world3d/perceive';
 import { type TalkCase, type TalkMemory, type TalkPerson, type TalkResult, newTalkMemory, talk } from '../core/world3d/talk';
 import type { Visitor } from '../core/skillweb';
@@ -639,6 +641,8 @@ export class SpikeWorld {
 
     // Ground chunks stream in once the view is sized (see `frame`); until then the exact height function stands in.
     this.layout = layout;
+    // Placed things that carry a lead give it to whoever looks at them (plan B11).
+    for (const p of layout.props) if (p.lead) this.propLeads.set(placedId(p), p.lead);
     // Each room is furnished by rules (see `content/furnish.ts`) when something first comes near its house; what stands
     // on the floor blocks feet, and what is in it (the hearth, books, pictures) feeds the filament field.
     this.houseIndex = new HouseIndex<FurnishedRoom[]>(layout.houses, (b) => {
@@ -2005,9 +2009,46 @@ export class SpikeWorld {
     return r;
   }
 
-  /** What a talk is about: the hero, the world's flags, the memory, the library. */
+  /** What a talk is about: the hero, the world's flags, the memory, the library, the hero's leads. */
   talkCase(hero: Visitor): TalkCase {
-    return { hero, flags: this.flags, memory: this.talkMemory, library: LIBRARY };
+    return { hero, flags: this.flags, memory: this.talkMemory, library: LIBRARY, leads: { state: this.leads, defs: LEADS, hours: this.worldHours } };
+  }
+
+  // --- leads (plan B11, `core/world3d/leads.ts`): what the hero knows that gives a reason to act ---
+
+  /** The leads the hero has. Saved. */
+  leads: LeadsState = {};
+  /** Placed things that carry a lead, by thing id. */
+  private readonly propLeads = new Map<string, string>();
+
+  /** Give the hero a lead; its title if it is new to them, else null. */
+  giveLead(id: string): string | null {
+    return giveLead(this.leads, LEADS, id, this.worldHours) ? LEADS[id].title : null;
+  }
+
+  /**
+   * The hero looks at a thing (taps it): if it carries a lead, they get it (if they hadn't). The lead's title, what it
+   * says of the thing (its first line, to show as the look), and whether it was new; null for a thing with no lead.
+   */
+  lookAt(t: ActTarget): { title: string; look: string; added: boolean } | null {
+    const id = this.propLeads.get(t.id);
+    if (!id || !LEADS[id]) return null;
+    const added = this.giveLead(id) !== null;
+    return { title: LEADS[id].title, look: LEADS[id].know, added };
+  }
+
+  /** The journal: every lead the hero has, newest first, with what they know, where it stands, and who might care. */
+  get journal(): { id: string; title: string; lines: string[]; status: LeadStatus; cares: Cares[] }[] {
+    return Object.entries(this.leads)
+      .filter(([id]) => LEADS[id])
+      .sort((a, b) => b[1].at - a[1].at)
+      // (Who might care: those whose answer has not been heard yet.)
+      .map(([id, r]) => ({ id, title: LEADS[id].title, lines: [...r.lines], status: leadStatus(LEADS[id], r, this.flags), cares: LEADS[id].answers.filter((_, i) => !r.heard.includes(i)).map((a) => a.who) }));
+  }
+
+  /** A person's name as the journal shows "who might care" (one of the map's people), or null. */
+  personNamed(id: string): string | null {
+    return this.talkPerson(id)?.name ?? null;
   }
 
   /** The thing a tap points at: right on it (`slack` null), or else within `slack` of its middle; and how far along the ray. */
@@ -2083,7 +2124,7 @@ export class SpikeWorld {
   private get acting(): ActWorld {
     const w = this.weather, idx = this.houseIndex;
     return {
-      things: THINGS, states: this.states, flags: this.flags, rng: this.actRng, library: LIBRARY,
+      things: THINGS, states: this.states, flags: this.flags, rng: this.actRng, library: LIBRARY, leads: this.leads,
       view: {
         rain: w.rain, hour: w.hour ?? 12,
         housesNear: (x, z, r) => idx.liteNear(x - r, z - r, x + r, z + r).filter((e) => Math.hypot(e.built.place.x - x, e.built.place.z - z) <= r).length,
@@ -2112,6 +2153,13 @@ export class SpikeWorld {
       else if (e.kind === 'make' && e.thing === 'campfire') this.lightFire();
       else if (e.kind === 'sit' && hero) this.sitHero(e.target);
       else if (e.kind === 'noise') this.makeNoise({ ...e.at, loud: e.loud, kind: e.sound, by: doer.id });
+    }
+    // A lead given is the hero's (someone else learning something waits for what people know).
+    if (hero) {
+      for (const e of [...r.events]) {
+        const title = e.kind === 'lead' ? this.giveLead(e.lead) : null;
+        if (title) r.events.push({ kind: 'say', line: { text: `Lead added: ${title}.`, tone: 'good' } });
+      }
     }
     return r;
   }
@@ -2254,15 +2302,16 @@ export class SpikeWorld {
   }
 
   /** What the save keeps of the world (the page adds the map and writes it: `core/world3d/save.ts`). */
-  saveState(): { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags: Record<string, boolean>; talk: TalkMemory } {
+  saveState(): { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags: Record<string, boolean>; talk: TalkMemory; leads: LeadsState } {
     const h = this.hero;
-    return { hour: this.weather.hour ?? 12, hero: { x: h.x, z: h.z, level: h.stair ? 0 : h.level }, explored: this.explored.toJSON(), things: this.states.toJSON(), flags: { ...this.flags }, talk: structuredClone(this.talkMemory) };
+    return { hour: this.weather.hour ?? 12, hero: { x: h.x, z: h.z, level: h.stair ? 0 : h.level }, explored: this.explored.toJSON(), things: this.states.toJSON(), flags: { ...this.flags }, talk: structuredClone(this.talkMemory), leads: structuredClone(this.leads) };
   }
 
-  /** Take a save back: the clock, the hero, what was seen, the things' states. */
-  loadState(s: { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags?: Record<string, boolean>; talk?: TalkMemory }): void {
+  /** Take a save back: the clock, the hero, what was seen, the things' states, what they know. */
+  loadState(s: { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags?: Record<string, boolean>; talk?: TalkMemory; leads?: LeadsState }): void {
     this.flags = { ...s.flags };
     this.talkMemory = s.talk ? structuredClone(s.talk) : newTalkMemory();
+    this.leads = s.leads ? structuredClone(s.leads) : {};
     this.weather.setHour(s.hour);
     this.heroSenses.rolledAt = null; // (back in the map: sight is rolled again)
     this.explored.assign(s.explored);

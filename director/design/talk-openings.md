@@ -56,7 +56,7 @@ An opening is what puts a try on the table. A try shows only while one of its op
 - **A journal** of leads, each with its lines.
 - **Choices that appear by themselves** in a talk when this person might care. On easy, the journal could also say who might care. Harder settings leave that to you.
 
-**The first slice, if this is the shape:** a lead record in the save, the journal, "Lead added". One curiosity on the Hamlet map (the statue, by the road out), two people who know about it (an elder and the innkeeper), and *ask about it* opened by the lead. Through the frame: a lead is an outcome (`{ lead: 'statue-north' }`) and an opening (`{ lead: 'statue-north' }`).
+**Built 2026-11-03** (plan B11, first slice). Rules `core/world3d/leads.ts`; leads `content/leads/` (`statue-north.ts`, `hesma-well.ts`); a map's prop carries one with `"lead"`; the journal `src/spike3d/journal.ts`. The elder became a guard, and the next lead's answers are the miller and any dwarf. Asking is free (no roll, no patience), once per answer. **The first slice, as it was planned:** a lead record in the save, the journal, "Lead added". One curiosity on the Hamlet map (the statue, by the road out), two people who know about it (an elder and the innkeeper), and *ask about it* opened by the lead. Through the frame: a lead is an outcome (`{ lead: 'statue-north' }`) and an opening (`{ lead: 'statue-north' }`).
 
 ## Adding leads: one file each, and a lead note (agreed shape, Q42)
 Leads are built so the tenth is as easy as the first: **a lead is a data file** (`content/leads/<id>.ts`, found by itself like kinds and verbs). Nothing about a particular lead is ever code. A file says:

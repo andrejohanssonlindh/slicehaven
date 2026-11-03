@@ -43,7 +43,7 @@ export interface Sheet {
 /** The hero as a doer: what they roll for a skill or an attribute. */
 export const heroDoer = (hero: Hero): Doer => ({ id: 'hero', dice: (s) => diceOf(hero, s) });
 
-export function makeSheet(world: () => SpikeWorld, notify: (text: string) => void, save: () => void, doer: Doer): Sheet {
+export function makeSheet(world: () => SpikeWorld, notify: (text: string) => void, save: () => void, doer: Doer, onLead: () => void = () => {}): Sheet {
   const el = document.getElementById('act')!;
   const nameEl = el.querySelector<HTMLElement>('.name')!, lookEl = el.querySelector<HTMLElement>('.look')!, offersEl = el.querySelector<HTMLElement>('.offers')!;
   const notice = document.getElementById('notice')!;
@@ -69,6 +69,7 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
       if (e.kind === 'time' && e.minutes >= 5) lines.push(t('act.time', '({n} minutes pass.)', { n: e.minutes }));
     });
     if (lines.length) notify(lines.join(' '));
+    if (r.events.some((e) => e.kind === 'lead')) onLead();
     save();
   }
 
@@ -90,6 +91,14 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
     const kind = target ? THINGS.get(target.kind) : null;
     nameEl.textContent = kind ? t(`thing.${kind.id}.name`, cap(thingName(kind))) : t('act.here', 'Where you stand');
     lookEl.textContent = kind ? t(`thing.${kind.id}.look`, kind.look ?? '') : w.heroIndoors ? t('act.hereIn', 'A floor of boards and beaten earth.') : t('act.hereOut', 'Open ground.');
+    // Looking at something that carries a lead gives it (plan B11): what you know of it, as the look.
+    const lead = target ? w.lookAt(target) : null;
+    if (lead) lookEl.textContent = lead.look;
+    if (lead?.added) {
+      notify(t('act.leadadded', 'Lead added: {title}.', { title: lead.title }));
+      onLead();
+      save();
+    }
     offersEl.replaceChildren();
     const list = w.offersFor(target, doer);
     for (const o of list) {

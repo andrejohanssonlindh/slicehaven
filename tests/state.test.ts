@@ -63,7 +63,7 @@ describe('states on placed things (B1)', () => {
 });
 
 describe('the saved world (B1)', () => {
-  const sample = { map: 'hamlet', hour: 17.5, hero: { x: 4, z: -2, level: 1 }, explored: { '0,0': 'AAE=' }, things: { 'h/0/hearth': { lit: false } }, flags: { 'searched:x': true }, talk: { social: { keeper: { talks: 1, mood: 1 } }, tokens: [], fails: {} } };
+  const sample = { map: 'hamlet', hour: 17.5, hero: { x: 4, z: -2, level: 1 }, explored: { '0,0': 'AAE=' }, things: { 'h/0/hearth': { lit: false } }, flags: { 'searched:x': true }, talk: { social: { keeper: { talks: 1, mood: 1 } }, tokens: [], fails: {} }, leads: { 'statue-north': { lines: ['A statue.'], heard: [0], at: 110 } } };
 
   it('writes and reads back one record per map, with its version', () => {
     const st = memory();

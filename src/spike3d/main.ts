@@ -16,6 +16,7 @@ import { SpikeWorld } from '../engine3d/world';
 import { t } from '../i18n';
 import { heroDoer, makeSheet, pageHero } from './actsheet';
 import { makeTalk } from './talksheet';
+import { makeJournal } from './journal';
 
 /**
  * M0, the 3D spike: one house with a working cut-away, ground with stamped mud
@@ -411,9 +412,11 @@ const TAP_SLACK = 22;
 const hero = pageHero();
 const doer = heroDoer(hero);
 /** The sheet a tapped thing opens (plan B3a). */
-const sheet = makeSheet(() => world, notify, save, doer);
+/** The journal of leads (plan B11). */
+const journal = makeJournal(() => world);
+const sheet = makeSheet(() => world, notify, save, doer, journal.added);
 /** Talking to someone tapped (plan B3d). */
-const talk = makeTalk(() => world, () => pipeline.renderer, hero, doer, notify, save);
+const talk = makeTalk(() => world, () => pipeline.renderer, hero, doer, notify, save, journal.added);
 
 function bindInput(): void {
   let down: { x: number; y: number; id: number; moved: number } | null = null;

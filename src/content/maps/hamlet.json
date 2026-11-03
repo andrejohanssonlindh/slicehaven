@@ -49,6 +49,9 @@
     { "id": "gathering", "hours": [12, 13] }
   ],
   "hero": { "house": "inn" },
+  "props": [
+    { "kind": "statue", "x": -50, "z": -0.5, "rot": 0, "seed": 7, "lead": "statue-north" }
+  ],
   "people": [
     { "id": "villager", "is": ["human", "job-miller"], "seed": 2, "does": [{ "do": "beat", "path": "lane" }] },
     { "id": "keeper", "is": ["human", "job-innkeeper"], "seed": 6, "home": "inn", "does": [{ "when": { "hours": [6, 7] }, "do": "tendfire" }, { "do": "rounds", "house": "inn" }] },

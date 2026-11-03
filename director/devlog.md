@@ -2,6 +2,16 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-03 — B11, first slice: leads
+
+- **A statue stands by the Hamlet's west road**, a weathered stone woman holding out a key. **Tap it:** "Lead added: The statue by the west road."
+- **Asking comes by itself.** Talk to someone who might care (the innkeeper, a guard) and *Ask about the statue by the road* is among the choices. No roll: they care, so they tell. The innkeeper's answer hands over **the next lead**, Saint Hesma's well, which the miller walking the lane and any dwarf can be asked about. Anyone else isn't offered it.
+- **The journal:** a **Leads** button bottom left. Each lead shows what you know, growing as you're told more. It's greyed once nobody has more to say (or it's solved). On easy it also says who might still know more.
+- **Built to be added to,** as agreed (Q42): each lead is one file. Send me a **lead note** (template in [openings](design/talk-openings.md#adding-leads-one-file-each-and-a-lead-note-agreed-shape-q42)) and it becomes one. Actions can give a lead too, and an action can need one (*search the statue's base* only once you know why).
+- **Not yet:** overheard and carried leads, your past, quests, leads going cold, and anything that solves the well. **Saves from before today are dropped** (the save now keeps leads).
+- **Try it:** Hamlet, walk west along the road to the statue and tap it, then go back to the innkeeper in the inn.
+- **Next:** B3c, owners, the scale and consequences.
+
 ## 2026-11-03 — B5: people see and hear you
 
 - **Sight is rolled** (your Q35): Alertness against 8 when you enter a map and every six hours of world time. A failure gives a narrow, short view; each advantage reaches farther and wider. Waking will roll it too once there's sleep; until then the panel has a **Roll sight** button.

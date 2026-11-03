@@ -71,6 +71,8 @@ export interface ActWorld {
   rng: Rng;
   /** The skill library, for the hooks a kind offers (left out: only the verbs are offered). */
   library?: Library;
+  /** The leads the hero has, by id (plan B11): the `lead` gate asks it. */
+  leads?: Readonly<Record<string, unknown>>;
 }
 
 /** A fact about a spot: true or false there (indoors, raining, among houses). One entry in `content/actions/facts.ts`. */
@@ -122,7 +124,9 @@ export type Outcome =
   /** Make a new thing of this kind where the doer stands (a campfire). */
   | { make: string }
   /** The doer sits on the thing. */
-  | { sit: true };
+  | { sit: true }
+  /** Gives the hero a lead (`content/leads/`, plan B11): studying an inscription, searching a coat. */
+  | { lead: string };
 
 /** A roll to resolve an action: the doer's best of these skills, against a difficulty. */
 export interface ActRoll {
@@ -183,7 +187,8 @@ export type ActEvent =
   | { kind: 'time'; minutes: number }
   | { kind: 'make'; thing: string; at: Spot }
   | { kind: 'sit'; target: ActTarget }
-  | { kind: 'noise'; at: Spot; loud: number; sound: string };
+  | { kind: 'noise'; at: Spot; loud: number; sound: string }
+  | { kind: 'lead'; lead: string };
 
 export interface ActResult {
   /** It was tried (false: a requirement said no, and `reason` says why). */
@@ -296,7 +301,7 @@ function apply(outs: readonly Outcome[], target: ActTarget | null, at: Spot, nam
     else if ('sit' in o) {
       if (!target) throw new Error('sitting needs a thing to sit on');
       events.push({ kind: 'sit', target });
-    }
+    } else if ('lead' in o) events.push({ kind: 'lead', lead: o.lead });
   }
 }
 

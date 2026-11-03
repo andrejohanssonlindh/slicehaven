@@ -1,4 +1,4 @@
-import { BRIDGE_WIDTH, archway, bridge, gate, signpost, stall, tower } from '../../../core/world3d/propsMore';
+import { BRIDGE_WIDTH, archway, bridge, gate, signpost, stall, statue, tower } from '../../../core/world3d/propsMore';
 import { type ThingDef, localBox } from '../../../core/world3d/things';
 import { fromParts } from '../parts';
 
@@ -45,6 +45,15 @@ const things: ThingDef[] = [
     // Only the rails: the way between them is the walkway.
     foot: (p) => [localBox(p, 0, -BRIDGE_WIDTH / 2, p.len / 2, 0.07), localBox(p, 0, BRIDGE_WIDTH / 2, p.len / 2, 0.07)],
     draw: (p) => fromParts(bridge(p.len, p.seed)),
+  },
+  {
+    // A curiosity (B11): a placed one may carry a lead (`"lead": "<id>"` on the map's prop), given by looking at it.
+    id: 'statue',
+    is: 'structure',
+    look: 'A weathered stone figure on a plinth.',
+    foot: [{ box: [0.55, 0.55] }],
+    keepClear: 1.5,
+    draw: (p) => fromParts(statue(p.seed)),
   },
   {
     id: 'signpost',

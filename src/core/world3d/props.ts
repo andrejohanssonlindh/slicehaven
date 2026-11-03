@@ -24,6 +24,8 @@ export interface PlacedProp {
   open?: boolean;
   /** The id of the house it is fixed to (a torch beside the door): it is hidden while the hero is inside that house, so the cut-away view stays clean. */
   on?: string;
+  /** A lead it carries (`content/leads/`), given to the hero who looks at it (plan B11). */
+  lead?: string;
   seed: number;
 }
 

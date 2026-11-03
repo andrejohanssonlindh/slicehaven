@@ -4,6 +4,7 @@ import type { Rng } from '../rng';
 import { type CheckDef, type Memory, type ObjectDef, type SceneState, type Token, apply, attempt, moodLine, openChecks } from '../scene';
 import { type Library, type Setting, type Visitor, expandObject, limitOf, readPerson, situation, talksLeftWith } from '../skillweb';
 import { type Doer, type Line, type Offer, bestSkill } from './actions';
+import { type LeadDef, type LeadsState, askAbout, leadsToAsk } from './leads';
 
 /**
  * Talking to someone in the 3D world (plan B3d): the action frame's social resolve. What can be tried on a person is
@@ -48,7 +49,12 @@ export interface TalkCase {
   flags: Record<string, boolean>;
   memory: TalkMemory;
   library: Library;
+  /** The hero's leads, the lead files, and the world's hours (plan B11): a lead opens asking about it. */
+  leads?: { state: LeadsState; defs: Record<string, LeadDef>; hours: number };
 }
+
+/** An offer that asks about a lead: `lead:<id>`. No roll and no patience spent: they care, so they tell. */
+export const LEAD_ASK = 'lead:';
 
 /** The fitting attribute for any social try, for someone with no fitting skill (at −2D6). */
 const PRESENCE = 'attr:Intryck';
@@ -92,7 +98,10 @@ export function talkOffers(p: TalkPerson, c: TalkCase): Offer[] {
   const s = stateOf(c), o = objectOf(p, c);
   const left = talksLeftWith(o, s, c.library);
   const work: Offer[] = p.work ? [{ id: ASK_WORK, label: `Ask ${p.name} about their work`, skills: [], from: 'verb' }] : [];
-  return [...work, ...openChecks(o, s)
+  const leads: Offer[] = c.leads
+    ? leadsToAsk(c.leads.state, c.leads.defs, c.flags, p).map((d) => ({ id: LEAD_ASK + d.id, label: d.ask.replaceAll('{name}', p.name), skills: [], from: 'verb' as const }))
+    : [];
+  return [...work, ...leads, ...openChecks(o, s)
     .filter((k) => opensNow(k, p, c) && (!k.talk || left === undefined || left > 0))
     .map((k) => ({ id: k.id, label: named(k.label, p), skills: [...k.skills], from: 'skill' as const }))];
 }
@@ -106,6 +115,8 @@ export interface TalkResult {
   hidden: boolean;
   success: boolean;
   lines: Line[];
+  /** A lead it handed over (plan B11). */
+  lead?: string;
 }
 
 /** Try one of the offers on them, as `doer`. Their memory of you changes; flags may be set. */
@@ -114,6 +125,14 @@ export function talk(offer: string, p: TalkPerson, doer: Doer, c: TalkCase, rng:
   if (offer === ASK_WORK && p.work) {
     const a = /^[aeiou]/i.test(p.work.calling) ? 'an' : 'a';
     return { done: true, hidden: false, success: true, lines: [{ text: `${p.name} works as ${a} ${p.work.calling.toLowerCase()}.` }, ...(p.work.about ? [{ text: p.work.about }] : [])] };
+  }
+  if (offer.startsWith(LEAD_ASK)) {
+    const id = offer.slice(LEAD_ASK.length);
+    const r = c.leads ? askAbout(c.leads.state, c.leads.defs, id, p, c.flags, c.leads.hours) : null;
+    if (!r) return { done: false, reason: `${p.name} has nothing to say about that.`, hidden: false, success: false, lines: [] };
+    const lines: Line[] = r.lines.map((text) => ({ text }));
+    if (r.next) lines.push({ text: `Lead added: ${c.leads!.defs[r.next].title}.`, tone: 'good' });
+    return { done: true, hidden: false, success: true, lines, ...(r.next ? { lead: r.next } : {}) };
   }
   const check: CheckDef | undefined = openChecks(o, s).find((k) => k.id === offer && opensNow(k, p, c));
   if (!check) return { done: false, reason: 'That is not something to try with them now.', hidden: false, success: false, lines: [] };

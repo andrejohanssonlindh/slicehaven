@@ -28,7 +28,7 @@ export interface Talk {
   readonly open_: boolean;
 }
 
-export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRenderer, hero: Hero, doer: Doer, notify: (text: string) => void, save: () => void): Talk {
+export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRenderer, hero: Hero, doer: Doer, notify: (text: string) => void, save: () => void, onLead: () => void = () => {}): Talk {
   const el = document.getElementById('talk')!;
   const canvas = el.querySelector<HTMLCanvasElement>('.portrait canvas')!;
   const nameEl = el.querySelector<HTMLElement>('.name')!, whatEl = el.querySelector<HTMLElement>('.what')!, moodEl = el.querySelector<HTMLElement>('.mood')!;
@@ -92,6 +92,7 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
     else {
       if (r.roll && !r.hidden) await showRolls([{ ...r.roll, label: r.skill ? rollableName(r.skill) : r.roll.label }]);
       for (const l of r.lines) log(l.text, l.tone === 'good' ? 'good' : l.tone === 'bad' ? 'bad' : l.tone === 'info' ? 'info' : 'they');
+      if (r.lead) onLead();
       save();
     }
     busy = false;

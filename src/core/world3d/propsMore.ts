@@ -137,6 +137,32 @@ export function stonewall(len: number, seed: number): PropParts {
   return { stone: m };
 }
 
+/**
+ * A stone statue on a plinth: a robed figure, worn by weather, one arm held out in front (+z) with something in the
+ * hand. About 2.6 m to the crown. Blocks are tilted a little by the seed, so no two stand quite alike.
+ */
+export function statue(seed: number): PropParts {
+  const rng = Rng.fromSeed(seed);
+  const m = emptyMesh();
+  const wob = (): number => (rng.next() - 0.5) * 0.04;
+  // The plinth: a wide foot, a block, a lip.
+  addBox(m, [-0.55, -0.15, -0.55], [0.55, 0.12, 0.55], { aoBottom: 0.6 });
+  addBox(m, [-0.42, 0.12, -0.42], [0.42, 0.78, 0.42], { aoBottom: 0.75 });
+  addBox(m, [-0.48, 0.78, -0.48], [0.48, 0.88, 0.48], { aoBottom: 0.85 });
+  // The robe, widening to the hem; the body; the shoulders; the hooded head.
+  addBox(m, [-0.3 + wob(), 0.88, -0.24], [0.3 + wob(), 1.35, 0.24], { aoBottom: 0.8 });
+  addBox(m, [-0.24, 1.35, -0.19], [0.24, 1.95, 0.19]);
+  addBox(m, [-0.29, 1.85, -0.17], [0.29, 2.05, 0.17]);
+  addBox(m, [-0.12 + wob(), 2.05, -0.13], [0.12 + wob(), 2.38, 0.13]);
+  addBox(m, [-0.15, 2.18, -0.16], [0.15, 2.42, 0.1]); // the hood
+  // One arm down at the side, one held out in front, and the key across the hand.
+  addBeam(m, [-0.27, 1.95, 0], [-0.3, 1.4, 0.03], 0.11, [1, 0, 0]);
+  addBeam(m, [0.27, 1.95, 0], [0.24, 1.62, 0.36], 0.11, [1, 0, 0]);
+  addBox(m, [0.2, 1.58, 0.36], [0.3, 1.66, 0.56]);
+  addBox(m, [0.18, 1.6, 0.52], [0.32, 1.66, 0.56]);
+  return { stone: m };
+}
+
 /** A barrel: bellied staves, a lid and two hoops. */
 export function barrel(): PropParts {
   const m = emptyMesh();
