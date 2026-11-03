@@ -2,6 +2,12 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-03 — Talk offers only what's open; the portrait is 3D, finer; leads thought through
+
+- **Your answers** ([decisions](decisions.md)). Q39: **3D, finer** is the portrait; the switch and the painted one are gone. Q40: with anyone you can **ask about their work** (no roll), **size them up**, **ask what they know**, **keep them busy** and **frighten them**. Picking a pocket will start from sneaking. Q41: several ways in, quests are leads, and free leads can be found.
+- **Talk now offers only those.** Comfort, persuade, law and the rest wait until something opens them: their state, a situation, a lead. A villager now has five choices, not fourteen.
+- **Leads, thought through** as you asked ([openings](design/talk-openings.md#leads-thought-through-for-discussion)): what a lead is, six ways in (found, told, overheard, carried, your past, asked of you), how one leads to the next, how it ends, how you see them. Then a small first slice to build. **Q42** asks whether that's the shape.
+
 ## 2026-11-03 — Talk fixes; openings for talk, for discussion
 
 - **The log no longer hides behind the choices:** they sit under it, overlapping only by a soft fade.

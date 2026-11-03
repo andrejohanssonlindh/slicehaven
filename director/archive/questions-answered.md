@@ -3,6 +3,9 @@
 *Archive of the questions in [questions](../questions.md) once answered or dropped. Newest on top. What they decided, if it still stands, is in the [decisions](../decisions.md).*
 
 ## 2026-11-03
+- **Q41 How collected hooks (leads) are held and seen** → **several ways.** **Quests in themselves are leads.** There can also be **free leads**: find an interesting statue outside a town, and "Lead added". The director wants help thinking it through (done on the [openings](../design/talk-openings.md) page; Q42).
+- **Q40 What can be talked about with anyone** → **sizing up, what they know, and their work** (which can open without a skill: ask about it). Also **distract** them and **rob** them (threaten). **Stealing** (picking a pocket) should be **started when sneaking**, not by tapping to talk.
+- **Q39 Which portrait** → **3D, finer.**
 - **Q38 Who holds the scale of how people see you** → **each person, to themselves.** When people meet, what they think of you **spreads**, good or bad, so reputation grows organically: what you do on one side of town isn't known on the other at once. **Advantages (övertag) in a challenge boost the effect** (the rulebook says so too, the director believes): a challenge won with something like 9 advantages has a dramatic effect.
 - **Q37 The portrait when you talk to someone** → **not sure: test both** (their own 3D body close up, and a painted pixel portrait), and likely a **third**: the 3D portrait made prettier. Zoomed in today the bodies are rather nondescript: not smooth, but a bit more detail. Decided when B3d starts, by trying them.
 

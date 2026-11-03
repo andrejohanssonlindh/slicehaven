@@ -6,7 +6,7 @@ import {
   tileTex, timberTex, windowGlowTex, windowTex,
 } from '../art/textures3d';
 import { mapNamed } from '../content/maps';
-import { PERSON_KINDS } from '../content/people';
+import { FACETS, PERSON_KINDS } from '../content/people';
 import { HERO_PERSON, streamingFilamentWorld } from '../content/spike3d';
 import type { PersonSpec } from '../core/persons';
 import type { CastMember, CompiledMap, MapEvent } from '../core/world3d/mapgen';
@@ -26,7 +26,6 @@ import { sheetDice } from '../core/npcsheet';
 import { type TalkCase, type TalkMemory, type TalkPerson, type TalkResult, newTalkMemory, talk } from '../core/world3d/talk';
 import type { Visitor } from '../core/skillweb';
 import { personName } from '../content/people/naming';
-import type { BodySpec } from '../core/world3d/body';
 import { LIBRARY } from '../content/skillweb';
 import { PlacedIndex } from '../core/world3d/placed';
 import { footprints } from '../core/world3d/roomplan';
@@ -1877,20 +1876,20 @@ export class SpikeWorld {
     const c = this.cast.find((x) => x.who.id === id);
     if (!c) return null;
     const r = PERSON_KINDS.resolve(c.who);
-    return { id, name: personName(r.chain, `${id}:${c.who.seed ?? 0}`), kind: r.facets.people ?? 'human', tags: r.chain };
-  }
-
-  /** A person's body spec (for a painted portrait) and seed. */
-  bodyOf(id: string): { spec: BodySpec; seed: number } | null {
-    const c = this.cast.find((x) => x.who.id === id);
-    return c ? { spec: bodySpecOf(PERSON_KINDS.resolve(c.who), c.who.seed ?? 1), seed: c.who.seed ?? 1 } : null;
+    // Their work: the calling they carry (its name), and what their kinds say about it.
+    const calling = r.facets.station && r.facets.station !== 'station' ? FACETS[r.facets.station]?.label : undefined;
+    const about = r.chain.map((k) => PERSON_KINDS.def(k)?.about).filter(Boolean).pop();
+    return {
+      id, name: personName(r.chain, `${id}:${c.who.seed ?? 0}`), kind: r.facets.people ?? 'human', tags: r.chain,
+      ...(calling ? { work: { calling, ...(about ? { about } : {}) } } : {}),
+    };
   }
 
   /**
    * A close-up of someone's head and shoulders, from in front of their face, rendered from the world as it is (their
    * own body, lit where they stand): `px` square, as sRGB pixels, rows top first. Null if they aren't standing here.
    */
-  portrait(renderer: THREE.WebGLRenderer, id: string, px: number, detail = 1): Uint8ClampedArray | null {
+  portrait(renderer: THREE.WebGLRenderer, id: string, px: number): Uint8ClampedArray | null {
     const c = this.cast.find((x) => x.who.id === id);
     if (!c) return null;
     const f = c.fig;
@@ -1910,7 +1909,6 @@ export class SpikeWorld {
     const cam = new THREE.PerspectiveCamera(fov, 1, 0.05, 40);
     cam.position.copy(aim).addScaledVector(fwd, dist).addScaledVector(side, dist * 0.18).add(new THREE.Vector3(0, dist * 0.12, 0));
     cam.lookAt(aim);
-    void detail;
     const rt = new THREE.WebGLRenderTarget(px, px, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter });
     // (The hero stands where the camera looks from: out of the shot.)
     const was = f.place.visible, heroWas = this.heroFig.place.visible;

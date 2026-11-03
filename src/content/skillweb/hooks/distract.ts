@@ -6,7 +6,7 @@ import { TALK, effortHooks, keep, say } from './helpers';
  * Distract: holding attention while something else happens. What it earns is a kept advantage for the
  * sneaking or stealing that follows (`sneak`, `steal`), not goodwill.
  */
-const distract = effortHooks('distract', { ...TALK, difficulty: DIFFICULTY.hard });
+const distract = effortHooks('distract', { ...TALK, difficulty: DIFFICULTY.hard, opens: ['always'] });
 
 export const DISTRACT: HookDef[] = [
   distract.general('Keep {name} busy',

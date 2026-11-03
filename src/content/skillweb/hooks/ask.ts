@@ -7,9 +7,9 @@ import { TALK, effortHooks, keep, say } from './helpers';
  * Ask: getting someone to tell you things. Every success sets `asked:{id}`, however the person answers,
  * so anything in a scene that waits for it still works (a test checks).
  */
-const ask = effortHooks('ask', { ...TALK, difficulty: DIFFICULTY.tricky });
+const ask = effortHooks('ask', { ...TALK, difficulty: DIFFICULTY.tricky, opens: ['always'] });
 /** Asking the poor and rootless goes better with streetwise than with charm: a different effort in the same slot. */
-const street = effortHooks('streetwise', { ...TALK, intention: 'ask', difficulty: DIFFICULTY.easy });
+const street = effortHooks('streetwise', { ...TALK, intention: 'ask', difficulty: DIFFICULTY.easy, opens: ['always'] });
 
 const told = (...e: Effect[]): Effect[] => [...e, { set: 'asked:{id}' }];
 

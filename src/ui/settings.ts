@@ -11,24 +11,16 @@ export const DICE_LEVELS: readonly DiceLevel[] = ['glass', 'icons', 'result'];
 export type DiceClose = 'ok' | 'auto';
 export const DICE_CLOSES: readonly DiceClose[] = ['ok', 'auto'];
 
-/**
- * The portrait when you talk to someone (Q37: decided by trying): their own 3D body close up, the same rendered finer
- * (more detail), or painted per pixel from their look.
- */
-export type PortraitStyle = '3d' | 'fine' | 'painted';
-export const PORTRAIT_STYLES: readonly PortraitStyle[] = ['3d', 'fine', 'painted'];
-
 export interface Settings {
   v: number;
   dice: DiceLevel;
   diceSkin: string;
   diceClose: DiceClose;
-  portrait: PortraitStyle;
 }
 
 const VERSION = 1;
 const KEY = 'slicehaven.settings';
-const DEFAULTS: Settings = { v: VERSION, dice: 'glass', diceSkin: 'bone', diceClose: 'ok', portrait: '3d' };
+const DEFAULTS: Settings = { v: VERSION, dice: 'glass', diceSkin: 'bone', diceClose: 'ok' };
 
 /** What this page has set, if storage would not keep it. */
 let memo: Settings | null = null;

@@ -1,6 +1,6 @@
 # Openings: why a thing can be said (for discussion)
 
-*2026-11-03. From the director's [notes of the same day](../vision/2026-11-03-director-notes-2.md). **Not agreed, not built:** a proposal to talk through (Q40, Q41). Belongs to B3d (talking) and reaches into B3c (situations), D2 (quests) and D4 (found things).*
+*2026-11-03. From the director's [notes of the same day](../vision/2026-11-03-director-notes-2.md). **Partly agreed** (Q40, Q41 answered; the "always" openings are built); leads are still for discussion (Q42). Belongs to B3d (talking) and reaches into B3c (situations), D2 (quests) and D4 (found things).*
 
 ## The problem
 Today a talk offers **every** social try the skill library has for who someone is: fourteen for a farmer, court manners included. That has two faults:
@@ -26,9 +26,40 @@ An opening is what puts a try on the table. A try shows only while one of its op
 
 **What it changes on screen:** a peasant met on the road offers three or four things, not fourteen. More turns up as the world gives reasons: they look grief-stricken, you found the letter, you're caught with their chair. Hidden reads (size up) stay open always: looking costs nothing.
 
+## Answered so far
+- **Q40, open with anyone:** sizing them up, asking what they know, and their work (asking about it needs no skill). Also **distracting** them and **threatening** them (robbing someone starts there). **Stealing** (picking a pocket) is started from **sneaking up on them**, never from a talk. *Built 2026-11-03:* only these are offered; everything else waits for an opening of its own.
+- **Q41, leads:** several ways in. **Quests are leads.** There are **free leads** too: find a curious statue outside a town, and "Lead added". Thought through below, for the next round.
+
+## Leads, thought through (for discussion)
+**What a lead is.** Something the hero knows that gives a reason to act: *a weathered statue of a woman holding a key, on the north road*. It isn't an item (a letter can carry one, but you know it even if the letter burns). It has three parts:
+- **what you know:** a few lines, which grow as you learn more;
+- **who might care:** anyone here, a kind of person (the old, the clergy, guards), one person, or a place;
+- **what it opens:** tries with those people (*ask about the statue*, *show them the key*) and on things (*search the statue's base*, *study the inscription*).
+
+**Where leads come from** (several ways, as you said):
+
+| Way in | Example | How it would be made |
+|---|---|---|
+| **Found in the world** | The statue on the north road; a burnt-out farm; fresh graves; a notice on the inn door; tracks into the wood | A kind of thing can carry a lead (`lead` on the kind, or on one placed thing). Looking at it, or a successful study or search, gives it. A map rule can scatter *curiosities* (statues, cairns, ruins) the way it scatters trees |
+| **Told** | *Ask what they know* goes well: the innkeeper mentions the stranger asking about you | Each person knows a few leads, from where they live, their calling and their kind (an innkeeper knows travellers' gossip, a priest knows the shrine's history). A good ask hands one over |
+| **Overheard** | Walk past two farmers at the gathering: "…and the mill's been dark three nights" | People at a place or an event say lines among themselves; within hearing (B5), a line can carry a lead |
+| **Carried** | A letter in a dead man's coat; a found map (D4) | An item gives its lead when read (B6) |
+| **Your past** | Your sister went to the capital and never wrote | The creator's life events (Friends & Foes and the rest) become starting leads |
+| **Asked of you** | The miller asks you to find out who's taking his grain | **A quest is a lead with someone waiting**: the same thing, plus a giver, stakes and a reward (D2) |
+
+**How a lead grows.** Asking the right person about it adds a line and often a new lead: the old woman says the statue is Saint Hesma, who kept the well. That opens *search the statue's base*, which finds a key, which opens a lead about a door. A chain of leads is a quest with no quest giver: exploring rewarded by what you find out (principle 4: hints are optional).
+
+**How a lead ends.** *Solved* (you found the door), *spent* (everyone who'd care has told you what they know), or *gone cold* (the stranger left town). A spent lead stays in the journal, greyed.
+
+**How you see them** (Q41's options taken together):
+- **"Lead added"** when you get one, the way "the hearth catches" shows now.
+- **A journal** of leads, each with its lines.
+- **Choices that appear by themselves** in a talk when this person might care. On easy, the journal could also say who might care. Harder settings leave that to you.
+
+**The first slice, if this is the shape:** a lead record in the save, the journal, "Lead added". One curiosity on the Hamlet map (the statue, by the road out), two people who know about it (an elder and the innkeeper), and *ask about it* opened by the lead. Through the frame: a lead is an outcome (`{ lead: 'statue-north' }`) and an opening (`{ lead: 'statue-north' }`).
+
 ## Open points (talk them through)
-- **Q40:** what's open with anyone, always.
-- **Q41:** how leads are held and seen: a journal you can read, topics you pick in a talk, or nothing shown at all.
+- **Q42:** is the lead shape above right, and is the first slice the right one?
 - **Do failed tries close?** Today some do (out of tries). With openings, a try could stay open but cost more patience.
 - **Does a lead run out?** Asking about the mill twice, or once everyone knows.
 - **Are leads shared with the hooks on things?** A lead could also open a try on a thing (*search the mill's ashes*). Probably yes: the same opening works for things and people.

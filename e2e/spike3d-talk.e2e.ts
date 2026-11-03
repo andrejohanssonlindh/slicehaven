@@ -11,12 +11,12 @@ afterAll(async () => {
   await stopEnv(env);
 });
 
-const quick = (portrait: string) => ({ 'slicehaven.settings': JSON.stringify({ v: 1, dice: 'result', diceSkin: 'bone', diceClose: 'auto', portrait }) });
+const quick = (_portrait?: string) => ({ 'slicehaven.settings': JSON.stringify({ v: 1, dice: 'result', diceSkin: 'bone', diceClose: 'auto' }) });
 const ready = (page: Page) => page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 60_000 });
 const evalIn = (page: Page) => (fn: string) => page.evaluate(`(() => { const w = window.spike.world; return ${fn}; })()`);
 
 describe('spike3d talking', () => {
-  it('tap a villager: they stop, the panel opens, a try is rolled and remembered; all three portraits draw', async () => {
+  it('tap a villager: they stop, the panel opens, a try is rolled and remembered; asking about their work needs no roll', async () => {
     const { page, errors } = await openPage(env, '/spike3d/?nogov&map=hamlet', { storage: quick('3d') });
     await ready(page);
     const w = evalIn(page);
@@ -42,21 +42,19 @@ describe('spike3d talking', () => {
     await page.screenshot({ path: `${OUT}talk-3d.png` });
     const choices = await page.locator('#talk .choices button span').allTextContents();
     expect(choices.some((c) => c.startsWith('Size up'))).toBe(true);
+    // Only what is open with anyone (Q40): no comforting a stranger, no picking pockets from a talk.
+    expect(choices.some((c) => /Comfort|pocket/.test(c))).toBe(false);
     // Ask them something: rolled, logged, remembered.
-    const ask = page.locator('#talk .choices button', { hasText: /^Ask/ }).first();
+    const ask = page.locator('#talk .choices button', { hasText: /what they know/ }).first();
     await ask.click();
     await page.waitForFunction(() => document.querySelectorAll('#talk .log p').length >= 3, undefined, { timeout: 15_000 });
     await page.waitForSelector('.dice-show', { state: 'detached', timeout: 15_000 });
     const mem = (await w(`w.talkMemory.social[${JSON.stringify(someone!.id)}]`)) as { talks: number };
     expect(mem.talks).toBe(1);
-    // The other portraits.
-    await page.click('#talk .pstyle');
-    await page.waitForTimeout(300);
-    await page.screenshot({ path: `${OUT}talk-fine.png` });
-    await page.click('#talk .pstyle');
-    await page.waitForTimeout(300);
-    await page.screenshot({ path: `${OUT}talk-painted.png` });
-    expect(await page.locator('#talk .pstyle').textContent()).toBe('Painted');
+    // Asking about their work needs no roll.
+    await page.locator('#talk .choices button', { hasText: 'about their work' }).click();
+    await page.waitForFunction(() => /works as/.test(document.querySelector('#talk .log')!.textContent ?? ''), undefined, { timeout: 5_000 });
+    await page.screenshot({ path: `${OUT}talk-after.png` });
     // Closing lets them go on with their day.
     await page.click('#talk .close');
     expect(await w('w.talkingWith')).toBeNull();

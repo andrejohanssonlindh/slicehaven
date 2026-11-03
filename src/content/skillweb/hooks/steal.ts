@@ -7,7 +7,8 @@ import { effortHooks, keep, say } from './helpers';
  * spends the `steal` advantage that distract earns. A success sets `stolen:{id}`; a failure sets
  * `suspicious:{id}` and the person turns hostile.
  */
-const steal = effortHooks('steal', { wants: ['steal'], difficulty: DIFFICULTY.hard });
+// (Picking a pocket starts from sneaking up on them, never from talking to them: Q40.)
+const steal = effortHooks('steal', { wants: ['steal'], difficulty: DIFFICULTY.hard, opens: ['sneaking'] });
 
 const caught = (text: string) => [say(text), { mood: -2 }, { set: 'suspicious:{id}' }];
 const lifted = (text: string) => [say(text, 'good'), { set: 'stolen:{id}' }];

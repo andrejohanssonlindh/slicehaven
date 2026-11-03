@@ -3,7 +3,7 @@ import type { HookDef } from '../../../core/skillweb';
 import { TALK, effortHooks, keep, say } from './helpers';
 
 /** Threaten: fear, size and a hard voice. Success sets `scared:{id}`; it never makes them like you. */
-const threaten = effortHooks('threaten', { ...TALK, difficulty: DIFFICULTY.hard });
+const threaten = effortHooks('threaten', { ...TALK, difficulty: DIFFICULTY.hard, opens: ['always'] });
 
 export const THREATEN: HookDef[] = [
   threaten.general('Frighten {name}',

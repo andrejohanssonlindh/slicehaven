@@ -7,7 +7,7 @@ import { effortHooks } from './helpers';
  * knows it by that name: the reading itself comes from readPerson (core/skillweb), true on success and
  * a plausible wrong one on failure. Observation costs no talk and does not make them like you less.
  */
-const read = effortHooks('read-people', { intention: 'size-up', difficulty: DIFFICULTY.hard, hidden: true });
+const read = effortHooks('read-people', { intention: 'size-up', difficulty: DIFFICULTY.hard, hidden: true, opens: ['always'] });
 
 export const READ_PEOPLE: HookDef[] = [
   // Nothing here may tell success from failure.

@@ -4,20 +4,11 @@ Newest on top. Answer in chat (just reference the number, e.g. "Q31: A"). Answer
 
 *A small ask for B6 too: the page of the carried-weight rule, when you've looked.*
 
-### Q41 · How are collected hooks (leads) held and seen? (B3d, D2; [openings](design/talk-openings.md))
-A lead is something the hero knows (the mill burnt, the smith owes money, a stranger asked about you), found in the world, heard, or given by a talk or a quest. It puts tries on the table with people who'd care.
-- **A, a journal and automatic choices (recommended).** Leads are written in a short journal you can read. In a talk, the ones this person might care about show up by themselves as choices ("Ask about the burnt mill").
-- **B, topics you raise.** In a talk you open your topics and pick one to bring up, even with someone who won't care (and learn that they don't).
-- **C, nothing shown.** No journal: tries just appear when you have a reason. The cleanest, but easy to forget what you know.
-
-### Q40 · What can you talk about with anyone? (B3d; [openings](design/talk-openings.md))
-Your note: some things with anyone, most only with a hook. What's on the table with a peasant met on the road, before any reason?
-- **A, very little (recommended): size them up, ask what they know (about the place), and their trade** if they have one (a merchant sells, the innkeeper has rooms). Everything else needs an opening.
-- **B, as A, plus making friends:** charm and small talk to warm them, so you can build a good name with anyone.
-- **C, as A, plus the hard tries:** you can always threaten or lie, since nothing stops you being rude. That has consequences (B3c).
-
-### Q39 · Which portrait? (B3d)
-Talk to someone on the Hamlet map and switch the portrait with the small button on it: **3D**, **3D, finer** or **Painted**. Which way do we go? If 3D, more detail means work on the bodies themselves (faces, hands), which helps the world as well; if painted, it becomes a painter per people.
+### Q42 · Leads: is this the shape? (B3d, D2; [leads, thought through](design/talk-openings.md#leads-thought-through-for-discussion))
+I've thought leads through on the openings page: what a lead is (what you know, who might care, what it opens), the six ways in (found, told, overheard, carried, your past, asked of you: a quest), how one grows into the next, how it ends, and how you see them ("Lead added", a journal, choices that appear by themselves). Then a first slice: one curious statue on the Hamlet road, two people who know about it, and *ask about it*.
+- **A, yes: build that first slice** (recommended), and we judge it in the game.
+- **B, change the shape first** (tell me what's off).
+- **C, later:** perception (B5) first, leads after.
 
 ---
 

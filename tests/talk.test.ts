@@ -6,7 +6,7 @@ import { diceOf } from '../src/core/hero';
 import { sheetDice } from '../src/core/npcsheet';
 import { Rng } from '../src/core/rng';
 import type { Doer } from '../src/core/world3d/actions';
-import { type TalkCase, type TalkPerson, moodOf, newTalkMemory, patienceLeft, talk, talkOffers } from '../src/core/world3d/talk';
+import { ASK_WORK, type TalkCase, type TalkPerson, moodOf, newTalkMemory, patienceLeft, talk, talkOffers } from '../src/core/world3d/talk';
 
 const hero = defaultHero();
 const doer: Doer = { id: 'hero', dice: (s) => diceOf(hero, s) };
@@ -19,11 +19,26 @@ function person(is: string[], id = 'p'): TalkPerson {
 const fresh = (): TalkCase => ({ hero: { kind: hero.kind, people: hero.people, tags: hero.tags }, flags: {}, memory: newTalkMemory(), library: LIBRARY });
 
 describe('talking (B3d)', () => {
-  it('offers the library\'s tries for who they are: size up, ask, persuade…', () => {
-    const labels = talkOffers(person(['human', 'job-farmer']), fresh()).map((o) => o.label);
-    expect(labels).toContain('Size up Wenna');
-    expect(labels).toContain('Ask Wenna what they know');
-    expect(labels.length).toBeGreaterThan(5);
+  it('with anyone, only what is always open (Q40): their work, size up, ask, distract, threaten', () => {
+    const labels = talkOffers({ ...person(['human', 'job-farmer']), work: { calling: 'Farmer' } }, fresh()).map((o) => o.label);
+    expect(labels).toEqual(expect.arrayContaining(['Ask Wenna about their work', 'Size up Wenna', 'Ask Wenna what they know', 'Keep Wenna busy']));
+    expect(labels.some((l) => /Frighten|Stare/.test(l))).toBe(true);
+    // Comforting needs a reason; picking a pocket starts from sneaking, never from a talk.
+    expect(labels.some((l) => /Comfort|pocket|court manners|Sweet-talk/.test(l))).toBe(false);
+  });
+
+  it('asking about their work needs no roll and costs no patience', () => {
+    const c = fresh(), p = { ...person(['human', 'job-farmer']), work: { calling: 'Farmer', about: 'Works the fields.' } };
+    const before = patienceLeft(p, c);
+    const r = talk(ASK_WORK, p, doer, c, Rng.fromSeed(1));
+    expect(r.roll).toBeUndefined();
+    expect(r.lines.map((l) => l.text)).toEqual(['Wenna works as a farmer.', 'Works the fields.']);
+    expect(patienceLeft(p, c)).toBe(before);
+  });
+
+  it('a try that isn\'t open can\'t be made, even by its id', () => {
+    const c = fresh(), p = person(['human', 'job-farmer']);
+    expect(talk(`${p.id}/comfort`, p, doer, c, Rng.fromSeed(1)).done).toBe(false);
   });
 
   it('a guard answers differently from a farmer (the martial facet)', () => {

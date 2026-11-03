@@ -1,4 +1,3 @@
-import { paintPortrait } from '../art/portrait';
 import { FACETS } from '../content/people';
 import { rollableName } from '../content/rollables';
 import type { Hero } from '../core/hero';
@@ -7,21 +6,20 @@ import { moodOf, patienceLeft, talkOffers } from '../core/world3d/talk';
 import type { SpikeWorld } from '../engine3d/world';
 import { t } from '../i18n';
 import { showRolls } from '../ui/dice';
-import { PORTRAIT_STYLES, type PortraitStyle, loadSettings, saveSettings } from '../ui/settings';
 import type * as THREE from 'three';
 
 /**
  * Talking to someone in the 3D world (plan B3d): their portrait, the conversation's log, and the choices laid over it.
  * Tap a person: the hero walks up, the person stops and turns to them, and the panel opens. Each choice is a social
  * try through the talk rules (`core/world3d/talk.ts`), rolled with the hero's sheet; the dice show it (not for a hidden
- * read). What they think of you is kept in the world's save. The portrait can be switched between three styles to
- * choose from (Q37): the 3D body close up, the same finer, or painted.
+ * read). What they think of you is kept in the world's save. The portrait is their own 3D body close up, rendered
+ * finer than the world (Q39).
  */
 
 /** How close the hero stands to talk, metres. */
 const TALK_REACH = 2.6;
-/** The 3D portrait's size in pixels: plain, and finer. */
-const PX: Record<Exclude<PortraitStyle, 'painted'>, number> = { '3d': 40, fine: 88 };
+/** The portrait's size in pixels: their 3D body close up, rendered finer than the world (Q39). */
+const PORTRAIT_PX = 88;
 
 export interface Talk {
   open(id: string): void;
@@ -33,7 +31,6 @@ export interface Talk {
 export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRenderer, hero: Hero, doer: Doer, notify: (text: string) => void, save: () => void): Talk {
   const el = document.getElementById('talk')!;
   const canvas = el.querySelector<HTMLCanvasElement>('.portrait canvas')!;
-  const pstyle = el.querySelector<HTMLButtonElement>('.pstyle')!;
   const nameEl = el.querySelector<HTMLElement>('.name')!, whatEl = el.querySelector<HTMLElement>('.what')!, moodEl = el.querySelector<HTMLElement>('.mood')!;
   const logEl = el.querySelector<HTMLElement>('.log')!, choicesEl = el.querySelector<HTMLElement>('.choices')!;
   const visitor = { kind: hero.kind, people: hero.people, tags: hero.tags };
@@ -41,41 +38,13 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
   let pending: string | null = null;
   let busy = false;
 
-  const styleName: Record<PortraitStyle, string> = { '3d': t('talk.p3d', '3D'), fine: t('talk.pfine', '3D, finer'), painted: t('talk.ppainted', 'Painted') };
-
   function drawPortrait(): void {
     if (!who) return;
-    const w = world(), style = loadSettings().portrait;
-    pstyle.textContent = styleName[style];
-    const ctx = canvas.getContext('2d')!;
-    if (style === 'painted') {
-      const b = w.bodyOf(who);
-      if (!b) return;
-      const pix = paintPortrait(b.spec, b.seed);
-      canvas.width = pix.w;
-      canvas.height = pix.h;
-      ctx.fillStyle = '#2a2234';
-      ctx.fillRect(0, 0, pix.w, pix.h);
-      const img = new ImageData(new Uint8ClampedArray(pix.data), pix.w, pix.h);
-      // (Drawn over a backdrop: putImageData would replace it.)
-      const tmp = document.createElement('canvas');
-      tmp.width = pix.w;
-      tmp.height = pix.h;
-      tmp.getContext('2d')!.putImageData(img, 0, 0);
-      ctx.drawImage(tmp, 0, 0);
-      return;
-    }
-    const px = PX[style];
-    const data = w.portrait(renderer(), who, px, style === 'fine' ? 2 : 1);
+    const data = world().portrait(renderer(), who, PORTRAIT_PX);
     if (!data) return;
-    canvas.width = canvas.height = px;
-    ctx.putImageData(new ImageData(new Uint8ClampedArray(data), px, px), 0, 0);
+    canvas.width = canvas.height = PORTRAIT_PX;
+    canvas.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(data), PORTRAIT_PX, PORTRAIT_PX), 0, 0);
   }
-  pstyle.addEventListener('click', () => {
-    const s = loadSettings().portrait;
-    saveSettings({ portrait: PORTRAIT_STYLES[(PORTRAIT_STYLES.indexOf(s) + 1) % PORTRAIT_STYLES.length] });
-    drawPortrait();
-  });
 
   function log(text: string, kind: 'you' | 'they' | 'info' | 'good' | 'bad' = 'they'): void {
     const p = document.createElement('p');

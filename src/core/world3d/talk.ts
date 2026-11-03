@@ -25,7 +25,12 @@ export interface TalkPerson {
   kind: string;
   /** Every facet they are (calling, its group, their people…): which hooks answer differently, and what they lean. */
   tags: string[];
+  /** Their work, if they have one: what they're called ("farmer") and a line about it. Asking about it needs no roll. */
+  work?: { calling: string; about?: string };
 }
+
+/** The offer that asks about their work: no roll, no patience spent (Q40). */
+export const ASK_WORK = 'talk:work';
 
 /** What the people of a map remember of the hero: by person id, their mood and tries; advantages kept; failed tries. */
 export interface TalkMemory {
@@ -72,13 +77,24 @@ export function patienceLeft(p: TalkPerson, c: TalkCase): number | null {
   return talksLeftWith(objectOf(p, c), stateOf(c), c.library) ?? null;
 }
 
-/** What can be tried with them: their open hooks; talking ones only while they'll still listen. */
+/**
+ * Is a try on the table in a talk? Only if one of its openings holds (design: director/design/talk-openings.md). For
+ * now that is `always` (Q40: size up, ask, distract, threaten); states, situations and leads come with what makes them.
+ */
+function opensNow(k: CheckDef, p: TalkPerson, c: TalkCase): boolean {
+  const id = k.id.slice(p.id.length + 1);
+  const h = c.library.hooks.find((x) => x.id === id);
+  return !!h?.opens?.includes('always');
+}
+
+/** What can be tried with them: asking about their work, then the tries that are open; talking ones only while they'll still listen. */
 export function talkOffers(p: TalkPerson, c: TalkCase): Offer[] {
   const s = stateOf(c), o = objectOf(p, c);
   const left = talksLeftWith(o, s, c.library);
-  return openChecks(o, s)
-    .filter((k) => !k.talk || left === undefined || left > 0)
-    .map((k) => ({ id: k.id, label: named(k.label, p), skills: [...k.skills], from: 'skill' as const }));
+  const work: Offer[] = p.work ? [{ id: ASK_WORK, label: `Ask ${p.name} about their work`, skills: [], from: 'verb' }] : [];
+  return [...work, ...openChecks(o, s)
+    .filter((k) => opensNow(k, p, c) && (!k.talk || left === undefined || left > 0))
+    .map((k) => ({ id: k.id, label: named(k.label, p), skills: [...k.skills], from: 'skill' as const }))];
 }
 
 export interface TalkResult {
@@ -95,7 +111,11 @@ export interface TalkResult {
 /** Try one of the offers on them, as `doer`. Their memory of you changes; flags may be set. */
 export function talk(offer: string, p: TalkPerson, doer: Doer, c: TalkCase, rng: Rng): TalkResult {
   const s = stateOf(c), o = objectOf(p, c);
-  const check: CheckDef | undefined = openChecks(o, s).find((k) => k.id === offer);
+  if (offer === ASK_WORK && p.work) {
+    const a = /^[aeiou]/i.test(p.work.calling) ? 'an' : 'a';
+    return { done: true, hidden: false, success: true, lines: [{ text: `${p.name} works as ${a} ${p.work.calling.toLowerCase()}.` }, ...(p.work.about ? [{ text: p.work.about }] : [])] };
+  }
+  const check: CheckDef | undefined = openChecks(o, s).find((k) => k.id === offer && opensNow(k, p, c));
   if (!check) return { done: false, reason: 'That is not something to try with them now.', hidden: false, success: false, lines: [] };
   const left = talksLeftWith(o, s, c.library);
   if (check.talk && left !== undefined && left <= 0) return { done: false, reason: `${p.name} has had enough of you for now.`, hidden: false, success: false, lines: [] };

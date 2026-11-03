@@ -70,7 +70,17 @@ export interface HookDef {
   hidden?: boolean;
   /** Only things that carry this much to read: 'lore' = the thing has `lore` texts (a hidden read has to say something). */
   needs?: 'lore';
+  /**
+   * What puts it on the table when talking in the 3D world (design: director/design/talk-openings.md). `always`: with
+   * anyone (Q40: size up, ask, distract, threaten). `sneaking`: only when started from sneaking up on them (picking a
+   * pocket), never from a talk. A state, a situation or a lead: when that holds (not built yet). None: it waits for an
+   * opening of its own, so it isn't offered in a talk yet. (The 2D skill map offers everything, as before.)
+   */
+  opens?: Opening[];
 }
+
+/** One reason a try is on the table (see `HookDef.opens`). */
+export type Opening = 'always' | 'sneaking' | { state: string } | { situation: string } | { lead: string } | { skill: string };
 
 /** How one people sees another: −3 (hostile) … +3 (kin). */
 export interface Rel {
