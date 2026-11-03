@@ -8,7 +8,7 @@
 - **Skill hooks** from the library are offered next to the verbs, on the kind's chain (search a footlocker, climb a tree…), rolled with your best fitting skill. Their sayings and flags happen; moods and kept advantages wait for people (B3d). Social tries and hidden reads aren't offered on things yet.
 - **Gates:** `state` (hides the offer: no "light" on a lit fire), `place` (facts that must or must not hold: `indoors`, `raining`, `inSettlement`, `dark`), `owner` (**a stub: always allowed until B3c**).
 - **Outcomes:** set a state, a flag (saved), a line said, minutes passing (only the hero's actions move the clock), make a thing (a campfire), sit.
-- **People act through it too:** the `tendfire` behaviour lights a house's fire at dawn with `verb:light`. People have no sheets yet (B4), so they roll 3D6 for any skill: a stub.
+- **People act through it too:** the `tendfire` behaviour lights a house's fire at dawn with `verb:light`, rolling with their own sheet (B4: `SpikeWorld.doerOf`). A roll can name a fitting attribute (`attr`) that anyone without the skills uses at −2D6, as the rules allow. `world.recentActs` keeps the last things done, by anyone.
 - **"Among the houses"** is worked out, not drawn: three or more houses within 20 m. A map with a palisade can make it sharper later.
 - **On the page:** tap a thing (or near it) → a sheet with its look and what can be tried; choosing walks you up to it and does it, with the dice. Tap the hero → *where you stand* (make a fire). Walking gets you up off a seat. A seat is sat on facing its own front (a stool by a table may face away from it: to tune).
 - **The hero who acts** is the character open in the creator, if it has skills yet; otherwise the default shepherd.
@@ -47,7 +47,7 @@ The director's proposal, building 10–20 % and then sending in notes to grow it
 When a note asks for a gate, a resolve mode or an outcome that doesn't exist yet, that is when the frame grows by one file, and it is agreed first (the pattern check).
 
 ## Taking things, and what follows (the director's notes, [2026-11-03](../vision/2026-11-03-director-notes.md))
-*A sketch to grow B3b–B3d from. Not agreed in its details; the open points are Q37 and Q38. Nothing here is built yet.*
+*A sketch to grow B3b–B3d from. Not agreed in its details (Q37 and Q38 are answered: portraits by trying; the scale per person, spreading). Nothing here is built yet.*
 
 **Taking is several offers on one thing, not one verb.** It holds for most objects, not just the stair, and each way uses a resolve mode the rules already have:
 
@@ -60,7 +60,7 @@ When a note asks for a gate, a resolve mode or an outcome that doesn't exist yet
 | **Just take** it ("a weapon, now") | No roll | A plain transgression, for whoever sees it (B5) |
 | **Steal** it unseen | A hide roll: harder the bigger it is, easier with a cloak or a sack to pack it in; easy when no one is near | Something carried openly can be **recognised** later by its owner and their household (their chair, down the street). Something in a pocket can't |
 
-**What it does to people: one scale per person.** Each person's view of the hero runs from about −100 to +100. The mood we have today (−3 to +3, from the 2D skill map) becomes bands on it. A transgression moves the scale by a **weight**:
+**What it does to people: one scale per person** (Q38: held by each person alone; **it spreads when people meet**, good or bad, so word travels and the other side of town doesn't know at once; **advantages won in a challenge scale the effect**, nine of them dramatically). Each person's view of the hero runs from about −100 to +100. The mood we have today (−3 to +3, from the 2D skill map) becomes bands on it. A transgression moves the scale by a **weight**:
 - **the kind of act** (use, move, take, steal, harm);
 - the thing's **value** against **the owner's wealth** (a lord won't miss a hen; the `rich` and `poor` tags already exist);
 - its **importance** (a guard's sword, an heirloom): a property of the thing, or of the owner's calling.

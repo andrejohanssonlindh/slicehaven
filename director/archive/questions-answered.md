@@ -2,6 +2,10 @@
 
 *Archive of the questions in [questions](../questions.md) once answered or dropped. Newest on top. What they decided, if it still stands, is in the [decisions](../decisions.md).*
 
+## 2026-11-03
+- **Q38 Who holds the scale of how people see you** → **each person, to themselves.** When people meet, what they think of you **spreads**, good or bad, so reputation grows organically: what you do on one side of town isn't known on the other at once. **Advantages (övertag) in a challenge boost the effect** (the rulebook says so too, the director believes): a challenge won with something like 9 advantages has a dramatic effect.
+- **Q37 The portrait when you talk to someone** → **not sure: test both** (their own 3D body close up, and a painted pixel portrait), and likely a **third**: the 3D portrait made prettier. Zoomed in today the bodies are rather nondescript: not smooth, but a bit more detail. Decided when B3d starts, by trying them.
+
 ## 2026-11-02
 - **Q36 Smoke and torches seen from inside** → inside a house, cut **that house's** smoke and **its** door torch. Not logical, but it looks better. (Fixed: F1, F2.)
 - **Q35 Rolling sight** → **open on easy, hidden otherwise.** A roll **against 8**; each advantage gives more; a failure gives a poor, half cone and short sight.

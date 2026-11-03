@@ -83,6 +83,16 @@ describe('the action frame', () => {
     expect(w.states.get(hearth.id, 'hearth', 'lit')).toBe(false);
   });
 
+  it('without the skill, the fitting attribute at −2D6 (the rules\' fallback)', () => {
+    const plain: Doer = { id: 'farmer', dice: (s) => (s === 'attr:Förflyttning' ? { n: 3, mod: 0 } : { n: 0, mod: 0 }) };
+    const w = world();
+    w.states.set(hearth.id, hearth.kind, 'lit', false);
+    const r = perform('verb:light', hearth, hearth, plain, w, ACTIONS);
+    expect(r.skill).toBe('attr:Förflyttning');
+    expect(r.roll?.dice).toEqual({ n: 1, mod: 0 });
+    expect(r.events.some((e) => e.kind === 'say' && /attribute/.test(e.line.text))).toBe(true);
+  });
+
   it('refuses a requirement with its reason and changes nothing: no fire indoors or among the houses', () => {
     const inside: Spot = { x: 0, z: 0, level: 0, house: 'home' };
     const r = perform('verb:makefire', null, inside, doer, world(), ACTIONS);

@@ -6,6 +6,7 @@ import { type Layout, type PlacedHouse, type PlacedTree, buildHouses, houseOuter
 import { type ChunkContent, type ChunkGenerator, PlacedIndex } from './placed';
 import { type PlacedProp } from './props';
 import type { PersonKinds, PersonSpec } from '../persons';
+import { PERSON_LEVELS, type RolledSheet } from '../npcsheet';
 import { type BehaviourLibrary, type DoEntry, type Place, scheduleProblems } from './behave';
 import type { Things } from './things';
 import { NavGrid, type Shape, ShapeIndex, type ShapeSource, findPath, shapeDist } from './space';
@@ -80,6 +81,8 @@ export interface MapPerson extends PersonSpec {
 export interface CastMember extends Omit<MapPerson, 'at'> {
   start: XZ;
   slot: number;
+  /** Their own character sheet (plan B4), rolled from who they are; null when the map was compiled without the kinds of person. */
+  sheet: RolledSheet | null;
 }
 
 /**
@@ -353,7 +356,7 @@ const KEYS = {
   house: ['id', 'room', 'size', 'roof', 'walls', 'wallH', 'seed', 'plan', 'torch', 'at'],
   at: ['x', 'z', 'rot', 'road', 'm', 't', 'side', 'gap'],
   wild: ['trees', 'mix', 'shrubs', 'boulders', 'grain', 'area'],
-  person: ['id', 'is', 'seed', 'look', 'home', 'at', 'does'],
+  person: ['id', 'is', 'seed', 'look', 'home', 'at', 'does', 'level'],
   place: ['at', 'face', 'area', 'path', 'loop', 'road', 'from', 'to', 'around', 'margin'],
   event: ['id', 'hours'],
 };
@@ -527,6 +530,7 @@ export function compileMap(spec: MapSpec, things: Things, opts: CompileOptions =
   for (const p of ctx.people) {
     const bad = persons?.problem(p);
     if (bad) problems.push(`person ${p.id}: ${bad}`);
+    if (p.level !== undefined && !PERSON_LEVELS.includes(p.level)) problems.push(`person ${p.id}: no level called ${String(p.level)} (${PERSON_LEVELS.join(', ')})`);
     if (cast.some((c) => c.id === p.id)) problems.push(`two people are called ${p.id}`);
     if (p.home && !houseIds.has(p.home)) problems.push(`person ${p.id}: no house ${p.home} to live in`);
     if (opts.behaviours) for (const s of scheduleProblems(p.does ?? [], opts.behaviours, places, houseIds)) problems.push(`person ${p.id}: ${s}`);
@@ -544,7 +548,8 @@ export function compileMap(spec: MapSpec, things: Things, opts: CompileOptions =
     const slot = slots.get(p.does) ?? 0;
     slots.set(p.does, slot + 1);
     const { at: _at, ...rest } = p;
-    cast.push({ ...rest, does: p.does ?? [], start: start ?? hero, slot });
+    const sheet = persons && !bad && (p.level === undefined || PERSON_LEVELS.includes(p.level)) ? persons.rolled(p, p.id) : null;
+    cast.push({ ...rest, does: p.does ?? [], start: start ?? hero, slot, sheet });
   }
 
   // The wilderness: made per chunk, kept off roads, water, houses and the hero's feet.

@@ -7,7 +7,8 @@ const light: VerbDef = {
   label: 'Light the {name}',
   on: { kind: 'fire' },
   gates: [{ gate: 'state', key: 'lit', is: false }, { gate: 'owner' }],
-  roll: { skills: ['Vildmarksvana'], difficulty: DIFFICULTY.easy, harder: [{ fact: 'raining', add: 4, note: 'the rain' }] },
+  // (Without Survival, Agility at −2D6: anyone can try to light a hearth.)
+  roll: { skills: ['Vildmarksvana'], attr: 'attr:Förflyttning', difficulty: DIFFICULTY.easy, harder: [{ fact: 'raining', add: 4, note: 'the rain' }] },
   takes: 10,
   success: [{ state: 'lit', value: true }, { say: 'The {name} catches and burns.', tone: 'good' }],
   failure: [{ say: 'The tinder smokes, glows and dies. The {name} stays cold.', tone: 'bad' }],

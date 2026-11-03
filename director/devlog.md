@@ -2,6 +2,16 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-03 — B4: everyone in a map has their own character sheet
+
+- **Every person in a map has their own sheet**, rolled from who they are, the same every time. Their **level** is what the map says, or drawn: mostly capable, a quarter novices, a few skilled, a rare master.
+- **A people's gifts are fixed** (your answer to Q27): a tirak always has darkvision and keen smell at 4D6, novice or master. Gifts that are rules (claws & tusks, poison-tough) are listed by name, for when the rules need them.
+- **Everyone has the basic skills** a new character starts with (2D6), unless their people can't: dwarves neither ride nor swim.
+- **Villagers roll with their own sheet** when they light their hearth at dawn. Most have no Survival, so they use **Agility at −2D6**, as the rules allow anyone without a fitting skill (now true for the hero too). A villager may fumble a few tries before the fire takes.
+- **See it:** *Kinds of person* page → **Show: Who lives in Hamlet** → tap anyone for their sheet. Or pick *Tirak* and any kind: their gifts have a section of their own.
+- **Your answers are recorded** ([decisions](decisions.md)): the portrait gets chosen by trying three side by side when B3d starts (Q37); how people see you is held by each person and spreads when people meet, with advantages in a challenge scaling it (Q38).
+- **Next:** B3d, talking in 3D.
+
 ## 2026-11-03 — Your notes on people, taking things and consequences, sorted into the plan
 
 - **Your notes** are kept as written in [vision](vision/2026-11-03-director-notes.md), with a digest. Nothing was built from them yet, as you asked.

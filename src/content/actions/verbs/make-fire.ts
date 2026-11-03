@@ -10,7 +10,7 @@ const makeFire: VerbDef = {
   label: 'Make a fire here',
   on: 'here',
   gates: [{ gate: 'place', not: ['indoors', 'inSettlement'] }],
-  roll: { skills: ['Vildmarksvana'], difficulty: DIFFICULTY.easy, harder: [{ fact: 'raining', add: 4, note: 'the rain' }] },
+  roll: { skills: ['Vildmarksvana'], attr: 'attr:Förflyttning', difficulty: DIFFICULTY.easy, harder: [{ fact: 'raining', add: 4, note: 'the rain' }] },
   takes: 10,
   success: [{ make: 'campfire' }, { say: 'You gather sticks, strike a spark, and a small fire takes.', tone: 'good' }],
   failure: [{ say: 'You can\'t get it to take. Ten minutes gone, and only smoke.', tone: 'bad' }],

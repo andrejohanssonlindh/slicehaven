@@ -53,6 +53,18 @@ export interface SheetDef {
   knackCount?: number;
   /** What they carry, by slot (weapon, shield, armour, item...): each person gets one from each slot's choices. The most specific kind wins per slot; an empty list takes a slot away. */
   gear?: Record<string, string[]>;
+  /**
+   * A people's gifts: abilities and marks every one of them has, at a fixed value (dice units), not rolled and not
+   * moved by level: a tirak always sees in the dark (Q27). The higher wins down a chain.
+   */
+  gifts?: Record<string, number>;
+  /** A people's gifts that are rules rather than skills ("Claws & tusks"), by their English name, for the rules to read later. */
+  rules?: string[];
+  /**
+   * Basic skills (dice units): what everyone has without training, as a new character in the creator does (base 1,
+   * 2D6). A later kind in the chain changes or (with 0) takes one away: dwarves don't ride, nor swim.
+   */
+  basics?: Record<string, number>;
 }
 
 /** A kind's sheet worked out down a chain: what every person of the kind shares. */
@@ -62,6 +74,9 @@ export interface MergedSheet {
   knacks: string[];
   knackCount: number;
   gear: Record<string, string[]>;
+  gifts: Record<string, number>;
+  rules: string[];
+  basics: Record<string, number>;
 }
 
 /** Where nothing says otherwise: an ordinary person (3D6 everywhere, the book's toiler). */
@@ -75,6 +90,9 @@ export function mergeSheets(layers: readonly (SheetDef | undefined)[]): MergedSh
   const knacks: string[] = [];
   let knackCount = 2;
   const gear: Record<string, string[]> = {};
+  const gifts: Record<string, number> = {};
+  const rules: string[] = [];
+  const basics: Record<string, number> = {};
   for (const s of layers) {
     if (!s) continue;
     Object.assign(attrs, s.attrs);
@@ -83,10 +101,16 @@ export function mergeSheets(layers: readonly (SheetDef | undefined)[]): MergedSh
     for (const k of s.knacks ?? []) if (!knacks.includes(k)) knacks.push(k);
     if (s.knackCount !== undefined) knackCount = s.knackCount;
     Object.assign(gear, s.gear);
+    for (const [k, v] of Object.entries(s.gifts ?? {})) gifts[k] = Math.max(gifts[k] ?? 0, v);
+    for (const r of s.rules ?? []) if (!rules.includes(r)) rules.push(r);
+    Object.assign(basics, s.basics);
   }
   for (const a of SHEET_ATTRS) attrs[a] += shift[a] ?? 0;
   for (const slot of Object.keys(gear)) if (!gear[slot].length) delete gear[slot];
-  return { attrs, skills, knacks: knacks.filter((k) => !skills[k]), knackCount, gear };
+  for (const k of Object.keys(basics)) if (basics[k] <= 0) delete basics[k];
+  // A gift is fixed: it is not also a skill that rolls with the level.
+  for (const k of Object.keys(gifts)) delete skills[k];
+  return { attrs, skills, knacks: knacks.filter((k) => !skills[k] && !gifts[k]), knackCount, gear, gifts, rules, basics };
 }
 
 /** The level a lean puts a skill at, for a person of a level: main at it, side a step below (never under novice). */
@@ -103,6 +127,10 @@ export interface SheetSpan {
   skills: { id: string; lean: Lean; level: PersonLevel; span: readonly [number, number] }[];
   knacks: { ids: string[]; count: number; level: PersonLevel; span: readonly [number, number] };
   gear: Record<string, string[]>;
+  /** Fixed, the same for everyone of the kind (dice units). */
+  gifts: Record<string, number>;
+  rules: string[];
+  basics: Record<string, number>;
 }
 
 /** How far a person's attribute strays from their kind's, either way, in dice units. */
@@ -117,7 +145,10 @@ export function sheetSpan(m: MergedSheet, level: PersonLevel): SheetSpan {
     .map(([id, lean]) => ({ id, lean, level: skillLevel(lean, level), span: LEVEL_SPAN[skillLevel(lean, level)] }))
     .sort((a, b) => (a.lean === b.lean ? a.id.localeCompare(b.id) : a.lean === 'main' ? -1 : 1));
   const kl = skillLevel('side', level);
-  return { level, attrs, skills, knacks: { ids: m.knacks, count: Math.min(m.knackCount, m.knacks.length), level: kl, span: LEVEL_SPAN[kl] }, gear: m.gear };
+  return {
+    level, attrs, skills, knacks: { ids: m.knacks, count: Math.min(m.knackCount, m.knacks.length), level: kl, span: LEVEL_SPAN[kl] }, gear: m.gear,
+    gifts: m.gifts, rules: m.rules, basics: m.basics,
+  };
 }
 
 /** One person's sheet: plain JSON, for the save. */
@@ -131,6 +162,28 @@ export interface RolledSheet {
   knacks: string[];
   /** One thing per slot. */
   gear: Record<string, string>;
+  /** Which of the skills are their people's gifts (fixed), and the gifts that are rules. */
+  gifts: string[];
+  rules: string[];
+}
+
+/** How many of each level there are among people nobody gave one: most capable, a quarter novices, few skilled, a rare master. */
+export const LEVEL_ODDS: Record<PersonLevel, number> = { novice: 0.25, capable: 0.55, skilled: 0.17, master: 0.03 };
+
+/** A level drawn by the odds above, the same for the same seed. */
+export function drawLevel(seed: number | string): PersonLevel {
+  let x = Rng.fromSeed(`level:${seed}`).next();
+  for (const l of PERSON_LEVELS) {
+    x -= LEVEL_ODDS[l];
+    if (x < 0) return l;
+  }
+  return 'capable';
+}
+
+/** The pool a sheet rolls for a skill or an attribute (`attr:…`); none is `{ n: 0 }`. */
+export function sheetDice(s: Pick<RolledSheet, 'attrs' | 'skills'>, id: string): Dice {
+  if (id.startsWith('attr:')) return unitsDice(s.attrs[id.slice(5) as SheetAttr] ?? 0);
+  return unitsDice(s.skills[id] ?? 0);
 }
 
 /** A value inside a span, leaning to its middle (the mean of two draws). */
@@ -150,7 +203,10 @@ export function rollSheet(span: SheetSpan, seed: number | string): RolledSheet {
     skills[k] = within(rng, span.knacks.span);
   }
   const gear = Object.fromEntries(Object.entries(span.gear).map(([slot, choices]) => [slot, rng.pick(choices)]));
-  return { level: span.level, attrs, skills, knacks, gear };
+  // (Drawn after everything else, so adding them changed no one's rolls.) Gifts are fixed; basics are a floor.
+  for (const [k, v] of Object.entries(span.gifts)) skills[k] = v;
+  for (const [k, v] of Object.entries(span.basics)) if ((skills[k] ?? 0) < v) skills[k] = v;
+  return { level: span.level, attrs, skills, knacks, gear, gifts: Object.keys(span.gifts), rules: [...span.rules] };
 }
 
 /** Units to dice (4 to a die): 13 is 3D6+1. */

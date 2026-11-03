@@ -22,10 +22,28 @@ describe('every map', () => {
       for (const p of c.layout.props.filter((p) => p.kind === 'walltorch')) expect(ids.has(p.on!)).toBe(true);
     });
 
+    it(`${name}: everyone in it has their own rolled sheet (B4)`, () => {
+      for (const c of mapNamed(name).cast) {
+        expect(c.sheet, c.id).not.toBeNull();
+        expect(Object.keys(c.sheet!.skills).length, c.id).toBeGreaterThan(5);
+      }
+    });
+
     it(`${name} compiles the same every time`, () => {
       expect(JSON.stringify(compile(MAPS[name]))).toBe(JSON.stringify(compile(MAPS[name])));
     });
   }
+});
+
+describe('people\'s levels', () => {
+  it('a map can set someone\'s level, and a level that is not one is a problem', () => {
+    const spec = structuredClone(MAPS.hamlet) as MapSpec;
+    const keeper = spec.people!.find((p) => p.id === 'keeper')!;
+    keeper.level = 'master';
+    expect(compile(spec).cast.find((c) => c.id === 'keeper')!.sheet!.level).toBe('master');
+    (keeper as { level: string }).level = 'legend';
+    expect(compile(spec).problems.join('\n')).toMatch(/keeper: no level called legend/);
+  });
 });
 
 describe('placing along a road', () => {

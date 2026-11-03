@@ -3,8 +3,8 @@ import type { ActTarget } from '../../../core/world3d/actions';
 
 /**
  * See to the fire of a house (their own by default): if it is out, walk to it and light it, through the same action
- * the hero uses (`verb:light`: the gates, a Survival roll, the outcome); a try that fails is tried again a little
- * later. Then stay by it. { "do": "tendfire" } or { "do": "tendfire", "house": "inn" }; usually at dawn:
+ * the hero uses (`verb:light`: the gates, a Survival roll with their own sheet, or Agility at −2D6 for those
+ * without the skill, the outcome); a try that fails is tried again a little later. Then stay by it. { "do": "tendfire" } or { "do": "tendfire", "house": "inn" }; usually at dawn:
  * { "when": { "hours": [6, 8] }, "do": "tendfire" }.
  */
 interface State {
@@ -14,7 +14,7 @@ interface State {
 }
 
 /** How long someone fumbles before trying again, seconds. */
-const RETRY = 20;
+const RETRY = 10;
 /** How close they must be to set a light to it, metres. */
 const REACH = 2;
 

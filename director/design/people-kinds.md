@@ -23,7 +23,10 @@
   - **each people's** build and its innate and cultural skills (as side skills) come from the creator;
   - **hand-made kinds** on top (`content/people/kinds/armed.ts`): `guard-sword`, `guard-spear`, `guard-bow`, `guard-crossbow`, `brigand-axe`, `brigand-bow`, `soldier-pike`. A new one is a few lines: what it is a kind of, its weapon skills, its gear.
 - **Code:** rules `src/core/npcsheet.ts` (levels, merging, spans, rolling; tests `tests/npcsheet.test.ts`); the base sheets `src/content/people/sheets.ts`; `PERSON_KINDS.sheet(person)`; the page `src/npcs/`.
-- **Not yet:** people in the 3D world don't carry a rolled sheet yet (that comes with step 5, tapping someone); the book's combined attack-and-defence value is left out (our people have weapon skills instead); innate abilities (darkvision, keen smell) are shown as side skills at the person's level, which may be wrong for things that are simply on or off.
+- **On the map (B4, 2026-11-03):** everyone in a map carries their own rolled sheet (`CastMember.sheet`, from `PERSON_KINDS.rolled(person, id)`), at their level: the map's `level`, else `drawLevel` (25 % novice, 55 % capable, 17 % skilled, 3 % master). They roll with it (`sheetDice`). The page shows a map's cast: `/npcs/?map=hamlet&who=keeper`.
+- **Gifts (Q27):** a people's abilities and marks with a value (`F:Mörkersyn 4`) are `gifts`, fixed for all of them and not moved by level; traits that are rules are kept by name (`rules`) for the rules to read later.
+- **Basic skills:** everyone has the skills a new character starts with at base 1 (2D6), as a floor under what they're trained in; a people's traits take some away (`inkomp:`, `grund:X 0`: dwarves neither ride nor swim).
+- **Not yet:** the book's combined attack-and-defence value is left out (our people have weapon skills instead).
 
 ## The idea: a person is a kind of several things at once
 The director (2026-10-30): people are kinds of **both their people (race) and what they do**, and perhaps more dimensions. The character creator already has those trees, so we use them as they are:

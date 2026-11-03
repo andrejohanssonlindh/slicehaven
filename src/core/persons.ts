@@ -1,4 +1,4 @@
-import { type MergedSheet, type SheetDef, mergeSheets } from './npcsheet';
+import { type MergedSheet, type PersonLevel, type RolledSheet, type SheetDef, drawLevel, mergeSheets, rollSheet, sheetSpan } from './npcsheet';
 import type { Dimension, Facet } from './people';
 import { Rng } from './rng';
 
@@ -66,6 +66,8 @@ export interface PersonSpec {
   is: string[];
   seed?: number;
   look?: LookDef;
+  /** How good they are (novice to master); left out, it is drawn from their seed (`drawLevel`: mostly capable). */
+  level?: PersonLevel;
 }
 
 /** A person worked out: every kind and facet they are (most general first), the facet they carry in each dimension, and their look. */
@@ -112,6 +114,16 @@ export class PersonKinds {
   /** What every person of these kinds shares on their sheet: each kind in the chain, its base sheet, then its own. */
   sheet(p: PersonSpec): MergedSheet {
     return mergeSheets(this.resolve(p).chain.flatMap((id) => [this.base[id], this.defs.get(id)?.sheet]));
+  }
+
+  /** Their level: as given, else drawn from who they are (`id`) and their seed. */
+  levelOf(p: PersonSpec, id: string): PersonLevel {
+    return p.level ?? drawLevel(`${id}:${p.seed ?? 0}`);
+  }
+
+  /** One person's own sheet (plan B4): their kinds' sheet at their level, rolled from who they are, the same every time. */
+  rolled(p: PersonSpec, id: string): RolledSheet {
+    return rollSheet(sheetSpan(this.sheet(p), this.levelOf(p, id)), `${id}:${p.seed ?? 0}`);
   }
 
   /** What is wrong with a person (an unknown kind, two peoples), or null. */

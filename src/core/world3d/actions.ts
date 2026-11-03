@@ -1,4 +1,5 @@
 import type { Dice } from '../chargen/tables';
+import { modify } from '../checks';
 import { type Roll, rollTest } from '../dice';
 import type { Rng } from '../rng';
 import type { Effect } from '../scene';
@@ -128,6 +129,11 @@ export interface ActRoll {
   difficulty: number;
   /** Harder (or easier) where a fact holds: rain on an outdoor fire. */
   harder?: { fact: string; add: number; note: string }[];
+  /**
+   * The attribute that fits (`attr:Förflyttning`), for someone with none of the skills: the rules let anyone use an
+   * attribute then, at −2D6 (`core/attributes.ts`). Without one, no skill means no roll and no success.
+   */
+  attr?: string;
 }
 
 /** A plain verb (`content/actions/verbs/`, one file each). */
@@ -321,10 +327,14 @@ export function perform(offer: string, target: ActTarget | null, at: Spot, doer:
         notes.push(h.note);
       }
     }
-    if (best) {
-      skill = best.skill;
-      roll = rollTest(best.dice, difficulty, world.rng);
+    // No fitting skill: the fitting attribute, two dice down (the rules' fallback).
+    const fallback = !best && v.roll.attr && doer.dice(v.roll.attr).n > 0 ? { skill: v.roll.attr, dice: modify(doer.dice(v.roll.attr), -2) } : null;
+    const use = best ?? fallback;
+    if (use) {
+      skill = use.skill;
+      roll = rollTest(use.dice, difficulty, world.rng);
       success = !!roll.success;
+      if (fallback) events.push({ kind: 'say', line: { text: 'No fitting skill: an attribute instead, at −2D6.', tone: 'info' } });
       if (notes.length) events.push({ kind: 'say', line: { text: `Harder: ${notes.join(', ')}.`, tone: 'info' } });
     } else {
       success = false;

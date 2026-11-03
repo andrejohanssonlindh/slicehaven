@@ -20,3 +20,9 @@
 .npcs-page .dim { opacity: .5; }
 .npcs-page .lean { font-style: normal; font-size: .7rem; padding: 1px 6px; border-radius: 8px; margin-left: 4px; background: #3a2f48; color: #b5aa95; }
 .npcs-page .lean.main { background: #e0b050; color: #1a1420; }
+.npcs-page .lean.gift { background: #4a6a8a; color: #e8e0d0; }
+/* A map's cast: one button a person, the chosen one lit. */
+.npcs-page .cast { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
+.npcs-page .cast button { text-align: left; padding: 9px 10px; font-size: .9rem; background: #2c2338; color: #e8e0d0; border: 1px solid #4a3d5a; border-radius: 6px; }
+.npcs-page .cast button small { color: #a89f8e; }
+.npcs-page .cast button.on { border-color: #e0b050; }

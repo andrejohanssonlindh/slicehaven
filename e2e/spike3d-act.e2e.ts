@@ -130,7 +130,13 @@ describe('spike3d actions', () => {
     expect(fire).not.toBeNull();
     await w(`(w.weather.setHour(5.9), w.states.set(${JSON.stringify(fire.id)}, ${JSON.stringify(fire.kind)}, 'lit', false), w.placeHeroAt(${fire.x + 6}, ${fire.z + 6}), 0)`);
     await w('(w.dayMinutes = 0, w.weather.setHour(6.05), 0)');
-    await page.waitForFunction(`window.spike.world.states.get(${JSON.stringify(fire.id)}, ${JSON.stringify(fire.kind)}, 'lit') === true`, undefined, { timeout: 60_000 });
+    // They walk to it and try, with their own sheet (B4): Survival if they have it, else Agility at −2D6. A try that
+    // takes lights it; one that fails is tried again.
+    await page.waitForFunction(`window.spike.world.recentActs.some((a) => a.who === 'keeper' && a.target === ${JSON.stringify(fire.id)})`, undefined, { timeout: 60_000 });
+    const tries = (await w(`w.recentActs.filter((a) => a.who === 'keeper')`)) as { offer: string; skill: string; success: boolean }[];
+    expect(tries[0].offer).toBe('verb:light');
+    expect(['Vildmarksvana', 'attr:Förflyttning']).toContain(tries[0].skill);
+    expect(await w(`w.states.get(${JSON.stringify(fire.id)}, ${JSON.stringify(fire.kind)}, 'lit')`)).toBe(tries.some((a) => a.success));
     expect((await w(`w.minds.find((m) => m.id === 'keeper').doing`))).toBe('tendfire');
     expect(errors).toEqual([]);
   });

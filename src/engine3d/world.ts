@@ -22,6 +22,7 @@ import { Explored } from '../core/world3d/explored';
 import { type StatesJSON, ThingStates, pieceId, placedId } from '../core/world3d/state';
 import { type ActResult, type ActTarget, type ActWorld, type Doer, type Offer, type Spot, offers, perform } from '../core/world3d/actions';
 import { ACTIONS } from '../content/actions';
+import { sheetDice } from '../core/npcsheet';
 import { LIBRARY } from '../content/skillweb';
 import { PlacedIndex } from '../core/world3d/placed';
 import { footprints } from '../core/world3d/roomplan';
@@ -325,6 +326,8 @@ export class SpikeWorld {
   private outFlames = new Set<THREE.Object3D>();
   /** Where the hero sits, while they sit (the verb `sit`): the seat's top and which way they face; the spot they stood on. */
   private seated: { x: number; z: number; y: number; floor: number; yaw: number; from: P2 } | null = null;
+  /** The last few things done in the world, by anyone (for tests now; for witnesses later, B3c). */
+  readonly recentActs: { who: string; offer: string; target: string | null; skill: string | null; success: boolean; hour: number }[] = [];
   /** Rolls made by actions (the hero's and the people's). */
   private actRng = Rng.fromSeed(Date.now() >>> 0);
   private markedAt: { x: number; z: number; f: number; t: number } | null = null;
@@ -1923,6 +1926,10 @@ export class SpikeWorld {
    */
   act(offer: string, target: ActTarget | null, doer: Doer, at: Spot = target ?? this.heroSpot()): ActResult {
     const r = perform(offer, target, at, doer, this.acting, ACTIONS);
+    if (r.done) {
+      this.recentActs.push({ who: doer.id, offer, target: target?.id ?? null, skill: r.skill ?? null, success: r.success ?? true, hour: this.weather.hour ?? 0 });
+      if (this.recentActs.length > 30) this.recentActs.shift();
+    }
     const hero = doer.id === 'hero';
     for (const e of r.events) {
       if (e.kind === 'time' && hero && this.weather.hour !== null) this.weather.advance(e.minutes / 60);
@@ -1932,15 +1939,18 @@ export class SpikeWorld {
     return r;
   }
 
-  /**
-   * What the map's people may do to things (their behaviours act through the same frame as the hero). They have no
-   * sheets yet (plan B4), so for now everyone rolls 3D6 for any skill: a stub.
-   */
+  /** What the map's people may do to things: their behaviours act through the same frame as the hero, rolling with their own sheets (plan B4). */
   private readonly acts: Acts = {
     fireOf: (house) => this.fireOf(house),
     lit: (t) => this.fireLit(t),
-    act: (mind, offer, t) => this.act(offer, t, { id: mind.id, dice: () => ({ n: 3, mod: 0 }) }),
+    act: (mind, offer, t) => this.act(offer, t, this.doerOf(mind.id)),
   };
+
+  /** Someone in the map as a doer: they roll what their sheet says (nothing, for someone with no sheet). */
+  doerOf(id: string): Doer {
+    const sheet = this.cast.find((c) => c.who.id === id)?.who.sheet ?? null;
+    return { id, dice: (skill) => (sheet ? sheetDice(sheet, skill) : { n: 0, mod: 0 }) };
+  }
 
   /** Set the hero down on a seat: on its top, facing the way it faces, until they walk. */
   private sitHero(t: ActTarget): void {

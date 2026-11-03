@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LEVEL_SPAN, PERSON_LEVELS, SHEET_ATTRS, mergeSheets, rollSheet, sheetSpan, skillLevel, unitsDice } from '../src/core/npcsheet';
+import { LEVEL_SPAN, PERSON_LEVELS, SHEET_ATTRS, drawLevel, mergeSheets, rollSheet, sheetDice, sheetSpan, skillLevel, unitsDice } from '../src/core/npcsheet';
 import { SKILL_BY_ID } from '../src/content/chargen/skills';
 import { ARMOUR, SHIELDS, WEAPONS } from '../src/content/chargen/equipment';
 import { FACETS, PERSON_KINDS } from '../src/content/people';
@@ -79,10 +79,61 @@ describe('rolling a person', () => {
     expect(sw(master)[0] - sw(novice)[0]).toBe(13);
   });
 
-  it('a tirak guard differs from a human one: the tirak build, and the tirak’s own gifts as side skills', () => {
+  it('a tirak guard differs from a human one: the tirak build, and the tirak’s own gifts', () => {
     const h = PERSON_KINDS.sheet({ is: ['human', 'job-guard'] }), tk = PERSON_KINDS.sheet({ is: ['tirak', 'job-guard'] });
     expect(tk.attrs.Kroppsbyggnad).toBeGreaterThan(h.attrs.Kroppsbyggnad);
-    expect(Object.keys(tk.skills).length).toBeGreaterThan(Object.keys(h.skills).length);
+    expect(Object.keys(tk.gifts)).toEqual(expect.arrayContaining(['F:Mörkersyn', 'F:Luktsinne']));
+    expect(Object.keys(h.gifts)).toEqual([]);
+    expect(tk.rules).toContain('Claws & tusks');
+  });
+});
+
+describe('gifts, basic skills and levels (B4, Q27)', () => {
+  it('a people\'s gifts are fixed: a tirak novice sees in the dark exactly as well as a tirak master', () => {
+    const m = PERSON_KINDS.sheet({ is: ['tirak', 'job-guard'] });
+    const novice = rollSheet(sheetSpan(m, 'novice'), 1), master = rollSheet(sheetSpan(m, 'master'), 2);
+    expect(novice.skills['F:Mörkersyn']).toBe(16);
+    expect(master.skills['F:Mörkersyn']).toBe(16);
+    expect(novice.gifts).toContain('F:Mörkersyn');
+    // Not also a skill that rolls with the level, nor a knack.
+    expect(m.skills['F:Mörkersyn']).toBeUndefined();
+    expect(m.knacks).not.toContain('F:Mörkersyn');
+  });
+
+  it('everyone has the basic skills at 2D6, unless their people can\'t (dwarves neither swim nor ride)', () => {
+    const human = rollSheet(sheetSpan(PERSON_KINDS.sheet({ is: ['human', 'job-farmer'] }), 'novice'), 3);
+    const dwarf = rollSheet(sheetSpan(PERSON_KINDS.sheet({ is: ['dwarf', 'job-farmer'] }), 'novice'), 3);
+    expect(human.skills.Rida).toBeGreaterThanOrEqual(8);
+    expect(human.skills.Genomsöka).toBeGreaterThanOrEqual(8);
+    expect(dwarf.skills.Rida ?? 0).toBe(0);
+    expect(dwarf.skills.Genomsöka).toBeGreaterThanOrEqual(8);
+  });
+
+  it('a basic skill is a floor: a trained skill is never pulled down to it', () => {
+    const m = PERSON_KINDS.sheet({ is: ['human', 'job-guard'] });
+    const main = Object.entries(m.skills).find(([, l]) => l === 'main')![0];
+    for (let seed = 1; seed < 20; seed++) expect(rollSheet(sheetSpan(m, 'skilled'), seed).skills[main]).toBeGreaterThanOrEqual(LEVEL_SPAN.skilled[0]);
+  });
+
+  it('a person\'s level is theirs if given, else drawn from who they are: mostly capable, a rare master', () => {
+    expect(PERSON_KINDS.levelOf({ is: ['human'], level: 'master' }, 'x')).toBe('master');
+    const n: Record<string, number> = {};
+    for (let i = 0; i < 2000; i++) {
+      const l = drawLevel(i);
+      n[l] = (n[l] ?? 0) + 1;
+    }
+    expect(n.capable).toBeGreaterThan(n.novice);
+    expect(n.novice).toBeGreaterThan(n.skilled);
+    expect(n.master).toBeLessThan(n.skilled);
+    expect(drawLevel('keeper:6')).toBe(drawLevel('keeper:6'));
+  });
+
+  it('rolls what the sheet says: a skill, an attribute, nothing for what they lack', () => {
+    const p = PERSON_KINDS.rolled({ is: ['human', 'job-guard'], seed: 9 }, 'guard');
+    expect(sheetDice(p, 'attr:Kroppsbyggnad').n).toBeGreaterThan(0);
+    expect(sheetDice(p, 'Genomsöka').n).toBeGreaterThanOrEqual(2);
+    expect(sheetDice(p, 'Teoretisk magi')).toEqual({ n: 0, mod: 0 });
+    expect(PERSON_KINDS.rolled({ is: ['human', 'job-guard'], seed: 9 }, 'guard')).toEqual(p);
   });
 });
 

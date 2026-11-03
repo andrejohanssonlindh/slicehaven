@@ -1,4 +1,6 @@
 import { ATTRS, type Token, parseGrants } from '../../core/chargen/grants';
+import { skillDice } from '../../core/chargen/tables';
+import { SKILLS } from '../chargen/skills';
 import type { Family, Opt } from '../../core/chargen/types';
 import { SHEET_ATTRS, type SheetAttr, type SheetDef } from '../../core/npcsheet';
 import { BACKGROUNDS } from '../chargen/backgrounds';
@@ -85,6 +87,37 @@ const namedSkills = (t: Token): string[] => (t.k === 'skill' || t.k === 'talang'
 
 const side = (opts: Opt[]): Record<string, 'side'> => Object.fromEntries(opts.flatMap((o) => skillsIn(o.g)).map((s) => [s, 'side' as const]));
 
+/** A creator skill value (base 1 is 2D6) in dice units. */
+const valueUnits = (v: number): number => {
+  const d = skillDice(v);
+  return d.n * 4 + d.mod;
+};
+
+/** The basic skills everyone has untrained, as a new character in the creator does (base 1: 2D6). */
+const BASICS: Record<string, number> = Object.fromEntries(SKILLS.filter((s) => s.base === 1).map((s) => [s.id, valueUnits(1)]));
+
+/**
+ * What a people's traits put on a sheet (Q27): an ability or a mark with a value ("F:Mörkersyn 4") is a **gift**, fixed
+ * for every one of them; a trait that is a rule is kept by name; one that takes a skill away ("inkomp:Simma",
+ * "grund:Rida 0") changes the basic skills; other skills it names are side skills, as before; so are its culture's.
+ */
+function peopleSheet(innate: Opt[], culture: Opt[]): Pick<SheetDef, 'skills' | 'gifts' | 'rules' | 'basics'> {
+  const skills: Record<string, 'side'> = side(culture);
+  const gifts: Record<string, number> = {}, basics: Record<string, number> = {}, rules: string[] = [];
+  for (const o of innate) {
+    for (const item of parseGrants(o.g)) {
+      if (item.k !== 'token') continue;
+      const tk = item.token;
+      if (tk.k === 'skill' && tk.skill.length === 1 && /^[FK]:[^?]+$/.test(tk.skill[0])) gifts[tk.skill[0]] = valueUnits(tk.n);
+      else if (tk.k === 'skill' || tk.k === 'talang') for (const s of namedSkills(tk)) skills[s] = 'side';
+      else if (tk.k === 'inkomp') for (const s of tk.skill) basics[s] = 0;
+      else if (tk.k === 'grund') basics[tk.skill] = valueUnits(tk.n);
+      else if (tk.k === 'regel' && !rules.includes(o.en)) rules.push(o.en);
+    }
+  }
+  return { skills, gifts, rules, basics };
+}
+
 /** A people's attributes as a shift from another set (the creator's order, `ATTRS`); zeros left out. */
 const shiftFrom = (to: number[] | undefined, from: number[]): A => {
   if (!to) return {};
@@ -114,7 +147,9 @@ function build(): Record<string, SheetDef> {
   }
   for (const [fam, def] of Object.entries(FAMILIES)) {
     const kind = FAMILY_KIND[fam];
-    out[kind] = { attrShift: shiftFrom(familyAttrs(fam as Family), HUMAN), skills: side([...def.innate, ...def.culture]) };
+    // Everyone has the basic skills; the family's traits may take some away (dwarves neither swim nor ride).
+    const ps = peopleSheet(def.innate, def.culture);
+    out[kind] = { attrShift: shiftFrom(familyAttrs(fam as Family), HUMAN), ...ps, basics: { ...BASICS, ...ps.basics } };
   }
   for (const p of PEOPLES) {
     const id = peopleFacet(p.id);
@@ -122,7 +157,7 @@ function build(): Record<string, SheetDef> {
     if (out[id] && !p.id.endsWith('-tiraker')) continue;
     const fam = familyAttrs(p.family);
     // Its own build as a shift from its family's (which `FAMILY_KIND` already has from a human's).
-    out[id] = { attrShift: shiftFrom(p.attrs, fam), skills: side([...p.innate, ...p.culture]) };
+    out[id] = { attrShift: shiftFrom(p.attrs, fam), ...peopleSheet(p.innate, p.culture) };
   }
   return out;
 }
