@@ -47,8 +47,15 @@ describe('spike3d fight', () => {
     for (; rounds < 60; rounds++) {
       await page.waitForSelector('#fight .choices button', { timeout: 60_000 });
       const labels = await page.$$eval('#fight .choices button', (bs) => bs.map((b) => b.textContent ?? ''));
-      if (labels.some((l) => /Walk away|New game/.test(l))) break;
-      if (rounds === 3) await page.screenshot({ path: `${OUT}/fight-round.png` });
+      if (labels.some((l) => /^OK$|New game/.test(l))) break;
+      if (rounds === 3) {
+        await page.screenshot({ path: `${OUT}/fight-round.png` });
+        // Your card opens the condition sheet: fatigue and where it came from, dice off rolls, wounds.
+        await page.click('#fight .us');
+        expect(await page.isVisible('#condition')).toBe(true);
+        await page.screenshot({ path: `${OUT}/fight-condition.png` });
+        await page.click('#condition .close');
+      }
       await page.click('#fight .choices button');
       await page.waitForTimeout(100);
     }
@@ -56,19 +63,25 @@ describe('spike3d fight', () => {
     expect(await w('w.weather.hour')).toBe(hour); // the clock stood still
     await page.screenshot({ path: `${OUT}/fight-end.png` });
     const log = await page.$$eval('#fight .log p', (ps) => ps.map((p) => p.textContent ?? ''));
-    expect(log.some((l) => /hits|strikes/.test(l))).toBe(true);
+    expect(log.some((l) => /strike.*against/i.test(l))).toBe(true);
     const heroDead = (await w('!!w.injuriesOf("hero")?.dead')) as boolean;
     const labels = await page.$$eval('#fight .choices button', (bs) => bs.map((b) => b.textContent ?? ''));
     if (heroDead) expect(labels).toContain('New game');
     else {
-      // Won (or spared): finish them if offered, then walk away; the world goes on.
+      // Won (or spared): finish them if offered, then OK; the world goes on.
       if (labels.includes('Finish them')) {
         await page.click('#fight .choices button:has-text("Finish them")');
-        await page.waitForSelector('#fight .choices button:has-text("Walk away")', { timeout: 60_000 });
+        await page.waitForSelector('#fight .choices button:text-is("OK")', { timeout: 60_000 });
         expect(await w('!!w.injuriesOf("gladiator")?.dead')).toBe(true);
       }
-      await page.click('#fight .choices button:has-text("Walk away")');
+      await page.click('#fight .choices button:text-is("OK")');
       expect(await w('w.inFight')).toBe(false);
+      // Fatigue comes back with time (Q49).
+      const before = (await w('w.injuriesOf("hero")?.fatigue ?? 0')) as number;
+      if (before > 0) {
+        await page.waitForTimeout(4000); // a real second is a world minute with the clock stopped; easy: a point a minute
+        expect((await w('w.injuriesOf("hero").fatigue')) as number).toBeLessThan(before);
+      }
     }
     // Kept through a reload: whoever died is still dead.
     const dead = (await w('["hero", "gladiator"].filter((id) => w.injuriesOf(id)?.dead)')) as string[];

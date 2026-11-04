@@ -7,7 +7,7 @@ import { Rng } from '../core/rng';
 import { DICE_SKINS } from '../content/dice/skins';
 import { showRolls } from '../ui/dice';
 import { DICE_CLOSES, DICE_LEVELS, loadSettings, saveSettings } from '../ui/settings';
-import { DIFFICULTIES } from '../core/difficulty';
+import { DIFFICULTIES, DIFFICULTY_RULES } from '../core/difficulty';
 import { diceOf } from '../core/hero';
 import { sightWord } from '../core/world3d/perceive';
 import { Governor, TIERS, type DeviceInfo, type Tier, type TierName, pickTier, qualityAt } from '../core/world3d/tiers';
@@ -17,6 +17,7 @@ import { t } from '../i18n';
 import { heroDoer, makeSheet, pageHero, whoseText } from './actsheet';
 import { FEARSOME_MARKS } from '../content/people/temper';
 import { makeTalk } from './talksheet';
+import { makeCondition } from './condition';
 import { makeFight } from './fight';
 import { makeJournal } from './journal';
 
@@ -193,6 +194,7 @@ function buildControls(): void {
   button('row-game', () => diffName[loadSettings().difficulty], () => loadSettings().difficulty === 'easy', () => {
     saveSettings({ difficulty: cycle(DIFFICULTIES, loadSettings().difficulty) });
     world.showSenses = loadSettings().difficulty === 'easy';
+    world.restMinutes = DIFFICULTY_RULES[loadSettings().difficulty].restMinutes;
   });
   // Sight is rolled on entering the map and every six world hours; this rolls it now (as waking will).
   button('row-game', () => t('spike.rollsight', 'Roll sight'), () => false, () => { world.rerollSight(); });
@@ -419,11 +421,13 @@ const journal = makeJournal(() => world);
 const sheet = makeSheet(() => world, notify, save, doer, journal.added);
 /** Talking to someone tapped (plan B3d). */
 /** A fight with someone tapped (plan B8a): it takes over from the talk, and the world waits while it lasts. */
+/** The hero's condition: fatigue and where it came from, dice off rolls, wounds (the "You" button). */
+const condition = makeCondition(() => world, hero);
 const fight = makeFight(() => world, hero, notify, save, () => {
   saveOff = true;
   clearWorld(mapName, localStorage);
   location.reload();
-});
+}, condition);
 const talk = makeTalk(() => world, () => pipeline.renderer, hero, doer, notify, save, journal.added, (id) => fight.start(id));
 
 function bindInput(): void {
@@ -476,6 +480,12 @@ function bindInput(): void {
     if (down.moved < 8) {
       // (In a fight, the fight panel decides what the hero does: taps on the world wait.)
       if (fight.on) {
+        down = null;
+        return;
+      }
+      // Knocked out (left lying after a fight): nothing to do but come round, as fatigue goes.
+      if (world.injuriesOf('hero')?.out) {
+        notify(t('spike.out', 'You are knocked out. You come round when your fatigue is gone ("You" shows it).'));
         down = null;
         return;
       }
@@ -644,6 +654,7 @@ setTimeout(() => {
   if (units('attr:Vaksamhet') > 0) world.alertness = units('attr:Vaksamhet');
   world.darkSight = Math.min(1, units('F:Mörkersyn') / 12);
   world.showSenses = loadSettings().difficulty === 'easy';
+  world.restMinutes = DIFFICULTY_RULES[loadSettings().difficulty].restMinutes;
   // Owners and the scale (B3c): who the hero is, as the people see them; and what they say unasked.
   world.heroWho = { kind: hero.kind, people: hero.people, tags: hero.tags };
   world.onSpeak = (_who, name, text) => notify(`${name}: "${text}"`);

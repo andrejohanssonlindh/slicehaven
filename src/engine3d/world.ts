@@ -44,7 +44,8 @@ import { type HouseEntry, HouseIndex } from '../core/world3d/houses';
 import type { PlacedProp } from '../core/world3d/props';
 import { THINGS } from '../content/things';
 import { modelOf } from '../core/world3d/things';
-import type { Injuries } from '../core/damage';
+import { type Injuries, recoverFatigue } from '../core/damage';
+import { REST_SPEED } from '../core/difficulty';
 import { cloudDrift, cloudThreshold } from '../core/world3d/sky';
 import { type Actor, Walking, newActor } from '../core/world3d/actors';
 import { type Acts, type Answers, type Clock, type Mind, fadeAnswer, newMind, stepMind, walkOn } from '../core/world3d/behave';
@@ -599,6 +600,10 @@ export class SpikeWorld {
   private readonly fightPoses = new Map<string, { pose: FightPose; t: number }>();
   /** What fights left on people (the hero too), by id: their injuries (`core/damage.ts`). Saved. */
   private hurt: Record<string, Injuries> = {};
+  /** World minutes for one point of fatigue back (the difficulty's; the page sets it). */
+  restMinutes = 2;
+  /** Real seconds gathered toward the next fatigue recovery step (it runs a few times a second, not every frame). */
+  private restIn = 0;
   /** How far what the hero holds has gone from home, and who has already answered it (person ids). */
   private carryStage: Stage = 'home';
   private readonly sawCarry = new Set<string>();
@@ -2663,6 +2668,27 @@ export class SpikeWorld {
     }
   }
 
+  /**
+   * Time heals fatigue (Q49): outside a fight, everyone hurt gets a point back every `restMinutes` world minutes,
+   * faster when the hero sits; the knocked out get up when it's all gone. With the clock stopped, a real second
+   * counts as a world minute so it still comes back.
+   */
+  private recover(dt: number): void {
+    this.restIn += dt;
+    if (this.restIn < 0.25) return;
+    const secs = this.restIn;
+    this.restIn = 0;
+    const minutes = this.dayMinutes > 0 ? (secs * 24) / this.dayMinutes : secs;
+    for (const [id, i] of Object.entries(this.hurt)) {
+      if (i.dead || (i.fatigue <= 0 && !i.out)) continue;
+      const per = this.restMinutes / (id === 'hero' && this.seated ? REST_SPEED : 1);
+      const next = recoverFatigue(i, minutes, per);
+      if (next === i) continue;
+      this.hurt[id] = next;
+      if (i.out && !next.out) this.fightPoses.delete(id); // up again
+    }
+  }
+
   /** A fighter swings (the rules said they strike): the pose plays once and settles back on guard. */
   swing(id: string): void {
     if (this.canStand(id)) this.fightPoses.set(id, { pose: 'swing', t: this.time });
@@ -3366,6 +3392,7 @@ export class SpikeWorld {
     if (this.turnInput) this.turn(this.turnInput * TURN_SPEED * dt);
     const w = this.weather;
     if (this.dayMinutes > 0 && !this.fighting) w.advance((dt * 24) / (this.dayMinutes * 60));
+    if (!this.fighting) this.recover(dt);
     w.update(dtMs);
     if (this.autoBolts && w.sky === 'storm' && this.skyRng.next() < dt / 5) this.strike();
     this.stepBolt(dt);

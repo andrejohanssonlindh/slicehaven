@@ -15,7 +15,8 @@
 | **Test ground** | `/spike3d/?map=arena`: a 30 × 15 m oval behind a palisade, gates east and west, pillars (block sight), low walls (not sight), barrels, crates, a woodpile | ✅ Weapons on the sand by the west gate, a gladiator at the far end. Map rule `oval` (`content/maps/rules/oval.ts`) |
 | **Combat rules core** | `src/core/combat.ts` | ✅ B8a (2026-11-04): one against one in melee. Moving (walk 5, run 10), picking up (3 m), opening on Reaktion, attack against the best defence (parry, block, dodge), tactics and their fatigue, roles swapping, retreat, drops, the end of the phase, the mercy stroke; a fighting style for those nobody steers. Tested (`tests/combat.test.ts`) |
 | **Weapons as things, the right hand** | `content/things/kinds/weapons.ts`, models `things/models/`; `Loose.wield` for people's weapons | ✅ Held in the right hand (`BodyRig.hand`, `model.grip`), dropped and picked up in a fight, saved |
-| **The fight in the world and on the page** | `SpikeWorld` (fights section), `src/spike3d/fight.ts`, `#fight` panel | ✅ The world stops; one choice a round; dice; walking, swings, lying down; injuries saved (`hurt`, save v7); a dead hero gets New game. `e2e/spike3d-fight.e2e.ts` |
+| **The fight in the world and on the page** | `SpikeWorld` (fights section), `src/spike3d/fight.ts`, `#fight` panel | ✅ The world stops; one choice a round; your own dice, a blow in steps; walking, swings, lying down; cards by difficulty; injuries saved (`hurt`, save v8); OK ends it; a dead hero gets New game. `e2e/spike3d-fight.e2e.ts` |
+| **Your condition** | `src/spike3d/condition.ts`, the **You** button; fatigue back with time in `SpikeWorld.recover` | ✅ Fatigue and its sources, dice off rolls and why, wounds |
 
 ## How a fight fits our world
 - **Live until it starts.** The world runs freely (A3). A fight starts when someone attacks or squares up and the other answers. Then **the world stops and plays in rounds of 4 seconds** of world time (decided 2026-11-02), with everyone within reach of it drawn in; the rest of the map waits.
@@ -34,7 +35,7 @@
 - **Cover is real geometry.** A pillar between you and the archer (`blocksSight`) blocks the shot; a low wall gives the parapet +8; a fight in melee +4. The vision code already casts these lines (`core/world3d/vision.ts`).
 - **Everyone is a real person with a real sheet** (decision 2026-10-30): the hero's sheet from the creator, others from their kind. Damage dice from their weapon and base damage; defence from their skill, shield, or Undvika; armour from what they wear (one value for the whole suit until armour pieces exist; the rules allow per part).
 - **NPCs choose by behaviour.** A fighter's choices (phase, tactic, retreat, surrender) are a behaviour file like the others (`content/behaviours/does/`), reading their temper (bold, afraid) and their injuries. Fleeing at heavy fatigue, yielding to a mark (the *Mark* edge), fetching friends: the same answers the standing system already has.
-- **After a fight**: fatigue recovers at the end of the scene (a short rest); wounds, pain, bleeds, infections and breaks stay, saved on the person. Healing by days comes with the healing chapter (later; the rules are summarised only up to after-effects).
+- **After a fight**: fatigue comes back with time, faster resting (Q49; no end of scene); wounds, pain, bleeds, infections and breaks stay, saved on the person. Healing by days comes with the healing chapter (later; the rules are summarised only up to after-effects).
 - **Visible injuries from the start** (director, 2026-11-02): every effect is plain data on the person, so the body builder can show it: a limb held still when broken or wounded, a stoop for torso wounds, blood on a bleeding part, a bandage once stopped, scars for healed wounds, a missing hand, an eye patch. The body has parts already (`core/world3d/body.ts`); the look reads `Injuries`. Dazed, knocked back, falling are poses (`content/people/poses.ts`).
 - **Improvised weapons** (plan B8): a swung stool reads a property off its kind (a damage string and type on `ThingDef`, like `size` and `weight`), never an `if` on its name.
 
@@ -62,12 +63,17 @@
 Mounted combat waits for riding (C4), mystic actions for magic (B9).
 
 ## Readings made while building B8a (to confirm or change)
-- **Untrained**: a combat skill you have no value in rolls 1D6 (Q48).
-- **Advantages** all buy *more damage* until edges can be chosen (B8b).
+- **Advantages** all buy *more damage* until edges can be chosen (B8b); the extra is rolled (or added) on its own so it can be shown (`HitInput.extra`).
 - **The mercy stroke** kills (someone helpless, a blow meant to kill); no roll.
 - **A defender's side action**: picking something up is allowed while defending (the book gives a side action in your active phase; the defender has no main action).
-- **The scene ends when you walk away** from a fight: fatigue goes, the knocked out wake (Q49).
+- **The knocked out wake when their fatigue is all gone** (`recoverFatigue`); the dying don't.
 - **The hero wears no armour yet** (there is none on them in the world); people wear their sheet's armour as one suit.
+
+## Decided after the first fight (2026-11-04)
+- **Untrained is 2D6** (Q48), every combat skill's base (`UNTRAINED` in `core/combat.ts`).
+- **No end of scene** (Q49): OK ends the fight once one side is left. Fatigue comes back with world time, one point per `restMinutes` of the difficulty (`DIFFICULTY_RULES`), three times as fast sat down (`REST_SPEED`); `SpikeWorld.recover`. A stopped clock counts a real second as a world minute.
+- **Fatigue remembers where it came from** (`Injuries.fatigueFrom`, filled by `addFatigue`: blows, bleeding, fire, each tactic); tactics come back first. **Penalties say why** (`penaltyParts`), and attack and defence pools carry their make-up (`PoolWhy`: `attackWhy`, `defencePool().why`). The page reads these for the log and the condition sheet (`src/spike3d/condition.ts`).
+- **You throw only your own dice** (`showRolls` `unthrown`, `notes`); a blow is shown in three steps (hit; where, damage, extra; serious wound). **What you see follows the difficulty** (`foeExact`, `ownExact`).
 
 ## Decided (2026-11-04)
 - **Q45** the bands in metres as in the table; moving is the side action (walk 5 m, run 10 m).

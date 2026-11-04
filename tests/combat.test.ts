@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
-  type Fight, type Fighter, type FightStyle, attackPool, bestDamage, bonusDice, chooseFor, damageDice, defencePool, dropFrom, fists, parseProps,
+  type Fight, type Fighter, type FightStyle, attackPool, attackWhy, bestDamage, bonusDice, chooseFor, damageDice, defencePool, dropFrom, fists, parseProps,
   resolveRound, roleOf, startFight, tacticFatigue, weaponFromRow, weaponOf,
 } from '../src/core/combat';
-import { unhurt } from '../src/core/damage';
+import { type Injuries, recoverFatigue, unhurt } from '../src/core/damage';
 import { Rng } from '../src/core/rng';
 import { WOUND_TABLES } from '../src/content/wounds';
 import { SHIELDS, WEAPONS } from '../src/content/chargen/equipment';
@@ -51,7 +51,7 @@ describe('weapons in hand', () => {
     const shield = SHIELDS.find((s) => s.sv === 'Stor rundsköld')!;
     const a = fighter('a', 0, 0);
     const b = fighter('b', 1, 1.5, { shield: { id: 'b-shield', shield: { name: shield.sv, melee: bonusDice(shield.melee), props: parseProps(shield.props) } } });
-    expect(defencePool({ ...b, pools: { ...b.pools, Sköld: { n: 4, mod: 0 } } }, weaponOf(a), 'standard')).toEqual({ how: 'block', dice: { n: 5, mod: 0 } });
+    expect(defencePool({ ...b, pools: { ...b.pools, Sköld: { n: 4, mod: 0 } } }, weaponOf(a), 'standard')).toMatchObject({ how: 'block', dice: { n: 5, mod: 0 } });
     expect(defencePool(a, weaponOf(b), 'standard').how).toBe('parry');
     // Bare hands parry at −2D6 against a weapon, so a dodger dodges.
     const bare = fighter('c', 1, 1.5, { weapon: null, pools: { Slagsmål: { n: 2, mod: 0 }, Undvika: { n: 3, mod: 0 } } });
@@ -69,6 +69,50 @@ describe('weapons in hand', () => {
     expect(tacticFatigue('quick', null, sword)).toBe(1);
     expect(tacticFatigue('quick', null, { ...sword, props: { Snabb: 1 } })).toBe(0);
     expect(tacticFatigue('powerful', 'counter', sword)).toBe(3);
+  });
+
+  it('an untrained combat skill rolls 2D6 (Q48), and a pool says where it came from', () => {
+    const a = fighter('a', 0, 0, { pools: {} });
+    expect(attackWhy(a, 'standard')).toMatchObject({ skill: 'Svärd', untrained: true, dice: { n: 2, mod: 0 } });
+    const hurt = fighter('b', 0, 0, { drew: true, injuries: { ...unhurt(), pain: 1, wounds: { rightArm: 1 } } });
+    const why = attackWhy(hurt, 'quick');
+    expect(why.mods).toEqual([{ why: 'quick', n: 1 }, { why: 'drew', n: -1 }, { why: 'pain', n: -1 }, { why: 'rightArm', n: -1 }]);
+    expect(why.dice).toEqual({ n: 2, mod: 0 });
+  });
+});
+
+describe('fatigue', () => {
+  it('remembers where it came from, and goes back with time (Q49)', () => {
+    const f = startFight([fighter('a', 0, 0), fighter('b', 1, 1.5)]);
+    f.melee = { attacker: 0, opened: 0 };
+    const r = resolveRound(f, { a: { attack: 'powerful' }, b: { defend: 'defensive' } }, RULES, Rng.fromSeed(3));
+    const [a, b] = r.fight.fighters;
+    expect(a.injuries.fatigueFrom.powerful).toBe(2);
+    expect(b.injuries.fatigueFrom.careful).toBe(1);
+    const sum = (i: typeof a.injuries) => Object.values(i.fatigueFrom).reduce((s, n) => s + (n ?? 0), 0);
+    expect(sum(b.injuries)).toBe(b.injuries.fatigue);
+    // Five points, one back every 2 minutes: tactics go first; knocked out, they wake when it's all gone.
+    let i: Injuries = { ...unhurt(), out: true, fatigue: 5, fatigueFrom: { hits: 4, powerful: 1 } };
+    i = recoverFatigue(i, 3, 2);
+    expect(i).toMatchObject({ fatigue: 4, fatigueFrom: { hits: 4 }, rested: 1, out: true });
+    i = recoverFatigue(i, 7, 2);
+    expect(i).toMatchObject({ fatigue: 0, fatigueFrom: {}, out: false });
+    expect(recoverFatigue({ ...unhurt(), out: true, dying: true, fatigue: 1, fatigueFrom: { hits: 1 } }, 9, 1).out).toBe(true);
+  });
+
+  it('a tie goes to the attacker', () => {
+    // Search seeds for a round where attack and defence come out equal: it must be a hit.
+    let seen = 0;
+    for (let s = 1; s < 400 && seen < 3; s++) {
+      const f = startFight([fighter('a', 0, 0), fighter('b', 1, 1.5)]);
+      f.melee = { attacker: 0, opened: 0 };
+      const l = resolveRound(f, {}, RULES, Rng.fromSeed(s)).log.find((x) => x.k === 'attack');
+      if (l?.k === 'attack' && l.defend && l.attack.total === l.defend.total) {
+        seen++;
+        expect(l.hit).toBe(true);
+      }
+    }
+    expect(seen).toBeGreaterThan(0);
   });
 });
 

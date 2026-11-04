@@ -1,10 +1,10 @@
 import type { Dice } from './chargen/tables';
 import { modify } from './checks';
 import {
-  type BodyPart, type DamageType, type HitResult, type Injuries, type PhaseEnd, type WoundTableDef,
-  endOfPhase, rollHit, withPenalty,
+  type BodyPart, type DamageType, type HitResult, type Injuries, type PenaltyWhy, type PhaseEnd, type RollUse, type WoundTableDef,
+  addFatigue, endOfPhase, hitPart, penaltyParts, rollHit, withPenalty,
 } from './damage';
-import { type Roll, advantages, rollDie, rollOpen, rollTest } from './dice';
+import { type Roll, advantages, rollDie, rollOpen, rollTable, rollTest } from './dice';
 import type { Rng } from './rng';
 
 /**
@@ -223,7 +223,13 @@ export type LogLine =
   | { k: 'move'; who: string; to: { x: number; z: number }; ran?: boolean; roll?: Roll }
   | { k: 'pickUp'; who: string; item: string }
   | { k: 'open'; attacker: number; rolls: Roll[] }
-  | { k: 'attack'; who: string; target: string; tactic: AttackTactic; defence: DefenceTactic; how: Defence; attack: Roll; defend: Roll | null; hit: boolean; advantages: number; part?: BodyPart; result?: HitResult; type?: DamageType }
+  | {
+    k: 'attack'; who: string; target: string; tactic: AttackTactic; defence: DefenceTactic; how: Defence;
+    attack: Roll; attackWhy: PoolWhy; defend: Roll | null; defendWhy?: PoolWhy; hit: boolean; advantages: number;
+    /** On a hit: the D10 for where, the part, the type, the damage pool's parts (weapon, tactic dice, extra, armour), and the result. */
+    whereRoll?: Roll; part?: BodyPart; result?: HitResult; type?: DamageType;
+    damage?: { weapon: Dice; tactic: number; extra: Dice; armour: number };
+  }
   | { k: 'drop'; who: string; item: string; at: { x: number; z: number } }
   | { k: 'retreat'; who: string; to: { x: number; z: number } }
   | { k: 'roles'; attacker: number }
@@ -261,10 +267,13 @@ export function nearestFoe(fight: Fight, f: Fighter): Fighter | null {
 /** What a fighter attacks or parries with: the weapon in hand, or fists. */
 export const weaponOf = (f: Fighter): WeaponStats => (f.weapon?.weapon ? weaponFromRow(f.weapon.weapon, f.baseDamage, f.physique) : fists(f.baseDamage));
 
-/** A pool from a fighter's sheet; with no skill at all, a combat roll still gets 1D6 (reading). */
+/** A skill nobody has trained: every combat skill starts at 2D6 (Q48, the director). */
+export const UNTRAINED: Dice = { n: 2, mod: 0 };
+
+/** A pool from a fighter's sheet; with no value at all, the untrained 2D6. */
 function pool(f: Fighter, id: string): Dice {
   const d = f.pools[id];
-  return d && (d.n > 0 || d.mod > 0) ? d : { n: 1, mod: 0 };
+  return d && (d.n > 0 || d.mod > 0) ? d : UNTRAINED;
 }
 
 /** Which arm(s) a weapon is in, for the wounds that weigh on it. */
@@ -273,38 +282,60 @@ const armsOf = (w: WeaponStats): ('left' | 'right')[] => (w.hands === 2 ? ['left
 /** Change a pool by whole dice (may go below 1D6 to nothing only if it had none). */
 const plus = (d: Dice, n: number): Dice => (n === 0 ? d : modify(d, n));
 
-/** The attack pool: the weapon's skill, the tactic, too little Physique, picking up this round, injuries. */
-export function attackPool(f: Fighter, tactic: AttackTactic): Dice {
-  const w = weaponOf(f);
-  const t = tactic === 'quick' ? 1 : tactic === 'powerful' ? -1 : 0;
-  const d = plus(pool(f, w.skill), t - w.weak - (f.drew && !w.props.Snabbdragen ? 1 : 0));
-  return withPenalty(d, f.injuries, { kind: 'combat', arms: armsOf(w) });
+/** Why a change of dice: a tactic, the weapon, picking up, armour's load, or an injury (`PenaltyWhy`). */
+export type ModWhy = 'quick' | 'powerful' | 'careful' | 'counter' | 'weak' | 'drew' | 'flexible' | 'fists' | 'weakWeapon' | 'load' | 'shield' | PenaltyWhy;
+
+/** A pool and where it came from: the skill (and its dice, or untrained), then every change in whole dice. */
+export interface PoolWhy {
+  skill: string;
+  base: Dice;
+  untrained: boolean;
+  /** Dice added (+) or taken (−), for a reason each; a shield's bonus as `shield` with its dice. */
+  mods: { why: ModWhy; n: number; dice?: Dice }[];
+  dice: Dice;
 }
+
+function poolWhy(f: Fighter, skill: string, mods: PoolWhy['mods'], use: RollUse, add: Dice | null = null): PoolWhy {
+  const own = f.pools[skill];
+  const untrained = !(own && (own.n > 0 || own.mod > 0));
+  const base = pool(f, skill);
+  const all = mods.filter((m) => m.n);
+  if (add) all.unshift({ why: 'shield', n: add.n, dice: add });
+  for (const p of penaltyParts(f.injuries, use)) all.push({ why: p.why, n: -p.n });
+  const start = add ? { n: base.n + add.n, mod: base.mod + add.mod } : base;
+  const change = all.filter((m) => m.why !== 'shield').reduce((s, m) => s + m.n, 0);
+  return { skill, base, untrained, mods: all, dice: plus(start, change) };
+}
+
+/** The attack pool and why: the weapon's skill, the tactic, too little Physique, picking up this round, injuries. */
+export function attackWhy(f: Fighter, tactic: AttackTactic): PoolWhy {
+  const w = weaponOf(f);
+  return poolWhy(f, w.skill, [
+    { why: tactic === 'powerful' ? 'powerful' : 'quick', n: tactic === 'quick' ? 1 : tactic === 'powerful' ? -1 : 0 },
+    { why: 'weak', n: -w.weak },
+    { why: 'drew', n: f.drew && !w.props.Snabbdragen ? -1 : 0 },
+  ], { kind: 'combat', arms: armsOf(w) });
+}
+
+export const attackPool = (f: Fighter, tactic: AttackTactic): Dice => attackWhy(f, tactic).dice;
 
 /**
  * The best way to defend against this attacker, and its pool: parry with the weapon (fists at −2D6 against a
  * weapon; a Weak weapon −1D6), block with a shield (its melee bonus), or dodge (Undvika, less the load of what they
  * wear; never a counter). A Flexible weapon takes 1D6 off a parry or a block.
  */
-export function defencePool(f: Fighter, against: WeaponStats, tactic: DefenceTactic): { how: Defence; dice: Dice } {
-  const t = tactic === 'defensive' ? 1 : tactic === 'counter' ? -1 : 0;
-  const flexible = against.props.Böjlig ? 1 : 0;
-  const drew = f.drew ? 1 : 0;
+export function defencePool(f: Fighter, against: WeaponStats, tactic: DefenceTactic): { how: Defence; dice: Dice; why: PoolWhy } {
+  const tac = { why: (tactic === 'counter' ? 'counter' : 'careful') as ModWhy, n: tactic === 'defensive' ? 1 : tactic === 'counter' ? -1 : 0 };
+  const flexible = { why: 'flexible' as ModWhy, n: against.props.Böjlig ? -1 : 0 };
+  const drew = { why: 'drew' as ModWhy, n: f.drew ? -1 : 0 };
   const w = weaponOf(f);
-  const options: { how: Defence; dice: Dice }[] = [];
-  const parry = plus(pool(f, w.skill), t - w.weak - flexible - drew - (w.unarmed && !against.unarmed ? 2 : 0) - (w.props.Svag && !against.unarmed ? 1 : 0));
-  options.push({ how: 'parry', dice: withPenalty(parry, f.injuries, { kind: 'combat', arms: armsOf(w) }) });
-  if (f.shield?.shield) {
-    const s = f.shield.shield;
-    const block = pool(f, 'Sköld');
-    const d = plus({ n: block.n + s.melee.n, mod: block.mod + s.melee.mod }, t - flexible - drew);
-    options.push({ how: 'block', dice: withPenalty(d, f.injuries, { kind: 'combat', arms: ['left'] }) });
-  }
-  if (tactic !== 'counter') {
-    const d = plus(pool(f, 'Undvika'), t - f.loadDice - drew);
-    options.push({ how: 'dodge', dice: withPenalty(d, f.injuries, { kind: 'movement' }) });
-  }
-  return options.reduce((a, b) => (poolMean(b.dice) > poolMean(a.dice) ? b : a));
+  const options: { how: Defence; why: PoolWhy }[] = [];
+  options.push({ how: 'parry', why: poolWhy(f, w.skill, [tac, { why: 'weak', n: -w.weak }, flexible, drew,
+    { why: 'fists', n: w.unarmed && !against.unarmed ? -2 : 0 }, { why: 'weakWeapon', n: w.props.Svag && !against.unarmed ? -1 : 0 }], { kind: 'combat', arms: armsOf(w) }) });
+  if (f.shield?.shield) options.push({ how: 'block', why: poolWhy(f, 'Sköld', [tac, flexible, drew], { kind: 'combat', arms: ['left'] }, f.shield.shield.melee) });
+  if (tactic !== 'counter') options.push({ how: 'dodge', why: poolWhy(f, 'Undvika', [tac, { why: 'load', n: -f.loadDice }, drew], { kind: 'movement' }) });
+  const best = options.reduce((a, b) => (poolMean(b.why.dice) > poolMean(a.why.dice) ? b : a));
+  return { how: best.how, dice: best.why.dice, why: best.why };
 }
 
 /** Tactic fatigue (never a shock roll): quick +1 (none with a Quick weapon), powerful +2; defensive or counter +1. */
@@ -391,28 +422,33 @@ function reactionRoll(f: Fighter, rng: Rng): Roll {
 /** One blow, attack against defence, and the damage if it lands. */
 function strike(fight: Fight, a: Fighter, d: Fighter, tactic: AttackTactic, defence: DefenceTactic, rules: FightRules, rng: Rng, log: LogLine[]): { hit: boolean; margin: number } {
   const w = weaponOf(a);
-  const atk = rollOpen(attackPool(a, tactic), rng, 'Attack');
-  const where = rollDie(10, rng);
+  const atkWhy = attackWhy(a, tactic);
+  const atk = rollOpen(atkWhy.dice, rng, 'Attack');
+  const whereRoll = rollTable(10, rng, 'Where');
   const dp = defencePool(d, w, defence);
   const def = canAct(d) ? rollOpen(dp.dice, rng, 'Defence') : null;
   const defTotal = def?.total ?? 0;
-  const hit = atk.total >= defTotal;
+  const hit = atk.total >= defTotal; // a tie goes to the attacker
   const margin = atk.total - defTotal;
   const adv = hit ? advantages(margin) : 0;
-  const line: Extract<LogLine, { k: 'attack' }> = { k: 'attack', who: a.id, target: d.id, tactic, defence, how: def ? dp.how : 'none', attack: atk, defend: def, hit, advantages: adv };
+  const line: Extract<LogLine, { k: 'attack' }> = {
+    k: 'attack', who: a.id, target: d.id, tactic, defence, how: def ? dp.how : 'none', attack: atk, attackWhy: atkWhy, defend: def,
+    ...(def ? { defendWhy: dp.why } : {}), hit, advantages: adv,
+  };
   if (hit) {
     const { type, dice } = bestDamage(w);
     const tacticDice = tactic === 'quick' ? -1 : tactic === 'powerful' ? 2 + (w.props.Kraftfull ? 1 : 0) : 0;
     // Every advantage buys more damage for now: +2 each, +1D6 each with a Dangerous weapon (choosing edges is B8b).
-    const more = w.props.Vådlig ? { n: adv, mod: 0 } : { n: 0, mod: 2 * adv };
-    const damage = { n: Math.max(0, dice.n + tacticDice + more.n), mod: dice.mod + more.mod };
-    const part = (['head', 'torso', 'torso', 'torso', 'leftArm', 'leftArm', 'rightArm', 'rightArm', 'leftLeg', 'rightLeg'] as BodyPart[])[where - 1];
+    const extra = w.props.Vådlig ? { n: adv, mod: 0 } : { n: 0, mod: 2 * adv };
+    const damage = { n: Math.max(0, dice.n + tacticDice), mod: dice.mod };
+    const part = hitPart(whereRoll.total);
+    const armour = armourAgainst(d, part, type, piercingOf(w, type, d));
     const result = rollHit({
-      type: w.unarmed ? 'brawl' : type, damage, part, armour: armourAgainst(d, part, type, piercingOf(w, type, d)),
+      type: w.unarmed ? 'brawl' : type, damage, extra, part, armour,
       wounding: w.props.Sargande, brutal: w.props.Brutal, shallow: !!w.props.Ytlig, vitality: pool(d, 'attr:Livskraft'), victim: d.injuries,
     }, rules.tables, rng);
     d.injuries = result.after;
-    Object.assign(line, { part, result, type });
+    Object.assign(line, { part, result, type, whereRoll, damage: { weapon: dice, tactic: tacticDice, extra, armour } });
     log.push(line);
     // Someone killed lets go of everything; a wound that says *drops* lets go of what is in the arm hit.
     if (result.after.dead) dropFrom(fight, d, [undefined], rng, log);
@@ -510,9 +546,11 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
     const defence = (choices[d.id] ?? {}).defend ?? 'standard';
     const dTactic: DefenceTactic = canAct(d) ? defence : 'standard';
     const { hit, margin } = strike(fight, a, d, tactic, dTactic, rules, rng, log);
-    a.injuries = { ...a.injuries, fatigue: a.injuries.fatigue + tacticFatigue(tactic, null, weaponOf(a)) };
+    a.injuries = structuredClone(a.injuries);
+    if (tactic !== 'standard') addFatigue(a.injuries, tacticFatigue(tactic, null, weaponOf(a)), tactic);
     if (canAct(d)) {
-      d.injuries = { ...d.injuries, fatigue: d.injuries.fatigue + tacticFatigue(null, dTactic, weaponOf(d)) };
+      d.injuries = structuredClone(d.injuries);
+      if (dTactic !== 'standard') addFatigue(d.injuries, tacticFatigue(null, dTactic, weaponOf(d)), dTactic === 'defensive' ? 'careful' : 'counter');
       if (swaps(dTactic, hit, margin)) nextAttacker = d.side;
     }
   }

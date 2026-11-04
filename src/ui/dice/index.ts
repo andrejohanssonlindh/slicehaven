@@ -62,6 +62,10 @@ export interface ShowOpts {
   level?: DiceLevel;
   skin?: string;
   close?: DiceClose;
+  /** Rolls (by index) only written, not thrown: someone else's, in a fight (the director: you throw your own dice). */
+  unthrown?: number[];
+  /** Plain lines written under the results (what a roll meant: "armour 5, 8 gets through"). */
+  notes?: string[];
 }
 
 /** What a level's show needs: the rolls, the skin, the overlay to draw in, and a signal that the player tapped to skip. */
@@ -84,9 +88,10 @@ const wait = (ms: number, skip: Promise<void>): Promise<void> => Promise.race([n
 
 /** Show some rolls (one throw: they land together), then their results; resolves when the show is over. */
 export async function showRolls(rolls: Roll[], opts: ShowOpts = {}): Promise<void> {
-  if (!rolls.length) return;
+  if (!rolls.length && !opts.notes?.length) return;
   const set = loadSettings();
-  const level = opts.level ?? set.dice;
+  const toThrow = rolls.filter((_, i) => !opts.unthrown?.includes(i));
+  const level = toThrow.length ? opts.level ?? set.dice : 'result';
   const skin = skinOf(opts.skin ?? set.diceSkin);
   const root = document.createElement('div');
   root.className = `dice-show dice-${level}`;
@@ -106,8 +111,8 @@ export async function showRolls(rolls: Roll[], opts: ShowOpts = {}): Promise<voi
   const skip = nextTap();
   // Many rolls at once (the creator's "roll everything"): the first throw's worth is shown as dice, all in the line.
   const thrown: Roll[] = [];
-  for (const r of rolls) if (thrown.reduce((n, x) => n + x.rolled.length, 0) + r.rolled.length <= MAX_SHOWN) thrown.push(r);
-  const stage: Stage = { rolls: thrown.length ? thrown : rolls.slice(0, 1), skin, root, skipped: () => tapped, skip, cleanup: [] };
+  for (const r of toThrow) if (thrown.reduce((n, x) => n + x.rolled.length, 0) + r.rolled.length <= MAX_SHOWN) thrown.push(r);
+  const stage: Stage = { rolls: thrown.length ? thrown : toThrow.slice(0, 1), skin, root, skipped: () => tapped, skip, cleanup: [] };
   try {
     if (level === 'glass') {
       const { throwOnGlass } = await import('./glass');
@@ -129,6 +134,12 @@ export async function showRolls(rolls: Roll[], opts: ShowOpts = {}): Promise<voi
         if (r.success !== undefined) line.classList.add(r.success ? 'ok' : 'fail');
         lines.append(line);
       }
+    }
+    for (const n of opts.notes ?? []) {
+      const line = document.createElement('div');
+      line.className = 'note';
+      line.textContent = n;
+      lines.append(line);
     }
     root.append(lines);
     if ((opts.close ?? set.diceClose) === 'ok') {

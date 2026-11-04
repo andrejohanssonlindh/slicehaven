@@ -4,6 +4,9 @@ Only decisions that still stand. Ones that were replaced are removed (git histor
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-04 | **An untrained combat skill rolls 2D6 (Q48)**, the base value of every combat skill | Director. |
+| 2026-11-04 | **A fight ends when no enemies are left and you press OK (Q49)**, like Fallout; no "end of scene" restores anyone. **Fatigue comes back one point per stretch of world time**, faster when actively resting (sat down: three times as fast); the stretch is the difficulty's (easy 1 minute, normal 2, hard 4). The knocked out lie there until their fatigue is gone | Director: the scene isn't the point; time and rest are. |
+| 2026-11-04 | **In a fight, you throw only your own dice**; the other side's rolls are written beside them. A blow is shown in steps: who hits, then where (the D10) and the damage, then the extra damage and any serious wound. **What you see follows the difficulty**: easy, both sides in numbers; normal, your own in numbers and the foe in words; hard, your fatigue too in words ("very tired") | Director, after the first fight. |
 | 2026-11-04 | **Combat distances in metres (Q45):** adjacent (melee) up to 2 m, short 2–10, medium 10–25, long 25–50, very long beyond. **Moving is the side action**: walk up to 5 m in your round; run up to 10 m with a movement roll if active in the melee phase. A round is 4 s | Director: reasonable. |
 | 2026-11-04 | **The first fight is real (Q46):** someone can die, and New game resets it. The director wants to see the full flow, death included | Director. |
 | 2026-11-04 | **Negative effects stack (Q47):** dazed and drops from one blow are −2D6; the same effect twice counts twice. **Dropping your weapon is real**: it lands on the ground nearby, you have none until you pick it up, and **picking it up is a side action** | Director. |

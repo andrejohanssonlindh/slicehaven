@@ -1,6 +1,6 @@
 import type { Dice } from './chargen/tables';
 import { modify } from './checks';
-import { type Roll, rollDie, rollOpen, rollTest } from './dice';
+import { type Roll, rollDie, rollOpen, rollTable, rollTest } from './dice';
 import type { Rng } from './rng';
 
 /**
@@ -276,10 +276,18 @@ const LEG_CUTS = new Set<CutArea>(['foot', 'calf', 'knee', 'thigh', 'hip']);
 
 // ── A person's injuries (plain JSON, saved) ─────────────────────────────────────────────────────────────────────
 
+/** Where fatigue came from, so a person can see it ("7 of 16 from blows taken, 2 from powerful strikes"). */
+export type FatigueWhy = 'hits' | 'bleeding' | 'fire' | 'quick' | 'powerful' | 'careful' | 'counter';
+export const FATIGUE_WHYS: FatigueWhy[] = ['hits', 'bleeding', 'fire', 'powerful', 'quick', 'careful', 'counter'];
+
 /** Everything damage has done to one person. Plain JSON. */
 export interface Injuries {
-  /** Fatigue gained this scene (all of it recovers when the scene ends). */
+  /** Fatigue gained (it recovers with time: `recoverFatigue`). */
   fatigue: number;
+  /** The same fatigue by where it came from (sums to `fatigue`). */
+  fatigueFrom: Partial<Record<FatigueWhy, number>>;
+  /** World minutes rested toward the next point of fatigue back. */
+  rested: number;
   /** The floor fatigue can't go below and that counts on top (load; an infection adds its level). */
   baseFatigue: number;
   /** A shock roll is owed at the end of this phase (damage gave fatigue). */
@@ -315,12 +323,46 @@ export interface Injuries {
 }
 
 export const unhurt = (baseFatigue = 0): Injuries => ({
-  fatigue: 0, baseFatigue, shockDue: false, short: [], blinded: false, pain: 0, wounds: {}, bleed: null, infection: null, ignited: null,
+  fatigue: 0, fatigueFrom: {}, rested: 0, baseFatigue, shockDue: false, short: [], blinded: false, pain: 0, wounds: {}, bleed: null, infection: null, ignited: null,
   internal: 0, broken: [], lost: [], armourOff: [], eyes: 0, features: 0, teeth: 0, genitals: false, attr: {}, hands: 0, out: false, dying: false, dead: false,
 });
 
 /** The fatigue that counts (shock rolls are against it): this scene's, the base, and an infection's level. */
 export const totalFatigue = (i: Injuries): number => i.fatigue + i.baseFatigue + (i.infection?.level ?? 0);
+
+/** Add fatigue, remembering where it came from (changes `i`). */
+export function addFatigue(i: Injuries, n: number, why: FatigueWhy): void {
+  if (n <= 0) return;
+  i.fatigue += n;
+  i.fatigueFrom[why] = (i.fatigueFrom[why] ?? 0) + n;
+}
+
+/**
+ * Time passes (Q49, the director: fatigue goes one point at a time, faster when resting; how fast is the
+ * difficulty's). `perPoint` world minutes give one point back. What came last goes first: tactics before blows.
+ * Someone knocked out wakes when their fatigue is all gone (reading); the dying and the dead don't.
+ */
+export function recoverFatigue(before: Injuries, minutes: number, perPoint: number): Injuries {
+  if (before.dead || (before.fatigue <= 0 && !before.out) || minutes <= 0) return before;
+  const i: Injuries = structuredClone(before);
+  i.rested += minutes;
+  let back = Math.floor(i.rested / perPoint);
+  i.rested -= back * perPoint;
+  back = Math.min(back, i.fatigue);
+  i.fatigue -= back;
+  for (const why of [...FATIGUE_WHYS].reverse()) {
+    const take = Math.min(back, i.fatigueFrom[why] ?? 0);
+    if (!take) continue;
+    back -= take;
+    i.fatigueFrom[why] = (i.fatigueFrom[why] ?? 0) - take;
+    if (!i.fatigueFrom[why]) delete i.fatigueFrom[why];
+  }
+  if (i.fatigue <= 0) {
+    i.rested = 0;
+    if (i.out && !i.dying) { i.out = false; i.short = []; }
+  }
+  return i;
+}
 
 /**
  * Merge a second bleed (or fire, or infection) into the one there is: the higher of each value, then the difficulty
@@ -430,23 +472,35 @@ export interface RollUse {
 
 const PAINED_ATTRS = new Set(['Förflyttning', 'Kroppsbyggnad', 'Reaktion', 'Vaksamhet']);
 
-/** How many D6 a person's injuries take off a roll. */
-export function penaltyDice(i: Injuries, use: RollUse): number {
-  let d = i.short.length; // each short effect −1D6 on everything; they stack (Q47)
+/** One reason a roll loses dice: a short effect, pain, a wounded part, broken ribs, blinded, an eye lost. */
+export type PenaltyWhy = ShortKind | 'pain' | BodyPart | 'ribs' | 'blinded' | 'eye';
+
+/** What a person's injuries take off a roll, reason by reason (dice each). */
+export function penaltyParts(i: Injuries, use: RollUse): { why: PenaltyWhy; n: number }[] {
+  const out: { why: PenaltyWhy; n: number }[] = [];
+  const add = (why: PenaltyWhy, n: number) => { if (n > 0) { const o = out.find((x) => x.why === why); if (o) o.n += n; else out.push({ why, n }); } };
+  for (const s of i.short) add(s, 1); // each short effect −1D6 on everything; they stack (Q47)
   const movementish = use.kind === 'movement' || (use.kind === 'attr' && use.attr === 'Förflyttning');
-  if (use.kind === 'combat' || use.kind === 'movement' || use.kind === 'mystic' || (use.kind === 'attr' && PAINED_ATTRS.has(use.attr ?? ''))) d += i.pain;
-  if (use.kind === 'shock') d += i.wounds.head ?? 0;
-  if (use.kind === 'death') d += i.wounds.torso ?? 0;
+  if (use.kind === 'combat' || use.kind === 'movement' || use.kind === 'mystic' || (use.kind === 'attr' && PAINED_ATTRS.has(use.attr ?? ''))) add('pain', i.pain);
+  if (use.kind === 'shock') add('head', i.wounds.head ?? 0);
+  if (use.kind === 'death') add('torso', i.wounds.torso ?? 0);
   if (use.kind === 'combat') {
-    const arms = use.arms ?? ['right'];
-    d += Math.max(...arms.map((s) => i.wounds[s === 'left' ? 'leftArm' : 'rightArm'] ?? 0));
-    if (i.broken.includes('ribs')) d += 1;
+    const arms = (use.arms ?? ['right']).map((s) => (s === 'left' ? 'leftArm' : 'rightArm') as BodyPart);
+    const worst = arms.reduce((a, b) => ((i.wounds[b] ?? 0) > (i.wounds[a] ?? 0) ? b : a));
+    add(worst, i.wounds[worst] ?? 0);
+    if (i.broken.includes('ribs')) add('ribs', 1);
   }
-  if (movementish) d += Math.max(i.wounds.leftLeg ?? 0, i.wounds.rightLeg ?? 0);
-  if (use.sight && i.blinded) d += 2;
-  if (use.ranged && i.eyes > 0 && !use.aimed) d += 1;
-  return d;
+  if (movementish) {
+    const leg: BodyPart = (i.wounds.rightLeg ?? 0) > (i.wounds.leftLeg ?? 0) ? 'rightLeg' : 'leftLeg';
+    add(leg, i.wounds[leg] ?? 0);
+  }
+  if (use.sight && i.blinded) add('blinded', 2);
+  if (use.ranged && i.eyes > 0 && !use.aimed) add('eye', 1);
+  return out;
 }
+
+/** How many D6 a person's injuries take off a roll. */
+export const penaltyDice = (i: Injuries, use: RollUse): number => penaltyParts(i, use).reduce((s, p) => s + p.n, 0);
 
 /** A pool with injuries taken off (never below 1D6 for a pool that had dice). */
 export const withPenalty = (pool: Dice, i: Injuries, use: RollUse): Dice => modify(pool, -penaltyDice(i, use));
@@ -456,8 +510,10 @@ export const withPenalty = (pool: Dice, i: Injuries, use: RollUse): Dice => modi
 /** What a landed blow brings. */
 export interface HitInput {
   type: DamageType;
-  /** The damage pool: weapon dice with base damage, tactic and more-damage edges already in. */
+  /** The damage pool: weapon dice with base damage and the tactic in. */
   damage: Dice;
+  /** More damage from advantages, rolled (or added) after it so it can be shown on its own. */
+  extra?: Dice;
   /** Chosen with the precision edge; otherwise `locationD10` (the D10 rolled with the attack) or a fresh one. */
   part?: BodyPart;
   locationD10?: number;
@@ -477,8 +533,12 @@ export interface HitInput {
 export interface HitResult {
   part: BodyPart;
   damageRoll: Roll;
-  /** The D10 that picks the serious wound. */
+  /** The extra damage: its roll if it had dice, and what it came to (0 with none). */
+  extraRoll?: Roll;
+  extra: number;
+  /** The D10 that picks the serious wound (`woundRoll` is the same die, to show). */
   woundD10: number;
+  woundRoll: Roll;
   net: number;
   fatigue: number;
   serious: (RowRead & { result: number; deathRoll?: Roll; died: boolean }) | null;
@@ -495,12 +555,15 @@ export interface HitResult {
 export function rollHit(h: HitInput, tables: Record<DamageType, WoundTableDef>, rng: Rng): HitResult {
   const part = h.part ?? hitPart(h.locationD10 ?? rollDie(10, rng));
   const damageRoll = rollOpen(h.damage, rng, 'Damage');
-  const woundD10 = rollDie(10, rng);
-  const net = damageRoll.total - Math.max(0, h.armour);
+  const extraRoll = h.extra && h.extra.n > 0 ? rollOpen(h.extra, rng, 'Extra damage') : undefined;
+  const extra = extraRoll ? extraRoll.total : h.extra?.mod ?? 0;
+  const woundRoll = rollTable(10, rng, 'Serious wound');
+  const woundD10 = woundRoll.total;
+  const net = damageRoll.total + extra - Math.max(0, h.armour);
   const t = damageTable(net);
   let after = structuredClone(h.victim);
   if (t.fatigue > 0) {
-    after.fatigue += t.fatigue + (h.brutal ?? 0);
+    addFatigue(after, t.fatigue + (h.brutal ?? 0), 'hits');
     after.shockDue = true;
   }
   let serious: HitResult['serious'] = null;
@@ -522,7 +585,7 @@ export function rollHit(h: HitInput, tables: Record<DamageType, WoundTableDef>, 
     }
     serious = { ...read, result, ...(deathRoll ? { deathRoll } : {}), died };
   }
-  return { part, damageRoll, woundD10, net, fatigue: t.fatigue > 0 ? t.fatigue + (h.brutal ?? 0) : 0, serious, risks, after };
+  return { part, damageRoll, ...(extraRoll ? { extraRoll } : {}), extra, woundD10, woundRoll, net, fatigue: t.fatigue > 0 ? t.fatigue + (h.brutal ?? 0) : 0, serious, risks, after };
 }
 
 // ── The end of a phase, and of a scene ──────────────────────────────────────────────────────────────────────────
@@ -544,8 +607,8 @@ export function endOfPhase(before: Injuries, vitality: Dice, rng: Rng): PhaseEnd
   const rolls: Roll[] = [];
   const notes: PhaseEnd['notes'] = [];
   if (i.dead) return { injuries: i, rolls, notes };
-  if (i.ignited && !i.out) { i.fatigue += i.ignited.heat; i.shockDue = true; notes.push('burned'); }
-  if (i.bleed && !i.out) { i.fatigue += i.bleed.rate; i.shockDue = true; notes.push('bled'); }
+  if (i.ignited && !i.out) { addFatigue(i, i.ignited.heat, 'fire'); i.shockDue = true; notes.push('burned'); }
+  if (i.bleed && !i.out) { addFatigue(i, i.bleed.rate, 'bleeding'); i.shockDue = true; notes.push('bled'); }
   if (i.shockDue && !i.out) {
     const r = rollTest(withPenalty(vitality, i, { kind: 'shock' }), totalFatigue(i), rng, 'Shock roll');
     rolls.push(r);
@@ -572,7 +635,7 @@ export function endOfPhase(before: Injuries, vitality: Dice, rng: Rng): PhaseEnd
 export const endOfActivePhase = (i: Injuries): Injuries => ({ ...i, short: [], blinded: false });
 
 /** The scene is over: fatigue recovers, the knocked out wake. Everything lasting stays. */
-export const endOfScene = (i: Injuries): Injuries => (i.dead ? i : { ...i, fatigue: 0, shockDue: false, short: [], blinded: false, out: false });
+export const endOfScene = (i: Injuries): Injuries => (i.dead ? i : { ...i, fatigue: 0, fatigueFrom: {}, rested: 0, shockDue: false, short: [], blinded: false, out: false });
 
 // ── Falls and burns ─────────────────────────────────────────────────────────────────────────────────────────────
 

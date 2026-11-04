@@ -40,6 +40,8 @@
 }
 .dice-lines .ok { color: #b8e08a; }
 .dice-lines .fail { color: #f0a080; }
+.dice-lines .note { font-size: 0.9em; opacity: 0.85; }
+.dice-lines .note.big { font-size: 1em; opacity: 1; font-weight: bold; }
 
 /* OK, floating at the right: the game's bevelled button (as in ui/style.css, repeated so any page has it). */
 .dice-ok {

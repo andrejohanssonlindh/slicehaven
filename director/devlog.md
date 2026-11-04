@@ -2,6 +2,19 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-04 — B8a: your notes on the first fight
+
+- **You throw only your own dice.** The gladiator's rolls are written beside yours, not thrown.
+- **A blow comes in steps**, each waiting for OK: first **who hits** (attack against defence, and any advantages), then **where and how much** (the D10 for where it lands, the damage dice, the extra damage from advantages on its own, less armour: "Damage 12 + 2 extra (1 advantage) − armour 6 = 8 gets through: 2 fatigue"), then on a serious wound **its D10** and the death roll.
+- **The log gives each pool and its make-up**: "You strike: 2D6 (Sword 2D6 untrained) = 13 against Arruns's parry 2D6+2 (Sword 2D6+2) = 6: it hits." Tactics, picking up, pain and wounds show as their own +1D6 or −1D6.
+- **Equal attack and defence:** the rules already give a tie to the attacker (now a test says so, and the log says "a tie: the attacker wins it"). What looked like a dodge was most likely a hit that glanced off the gladiator's armour; the log now says that in numbers.
+- **Each side has a card**: weapon and skill dice, a fatigue bar (full: where most people fail the shock roll), and how they are. **By difficulty**: easy, both sides in numbers; normal, yours in numbers and the gladiator's in words ("tired", "in pain"); hard, your own fatigue in words too.
+- **Your condition** (the new **You** button bottom left, or tap your card in a fight): fatigue and where each point came from ("6 / 9 from blows taken, 2 / 9 from powerful strikes"), the shock roll it's against, how fast it comes back, the dice taken off each kind of roll and why, and the wounds, pain, bleeding and breaks. On easy, tap the gladiator's card for theirs.
+- **Q48: untrained is 2D6** now, as you said. The shepherd with a sword is less hopeless.
+- **Q49:** the fight ends when no one is left to fight and you press **OK** (it was *Walk away*). Nothing is restored then. **Fatigue comes back one point at a time**: a point every 1, 2 or 4 minutes of world time (easy, normal, hard), three times as fast **sitting down**. With the clock stopped, a real second counts as a world minute so it still comes back.
+- **The knocked-out gladiator stays down** until their fatigue is gone (they used to get up when you walked away). If you're the one knocked out and spared, you lie there until you come round.
+- Save version 8 (fatigue now remembers where it came from).
+
 ## 2026-11-04 — B8a: a fight to the death in the arena (first playable)
 
 - **Try it:** `/spike3d/?map=arena`. Weapons lie on the sand by the west gate: an arming sword, a quarterstaff, a hand axe, a cudgel. Tap one → *Pick up*. Walk to the gladiator at the far end, tap them → **Fight**. (The default shepherd fights best with the **quarterstaff**: staff is their skill. With a sword they roll 1D6, see Q48.)
