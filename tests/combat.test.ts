@@ -196,6 +196,22 @@ describe('fatigue', () => {
   });
 });
 
+describe('drawing your own weapon', () => {
+  it('is the side action: from the belt to the hand, −1D6 on the next roll unless quick to draw', () => {
+    const f = startFight([fighter('a', 0, 0, { weapon: null, belt: [{ id: 'own', weapon: row('Stridssvärd') }] }), fighter('b', 1, 8)]);
+    const r = resolveRound(f, { a: { draw: 'own' } }, RULES, Rng.fromSeed(1));
+    const a = r.fight.fighters[0];
+    expect(a.weapon?.id).toBe('own');
+    expect(a.belt).toEqual([]);
+    expect(a.drew).toBe(true);
+    expect(r.log[0]).toEqual({ k: 'draw', who: 'a', item: 'own' });
+    expect(attackWhy(a, 'standard').mods).toContainEqual({ why: 'drew', n: -1 });
+    // Hands full: nothing is drawn.
+    const full = startFight([fighter('a', 0, 0, { belt: [{ id: 'own', weapon: row('Dolk') }] })]);
+    expect(resolveRound(full, { a: { draw: 'own' } }, RULES, Rng.fromSeed(1)).fight.fighters[0].weapon?.id).toBe('a-sword');
+  });
+});
+
 describe('the upper hand (declared in reverse order)', () => {
   it('belongs to the attacker in a melee, with no roll', () => {
     const f = { ...startFight([fighter('a', 0, 0), fighter('b', 1, 1.5)]), melee: { attacker: 1, opened: 1 } };

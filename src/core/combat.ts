@@ -176,6 +176,8 @@ export interface Fighter {
   weapon: FightItem | null;
   /** In the left hand. */
   shield: FightItem | null;
+  /** Carried on them, not in hand (at the belt, on the back): drawn as the side action. */
+  belt?: FightItem[];
   injuries: Injuries;
   /** Picked something up this round: −1D6 on their next attack or defence unless it is quick to draw. */
   drew: boolean;
@@ -217,6 +219,8 @@ export interface Choice {
   /** The side action: walk or run towards a spot, or pick something up. */
   move?: { x: number; z: number; run?: boolean };
   pickUp?: string;
+  /** Draw something they carry (`Fighter.belt`), as the side action: −1D6 on the next attack or defence, as picking up. */
+  draw?: string;
   /** The main action, as the attacker in a melee: attack with a tactic, retreat, or (on someone knocked out) the mercy stroke. */
   attack?: AttackTactic;
   retreat?: boolean;
@@ -242,6 +246,7 @@ export interface FightRules {
 export type LogLine =
   | { k: 'move'; who: string; to: { x: number; z: number }; ran?: boolean; roll?: Roll }
   | { k: 'pickUp'; who: string; item: string }
+  | { k: 'draw'; who: string; item: string }
   | { k: 'open'; attacker: number; rolls: Roll[] }
   /** Who has the upper hand this round, and the Reaktion rolls that decided it (none in a melee: the attacker has it). */
   | { k: 'initiative'; upper: number; rolls: Roll[]; ids: string[] }
@@ -596,6 +601,16 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
         f[slot] = { id: item.id, ...(item.weapon ? { weapon: item.weapon } : {}), ...(item.shield ? { shield: item.shield } : {}) };
         f.drew = true;
         log.push({ k: 'pickUp', who: f.id, item: item.id });
+      }
+    } else if (c.draw) {
+      const i = (f.belt ?? []).findIndex((b) => b.id === c.draw);
+      const item = f.belt?.[i];
+      const slot = item?.shield ? 'shield' : 'weapon';
+      if (item && !f[slot] && !(slot === 'shield' && weaponOf(f).hands === 2)) {
+        f.belt!.splice(i, 1);
+        f[slot] = item;
+        f.drew = true;
+        log.push({ k: 'draw', who: f.id, item: item.id });
       }
     } else if (c.move && !inMelee(f)) moveTowards(fight, f, c.move, !!c.move.run, rules, rng, log);
   }

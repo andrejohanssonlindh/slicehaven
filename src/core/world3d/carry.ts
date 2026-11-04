@@ -73,6 +73,8 @@ export interface Loose {
   by?: string;
   /** One of the map's people holding it as their weapon (plan B8a), by id: their own, drawn for a fight, or picked up in one. */
   wield?: string;
+  /** Carried on the hero, not in hand (at the belt, on the back): their own gear, drawn when wanted. Not in the world. */
+  stowed?: boolean;
 }
 
 /**
@@ -95,6 +97,8 @@ export interface CarryState {
   hidden: boolean;
   /** Every thing that has been moved, by its id. */
   loose: Record<string, Loose>;
+  /** Whose gear the hero was given (`SpikeWorld.outfit`): a new hero, or other gear, gives it again. */
+  outfit?: string;
 }
 
 export const newCarry = (): CarryState => ({ held: null, hidden: false, loose: {} });

@@ -1,5 +1,5 @@
 import { CONTENT } from '../content/chargen';
-import { WEAPONS, propList } from '../content/chargen/equipment';
+import { SHIELDS, WEAPONS, propList } from '../content/chargen/equipment';
 import { diceText } from '../core/chargen/tables';
 import { UNTRAINED } from '../core/combat';
 import { PERSON_LEVELS, type PersonLevel } from '../core/npcsheet';
@@ -31,6 +31,9 @@ export function pageHero(): Hero {
     const s = r.chars.find((c) => c.id === r.current) ?? r.chars[0];
     if (s) {
       const h = heroFromChar(s.details?.name ?? '', derive(s, CONTENT));
+      // What they own from the creator: every weapon and shield chosen or bought (several are possible).
+      const owned = [...Object.values(s.equipment.weapons), ...s.equipment.bought.flatMap((b) => Array<string>(Math.max(1, b.qty)).fill(b.name))];
+      h.gear = owned.filter((n) => WEAPONS.some((w) => w.sv === n) || SHIELDS.some((w) => w.sv === n));
       if (Object.keys(h.dice).some((k) => !k.startsWith('attr:'))) return h;
     }
   } catch {
@@ -106,9 +109,9 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
    * Pick one of what a thing offers, in the same sheet (plan B8a): a rack's stock (every weapon, with its skill and
    * damage), or how good a fighter a gong calls (the levels).
    */
-  function pick(what: 'stock' | 'calls', target: ActTarget): void {
+  function pick(what: 'stock' | 'calls' | 'gear', target: ActTarget | null): void {
     const w = world();
-    const kind = THINGS.get(target.kind);
+    const kind = target ? THINGS.get(target.kind) : null;
     offersEl.replaceChildren();
     const add = (label: string, small: string, go: () => void): void => {
       const b = document.createElement('button');
@@ -124,7 +127,25 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
       b.addEventListener('click', () => { close(); go(); save(); });
       offersEl.appendChild(b);
     };
-    if (what === 'stock' && kind.stock) {
+    if (what === 'gear') {
+      // Your own weapons (the director: "there might be several, so one has to choose").
+      const gear = w.stowed;
+      if (gear.length === 1) {
+        w.drawOwn(gear[0].id);
+        return notify(t('act.drew', 'You draw your {name}.', { name: thingName(THINGS.get(gear[0].kind)) }));
+      }
+      nameEl.textContent = t('act.pick.gear', 'Draw which?');
+      lookEl.textContent = t('act.pick.gearlook', 'What you carry. Your skill with each is in brackets.');
+      for (const g of gear) {
+        const thing = THINGS.get(g.kind);
+        const row = thing.weapon ? WEAPONS.find((x) => x.sv === thing.weapon) : undefined;
+        const skill = row ? `${rollableName(row.skill)} ${diceText(doer.dice(row.skill).n > 0 ? doer.dice(row.skill) : UNTRAINED)}` : '';
+        add(cap(t(`thing.${g.kind}.name`, thingName(thing))), [skill, row && row.h1 === '–' ? t('act.pick.two', 'two hands') : ''].filter(Boolean).join(' · '), () => {
+          if (w.drawOwn(g.id)) notify(t('act.drew', 'You draw your {name}.', { name: thingName(thing) }));
+        });
+      }
+    } else if (!kind || !target) return;
+    else if (what === 'stock' && kind.stock) {
       nameEl.textContent = t('act.pick.stock', 'Take which?');
       lookEl.textContent = t('act.pick.stocklook', 'Your skill with each is in brackets.');
       const kinds = THINGS.placeable.filter((k) => k !== kind.id && THINGS.get(k).chain.includes(kind.stock!));

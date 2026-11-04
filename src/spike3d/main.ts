@@ -1,5 +1,6 @@
 import { type Sky, WIND_DIRS, clockText } from '../core/environment';
 import { ASPECTS, LEVEL_NAMES } from '../core/filaments';
+import { gearKinds } from '../content/things/gear';
 import { MAPS, mapNamed } from '../content/maps';
 import { clearWorld, loadWorld, saveWorld } from '../core/world3d/save';
 import { rollPool, rollTable, rollTest } from '../core/dice';
@@ -696,6 +697,9 @@ setTimeout(() => {
     world.loadState(saved);
     notify(t('spike.welcomeback', 'The world is as you left it. (New game in the panel starts over.)'));
   }
+  // The hero's own gear (the director: use what you have from creation), carried on them until drawn.
+  const gear = gearKinds(hero.gear ?? []);
+  world.outfit(gear.kinds, `${hero.from}:${hero.name}:${(hero.gear ?? []).join(',')}`);
   fight.check();
   if (saving) {
     setInterval(save, 5000);

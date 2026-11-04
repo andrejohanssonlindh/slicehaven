@@ -86,6 +86,10 @@ export interface ActWorld {
   owners?: OwnerView;
   /** What a doer holds now (its kind), or null: hands full can't take another or sit (plan B3b). Left out: hands are free. */
   holding?: (doer: string) => string | null;
+  /** What a doer carries on them, not in hand (their own gear, by kind; plan B8a). Left out: nothing. */
+  stowed?: (doer: string) => string[];
+  /** Is what the doer holds their own (it can be put away on them)? */
+  holdsOwn?: (doer: string) => boolean;
 }
 
 /** What the owner gate asks of the world (plan B3c). */
@@ -163,7 +167,9 @@ export type Outcome =
   /** The doer puts down what they hold, where they stand. */
   | { putDown: true }
   /** The doer picks one of what the thing offers (its `stock` or the levels of whom it `calls`); the page asks which. */
-  | { choose: 'stock' | 'calls' };
+  | { choose: 'stock' | 'calls' | 'gear' }
+  /** The doer puts what they hold away on them (their own gear: at the belt, on the back). */
+  | { stow: true };
 
 /** A roll to resolve an action: the doer's best of these skills, against a difficulty. */
 export interface ActRoll {
@@ -235,7 +241,8 @@ export type ActEvent =
   | { kind: 'carry'; target: ActTarget; hidden: boolean }
   | { kind: 'putdown'; at: Spot }
   /** Something to pick from the thing: which of its stock to take, or how good a fighter to call (the page asks). */
-  | { kind: 'choose'; what: 'stock' | 'calls'; target: ActTarget }
+  | { kind: 'choose'; what: 'stock' | 'calls' | 'gear'; target: ActTarget | null }
+  | { kind: 'stow' }
   /** Who saw a wrong the hero did, and how far it moved their view of them (B3c; the page shows it on easy). */
   | { kind: 'seen'; by: { id: string; name: string; by: number }[] };
 
@@ -378,9 +385,9 @@ function apply(outs: readonly Outcome[], target: ActTarget | null, at: Spot, nam
       events.push({ kind: 'carry', target, hidden: o.carry === 'hidden' });
     } else if ('putDown' in o) events.push({ kind: 'putdown', at });
     else if ('choose' in o) {
-      if (!target) throw new Error('choosing needs a thing to choose from');
+      if (!target && o.choose !== 'gear') throw new Error('choosing needs a thing to choose from');
       events.push({ kind: 'choose', what: o.choose, target });
-    }
+    } else if ('stow' in o) events.push({ kind: 'stow' });
   }
 }
 

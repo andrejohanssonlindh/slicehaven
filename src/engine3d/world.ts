@@ -2427,6 +2427,8 @@ export class SpikeWorld {
         wealth: (house) => this.houseWealth(house),
       },
       holding: (doer) => (doer === 'hero' ? this.holding : null),
+      stowed: (doer) => (doer === 'hero' ? this.stowed.map((s) => s.kind) : []),
+      holdsOwn: (doer) => doer === 'hero' && !!this.carry.held && !!this.carry.loose[this.carry.held]?.mine,
       leadStudy: (t) => {
         const id = this.propLeads.get(t.id), def = id ? LEADS[id] : undefined, rec = id ? this.leads[id] : undefined;
         return id && def?.study && rec && !rec.studied ? { lead: id, study: def.study } : null;
@@ -2461,6 +2463,7 @@ export class SpikeWorld {
       else if (e.kind === 'sit' && hero) this.sitHero(e.target);
       else if (e.kind === 'carry' && hero) this.pickUp(e.target, e.hidden);
       else if (e.kind === 'putdown' && hero) this.putDown();
+      else if (e.kind === 'stow' && hero) this.stowHeld();
       else if (e.kind === 'noise') this.makeNoise({ ...e.at, loud: e.loud, kind: e.sound, by: doer.id });
     }
     // A wrong by the hero is answered by whoever saw it (B3c); what the map's people do wrong waits for them to be watched too.
@@ -2799,6 +2802,50 @@ export class SpikeWorld {
   }
 
   /**
+   * The hero's own gear (plan B8a, the director: "use what you have from creation"): the weapons and shields they own,
+   * carried at the belt or on the back, not in hand. Given once per hero (`key`: who they are and what they own); a
+   * new hero or other gear replaces what the last one carried (anything dropped in the world stays where it lies).
+   */
+  outfit(kinds: string[], key: string): void {
+    if (this.carry.outfit === key) return;
+    for (const [id, l] of Object.entries(this.carry.loose)) if (l.stowed || (id.startsWith('hero:own:') && this.carry.held === id)) delete this.carry.loose[id];
+    if (this.carry.held && !this.carry.loose[this.carry.held]) this.carry.held = null;
+    kinds.forEach((kind, n) => {
+      if (!THINGS.has(kind)) return;
+      this.carry.loose[`hero:own:${kind}:${n}`] = { kind, seed: n + 1, home: { x: this.hero.x, z: this.hero.z, level: 0, house: null, rot: 0, room: null }, at: null, mine: true, stowed: true };
+    });
+    this.carry.outfit = key;
+    this.showHeld();
+  }
+
+  /** What the hero carries on them, not in hand (their own gear): id and kind, in the order given. */
+  get stowed(): { id: string; kind: string }[] {
+    return Object.entries(this.carry.loose).filter(([, l]) => l.stowed).map(([id, l]) => ({ id, kind: l.kind }));
+  }
+
+  /** Draw one of the hero's own things into their hand (hands must be free). Returns false if it can't. */
+  drawOwn(id: string): boolean {
+    const l = this.carry.loose[id];
+    if (!l?.stowed || this.carry.held) return false;
+    delete l.stowed;
+    this.carry.held = id;
+    this.carry.hidden = false;
+    this.showHeld();
+    return true;
+  }
+
+  /** Put what the hero holds away on them (only their own: something of someone else's is put down or given back). */
+  stowHeld(): boolean {
+    const id = this.carry.held;
+    const l = id ? this.carry.loose[id] : null;
+    if (!id || !l?.mine) return false;
+    l.stowed = true;
+    this.carry.held = null;
+    this.showHeld();
+    return true;
+  }
+
+  /**
    * The hero takes one of a rack's stock (a weapon rack: any weapon): a new thing of that kind, in their hand, theirs
    * from now on (saved like anything loose). Their hands must be free. Returns its id, or null.
    */
@@ -2808,7 +2855,7 @@ export class SpikeWorld {
     let n = 1;
     while (this.carry.loose[`${rack.id}:${kind}:${n}`]) n++;
     const id = `${rack.id}:${kind}:${n}`;
-    this.carry.loose[id] = { kind, seed: n, home: { x: rack.x, z: rack.z, level: rack.level, house: rack.house, rot: 0, room: null }, at: null };
+    this.carry.loose[id] = { kind, seed: n, home: { x: rack.x, z: rack.z, level: rack.level, house: rack.house, rot: 0, room: null }, at: null, mine: true };
     this.carry.held = id;
     this.carry.hidden = false;
     this.showHeld();

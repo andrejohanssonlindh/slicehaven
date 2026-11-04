@@ -2,6 +2,14 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-04 — B8a: your own weapons from the creator
+
+- **Your hero carries the weapons they own**: every weapon chosen or bought in the creator (the default shepherd has the quarterstaff). They're at the belt or on the back, not in your hand.
+- **Tap yourself → Draw a weapon.** If you own more than one, it asks which, with your skill and dice for each. **Put away the {weapon}** puts it back. A weapon taken from the arena's rack is yours too, so it can be put away as well.
+- **In a fight:** with empty hands you get **Draw your quarterstaff** (one button per weapon you carry). It's the side action and, as the rules say, −1D6 on your next roll unless the weapon is quick to draw. If you start a fight with nothing drawn, the log tells you to draw.
+- A dropped weapon of yours lies on the sand like any other until you pick it up. **Shields from the creator** are carried too once shields exist (next). Bows have no model yet, so they're left out.
+- **Not yet:** what you carry at the belt doesn't count towards how much you can carry. That comes with pockets and the bag (B6).
+
 ## 2026-11-04 — Fighting styles as "when this, do that"
 
 - **How people fight is now data** ([fight minds](design/fight-minds.md)), as you suggested. A style is a list of lines, *"when this holds, do that"*, like people's days. For each part of a round (moving, the blow, the defence, offering to yield), the first line that holds decides.

@@ -68,4 +68,26 @@ const small: GateDef = {
   check: (c) => (hideable(kindOf(c)?.size) ? null : 'The {name} is too big to hide.'),
 };
 
-export default [handsFree, holding, size, weight, small];
+/** Carrying gear of their own, not in hand (plan B8a): drawing a weapon is offered only then. */
+const hasGear: GateDef = {
+  id: 'has-gear',
+  about: 'The doer carries something of their own on them that can be drawn (a weapon from their gear).',
+  kind: 'requirement',
+  hides: true,
+  check: (c) => ((c.world.stowed?.(c.doer.id) ?? []).length ? null : 'You carry nothing to draw.'),
+};
+
+/** Holding something of their own (their gear, or a weapon taken from a rack): putting it away is offered only then. */
+const holdingOwn: GateDef = {
+  id: 'holding-own',
+  about: 'The doer holds something that is their own and can be carried on them (a weapon).',
+  kind: 'requirement',
+  hides: true,
+  check: (c) => {
+    const k = c.world.holding?.(c.doer.id);
+    const def = k && c.world.things.has(k) ? c.world.things.get(k) : null;
+    return def?.weapon && c.world.holdsOwn?.(c.doer.id) ? null : 'You hold nothing of yours to put away.';
+  },
+};
+
+export default [handsFree, holding, size, weight, small, hasGear, holdingOwn];

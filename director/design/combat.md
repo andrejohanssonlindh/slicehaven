@@ -19,6 +19,7 @@
 | **Choosing a weapon, calling a foe** | kinds `weapon-rack` (`stock`) and `gong` (`calls`) in `content/things/kinds/arena.ts`; verbs `take-from`, `strike-gong` (outcome `choose`, the picker in `actsheet.ts`); `SpikeWorld.takeFromStock`, `callFighter` | ✅ 17 weapons; a gladiator at any level (not saved) |
 | **The upper hand** | `seizeInitiative`, `Fight.upper`, `chooseFor(…, known)`; the page's `beginRound`, `intentOf` | ✅ Declared in reverse order: whoever is ahead sees the other's choice |
 | **Seeing and moving in a fight** | `SpikeWorld.viewAim`, `fightCentre`, `recentre`, `markSpot`; the page's `aimView`, `tap`, `planned`, `goTo` | ✅ The view keeps the fight clear of the panel; a tap on the ground or a weapon plans the round's move |
+| **Your own gear** | `Hero.gear` (from the creator), `SpikeWorld.outfit`, `stowed`, `drawOwn`, `stowHeld` (`Loose.stowed`); verbs `draw`, `stow` (gates `has-gear`, `holding-own`, outcome `choose: 'gear'`); `Fighter.belt`, `Choice.draw` | ✅ Carried on you until drawn; drawing in a fight is the side action |
 | **Yielding** | `Choice.plead`, `pleaDifficulty`, `FightStyle.spare`, `Fight.spared` | ✅ The best of Argue and Charm against the foe's style, eased if they're more tired and hurt than you |
 | **Your condition** | `src/spike3d/condition.ts`, the **You** button; fatigue back with time in `SpikeWorld.recover` | ✅ Fatigue and its sources, dice off rolls and why, wounds |
 

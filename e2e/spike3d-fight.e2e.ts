@@ -1,4 +1,4 @@
-/* Browser test: a fight in the arena (B8a): pick a sword up off the sand (held in the right hand, not slowing you), fight the gladiator round by round from the fight panel until one side wins (the upper hand: whoever is quicker sees the other's choice; a tap plans a move; the panel leaves the fight in view), and what it left (the dead, the injuries) is kept through a reload. */
+/* Browser test: a fight in the arena (B8a): draw and put away your own weapon; pick a sword up off the sand (held in the right hand, not slowing you), fight the gladiator round by round from the fight panel until one side wins (the upper hand: whoever is quicker sees the other's choice; a tap plans a move; the panel leaves the fight in view), and what it left (the dead, the injuries) is kept through a reload. */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { OUT, openPage, startEnv, stopEnv, type Env } from './harness';
 
@@ -18,6 +18,19 @@ describe('spike3d fight', () => {
     await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 90_000 });
     const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; const fight = window.spike.fight; return ${fn}; })()`);
     await page.waitForTimeout(1500);
+
+    // The hero's own gear (the shepherd's quarterstaff) is carried on them: tap yourself → Draw a weapon; Put away.
+    expect(await w('w.stowed.map((s) => s.kind)')).toEqual(['quarterstaff']);
+    await w(`(window.spike.sheet.open(null), 0)`);
+    await page.click('#act .offers button:has-text("Draw a weapon")');
+    expect(await w('w.holding')).toBe('quarterstaff');
+    expect(await w('w.inHand.has("hero")')).toBe(true);
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `${OUT}/fight-drawn.png` });
+    await w(`(window.spike.sheet.open(null), 0)`);
+    await page.click('#act .offers button:has-text("Put away the quarterstaff")');
+    expect(await w('w.holding')).toBeNull();
+    expect(await w('w.stowed.length')).toBe(1);
 
     // The gong calls a fresh gladiator at the level picked; the rack hands out any weapon (then put it back down).
     const thing = async (kind: string) => (await w(`(() => {

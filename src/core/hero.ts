@@ -18,6 +18,8 @@ export interface Hero {
   tags?: string[];
   /** Load points from the build (a dwarf's −8): each taken off is a kilogram more carried (plan B6). */
   load?: number;
+  /** The weapons and shields they own, by their row in the weapon and shield tables (`Stridssvärd`): their gear from the creator. */
+  gear?: string[];
 }
 
 export const NO_DICE: Dice = { n: 0, mod: 0 };

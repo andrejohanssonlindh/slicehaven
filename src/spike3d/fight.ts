@@ -138,6 +138,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       id: 'hero', side: 0, x: at.x, z: at.z, pools: Object.fromEntries(FIGHT_IDS.map((id) => [id, hero.dice[id] ?? { n: 0, mod: 0 }])),
       physique: phys, baseDamage: baseDamage(units(phys)), baseArmour: baseArmour(units(phys)), armour: { cut: 0, crush: 0, thrust: 0 }, loadDice: 0,
       weapon: held && row ? { id: held.id, weapon: row } : null, shield: null, injuries: w.injuriesOf('hero') ?? unhurt(), drew: false,
+      belt: w.stowed.flatMap((s) => { const r = rowOfKind(s.kind); return r && r.sv !== IMPROVISED ? [{ id: s.id, weapon: r }] : []; }),
     };
   }
 
@@ -310,6 +311,8 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     // Something to pick up within reach (only empty-handed: one thing at a time).
     const near = !me.weapon ? fight.ground.filter((g) => Math.hypot(g.x - me.x, g.z - me.z) <= PICKUP_REACH) : [];
     const pick = near.map((g) => ({ label: t('fight.pickup', 'Pick up the {name}', { name: kindName(g.id) }), go: () => play({ pickUp: g.id, defend: 'standard' }) }));
+    // Your own weapons, carried at the belt or on the back: draw one (the side action; −1D6 on the next roll unless quick to draw).
+    if (!me.weapon) pick.unshift(...(me.belt ?? []).map((b) => ({ label: t('fight.draw', 'Draw your {name}', { name: kindName(b.id) }), go: () => play({ draw: b.id, defend: 'standard' }) })));
     if (role === 'free') {
       out.push(...planned());
       // Weapons lying about, not yet in reach: go to one (empty-handed only, as picking up is).
@@ -531,6 +534,10 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
           log(l.ran ? of(l.who, ['fight.ran.you', 'You run in.'], ['fight.ran', '{who} runs in.']) : of(l.who, ['fight.walked.you', 'You close in.'], ['fight.walked', '{who} closes in.']), l.who === 'hero' ? 'you' : 'they');
           break;
         }
+        case 'draw':
+          if (l.who === 'hero') w.drawOwn(l.item);
+          log(of(l.who, ['fight.drew.you', 'You draw your {thing}.'], ['fight.drew', '{who} draws a {thing}.'], { thing: kindName(l.item) }), l.who === 'hero' ? 'you' : 'they');
+          break;
         case 'pickUp':
           await settle(w);
           w.takeUp(l.who, l.item);
@@ -632,7 +639,11 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     logEl.replaceChildren();
     el.hidden = false;
     log(t('fight.begins', 'You face {name}. The fight is on.', { name: p.name }), 'info');
-    if (!fight.fighters[0].weapon) log(t('fight.nohands', 'You have no weapon: you fight with your fists. Weapons lie on the ground nearby.'), 'info');
+    if (!fight.fighters[0].weapon) {
+      log(fight.fighters[0].belt?.length
+        ? t('fight.drawfirst', 'Your weapon is not in your hand: draw it (the side action), or fight with your fists.')
+        : t('fight.nohands', 'You have no weapon: you fight with your fists. Weapons lie on the ground nearby.'), 'info');
+    }
     // Beaten in an earlier fight, they may ask to yield at once.
     offerYield(styleFor(p.tags, p.fights));
     pending = null;
