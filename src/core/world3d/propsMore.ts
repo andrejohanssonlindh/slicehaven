@@ -1,4 +1,5 @@
 import { Rng } from '../rng';
+import { addCylinder } from './modelkit';
 import { type MeshData, type Vec3, addBeam, addBox, addOrientedBox, emptyMesh } from './mesh';
 
 /**
@@ -283,4 +284,15 @@ export function stump(seed: number): PropParts {
     addBeam(m, [Math.cos(a) * 0.2, 0.15, Math.sin(a) * 0.2], [Math.cos(a) * 0.5, -0.02, Math.sin(a) * 0.5], 0.12, [0, 1, 0]);
   }
   return { wood: m };
+}
+
+/** A stone pillar: a square foot, a round shaft that narrows a little, a capital. About 3 m tall. */
+export function pillar(seed: number): PropParts {
+  const rng = Rng.fromSeed(seed);
+  const m = emptyMesh();
+  const h = 2.8 + rng.next() * 0.4;
+  addBox(m, [-0.5, -0.1, -0.5], [0.5, 0.3, 0.5], { aoBottom: 0.7 });
+  addCylinder(m, 0, 0, 0.3, h, 0.36, 0.3, 8, { top: false });
+  addBox(m, [-0.46, h, -0.46], [0.46, h + 0.25, 0.46]);
+  return { stone: m };
 }

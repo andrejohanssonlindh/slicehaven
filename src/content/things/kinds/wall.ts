@@ -19,6 +19,15 @@ const walls: ThingDef[] = [
     foot: [{ run: 0.3 }],
     draw: (p) => fromParts(stonewall(p.len, p.seed)),
   },
+  {
+    // Knee-high: feet stop at it, the eye goes over.
+    id: 'lowwall',
+    is: 'structure',
+    look: 'A low wall of fieldstone, knee-high.',
+    len: 3,
+    foot: [{ run: 0.3 }],
+    draw: (p) => fromParts(stonewall(p.len, p.seed)),
+  },
 ];
 
 export default walls;

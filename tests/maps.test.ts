@@ -13,7 +13,7 @@ describe('every map', () => {
     it(`${name} compiles with no problems`, () => {
       const c = mapNamed(name);
       expect(c.problems).toEqual([]);
-      expect(c.layout.houses.length).toBeGreaterThan(0);
+      expect(c.layout.houses.length + c.layout.props.length).toBeGreaterThan(0); // a map may have no houses (the arena)
     });
 
     it(`${name}: a door torch says which house it is fixed to (it hides while the hero is inside)`, () => {

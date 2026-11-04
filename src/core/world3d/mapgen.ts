@@ -164,6 +164,8 @@ export interface RuleContext {
   /** `things` phase: the layout so far (add trees and props), and the houses' whole boxes. */
   layout: Layout;
   boxes: Shape[];
+  /** Patches of trodden ground to add to the map's `mud` (an arena's floor); a rule pushes, the ground reads them. */
+  mud: { x: number; z: number; r: number }[];
   lakeD(x: number, z: number): number;
   roadD(x: number, z: number): number;
 }
@@ -426,7 +428,7 @@ export function compileMap(spec: MapSpec, things: Things, opts: CompileOptions =
 
   // The rules, in order, each in its phase (a rule nobody wrote is told so).
   const ctx: RuleContext = {
-    spec, things, rng, half, edge, problem, lakeD, roadD,
+    spec, things, rng, half, edge, problem, lakeD, roadD, mud: [],
     houses: [...(spec.houses ?? [])], people: [...(spec.people ?? [])],
     layout: { houses: [], trees: [...(spec.trees ?? [])], props: [...(spec.props ?? [])] }, boxes: [],
   };
@@ -486,7 +488,7 @@ export function compileMap(spec: MapSpec, things: Things, opts: CompileOptions =
   });
 
   // Ground.
-  const mud = [...(spec.mud ?? [])];
+  const mud = [...(spec.mud ?? []), ...ctx.mud];
   if (spec.doorMud) {
     for (const b of built) {
       const d = b.model.door;

@@ -2,6 +2,14 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-04 — Combat prework: the rules, damage and wounds, an arena
+
+- **The rules in our words.** I read the fight and damage chapters and wrote them up as a working summary: [combat rules](design/combat-rules.md). It covers rounds and phases, melee roles and tactics, several fighters, ranged, edges, weapon properties, damage, the after-effects, falls and burns. It's mechanics only, with book pages so you can check a rule. Where the book is unclear, the page says "reading".
+- **Damage and wounds are built** (`core/damage.ts`). A blow lands on a body part, armour comes off, and the damage table gives fatigue. At 10 or more there's a serious wound from one of six tables (cut, crush, thrust, brawl, fall, burn; all 280 rows, mechanics only, no book text). Then the death roll, break and amputation risks, and the after-effects on the person: pain, wounds per part, bleeding, infection, fire, broken bones, lost eyes and teeth. Bleeds, fires and infections merge as the rules say. Injuries weigh on the right rolls (a wounded sword arm on combat, a torso wound on death rolls). At the end of a phase come bleeding, fire and the shock roll, and the end of the scene clears fatigue. Fall and burn dice are in too. It's all tested, but not yet in the world: nothing hits anyone until combat (B8a).
+- **The plan:** [combat](design/combat.md) maps the rules onto our live world in metres (the bands become ranges, cover is real geometry, NPCs fight by behaviour, visible injuries read the same data). It sets the order of vignettes: sparring, then edges, several fighters, ranged, visible injuries, fights out in the world.
+- **An arena to test in:** `/spike3d/?map=arena` is a 30 × 15 m oval behind a palisade with gates east and west. Inside are four pillars (they block sight, for archers later), two low walls (they don't), barrels, crates and a woodpile. Map rule `oval` (written by a Sonnet helper) places a wall round an ellipse with gaps for gates; new kinds `pillar` and `lowwall`.
+- **Questions:** Q45 (the bands in metres), Q46 (start with a sparring match where no one dies?), Q47 (do two short effects from one blow add up?).
+
 ## 2026-11-04 — B6, first slice: weight and carrying capacity
 
 - **The rule (your call today):** you carry 5 kg for each die of Physique and 1 kg for each pip, without trouble. 3D6+2 carries 17 kg; the default shepherd (2D6+3) carries 13.

@@ -6,7 +6,7 @@ import { THINGS } from '../things';
 /**
  * Every map in the game is a JSON file here (`<name>.json`, its `name` the same), found without a list to edit; and
  * every map rule is a file in `rules/` (one rule each, its `id` what maps call it). `tests/maps.test.ts` checks every
- * map compiles with no problems. (A vitest run that misses a brand-new file has a stale glob: edit this file once.)
+ * map compiles with no problems (arena: the gladiator ring). (A vitest run that misses a brand-new file has a stale glob: edit this file once.)
  */
 const mapFiles = import.meta.glob<{ default: MapSpec }>('./*.json', { eager: true });
 const ruleFiles = import.meta.glob<{ default: MapRule }>('./rules/*.ts', { eager: true });

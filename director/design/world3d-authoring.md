@@ -49,12 +49,14 @@ A map is a JSON file, `content/maps/<name>.json` (its `name` the same). It is fo
 "hero": { "house": "inn" }
 ```
 - **Houses** go along a road (`road` index, `m` metres from its start or `t` a share 0 to 1, a compass `side`, optional `gap`) and face it, or at an exact `x, z, rot`. Sizes `small`/`medium`/`large` (or `{width, depth}`), roofs thatch/shingle/tile/sod, a `room` kind, a `plan` (kind of building), `torch` for a torch by the door.
-- **Rules** (`"rule": "<name>"`) place things by intent, in the order written. Each is one file in `content/maps/rules/` (`MapRule` in `core/world3d/mapgen.ts`: its name, the keys it takes, its phase, and `expand`). A new rule is a new file. There are three:
+- **Rules** (`"rule": "<name>"`) place things by intent, in the order written. Each is one file in `content/maps/rules/` (`MapRule` in `core/world3d/mapgen.ts`: its name, the keys it takes, its phase, and `expand`). A new rule is a new file. There are four:
   - `street`: houses along a road every so many metres, on one or both sides; listed (`houses`, ids kept) or by turns from `cycle` (a look with `max` is used only that often).
   - `torches`: a torch post (or any `kind`) every so many metres along one side of a road.
   - `scatter`: a number of a kind in an `area` (`circle`, `rect`, `ring`, `all`), at seeded spots clear of houses, roads, water and each other (each thing's `keepClear`). It reports `only room for N of M`.
+  - `oval`: a wall round an ellipse (`at`, `rx`, `rz`, a `kind` of run, `palisade` by default, pieces about `every` m), with `gaps` (`{ "at": degrees, "width": m }`, 0 east, 90 south) for gates, a `posts` kind either side of each gap, and `floor: true` to tread the inside bare (it adds mud patches through `ctx.mud`; the ground reads them). Tested in `tests/oval-rule.test.ts`.
 - **Wild** woods (`wild`) are made chunk by chunk; `area` keeps them to a district.
 - **Compile** (`compileMap`, or `compile` in `content/maps`, which brings every library) returns the ground, the layout, the hero start, the people and **`problems`**: a house in the lake or on a road or touching another, a thing off the map, a door the hero cannot reach, an id used twice, a person nobody can be, **a key nothing reads (a typo)**, a rule nobody wrote. `tests/maps.test.ts` requires **no problems for every map**, so a new file is checked the moment it is saved.
+- **Maps today**: `hamlet`, `spike`, `wilds`, and `arena` (a 30 by 15 m oval of packed earth in a palisade, a gate east and west, pillars that stop the eye, a knee-high wall stub, barrels, crates and a woodpile; no people, for trying fights; kinds `pillar` and `lowwall`).
 - **See it**: `/spike3d/?map=hamlet`. Problems also go to the browser console. `?world=N` overrides the size.
 - Deterministic: same spec, same world (the seed is in the spec).
 
