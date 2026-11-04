@@ -3,6 +3,7 @@
 *Archive of the questions in [questions](../questions.md) once answered or dropped. Newest on top. What they decided, if it still stands, is in the [decisions](../decisions.md).*
 
 ## 2026-11-04
+- **Q50 Floating damage numbers on normal and hard (B8g)** → **A, as a start:** numbers on easy only. On normal and hard a short word floats up (*"deep cut"*, *"glancing"*) and the icon lands on the body outline.
 - **Q48 Fighting with a skill you don't have** → **2D6**: the base value of every combat skill.
 - **Q49 When does the scene end after a fight?** → like Fallout: the fight ends when no enemies are left and you press **OK**. **Fatigue goes one point per stretch of time**, faster when you actively rest; how long the stretch is follows the difficulty. Asked alongside, notes from the first fight: throw only your own dice; pause to show the damage, the extra damage and the D10; an equal defence seemed to stop an attack (the rules give a tie to the attacker, now tested; most likely it hit and glanced off the armour, which the log now says in numbers); show each side clearly by difficulty; the log should give the pool and its make-up; a knocked-out foe stood up again; a view of where your fatigue and lost dice come from.
 - **Q45 The bands in metres** → **yes** (adjacent ≤ 2 m, short ≤ 10, medium ≤ 25, long ≤ 50; walk 5 m, run 10 m a round). The director asked whether moving as the side action was noted: it is.

@@ -18,7 +18,7 @@ It is a log with buttons: you read the fight instead of watching it. Two things 
 - **A body outline for each fighter** (yours under your column, theirs under theirs). It shows the six hit locations from the D10 table (head, torso, both arms, both legs). **Wound icons land on the part that was hit** (cut, crush, broken, bleeding), and fatigue is a bar beside it. This is also how the director's early note on seeing injuries shows up in a fight. On normal and hard, the foe's outline shows only what you could see.
 
 ## Two modes: fast (default) and dice
-- **Fast, the default.** Tap a move and the exchange plays out at once: swing → parried, blocked, dodged or hit → **damage floats up over the one hit in red, rising slowly**, the old-game way → an icon lands on their body outline. About 1.5 s, then your next pick. The dice are still rolled, just not shown; **tap a line in the log to see that exchange's dice**.
+- **Fast, the default.** Tap a move and the exchange plays out at once: swing → parried, blocked, dodged or hit → **damage floats up over the one hit in red, rising slowly**, the old-game way (a number on easy; a word such as *"deep cut"* on normal and hard, Q50) → an icon lands on their body outline. About 1.5 s, then your next pick. The dice are still rolled, just not shown; **tap a line in the log to see that exchange's dice**.
 - **Dice.** Today's step-by-step flow in the new layout: **one roll per step**. Your attack, their defence (written beside), where it lands (D10), the damage, the serious-wound D10. Your own dice on the glass, as decided.
 - A setting, kept in the game settings beside the dice level.
 
@@ -82,5 +82,4 @@ There will be many more motions: per weapon, per fighting style, parry, block, d
 - Fast mode is the default; dice mode is a setting.
 - Every defence is shown; none is picked for you.
 - The motion foundation comes before any new animation; Sonnet makes the motion library on top of it.
-
-**Open:** [Q50](../questions.md), floating numbers on normal and hard.
+- **Floating damage (Q50), as a start:** numbers on easy only. On normal and hard a short word floats up (*"deep cut"*, *"glancing"*) and the icon lands on the body outline.

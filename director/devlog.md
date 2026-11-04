@@ -7,7 +7,7 @@
 - **Talked through your redesign** and wrote it up: [how a fight looks and feels](design/fight-feel.md). The rules don't change; the page, the camera and the animations do. It's on the plan as **B8g, next up, not started**, before B8b edges (the edges will land in the new Offensive group).
 - **Agreed:** the side-on fight view, every move shown in three groups with the foe's mirrored, body outlines with wound icons, fast mode by default, one tap on a computer and two on a phone, the attacker's swing as soon as you've picked, the timer (none on easy, normal later, hard 8 s, tunable).
 - **Checked the animations:** joints and looping poses are data, but **the swing is written in code**, and the fight poses are a fixed list. So stage **F0** makes motions data (one file each, looked up by act, weapon and style, with a viewer on `/models/`). **F1, the motion library, is for Sonnet**, with a brief in the design.
-- **One question:** [Q50](questions.md), floating numbers on normal and hard.
+- **Q50 answered:** numbers float up on easy only; on normal and hard a word does.
 
 ## 2026-11-04 — B8a: shields, and a sword and shield together
 
