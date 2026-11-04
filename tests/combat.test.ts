@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
-  type Fight, type Fighter, type FightStyle, acceptYield, attackPool, attackWhy, beaten, bestDamage, moreDamage, refuseYield, wantsToYield, bonusDice, chooseFor, damageDice, defencePool, dropFrom, fists, parseProps, pleaDifficulty,
+  type Fight, type Fighter, acceptYield, attackPool, attackWhy, beaten, bestDamage, moreDamage, refuseYield, bonusDice, damageDice, defencePool, dropFrom, fists, parseProps, pleaDifficulty,
   resolveRound, roleOf, seizeInitiative, startFight, tacticFatigue, weaponFromRow, weaponOf,
 } from '../src/core/combat';
 import { type Injuries, recoverFatigue, unhurt } from '../src/core/damage';
 import { Rng } from '../src/core/rng';
+import { type Style, chooseFor as choose, wantsToYield as wants } from '../src/core/fightmind';
+import { FIGHT_MINDS } from '../src/content/combat';
 import { WOUND_TABLES } from '../src/content/wounds';
 import { SHIELDS, WEAPONS } from '../src/content/chargen/equipment';
 
@@ -21,7 +23,17 @@ const fighter = (id: string, side: number, x: number, over: Partial<Fighter> = {
   injuries: unhurt(), drew: false, ...over,
 });
 
-const STYLE: FightStyle = { id: 'test', attack: { standard: 2, quick: 1, powerful: 1 }, defence: { standard: 3, defensive: 1, counter: 0 }, mercy: true, run: false, spare: 12, yieldAt: Infinity };
+const STYLE: Style = {
+  id: 'test', spare: 12, lines: [
+    { when: { foeDown: true }, do: 'finish' },
+    { do: 'pickUp' },
+    { do: 'closeIn' },
+    { do: 'strike', weights: { standard: 2, quick: 1, powerful: 1 } },
+    { do: 'defend', weights: { standard: 3, defensive: 1 } },
+  ],
+};
+const chooseFor = (f: Fight, id: string, style: Style, rng: Rng, known?: Parameters<typeof choose>[5]) => choose(f, id, style, FIGHT_MINDS, rng, known);
+const wantsToYield = (f: Fight, id: string, style: Style) => wants(f, id, style, FIGHT_MINDS, Rng.fromSeed(1));
 
 describe('weapons in hand', () => {
   it('reads properties and damage lines', () => {
@@ -154,7 +166,7 @@ describe('fatigue', () => {
   });
 
   it('a beaten foe offers to yield; accepted, they lay down their weapon', () => {
-    const style = { ...STYLE, yieldAt: 1 };
+    const style: Style = { ...STYLE, lines: [{ when: { beaten: 1 }, do: 'offerYield' }, ...STYLE.lines] };
     const f = startFight([fighter('a', 0, 0), fighter('b', 1, 1.5, { injuries: { ...unhurt(), broken: ['rightLeg'], wounds: { torso: 2 } } })]);
     expect(beaten(f.fighters[1])).toBeGreaterThanOrEqual(1);
     expect(wantsToYield(f, 'b', style)).toBe(true);
@@ -218,7 +230,7 @@ describe('the upper hand (declared in reverse order)', () => {
 
   it('lets someone who knows the other’s tactic lean to the answer', () => {
     const f = { ...startFight([fighter('a', 0, 0), fighter('b', 1, 1.5)]), melee: { attacker: 0, opened: 1 } };
-    const style: FightStyle = { ...STYLE, attack: { standard: 1, quick: 1, powerful: 1 }, defence: { standard: 1, defensive: 1, counter: 1 } };
+    const style: Style = { ...STYLE, lines: [{ do: 'strike', weights: { standard: 1, quick: 1, powerful: 1 } }, { do: 'defend', weights: { standard: 1, defensive: 1, counter: 1 } }] };
     const count = (known: Parameters<typeof chooseFor>[4], key: 'attack' | 'defend', value: string) => {
       const rng = Rng.fromSeed(11);
       let n = 0;
@@ -312,6 +324,6 @@ describe('a round', () => {
     expect(c.mercy).toBe('b');
     const r2 = resolveRound(r.fight, { a: c }, RULES, Rng.fromSeed(1));
     expect(r2.fight.fighters[1].injuries.dead).toBe(true);
-    expect(chooseFor(r.fight, 'a', { ...STYLE, mercy: false }, Rng.fromSeed(1)).mercy).toBeUndefined();
+    expect(chooseFor(r.fight, 'a', { ...STYLE, lines: STYLE.lines.filter((l) => l.do !== 'finish') }, Rng.fromSeed(1)).mercy).toBeUndefined();
   });
 });

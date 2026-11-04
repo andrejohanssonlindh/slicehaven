@@ -1,6 +1,6 @@
-# How people fight: styles as "when this, do that" (proposal)
+# How people fight: styles as "when this, do that"
 
-*2026-11-04. The director: "extract the AI, their actions… a type of strategy as a thing. On A do B. Also how and when they give up. Then apply it to a character." **Agreed 2026-11-04; building next.***
+*2026-11-04. The director: "extract the AI, their actions… a type of strategy as a thing. On A do B. Also how and when they give up. Then apply it to a character." **Agreed and built 2026-11-04** (see [what was built](#built-2026-11-04)).*
 
 ## Today
 A fighting style (`content/combat/styles.ts`) is a handful of numbers: how often each tactic, run or not, finish the downed or not, how hard to beg off, how beaten before offering to yield. The *decisions* are code in `chooseFor` (`core/combat.ts`): pick up a weapon if empty-handed, close in, answer a known tactic. Every new piece (shields, two against one, bows) would add another `if` there, the same for everyone.
@@ -46,3 +46,10 @@ The same "lines" shape fits other turn-based situations later (a social conflict
 
 ## Order
 Before the shields, I'd suggest: small (a day's slice), and shields, several fighters and ranged then each add a condition or a choice instead of growing `chooseFor`.
+
+## Built (2026-11-04)
+- **Engine** `core/fightmind.ts`: `chooseFor(fight, id, style, library, rng, known)`, `wantsToYield`, `resolveStyle` (a `base` style's lines follow its own), `styleProblems`. Each part of the round (`side`, `main`, `defence`, `offer`) takes the first line that holds and gives something; a choice can say it belongs to once the fight is won (`phase: 'won'`: the killing stroke).
+- **Conditions** (`content/combat/when/`): `free`, `attacking`, `defending`, `unarmed`, `weaponWithin`, `beaten`, `foeBeaten`, `foeDown`, `foeFurther`, `theyMean`.
+- **Choices** (`content/combat/does/`): `closeIn` (`run`), `pickUp` (`within`), `holdGround`, `strike` and `defend` (`weights`, `lean`), `retreat`, `offerYield`, `finish`. Knowing the foe's tactic, `strike` and `defend` lean to the answer unless `"lean": false`.
+- **Styles** (`content/combat/styles/`): `default` and `gladiator` as before, the gladiator with one new line (**pressing a flagging foe**: attacking a foe beaten 1 or worse, mostly powerful blows); `coward` starts from the default (asks to yield at 0.5 beaten, defends carefully, easy to talk down, 6). **A person in a map** takes one with `"fights": "coward"`.
+- Not yet: fleeing (leaving the fight), keeping away, begging (`plead`) for those nobody steers; they come as files when a fight needs them.

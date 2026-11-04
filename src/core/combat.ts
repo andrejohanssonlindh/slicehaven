@@ -277,8 +277,8 @@ const dist = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.
 /** Still able to act: not knocked out, dying, dead or gone. */
 export const canAct = (f: Fighter): boolean => !f.injuries.out && !f.injuries.dead && !f.injuries.dying && !f.gone;
 
-/** Their foes still in the fight. */
-const foesOf = (fight: Fight, f: Fighter) => fight.fighters.filter((o) => o.side !== f.side && !o.gone && !o.injuries.dead);
+/** Their foes still in the fight (the dead and the gone left out). */
+export const foesOf = (fight: Fight, f: Fighter) => fight.fighters.filter((o) => o.side !== f.side && !o.gone && !o.injuries.dead);
 
 /** The nearest foe who can still act (the one a lone fighter faces). */
 export function nearestFoe(fight: Fight, f: Fighter): Fighter | null {
@@ -718,23 +718,7 @@ export const between = (fight: Fight, a: string, b: string): number => {
   return fa && fb ? dist(fa, fb) : Infinity;
 };
 
-// ── How someone fights when no one chooses for them ──────────────────────────────────────────────────────────────
-
-/** A way of fighting (content: `content/combat/styles/`): how often each tactic, when to pick a weapon up, when to finish. */
-export interface FightStyle {
-  id: string;
-  /** Weights for the attack tactics. */
-  attack: Record<AttackTactic, number>;
-  defence: Record<DefenceTactic, number>;
-  /** Strike the knocked out (to the death). */
-  mercy: boolean;
-  /** Run when closing in, if far. */
-  run: boolean;
-  /** How hard it is to beg them to let you yield (a difficulty; `pleaDifficulty` eases it as the fight goes your way). */
-  spare: number;
-  /** How beaten (`beaten`) they must be to offer to yield themselves (Infinity: never). */
-  yieldAt: number;
-}
+// ── Yielding (how someone nobody steers chooses is `core/fightmind.ts`) ─────────────────────────────────────────
 
 /** The skills a plea to yield is rolled with: the best of them. */
 export const PLEA_SKILLS = ['Argumentera', 'Charm'];
@@ -745,7 +729,7 @@ export const PLEA_SKILLS = ['Argumentera', 'Charm'];
  * more than you (wounds), never under 6; and 6 harder for each time you have yielded to them before (the director:
  * pick up another weapon after yielding, and they won't forgive you so easily).
  */
-export function pleaDifficulty(fight: Fight, pleader: string, style: FightStyle, yieldedBefore = 0): number {
+export function pleaDifficulty(fight: Fight, pleader: string, style: { spare: number }, yieldedBefore = 0): number {
   const me = fight.fighters.find((f) => f.id === pleader);
   const foe = me ? nearestFoe(fight, me) : null;
   if (!me || !foe) return style.spare + 6 * yieldedBefore;
@@ -784,17 +768,6 @@ export function beaten(f: Fighter): number {
   return totalFatigue(i) / Math.max(1, poolMean(pool(f, 'attr:Livskraft'))) + 0.25 * wounds + 0.5 * i.broken.length + (grounded(i) ? 0.5 : 0) + (f.weapon ? 0 : 0.25);
 }
 
-/**
- * Someone nobody steers who is beaten enough offers to yield (the director: a fighter so far under shouldn't just go
- * on), by their style's `yieldAt`; once refused, only when they are worse off by half again.
- */
-export function wantsToYield(fight: Fight, id: string, style: FightStyle): boolean {
-  const f = fight.fighters.find((x) => x.id === id);
-  if (!f || !canAct(f) || fight.winner !== null || fight.offer) return false;
-  const b = beaten(f);
-  return b >= style.yieldAt && b >= (fight.refused?.[id] ?? -Infinity) + 0.5;
-}
-
 /** Accept an offer to yield: the one who offered lays down their weapon, and the fight is over. */
 export function acceptYield(before: Fight, id: string, rng: Rng): RoundResult {
   const fight = structuredClone(before);
@@ -812,61 +785,6 @@ export function refuseYield(before: Fight, id: string): Fight {
   delete fight.offer;
   if (f) fight.refused = { ...fight.refused, [id]: beaten(f) };
   return fight;
-}
-
-const weighted = <T extends string>(w: Record<T, number>, rng: Rng): T => {
-  const entries = Object.entries(w) as [T, number][];
-  let x = rng.next() * entries.reduce((s, [, v]) => s + v, 0);
-  for (const [k, v] of entries) if ((x -= v) < 0) return k;
-  return entries[0][0];
-};
-
-/**
- * How a fighter who knows the other's tactic leans (they have the upper hand: `Fight.upper`): each weight of their
- * style is multiplied (a style that never counters still won't). Against careful or countering defence, a quick
- * blow (more dice to get through); against a powerful blow, defend carefully or counter (it is slow); against a
- * quick one, defend carefully. (Reading: the book gives no answers; these follow from what each tactic does.)
- */
-export const ANSWER_ATTACK: Record<DefenceTactic, Partial<Record<AttackTactic, number>>> = {
-  standard: {}, defensive: { quick: 2, powerful: 0.5 }, counter: { quick: 2, powerful: 0.5 },
-};
-export const ANSWER_DEFENCE: Record<AttackTactic, Partial<Record<DefenceTactic, number>>> = {
-  standard: {}, quick: { defensive: 2 }, powerful: { defensive: 2, counter: 3 },
-};
-const lean = <T extends string>(w: Record<T, number>, by: Partial<Record<T, number>>): Record<T, number> =>
-  Object.fromEntries(Object.entries(w).map(([k, v]) => [k, (v as number) * (by[k as T] ?? 1)])) as Record<T, number>;
-
-/**
- * What a fighter the page doesn't steer does this round (the gladiator): pick up a weapon if empty-handed and one
- * lies near, close in on the nearest foe, strike with a tactic by their style, defend by their style, and finish
- * someone knocked out if their style says so. `known`: what the foe declared, when this fighter has the upper hand.
- */
-export function chooseFor(fight: Fight, id: string, style: FightStyle, rng: Rng, known?: Choice): Choice {
-  const f = fight.fighters.find((x) => x.id === id);
-  if (!f || !canAct(f)) return {};
-  const c: Choice = {};
-  const downed = foesOf(fight, f).find((o) => !o.injuries.dead && (o.injuries.out || o.injuries.dying));
-  if (fight.winner !== null) {
-    if (style.mercy && downed) {
-      if (dist(f, downed) <= ADJACENT) c.mercy = downed.id;
-      else c.move = { x: downed.x, z: downed.z };
-    }
-    return c;
-  }
-  const near = !f.weapon ? fight.ground.filter((g) => g.weapon && dist(g, f) <= PICKUP_REACH).sort((a, b) => dist(a, f) - dist(b, f))[0] : undefined;
-  if (near) c.pickUp = near.id;
-  const foe = nearestFoe(fight, f);
-  if (foe && !c.pickUp && !fight.melee && dist(f, foe) > ADJACENT) {
-    // Stop just short of them, within reach.
-    const d = dist(f, foe);
-    const k = (d - ADJACENT * 0.75) / d;
-    c.move = { x: f.x + (foe.x - f.x) * k, z: f.z + (foe.z - f.z) * k, run: style.run && d > WALK + ADJACENT };
-  }
-  const tactics = attackTactics(f);
-  const w = Object.fromEntries(tactics.map((t) => [t, style.attack[t]])) as Record<AttackTactic, number>;
-  c.attack = weighted(known?.defend ? lean(w, ANSWER_ATTACK[known.defend]) : w, rng);
-  c.defend = weighted(known?.attack ? lean(style.defence, ANSWER_DEFENCE[known.attack]) : style.defence, rng);
-  return c;
 }
 
 // ── Building a fighter ──────────────────────────────────────────────────────────────────────────────────────────

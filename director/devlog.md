@@ -2,6 +2,14 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-04 — Fighting styles as "when this, do that"
+
+- **How people fight is now data** ([fight minds](design/fight-minds.md)), as you suggested. A style is a list of lines, *"when this holds, do that"*, like people's days. For each part of a round (moving, the blow, the defence, offering to yield), the first line that holds decides.
+- **The gladiator's lines:** finish a foe who's down. Ask to yield when wrecked. Pick up a weapon at your feet. Run in. **Press a flagging foe with powerful blows** (new). Otherwise strike and defend by its usual weights.
+- **A new style to show how it builds:** the **coward** is the default way of fighting with two lines on top. It asks to yield as soon as it goes badly, defends carefully, and is easy to talk down. A map gives it to someone with `"fights": "coward"`. Nobody has it yet.
+- **Ten conditions and eight choices** to build styles from, one file each. A style naming one that doesn't exist fails the tests.
+- The fights play as before. The one change is the gladiator pressing harder when you're flagging.
+
 ## 2026-11-04 — B8a: seeing the fight, and moving on purpose
 
 - **The panel no longer covers the fight.** On a phone it stays at the bottom, and the view now keeps the fighters in the part above it. On a computer (a wide window) it docks on the right, clear of the zoom and turn buttons, and the fight sits in the rest of the screen. The view follows the fight: halfway between you and your foe, but never more than 5 m from you, so you stay in view when you're far apart. If you drag the view away, your next tap or round brings it back.

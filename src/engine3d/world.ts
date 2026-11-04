@@ -2025,6 +2025,7 @@ export class SpikeWorld {
       id, name: personName(r.chain, `${id}:${c.who.seed ?? 0}`), kind: r.facets.people ?? 'human', tags: r.chain,
       ...(calling ? { work: { calling, ...(about ? { about } : {}) } } : {}),
       ...(c.who.home ? { home: c.who.home } : {}),
+      ...(c.who.fights ? { fights: c.who.fights } : {}),
       ...(c.who.home && this.houseWelcome(c.who.home)?.ask ? { leaveAsk: this.houseWelcome(c.who.home)!.ask } : {}),
     };
   }

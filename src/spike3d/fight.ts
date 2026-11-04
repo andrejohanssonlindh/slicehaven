@@ -1,14 +1,15 @@
 import { ARMOUR, WEAPONS } from '../content/chargen/equipment';
-import { styleFor } from '../content/combat/styles';
+import { FIGHT_MINDS, styleFor } from '../content/combat';
 import { rollableName } from '../content/rollables';
 import { THINGS } from '../content/things';
 import { WOUND_TABLES } from '../content/wounds';
 import { baseArmour, baseDamage, type Dice, diceText } from '../core/chargen/tables';
 import {
   ADJACENT, RUN, WALK, type Choice, type Fight, type Fighter, type FightItem, type FightRules, type LogLine, PICKUP_REACH, UNTRAINED, attackTactics,
-  type FightStyle, PLEA_SKILLS, acceptYield, between, canAct, chooseFor, loadDiceOf, pleaDifficulty, refuseYield, resolveRound, roleOf,
-  seizeInitiative, startFight, wantsToYield, weaponOf,
+  PLEA_SKILLS, acceptYield, between, canAct, loadDiceOf, pleaDifficulty, refuseYield, resolveRound, roleOf,
+  seizeInitiative, startFight, weaponOf,
 } from '../core/combat';
+import { type Style, chooseFor, wantsToYield } from '../core/fightmind';
 import { type Injuries, totalFatigue, unhurt } from '../core/damage';
 import { DIFFICULTY_RULES } from '../core/difficulty';
 import type { Roll } from '../core/dice';
@@ -243,6 +244,12 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     logEl.scrollTop = logEl.scrollHeight;
   }
 
+  /** How the foe fights: their own style (the map's `fights`), else their kind's. */
+  const foeStyle = (): Style => {
+    const p = world().talkPerson(foeId);
+    return styleFor(p?.tags ?? [], p?.fights);
+  };
+
   /**
    * What someone means to do this round, in words ("strike hard", "pick up the sword and then close in"), as the hero
    * reads it when they have the upper hand: the side action and, by their role, the tactic.
@@ -276,7 +283,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       const r = seizeInitiative(fight, rng);
       fight = r.fight;
       await show(r.log, world());
-      if (fight.upper === 0) pending = chooseFor(fight, foeId, styleFor(world().talkPerson(foeId)?.tags ?? []), rng);
+      if (fight.upper === 0) pending = chooseFor(fight, foeId, foeStyle(), FIGHT_MINDS, rng);
       busy = false;
     }
     refresh();
@@ -367,7 +374,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
    * hard the foe is to talk down (their style, eased if the fight has gone your way). On easy the difficulty shows.
    */
   function plea(defending: boolean): { label: string; go: () => Promise<void> } {
-    const style = styleFor(world().talkPerson(foeId)?.tags ?? []);
+    const style = foeStyle();
     const best = PLEA_SKILLS.map((s) => ({ s, d: hero.dice[s] ?? { n: 0, mod: 0 } })).reduce((a, b) => (units(b.d) > units(a.d) ? b : a));
     const dice = best.d.n > 0 ? best.d : { n: 1, mod: 0 };
     const difficulty = pleaDifficulty(fight!, 'hero', style, world().yieldedTo(foeId));
@@ -392,11 +399,11 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       const at = w.fighterAt(f.id);
       if (at) { f.x = at.x; f.z = at.z; }
     }
-    const style = styleFor(w.talkPerson(foeId)?.tags ?? []);
+    const style = foeStyle();
     // Choosing anything but accepting their offer to yield refuses it: they fight on.
     if (fight.offer) fight = refuseYield(fight, fight.offer);
     // With the upper hand they declared already (`pending`); without it, they choose knowing yours.
-    const theirs = pending ?? chooseFor(fight, foeId, style, rng, fight.upper === 1 ? mine : undefined);
+    const theirs = pending ?? chooseFor(fight, foeId, style, FIGHT_MINDS, rng, fight.upper === 1 ? mine : undefined);
     pending = null;
     plan = null;
     w.markSpot(null);
@@ -413,7 +420,8 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     offerYield(style);
     if (fight.winner !== null && fight.winner !== 0 && fight.fighters[0].injuries.out && !fight.fighters[0].injuries.dead) {
       // They won and you are down: they finish it if their style does, else they leave you be.
-      if (style.mercy) return play({});
+      const next = chooseFor(fight, foeId, style, FIGHT_MINDS, rng);
+      if (next.mercy || next.move) return play({});
       log(t('fight.spared', '{name} leaves you lying there.', { name: Name(foeId) }), 'bad');
     }
     if (fight.fighters[0].injuries.dead) log(t('fight.youdie', 'You are dead.'), 'bad');
@@ -421,8 +429,8 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
   }
 
   /** If the foe is beaten enough, they offer to yield: the choices then lead with accepting it. */
-  function offerYield(style: FightStyle): void {
-    if (!fight || !wantsToYield(fight, foeId, style)) return;
+  function offerYield(style: Style): void {
+    if (!fight || !wantsToYield(fight, foeId, style, FIGHT_MINDS, rng)) return;
     fight = { ...fight, offer: foeId };
     log(t('fight.offers', '{who} lowers their weapon and asks to yield.', { who: Name(foeId) }), 'good');
   }
@@ -626,7 +634,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     log(t('fight.begins', 'You face {name}. The fight is on.', { name: p.name }), 'info');
     if (!fight.fighters[0].weapon) log(t('fight.nohands', 'You have no weapon: you fight with your fists. Weapons lie on the ground nearby.'), 'info');
     // Beaten in an earlier fight, they may ask to yield at once.
-    offerYield(styleFor(p.tags));
+    offerYield(styleFor(p.tags, p.fights));
     pending = null;
     void beginRound();
   }

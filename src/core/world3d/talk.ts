@@ -29,6 +29,8 @@ export interface TalkPerson {
   tags: string[];
   /** Their work, if they have one: what they're called ("farmer") and a line about it. Asking about it needs no roll. */
   work?: { calling: string; about?: string };
+  /** Their own fighting style, if their map gives one (`MapPerson.fights`). */
+  fights?: string;
   /** Their home (a house id): they can give leave to be in it (plan B3c). */
   home?: string;
   /**

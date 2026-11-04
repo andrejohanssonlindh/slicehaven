@@ -72,6 +72,8 @@ export interface MapPerson extends PersonSpec {
   id: string;
   /** Their house (an id); `home` in a schedule means it. */
   home?: string;
+  /** How they fight: a fighting style's id (`content/combat/styles/`); left out, the one for their kind. */
+  fights?: string;
   /** Where they start: a place's name, or a spot (default: outside their home's door, else the first place their schedule names). */
   at?: string | XZ;
   does: DoEntry[];
