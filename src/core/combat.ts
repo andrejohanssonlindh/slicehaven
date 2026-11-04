@@ -1,0 +1,616 @@
+import type { Dice } from './chargen/tables';
+import { modify } from './checks';
+import {
+  type BodyPart, type DamageType, type HitResult, type Injuries, type PhaseEnd, type WoundTableDef,
+  endOfPhase, rollHit, withPenalty,
+} from './damage';
+import { type Roll, advantages, rollDie, rollOpen, rollTest } from './dice';
+import type { Rng } from './rng';
+
+/**
+ * Combat (plan B8a): a fight in rounds, pure rules. The ruleset's melee in our words is
+ * `director/design/combat-rules.md` (sections 1, 2, 4); how it maps onto the live world is `combat.md`. A fight is
+ * plain JSON (`Fight`): who fights on which side, where they stand in metres, what they hold, their injuries, whether
+ * a melee is open and which side attacks in it, and what lies on the ground. A round is resolved from everyone's
+ * choices (`resolveRound`) and comes back as a new fight and a log of what happened, with every roll, so the page can
+ * show the dice and the world can play it out (walk, swing, drop a sword on the sand).
+ *
+ * This first slice is one against one, in melee: moving (walk 5 m, run 10 m), picking up, opening a melee
+ * (Reaktion), attacking with a tactic, defending with a tactic (parry, block or dodge, whichever is best),
+ * advantages spent on more damage (the edge to choose comes with B8b), retreating, the end of the phase
+ * (bleeding, shock), dropping what is in a hit arm, the mercy stroke on someone knocked out. Several fighters (B8c)
+ * and ranged (B8d) build on the same state. Nothing here knows the 3D world; distances are metres on the ground.
+ */
+
+// ── Distances (decided, Q45) ────────────────────────────────────────────────────────────────────────────────────
+
+/** Melee reach: adjacent is up to 2 m. */
+export const ADJACENT = 2;
+/** A side action's walk, and a run (a Förflyttning roll against the ground). */
+export const WALK = 5;
+export const RUN = 10;
+/** How far one can stoop for something lying on the ground as a side action. */
+export const PICKUP_REACH = 3;
+
+// ── What a fighter holds ────────────────────────────────────────────────────────────────────────────────────────
+
+/** Weapon properties, by their Swedish name, with their number (1 when none): `{ Precis: 1, Snabb: 1 }`. */
+export type Props = Record<string, number>;
+
+/** "Precis 1, Snabb, Genomslag S5" → `{ Precis: 1, Snabb: 1, Genomslag: 5 }`. */
+export function parseProps(props: string): Props {
+  const out: Props = {};
+  for (const p of props.split(/,\s*/)) {
+    const name = /^[A-ZÅÄÖ][a-zåäö]+/.exec(p.trim())?.[0];
+    if (!name) continue;
+    const n = /(\d+)(?:–\d+)?\s*$/.exec(p)?.[1];
+    out[name] = n ? Number(n) : 1;
+  }
+  return out;
+}
+
+/** A damage line from the equipment tables ("G+2T6+1", "G+3", "4T6+2", "–") with base damage put in; null for "–". */
+export function damageDice(line: string, base: Dice): Dice | null {
+  const s = line.trim();
+  if (!s || s === '–' || !/^(G|\d)/.test(s)) return null;
+  let n = 0, mod = 0, rest = s;
+  if (rest.startsWith('G')) { n += base.n; mod += base.mod; rest = rest.slice(1); }
+  for (const m of rest.matchAll(/([+-]?)(\d+)(T6)?/g)) {
+    const v = Number(m[2]) * (m[1] === '-' ? -1 : 1);
+    if (m[3]) n += v;
+    else mod += v;
+  }
+  return { n, mod };
+}
+
+/** A bonus written "+2", "+1T6", "±0" (a shield's) as dice. */
+export function bonusDice(s: string): Dice {
+  const m = /([+-]?)(\d+)(T6)?/.exec(s);
+  if (!m) return { n: 0, mod: 0 };
+  const v = Number(m[2]) * (m[1] === '-' ? -1 : 1);
+  return m[3] ? { n: v, mod: 0 } : { n: 0, mod: v };
+}
+
+/** The mean of an open pool, near enough to compare two pools. */
+export const poolMean = (d: Dice): number => d.n * 4.2 + d.mod;
+
+/** A weapon in hand, as the fight needs it: plain data built from its row (`weaponFromRow`) or a thing's kind. */
+export interface WeaponStats {
+  /** The row or kind it came from (shown, translated by the page). */
+  name: string;
+  /** The combat skill it is used with. */
+  skill: string;
+  /** Damage by type, base damage included. */
+  damage: Partial<Record<DamageType, Dice>>;
+  /** Held in both hands (a greatsword, a stool); otherwise in the right. */
+  hands: 1 | 2;
+  props: Props;
+  /** Dice off attack and parry for too little Physique to wield it (0 if strong enough). */
+  weak: number;
+  /** The fists: no weapon at all. */
+  unarmed?: boolean;
+}
+
+export interface ShieldStats {
+  name: string;
+  /** The melee bonus on a block. */
+  melee: Dice;
+  props: Props;
+}
+
+/** The parts of an equipment row the fight reads (`content/chargen/equipment.ts`). */
+export interface WeaponRow {
+  sv: string;
+  skill: string;
+  h1: string;
+  h2: string;
+  melee?: { hugg: string; kross: string; stick: string };
+  props: string;
+}
+
+/** Physique needed ("2T6", "0", "–") against Physique dice: the dice short (0 if strong enough), or null if it can't be held so. */
+export function physiqueShort(need: string, physique: Dice): number | null {
+  if (need === '–') return null;
+  const req = need === '0' ? 0 : Number(/(\d+)T6/.exec(need)?.[1] ?? 0);
+  return Math.max(0, req - physique.n);
+}
+
+/**
+ * A weapon row in a fighter's hands: damage with their base damage, one hand if they are strong enough for it, else
+ * two (with Double grip's +2), and the dice short if they aren't strong enough even so.
+ */
+export function weaponFromRow(row: WeaponRow, base: Dice, physique: Dice): WeaponStats {
+  const props = parseProps(row.props);
+  const one = physiqueShort(row.h1, physique);
+  const two = physiqueShort(row.h2, physique);
+  const hands: 1 | 2 = one === 0 || two === null ? 1 : 2;
+  const weak = (hands === 1 ? one : two) ?? 0;
+  const damage: WeaponStats['damage'] = {};
+  const lines: [DamageType, string | undefined][] = [['cut', row.melee?.hugg], ['crush', row.melee?.kross], ['thrust', row.melee?.stick]];
+  for (const [type, line] of lines) {
+    const d = line && damageDice(line, base);
+    if (d) damage[type] = hands === 2 && props.Dubbelfattning ? { n: d.n, mod: d.mod + 2 } : d;
+  }
+  return { name: row.sv, skill: row.skill, damage, hands, props, weak };
+}
+
+/** Bare hands: brawling (`Slagsmål`), base damage as crush, the brawl wound table. */
+export const fists = (base: Dice): WeaponStats => ({ name: 'fists', skill: 'Slagsmål', damage: { brawl: { ...base } }, hands: 1, props: {}, weak: 0, unarmed: true });
+
+/** The weapon's best damage type (the highest pool), and its dice. */
+export function bestDamage(w: WeaponStats): { type: DamageType; dice: Dice } {
+  let best: { type: DamageType; dice: Dice } | null = null;
+  for (const [type, dice] of Object.entries(w.damage) as [DamageType, Dice][]) if (!best || poolMean(dice) > poolMean(best.dice)) best = { type, dice };
+  return best ?? { type: 'brawl', dice: { n: 1, mod: 0 } };
+}
+
+// ── The fight ───────────────────────────────────────────────────────────────────────────────────────────────────
+
+/** Something held in a fight (or lying on the ground): its id is the world's thing id, so it can be drawn. */
+export interface FightItem {
+  id: string;
+  weapon?: WeaponStats;
+  shield?: ShieldStats;
+}
+
+export interface Fighter {
+  id: string;
+  /** Which side they fight on (0 the hero's). */
+  side: number;
+  x: number;
+  z: number;
+  /** The pools they roll: combat skills, `Undvika`, `Sköld`, and `attr:Reaktion`, `attr:Livskraft`, `attr:Förflyttning`. */
+  pools: Record<string, Dice>;
+  baseDamage: Dice;
+  baseArmour: number;
+  /** Worn armour against each type (one suit for the whole body until armour pieces come). */
+  armour: { cut: number; crush: number; thrust: number };
+  /** Dice off dodging (and running) for the load of what they wear. */
+  loadDice: number;
+  /** In the right hand (or both, for a two-handed one); null: bare hands. */
+  weapon: FightItem | null;
+  /** In the left hand. */
+  shield: FightItem | null;
+  injuries: Injuries;
+  /** Picked something up this round: −1D6 on their next attack or defence unless it is quick to draw. */
+  drew: boolean;
+  /** Left the fight (fled far enough). */
+  gone?: boolean;
+}
+
+export interface Fight {
+  round: number;
+  fighters: Fighter[];
+  /** The melee, if one is open: which side attacks in it this round, and the round it opened. */
+  melee: { attacker: number; opened: number } | null;
+  /** What lies on the ground (dropped weapons), where. */
+  ground: (FightItem & { x: number; z: number })[];
+  /** The side that won, once only one side can still fight (null: none yet). */
+  winner: number | null;
+}
+
+export type AttackTactic = 'standard' | 'quick' | 'powerful';
+export type DefenceTactic = 'standard' | 'defensive' | 'counter';
+
+/** What one fighter does this round. Anything left out is the default (stand, standard tactics). */
+export interface Choice {
+  /** The side action: walk or run towards a spot, or pick something up. */
+  move?: { x: number; z: number; run?: boolean };
+  pickUp?: string;
+  /** The main action, as the attacker in a melee: attack with a tactic, retreat, or (on someone knocked out) the mercy stroke. */
+  attack?: AttackTactic;
+  retreat?: boolean;
+  /** As the defender. */
+  defend?: DefenceTactic;
+  /** Strike someone knocked out (no defence; armour doesn't help against cut and thrust). */
+  mercy?: string;
+}
+
+/** The rules a fight is played by that come from content: the wound tables, the ground's difficulty to run on. */
+export interface FightRules {
+  tables: Record<DamageType, WoundTableDef>;
+  /** Förflyttning difficulty for running (road 6, grass 10, bog 14; +2 at night without dark-sight). */
+  ground: number;
+}
+
+/** One line of what happened, with its rolls. Plain words for the page to put in its own (`t()`). */
+export type LogLine =
+  | { k: 'move'; who: string; to: { x: number; z: number }; ran?: boolean; roll?: Roll }
+  | { k: 'pickUp'; who: string; item: string }
+  | { k: 'open'; attacker: number; rolls: Roll[] }
+  | { k: 'attack'; who: string; target: string; tactic: AttackTactic; defence: DefenceTactic; how: Defence; attack: Roll; defend: Roll | null; hit: boolean; advantages: number; part?: BodyPart; result?: HitResult; type?: DamageType }
+  | { k: 'drop'; who: string; item: string; at: { x: number; z: number } }
+  | { k: 'retreat'; who: string; to: { x: number; z: number } }
+  | { k: 'roles'; attacker: number }
+  | { k: 'end'; who: string; end: PhaseEnd }
+  | { k: 'mercy'; who: string; target: string }
+  | { k: 'over'; winner: number };
+
+export type Defence = 'parry' | 'block' | 'dodge' | 'none';
+
+export interface RoundResult {
+  fight: Fight;
+  log: LogLine[];
+}
+
+/** Start a fight; nobody is in a melee yet (it opens when two foes stand within reach). */
+export function startFight(fighters: Fighter[]): Fight {
+  return { round: 1, fighters: structuredClone(fighters), melee: null, ground: [], winner: null };
+}
+
+const dist = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z);
+
+/** Still able to act: not knocked out, dying, dead or gone. */
+export const canAct = (f: Fighter): boolean => !f.injuries.out && !f.injuries.dead && !f.injuries.dying && !f.gone;
+
+/** Their foes still in the fight. */
+const foesOf = (fight: Fight, f: Fighter) => fight.fighters.filter((o) => o.side !== f.side && !o.gone && !o.injuries.dead);
+
+/** The nearest foe who can still act (the one a lone fighter faces). */
+export function nearestFoe(fight: Fight, f: Fighter): Fighter | null {
+  let best: Fighter | null = null;
+  for (const o of foesOf(fight, f)) if (canAct(o) && (!best || dist(f, o) < dist(f, best))) best = o;
+  return best;
+}
+
+/** What a fighter attacks or parries with: the weapon in hand, or fists. */
+export const weaponOf = (f: Fighter): WeaponStats => f.weapon?.weapon ?? fists(f.baseDamage);
+
+/** A pool from a fighter's sheet; with no skill at all, a combat roll still gets 1D6 (reading). */
+function pool(f: Fighter, id: string): Dice {
+  const d = f.pools[id];
+  return d && (d.n > 0 || d.mod > 0) ? d : { n: 1, mod: 0 };
+}
+
+/** Which arm(s) a weapon is in, for the wounds that weigh on it. */
+const armsOf = (w: WeaponStats): ('left' | 'right')[] => (w.hands === 2 ? ['left', 'right'] : ['right']);
+
+/** Change a pool by whole dice (may go below 1D6 to nothing only if it had none). */
+const plus = (d: Dice, n: number): Dice => (n === 0 ? d : modify(d, n));
+
+/** The attack pool: the weapon's skill, the tactic, too little Physique, picking up this round, injuries. */
+export function attackPool(f: Fighter, tactic: AttackTactic): Dice {
+  const w = weaponOf(f);
+  const t = tactic === 'quick' ? 1 : tactic === 'powerful' ? -1 : 0;
+  const d = plus(pool(f, w.skill), t - w.weak - (f.drew && !w.props.Snabbdragen ? 1 : 0));
+  return withPenalty(d, f.injuries, { kind: 'combat', arms: armsOf(w) });
+}
+
+/**
+ * The best way to defend against this attacker, and its pool: parry with the weapon (fists at −2D6 against a
+ * weapon; a Weak weapon −1D6), block with a shield (its melee bonus), or dodge (Undvika, less the load of what they
+ * wear; never a counter). A Flexible weapon takes 1D6 off a parry or a block.
+ */
+export function defencePool(f: Fighter, against: WeaponStats, tactic: DefenceTactic): { how: Defence; dice: Dice } {
+  const t = tactic === 'defensive' ? 1 : tactic === 'counter' ? -1 : 0;
+  const flexible = against.props.Böjlig ? 1 : 0;
+  const drew = f.drew ? 1 : 0;
+  const w = weaponOf(f);
+  const options: { how: Defence; dice: Dice }[] = [];
+  const parry = plus(pool(f, w.skill), t - w.weak - flexible - drew - (w.unarmed && !against.unarmed ? 2 : 0) - (w.props.Svag && !against.unarmed ? 1 : 0));
+  options.push({ how: 'parry', dice: withPenalty(parry, f.injuries, { kind: 'combat', arms: armsOf(w) }) });
+  if (f.shield?.shield) {
+    const s = f.shield.shield;
+    const block = pool(f, 'Sköld');
+    const d = plus({ n: block.n + s.melee.n, mod: block.mod + s.melee.mod }, t - flexible - drew);
+    options.push({ how: 'block', dice: withPenalty(d, f.injuries, { kind: 'combat', arms: ['left'] }) });
+  }
+  if (tactic !== 'counter') {
+    const d = plus(pool(f, 'Undvika'), t - f.loadDice - drew);
+    options.push({ how: 'dodge', dice: withPenalty(d, f.injuries, { kind: 'movement' }) });
+  }
+  return options.reduce((a, b) => (poolMean(b.dice) > poolMean(a.dice) ? b : a));
+}
+
+/** Tactic fatigue (never a shock roll): quick +1 (none with a Quick weapon), powerful +2; defensive or counter +1. */
+export function tacticFatigue(attack: AttackTactic | null, defence: DefenceTactic | null, w: WeaponStats): number {
+  let n = 0;
+  if (attack === 'quick' && !w.props.Snabb) n += 1;
+  if (attack === 'powerful') n += 2;
+  if (defence === 'defensive' || defence === 'counter') n += 1;
+  return n;
+}
+
+/** The tactics a fighter may take with what they hold (an Unwieldy weapon can't strike quick). */
+export const attackTactics = (f: Fighter): AttackTactic[] => (weaponOf(f).props.Otymplig ? ['standard', 'powerful'] : ['standard', 'quick', 'powerful']);
+
+/** Worn armour on a part against a type, unless torn off there; base armour always. Brawl counts as crush. */
+function armourAgainst(f: Fighter, part: BodyPart, type: DamageType, piercing: number): number {
+  const worn = f.injuries.armourOff.includes(part) ? 0 : type === 'cut' ? f.armour.cut : type === 'thrust' ? f.armour.thrust : type === 'crush' || type === 'brawl' ? f.armour.crush : 0;
+  return Math.max(0, f.baseArmour + worn - piercing);
+}
+
+/** Does the damage come in the weapon's type? Piercing X only against its own type ("Genomslag S5" pierces thrust). */
+function piercingOf(w: WeaponStats, type: DamageType, target: Fighter): number {
+  let p = 0;
+  if (w.props.Genomslag && type === 'thrust') p += w.props.Genomslag;
+  const unarmoured = target.armour.cut + target.armour.crush + target.armour.thrust === 0;
+  if (w.props.Skärande && unarmoured && (type === 'cut' || type === 'thrust')) p += w.props.Skärande;
+  return p;
+}
+
+/** Where dropped things land: 1–3 m off, in a direction the dice say. */
+function dropSpot(f: Fighter, rng: Rng): { x: number; z: number } {
+  const a = (rollDie(12, rng) / 12) * Math.PI * 2;
+  const r = 1 + (rollDie(6, rng) - 1) * 0.4;
+  return { x: f.x + Math.cos(a) * r, z: f.z + Math.sin(a) * r };
+}
+
+/**
+ * After a hit with *drops*: what is in the hit arm falls (the weapon from the right, the shield from the left); a
+ * head or torso hit drops everything. A two-handed grip and a Secure item stay (Q47: a dropped weapon really lies on
+ * the ground until someone picks it up).
+ */
+export function dropFrom(fight: Fight, f: Fighter, parts: (BodyPart | undefined)[], rng: Rng, log: LogLine[]): void {
+  const all = parts.some((p) => p === undefined || p === 'head' || p === 'torso');
+  const slots: ('weapon' | 'shield')[] = [];
+  if (all || parts.includes('rightArm')) slots.push('weapon');
+  if (all || parts.includes('leftArm')) slots.push('shield');
+  for (const slot of slots) {
+    const item = f[slot];
+    if (!item) continue;
+    const props = item.weapon?.props ?? item.shield?.props ?? {};
+    if (props.Säker || item.weapon?.hands === 2) continue;
+    const at = dropSpot(f, rng);
+    fight.ground.push({ ...item, ...at });
+    f[slot] = null;
+    log.push({ k: 'drop', who: f.id, item: item.id, at });
+  }
+}
+
+/** Walk (or run) towards a spot, as far as the side action goes; a failed run is a walk. */
+function moveTowards(f: Fighter, to: { x: number; z: number }, run: boolean, rules: FightRules, rng: Rng, log: LogLine[]): void {
+  if (f.injuries.short.includes('fall')) return; // down: can't move until up
+  let roll: Roll | undefined;
+  let reach = WALK;
+  if (run) {
+    const d = withPenalty(plus(pool(f, 'attr:Förflyttning'), -f.loadDice), f.injuries, { kind: 'attr', attr: 'Förflyttning' });
+    roll = rollTest(d, rules.ground, rng, 'Run');
+    if (roll.success) reach = RUN;
+  }
+  const d = dist(f, to);
+  const k = d <= reach ? 1 : reach / d;
+  f.x += (to.x - f.x) * k;
+  f.z += (to.z - f.z) * k;
+  log.push({ k: 'move', who: f.id, to: { x: f.x, z: f.z }, ...(run ? { ran: !!roll?.success } : {}), ...(roll ? { roll } : {}) });
+}
+
+/** A Reaktion roll to open a melee (Reach X: +X D6). */
+function reactionRoll(f: Fighter, rng: Rng): Roll {
+  const reach = weaponOf(f).props.Räckvidd ?? 0;
+  const d = withPenalty(plus(pool(f, 'attr:Reaktion'), reach), f.injuries, { kind: 'attr', attr: 'Reaktion' });
+  return rollOpen(d, rng, 'Reaktion');
+}
+
+/** One blow, attack against defence, and the damage if it lands. */
+function strike(fight: Fight, a: Fighter, d: Fighter, tactic: AttackTactic, defence: DefenceTactic, rules: FightRules, rng: Rng, log: LogLine[]): { hit: boolean; margin: number } {
+  const w = weaponOf(a);
+  const atk = rollOpen(attackPool(a, tactic), rng, 'Attack');
+  const where = rollDie(10, rng);
+  const dp = defencePool(d, w, defence);
+  const def = canAct(d) ? rollOpen(dp.dice, rng, 'Defence') : null;
+  const defTotal = def?.total ?? 0;
+  const hit = atk.total >= defTotal;
+  const margin = atk.total - defTotal;
+  const adv = hit ? advantages(margin) : 0;
+  const line: Extract<LogLine, { k: 'attack' }> = { k: 'attack', who: a.id, target: d.id, tactic, defence, how: def ? dp.how : 'none', attack: atk, defend: def, hit, advantages: adv };
+  if (hit) {
+    const { type, dice } = bestDamage(w);
+    const tacticDice = tactic === 'quick' ? -1 : tactic === 'powerful' ? 2 + (w.props.Kraftfull ? 1 : 0) : 0;
+    // Every advantage buys more damage for now: +2 each, +1D6 each with a Dangerous weapon (choosing edges is B8b).
+    const more = w.props.Vådlig ? { n: adv, mod: 0 } : { n: 0, mod: 2 * adv };
+    const damage = { n: Math.max(0, dice.n + tacticDice + more.n), mod: dice.mod + more.mod };
+    const part = (['head', 'torso', 'torso', 'torso', 'leftArm', 'leftArm', 'rightArm', 'rightArm', 'leftLeg', 'rightLeg'] as BodyPart[])[where - 1];
+    const result = rollHit({
+      type: w.unarmed ? 'brawl' : type, damage, part, armour: armourAgainst(d, part, type, piercingOf(w, type, d)),
+      wounding: w.props.Sargande, brutal: w.props.Brutal, shallow: !!w.props.Ytlig, vitality: pool(d, 'attr:Livskraft'), victim: d.injuries,
+    }, rules.tables, rng);
+    d.injuries = result.after;
+    Object.assign(line, { part, result, type });
+    log.push(line);
+    // Someone killed lets go of everything; a wound that says *drops* lets go of what is in the arm hit.
+    if (result.after.dead) dropFrom(fight, d, [undefined], rng, log);
+    else {
+      const drops = (result.serious?.effects ?? []).filter((e) => e.k === 'drop');
+      if (drops.length) dropFrom(fight, d, drops.map((e) => ('part' in e ? e.part : undefined)), rng, log);
+    }
+  } else log.push(line);
+  return { hit, margin };
+}
+
+/** Who attacks next round, after the defender's tactic and the result (p. 89). */
+function swaps(defence: DefenceTactic, hit: boolean, margin: number): boolean {
+  if (defence === 'counter') return true;
+  if (defence === 'defensive') return !hit && -margin >= 10;
+  return !hit;
+}
+
+/** The side that has won: the only one with anyone left who can act. */
+function winnerOf(fight: Fight): number | null {
+  const sides = new Set(fight.fighters.filter(canAct).map((f) => f.side));
+  return sides.size === 1 ? [...sides][0] : sides.size === 0 ? -1 : null;
+}
+
+/**
+ * Play one round from everyone's choices (by fighter id). Side actions first (moving, picking up), then a melee opens
+ * if two foes stand within reach (Reaktion, the higher attacks), then the attacker's main action (an attack against
+ * the defender's tactic, or a retreat), then the end of the phase for everyone (bleeding, the shock roll), and short
+ * effects from before this phase wear off. Returns the new fight and the log.
+ */
+export function resolveRound(before: Fight, choices: Record<string, Choice>, rules: FightRules, rng: Rng): RoundResult {
+  const fight: Fight = structuredClone(before);
+  const log: LogLine[] = [];
+  const shortBefore = new Map(fight.fighters.map((f) => [f.id, f.injuries.short.length]));
+  const inMelee = (f: Fighter) => !!fight.melee && canAct(f);
+  for (const f of fight.fighters) f.drew = false;
+
+  // Side actions: pick up (also in a melee), move (only when free).
+  for (const f of fight.fighters) {
+    if (!canAct(f)) continue;
+    const c = choices[f.id] ?? {};
+    if (c.pickUp) {
+      const i = fight.ground.findIndex((g) => g.id === c.pickUp && dist(g, f) <= PICKUP_REACH);
+      const item = fight.ground[i];
+      const slot = item?.shield ? 'shield' : 'weapon';
+      if (item && !f[slot] && !(slot === 'shield' && f.weapon?.weapon?.hands === 2)) {
+        fight.ground.splice(i, 1);
+        f[slot] = { id: item.id, ...(item.weapon ? { weapon: item.weapon } : {}), ...(item.shield ? { shield: item.shield } : {}) };
+        f.drew = true;
+        log.push({ k: 'pickUp', who: f.id, item: item.id });
+      }
+    } else if (c.move && !inMelee(f)) moveTowards(f, c.move, !!c.move.run, rules, rng, log);
+  }
+
+  // A melee opens when two foes who can act stand within reach.
+  if (!fight.melee) {
+    const able = fight.fighters.filter(canAct);
+    const pair = able.flatMap((a) => able.filter((b) => b.side > a.side && dist(a, b) <= ADJACENT).map((b) => [a, b] as const))[0];
+    if (pair) {
+      const rolls = pair.map((f) => reactionRoll(f, rng));
+      let first = rolls[0].total === rolls[1].total ? poolMean(pool(pair[0], 'attr:Reaktion')) - poolMean(pool(pair[1], 'attr:Reaktion')) : rolls[0].total - rolls[1].total;
+      if (first === 0) first = rollDie(2, rng) === 1 ? 1 : -1;
+      fight.melee = { attacker: (first > 0 ? pair[0] : pair[1]).side, opened: fight.round };
+      log.push({ k: 'open', attacker: fight.melee.attacker, rolls });
+    }
+  }
+
+  // The main action: the attacking side strikes (or retreats); someone knocked out can be given the mercy stroke.
+  let nextAttacker: number | null = fight.melee?.attacker ?? null;
+  for (const a of fight.fighters) {
+    if (!canAct(a)) continue;
+    const c = choices[a.id] ?? {};
+    if (c.mercy) {
+      const v = fight.fighters.find((f) => f.id === c.mercy);
+      // The mercy stroke (p. 101): someone knocked out can't defend, and it is given to kill (reading: it does).
+      if (v && !v.injuries.dead && (v.injuries.out || v.injuries.dying) && dist(a, v) <= ADJACENT + 0.5) {
+        v.injuries = { ...v.injuries, dead: true };
+        log.push({ k: 'mercy', who: a.id, target: v.id });
+      }
+      continue;
+    }
+    if (!fight.melee || a.side !== fight.melee.attacker) continue;
+    const d = nearestFoe(fight, a);
+    if (!d || dist(a, d) > ADJACENT + 0.5) continue;
+    if (c.retreat && fight.melee.opened !== fight.round && !a.injuries.short.includes('fall')) {
+      const away = dist(a, d) || 1;
+      a.x += ((a.x - d.x) / away) * WALK;
+      a.z += ((a.z - d.z) / away) * WALK;
+      fight.melee = null;
+      nextAttacker = null;
+      log.push({ k: 'retreat', who: a.id, to: { x: a.x, z: a.z } });
+      break;
+    }
+    const tactic = c.attack && attackTactics(a).includes(c.attack) ? c.attack : 'standard';
+    const defence = (choices[d.id] ?? {}).defend ?? 'standard';
+    const dTactic: DefenceTactic = canAct(d) ? defence : 'standard';
+    const { hit, margin } = strike(fight, a, d, tactic, dTactic, rules, rng, log);
+    a.injuries = { ...a.injuries, fatigue: a.injuries.fatigue + tacticFatigue(tactic, null, weaponOf(a)) };
+    if (canAct(d)) {
+      d.injuries = { ...d.injuries, fatigue: d.injuries.fatigue + tacticFatigue(null, dTactic, weaponOf(d)) };
+      if (swaps(dTactic, hit, margin)) nextAttacker = d.side;
+    }
+  }
+
+  // The end of the phase: fire and bleeding, the shock roll; short effects from before this phase wear off.
+  for (const f of fight.fighters) {
+    if (f.injuries.dead || f.gone) continue;
+    const end = endOfPhase(f.injuries, pool(f, 'attr:Livskraft'), rng);
+    f.injuries = { ...end.injuries, short: end.injuries.short.slice(shortBefore.get(f.id) ?? 0), blinded: false };
+    if (end.rolls.length || end.notes.length) log.push({ k: 'end', who: f.id, end });
+  }
+
+  // The melee goes on (or ends with no one left in it); roles for the next round.
+  if (fight.melee) {
+    const stillIn = fight.fighters.filter(canAct);
+    const engaged = stillIn.some((a) => stillIn.some((b) => b.side !== a.side && dist(a, b) <= ADJACENT + 0.5));
+    if (!engaged) fight.melee = null;
+    else if (nextAttacker !== null && nextAttacker !== fight.melee.attacker) {
+      fight.melee = { ...fight.melee, attacker: nextAttacker };
+      log.push({ k: 'roles', attacker: nextAttacker });
+    }
+  }
+  const w = winnerOf(fight);
+  if (w !== null && fight.winner === null) {
+    fight.winner = w;
+    log.push({ k: 'over', winner: w });
+  }
+  fight.round += 1;
+  return { fight, log };
+}
+
+/** Is the fight still to be fought (two sides that can act)? Mercy strokes may still follow once it is won. */
+export const fightOn = (f: Fight): boolean => f.winner === null;
+
+/** Who the fighter would be fighting in melee this round, and in which role. */
+export function roleOf(fight: Fight, id: string): 'attacker' | 'defender' | 'free' {
+  const f = fight.fighters.find((x) => x.id === id);
+  if (!f || !fight.melee || !canAct(f)) return 'free';
+  const foe = nearestFoe(fight, f);
+  if (!foe || dist(f, foe) > ADJACENT + 0.5) return 'free';
+  return fight.melee.attacker === f.side ? 'attacker' : 'defender';
+}
+
+/** Metres between two fighters. */
+export const between = (fight: Fight, a: string, b: string): number => {
+  const fa = fight.fighters.find((f) => f.id === a), fb = fight.fighters.find((f) => f.id === b);
+  return fa && fb ? dist(fa, fb) : Infinity;
+};
+
+// ── How someone fights when no one chooses for them ──────────────────────────────────────────────────────────────
+
+/** A way of fighting (content: `content/combat/styles/`): how often each tactic, when to pick a weapon up, when to finish. */
+export interface FightStyle {
+  id: string;
+  /** Weights for the attack tactics. */
+  attack: Record<AttackTactic, number>;
+  defence: Record<DefenceTactic, number>;
+  /** Strike the knocked out (to the death). */
+  mercy: boolean;
+  /** Run when closing in, if far. */
+  run: boolean;
+}
+
+const weighted = <T extends string>(w: Record<T, number>, rng: Rng): T => {
+  const entries = Object.entries(w) as [T, number][];
+  let x = rng.next() * entries.reduce((s, [, v]) => s + v, 0);
+  for (const [k, v] of entries) if ((x -= v) < 0) return k;
+  return entries[0][0];
+};
+
+/**
+ * What a fighter the page doesn't steer does this round (the gladiator): pick up a weapon if empty-handed and one
+ * lies near, close in on the nearest foe, strike with a tactic by their style, defend by their style, and finish
+ * someone knocked out if their style says so.
+ */
+export function chooseFor(fight: Fight, id: string, style: FightStyle, rng: Rng): Choice {
+  const f = fight.fighters.find((x) => x.id === id);
+  if (!f || !canAct(f)) return {};
+  const c: Choice = {};
+  const downed = foesOf(fight, f).find((o) => !o.injuries.dead && (o.injuries.out || o.injuries.dying));
+  if (fight.winner !== null) {
+    if (style.mercy && downed) {
+      if (dist(f, downed) <= ADJACENT) c.mercy = downed.id;
+      else c.move = { x: downed.x, z: downed.z };
+    }
+    return c;
+  }
+  const near = !f.weapon ? fight.ground.filter((g) => g.weapon && dist(g, f) <= PICKUP_REACH).sort((a, b) => dist(a, f) - dist(b, f))[0] : undefined;
+  if (near) c.pickUp = near.id;
+  const foe = nearestFoe(fight, f);
+  if (foe && !c.pickUp && !fight.melee && dist(f, foe) > ADJACENT) {
+    // Stop just short of them, within reach.
+    const d = dist(f, foe);
+    const k = (d - ADJACENT * 0.75) / d;
+    c.move = { x: f.x + (foe.x - f.x) * k, z: f.z + (foe.z - f.z) * k, run: style.run && d > WALK + ADJACENT };
+  }
+  const tactics = attackTactics(f);
+  const w = Object.fromEntries(tactics.map((t) => [t, style.attack[t]])) as Record<AttackTactic, number>;
+  c.attack = weighted(w, rng);
+  c.defend = weighted(style.defence, rng);
+  return c;
+}
+
+// ── Building a fighter ──────────────────────────────────────────────────────────────────────────────────────────
+
+/** Dice off dodging for the load of armour worn (the load scale: 17–24 −1D6, 25+ −2D6, 49+ −3D6). */
+export const loadDiceOf = (load: number): number => (load >= 49 ? 3 : load >= 25 ? 2 : load >= 17 ? 1 : 0);
