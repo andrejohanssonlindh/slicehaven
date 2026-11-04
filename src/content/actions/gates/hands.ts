@@ -1,6 +1,6 @@
 import type { GateCase, GateDef } from '../../../core/world3d/actions';
 import { thingName } from '../../../core/world3d/actions';
-import { carriable, hideable } from '../../../core/world3d/carry';
+import { HAUL_SKILL, carriable, carryCapacity, hideable, kgText } from '../../../core/world3d/carry';
 
 /**
  * Gates about hands and sizes (plan B3b; rules `core/world3d/carry.ts`). Until pockets and the bag come (B6), whatever
@@ -42,6 +42,23 @@ const size: GateDef = {
   check: (c) => (carriable(kindOf(c)?.size) ? null : 'The {name} is too heavy to carry alone.'),
 };
 
+/**
+ * Within what the doer can carry (plan B6, `carryCapacity`): what they hold already and this together. Until fatigue
+ * comes nothing over it can be carried; refused with both weights.
+ */
+const weight: GateDef = {
+  id: 'weight',
+  about: 'What the doer would carry, this thing with what they hold, is within their carrying capacity (kg from Physique, Slita & släpa and build).',
+  kind: 'requirement',
+  check: (c) => {
+    const kg = kindOf(c)?.weight ?? 0;
+    const k = c.world.holding?.(c.doer.id);
+    const held = k && c.world.things.has(k) ? (c.world.things.get(k).weight ?? 0) : 0;
+    const can = carryCapacity(c.doer.dice('attr:Kroppsbyggnad'), c.doer.dice(HAUL_SKILL), c.doer.load ?? 0);
+    return held + kg <= can ? null : `The {name} is too heavy for you: it weighs ${kgText(kg)}, and you can carry ${kgText(can)}.`;
+  },
+};
+
 /** Small enough to slip away unseen (pocket or bag size); otherwise not offered. */
 const small: GateDef = {
   id: 'small',
@@ -51,4 +68,4 @@ const small: GateDef = {
   check: (c) => (hideable(kindOf(c)?.size) ? null : 'The {name} is too big to hide.'),
 };
 
-export default [handsFree, holding, size, small];
+export default [handsFree, holding, size, weight, small];

@@ -72,32 +72,32 @@ const PIECES: Record<string, Piece> = {
 const SEATS: Record<string, number> = { stool: 0.45, innbench: 0.45, bed: 0.5 };
 
 /**
- * What can be taken (plan B3b, `core/world3d/carry.ts`): how big it is and what it is worth, in coins (a first guess
- * until prices come with B6). A piece not listed is part of the room (a hearth, a shelf, the pegs) and stays put.
+ * What can be taken (plan B3b, `core/world3d/carry.ts`): how big it is, what it weighs (kg, B6: a full keg, a sack of
+ * grain), and what it is worth, in coins (a first guess until prices come with B6). A piece not listed is part of the room (a hearth, a shelf, the pegs) and stays put.
  * Heavy pieces can be tried, and are too heavy to carry alone.
  */
-const TAKE: Record<string, { size: Size; value?: number; importance?: number }> = {
-  stool: { size: 'hands', value: 2 },
-  broom: { size: 'hands', value: 1 },
-  keg: { size: 'hands', value: 6 },
-  sacks: { size: 'hands', value: 4 },
-  basket: { size: 'bag', value: 1 },
-  kindling: { size: 'hands', value: 0.5 },
-  pallet: { size: 'hands', value: 1 },
-  footlocker: { size: 'hands', value: 8 },
-  nets: { size: 'hands', value: 3 },
-  haybale: { size: 'hands', value: 1 },
-  herbs: { size: 'pocket', value: 1 },
-  table: { size: 'heavy', value: 6 },
-  longTable: { size: 'heavy', value: 10 },
-  innbench: { size: 'heavy', value: 5 },
-  bed: { size: 'heavy', value: 12 },
-  anvil: { size: 'heavy', value: 40, importance: 1 },
-  loom: { size: 'heavy', value: 25, importance: 1 },
-  workbench: { size: 'heavy', value: 8 },
-  counter: { size: 'heavy', value: 8 },
-  aleKegs: { size: 'heavy', value: 20 },
-  cratestack: { size: 'heavy', value: 6 },
+const TAKE: Record<string, { size: Size; weight: number; value?: number; importance?: number }> = {
+  stool: { size: 'hands', weight: 3, value: 2 },
+  broom: { size: 'hands', weight: 1, value: 1 },
+  keg: { size: 'hands', weight: 16, value: 6 },
+  sacks: { size: 'hands', weight: 20, value: 4 },
+  basket: { size: 'bag', weight: 1, value: 1 },
+  kindling: { size: 'hands', weight: 4, value: 0.5 },
+  pallet: { size: 'hands', weight: 5, value: 1 },
+  footlocker: { size: 'hands', weight: 12, value: 8 },
+  nets: { size: 'hands', weight: 5, value: 3 },
+  haybale: { size: 'hands', weight: 15, value: 1 },
+  herbs: { size: 'pocket', weight: 0.2, value: 1 },
+  table: { size: 'heavy', weight: 30, value: 6 },
+  longTable: { size: 'heavy', weight: 60, value: 10 },
+  innbench: { size: 'heavy', weight: 25, value: 5 },
+  bed: { size: 'heavy', weight: 40, value: 12 },
+  anvil: { size: 'heavy', weight: 80, value: 40, importance: 1 },
+  loom: { size: 'heavy', weight: 50, value: 25, importance: 1 },
+  workbench: { size: 'heavy', weight: 50, value: 8 },
+  counter: { size: 'heavy', weight: 70, value: 8 },
+  aleKegs: { size: 'heavy', weight: 100, value: 20 },
+  cratestack: { size: 'heavy', weight: 60, value: 6 },
 };
 
 /** The family every piece of furniture is a kind of: an item in a room. */

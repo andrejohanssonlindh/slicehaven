@@ -16,6 +16,8 @@ export interface Hero {
   people?: string;
   /** Own facets (people library): homeland, faith, calling, people. Sharing one with someone can help. */
   tags?: string[];
+  /** Load points from the build (a dwarf's −8): each taken off is a kilogram more carried (plan B6). */
+  load?: number;
 }
 
 export const NO_DICE: Dice = { n: 0, mod: 0 };

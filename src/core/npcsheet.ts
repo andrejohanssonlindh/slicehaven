@@ -65,6 +65,8 @@ export interface SheetDef {
    * 2D6). A later kind in the chain changes or (with 0) takes one away: dwarves don't ride, nor swim.
    */
   basics?: Record<string, number>;
+  /** Load points their build adds (negative takes off: a dwarf's −8, from the grant `belastning`). These add up down the chain. */
+  load?: number;
 }
 
 /** A kind's sheet worked out down a chain: what every person of the kind shares. */
@@ -77,6 +79,7 @@ export interface MergedSheet {
   gifts: Record<string, number>;
   rules: string[];
   basics: Record<string, number>;
+  load: number;
 }
 
 /** Where nothing says otherwise: an ordinary person (3D6 everywhere, the book's toiler). */
@@ -93,6 +96,7 @@ export function mergeSheets(layers: readonly (SheetDef | undefined)[]): MergedSh
   const gifts: Record<string, number> = {};
   const rules: string[] = [];
   const basics: Record<string, number> = {};
+  let load = 0;
   for (const s of layers) {
     if (!s) continue;
     Object.assign(attrs, s.attrs);
@@ -104,13 +108,14 @@ export function mergeSheets(layers: readonly (SheetDef | undefined)[]): MergedSh
     for (const [k, v] of Object.entries(s.gifts ?? {})) gifts[k] = Math.max(gifts[k] ?? 0, v);
     for (const r of s.rules ?? []) if (!rules.includes(r)) rules.push(r);
     Object.assign(basics, s.basics);
+    load += s.load ?? 0;
   }
   for (const a of SHEET_ATTRS) attrs[a] += shift[a] ?? 0;
   for (const slot of Object.keys(gear)) if (!gear[slot].length) delete gear[slot];
   for (const k of Object.keys(basics)) if (basics[k] <= 0) delete basics[k];
   // A gift is fixed: it is not also a skill that rolls with the level.
   for (const k of Object.keys(gifts)) delete skills[k];
-  return { attrs, skills, knacks: knacks.filter((k) => !skills[k] && !gifts[k]), knackCount, gear, gifts, rules, basics };
+  return { attrs, skills, knacks: knacks.filter((k) => !skills[k] && !gifts[k]), knackCount, gear, gifts, rules, basics, load };
 }
 
 /** The level a lean puts a skill at, for a person of a level: main at it, side a step below (never under novice). */
@@ -131,6 +136,7 @@ export interface SheetSpan {
   gifts: Record<string, number>;
   rules: string[];
   basics: Record<string, number>;
+  load: number;
 }
 
 /** How far a person's attribute strays from their kind's, either way, in dice units. */
@@ -147,7 +153,7 @@ export function sheetSpan(m: MergedSheet, level: PersonLevel): SheetSpan {
   const kl = skillLevel('side', level);
   return {
     level, attrs, skills, knacks: { ids: m.knacks, count: Math.min(m.knackCount, m.knacks.length), level: kl, span: LEVEL_SPAN[kl] }, gear: m.gear,
-    gifts: m.gifts, rules: m.rules, basics: m.basics,
+    gifts: m.gifts, rules: m.rules, basics: m.basics, load: m.load,
   };
 }
 
@@ -165,6 +171,8 @@ export interface RolledSheet {
   /** Which of the skills are their people's gifts (fixed), and the gifts that are rules. */
   gifts: string[];
   rules: string[];
+  /** Load points from their build (a dwarf's −8); left out when 0. */
+  load?: number;
 }
 
 /** How many of each level there are among people nobody gave one: most capable, a quarter novices, few skilled, a rare master. */
@@ -206,7 +214,7 @@ export function rollSheet(span: SheetSpan, seed: number | string): RolledSheet {
   // (Drawn after everything else, so adding them changed no one's rolls.) Gifts are fixed; basics are a floor.
   for (const [k, v] of Object.entries(span.gifts)) skills[k] = v;
   for (const [k, v] of Object.entries(span.basics)) if ((skills[k] ?? 0) < v) skills[k] = v;
-  return { level: span.level, attrs, skills, knacks, gear, gifts: Object.keys(span.gifts), rules: [...span.rules] };
+  return { level: span.level, attrs, skills, knacks, gear, gifts: Object.keys(span.gifts), rules: [...span.rules], ...(span.load ? { load: span.load } : {}) };
 }
 
 /** Units to dice (4 to a die): 13 is 3D6+1. */

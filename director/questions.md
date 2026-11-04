@@ -2,8 +2,6 @@
 
 Newest on top. Answer in chat (just reference the number, e.g. "Q31: A"). Answered questions move to the [archive](archive/questions-answered.md); what they decided goes to the [decisions](decisions.md). Each question names the [plan](todo.md) item it holds up.
 
-*A small ask for B6 too: the page of the carried-weight rule, when you've looked.*
-
 *No open questions right now.*
 
 ---

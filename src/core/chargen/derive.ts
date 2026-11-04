@@ -127,7 +127,7 @@ export type Effect =
   | { k: 'mysterier'; n: number; learned: boolean }
   | { k: 'religion'; ids: string[] }
   | { k: 'doktrin'; n: number }
-  | { k: 'derived'; stat: 'grundrustning' | 'grundskada' | 'lakningstakt'; n: number }
+  | { k: 'derived'; stat: 'grundrustning' | 'grundskada' | 'lakningstakt' | 'belastning'; n: number }
   | { k: 'regel'; text: string }
   | { k: 'foremal'; text: string }
   | { k: 'lana'; key: string; people: string[] }
@@ -216,7 +216,7 @@ export interface Derived {
   }[];
   attrPoints: { total: number; spent: number; extra: number };
   wisdom: WisdomRow;
-  derived: { armour: number; damage: Dice; healing: number };
+  derived: { armour: number; damage: Dice; healing: number; /** Load points from the build (a dwarf's −8): one kilogram of carrying capacity for each taken off. */ load: number };
   skills: SkillRow[];
   pools: PoolRow[];
   numb: Record<Exclude<NumbCat, 'valfri'>, number>;
@@ -775,6 +775,7 @@ export function derive(state: CharState, c: Content): Derived {
       armour: baseArmour(physique) + derivedMods.filter((d) => d.stat === 'grundrustning').reduce((n, d) => n + d.n, 0),
       damage: { n: dmg.n, mod: dmg.mod + dmgMod },
       healing: 1 + derivedMods.filter((d) => d.stat === 'lakningstakt').reduce((n, d) => n + d.n, 0),
+      load: derivedMods.filter((d) => d.stat === 'belastning').reduce((n, d) => n + d.n, 0),
     },
     skills,
     pools: poolRows,
@@ -918,7 +919,7 @@ export function describeToken(t: Token, c: Pick<Content, 'skill'>): string {
     case 'doktrin':
       return `${t.n} extra doctrine${t.n === 1 ? '' : 's'}`;
     case 'derived':
-      return `${{ grundrustning: 'Base armour', grundskada: 'Base damage', lakningstakt: 'Healing rate' }[t.stat]} ${sign(t.n)}`;
+      return `${{ grundrustning: 'Base armour', grundskada: 'Base damage', lakningstakt: 'Healing rate', belastning: 'Load' }[t.stat]} ${sign(t.n)}`;
     case 'regel':
       return t.text;
     case 'foremal':

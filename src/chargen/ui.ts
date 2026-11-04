@@ -75,7 +75,7 @@ export function effectText(e: Effect, s: CharState): string {
     case 'doktrin':
       return `${e.n} extra doctrine${e.n === 1 ? '' : 's'}`;
     case 'derived':
-      return `${{ grundrustning: 'Base armour', grundskada: 'Base damage', lakningstakt: 'Healing rate' }[e.stat]} ${sign(e.n)}`;
+      return `${{ grundrustning: 'Base armour', grundskada: 'Base damage', lakningstakt: 'Healing rate', belastning: 'Load' }[e.stat]} ${sign(e.n)}`;
     case 'regel':
     case 'foremal':
       return e.text;

@@ -5,6 +5,7 @@ import { derive } from '../core/chargen/derive';
 import { loadRoster } from '../core/chargen/state';
 import { type Hero, diceOf } from '../core/hero';
 import { type ActResult, type ActTarget, type Doer, thingName } from '../core/world3d/actions';
+import { HAUL_SKILL, carryCapacity, kgText } from '../core/world3d/carry';
 import type { SpikeWorld } from '../engine3d/world';
 import { t } from '../i18n';
 import { showRolls } from '../ui/dice';
@@ -59,7 +60,7 @@ export function whoseText(w: ReturnType<SpikeWorld['whoseAt']>, names: boolean):
 }
 
 /** The hero as a doer: what they roll for a skill or an attribute. */
-export const heroDoer = (hero: Hero): Doer => ({ id: 'hero', dice: (s) => diceOf(hero, s) });
+export const heroDoer = (hero: Hero): Doer => ({ id: 'hero', dice: (s) => diceOf(hero, s), load: hero.load ?? 0 });
 
 export function makeSheet(world: () => SpikeWorld, notify: (text: string) => void, save: () => void, doer: Doer, onLead: () => void = () => {}): Sheet {
   const el = document.getElementById('act')!;
@@ -123,6 +124,13 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
     // What you carry (B3b), said where you stand.
     const held = !target && w.holding && THINGS.has(w.holding) ? THINGS.get(w.holding) : null;
     if (held) lookEl.textContent = `${lookEl.textContent} ${t('act.holding', 'You are carrying the {name}.', { name: t(`thing.${held.id}.name`, thingName(held)) })}`.trim();
+    // What it weighs, on what can be taken; where you stand, what you can carry (B6).
+    const kg = kind?.size && kind.weight !== undefined ? kind.weight : null;
+    if (kg !== null) lookEl.textContent = `${lookEl.textContent} ${t('act.weighs', 'It weighs about {kg}.', { kg: kgText(kg) })}`.trim();
+    if (!target) {
+      const can = carryCapacity(doer.dice('attr:Kroppsbyggnad'), doer.dice(HAUL_SKILL), doer.load ?? 0);
+      lookEl.textContent = `${lookEl.textContent} ${t('act.capacity', 'You can carry {kg} without trouble.', { kg: kgText(can) })}`.trim();
+    }
     if (lead?.added) {
       notify(t('act.leadadded', 'Lead added: {title}.', { title: lead.title }));
       onLead();

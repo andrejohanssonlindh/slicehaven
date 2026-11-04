@@ -27,6 +27,25 @@ export const carriable = (s: Size | undefined): s is Exclude<Size, 'heavy'> => s
 /** Small enough to slip away unseen (under a cloak, into a sleeve)? */
 export const hideable = (s: Size | undefined): boolean => s === 'pocket' || s === 'bag';
 
+/**
+ * How much someone carries without trouble, in kilograms (plan B6; the director's rule, 2026-11-04): 5 kg for each
+ * die of Physique and 1 for each pip (3D6+2 carries 17 kg); the expertise *Slita & släpa* (toil and haul) adds half
+ * as much again for its own dice (4D6 adds 10 kg); and a build that takes load points off (a dwarf's −8, the grant
+ * `belastning`) adds a kilogram for each, since one kilogram over is one load point. Until fatigue comes nothing over
+ * it can be carried; after that, every kilogram over is a load point on the ruleset's scale, the same scale armour,
+ * heat and mounts use (penalties to movement, base fatigue).
+ */
+export const KG_PER_DIE = 5;
+export const kgOfDice = (d: { n: number; mod: number }): number => d.n * KG_PER_DIE + d.mod;
+export const HAUL_SKILL = 'E:Slita & släpa';
+
+export function carryCapacity(physique: { n: number; mod: number }, haul: { n: number; mod: number }, load = 0): number {
+  return kgOfDice(physique) + kgOfDice(haul) / 2 + Math.max(0, -load);
+}
+
+/** Kilograms in a line: "17 kg", "0.5 kg", "10.5 kg". */
+export const kgText = (kg: number): string => `${Math.round(kg * 10) / 10} kg`;
+
 /** Where a loose thing is: a spot on the ground or on a storey of a house, and which way it faces. */
 export interface LooseSpot {
   x: number;

@@ -66,7 +66,7 @@ export const FAMILIES: Record<Family, FamilyDef> = {
     en: 'Dwarves',
     innate: [
       t('Fast mark', 'Solid ground', 'inkomp:Simma; inkomp:Sjömannaskap; grund:Rida 0; regel:Seasick and travel-sick: −2D6 on all rolls aboard a ship, −1D6 when riding or in a wagon.'),
-      t('Kort och kraftig', 'Short and stout', 'regel:Subtract 8 from your load when working out encumbrance (minimum 0).'),
+      t('Kort och kraftig', 'Short and stout', 'belastning -8', 'Built to carry: 8 less load (8 kg more carried without trouble).'),
       t('Mörkersyn', 'Darkvision', 'F:Mörkersyn 4', 'Your eyes glow red in the dark.'),
       t('Vandrare', 'Walker', 'talang:Marsch'),
     ],

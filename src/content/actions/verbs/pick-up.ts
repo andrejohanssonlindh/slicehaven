@@ -10,7 +10,7 @@ const pickUp: VerbDef = {
   id: 'pick-up',
   label: 'Pick up the {name}',
   on: { has: 'size' },
-  gates: [{ gate: 'size' }, { gate: 'hands-free' }],
+  gates: [{ gate: 'size' }, { gate: 'weight' }, { gate: 'hands-free' }],
   success: [{ carry: 'open' }, { say: 'You pick up the {name}.' }],
 };
 

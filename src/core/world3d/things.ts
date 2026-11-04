@@ -84,6 +84,8 @@ export interface ThingDef {
    * alone). No size: it is part of where it stands (a hearth, a shelf) and can't be taken.
    */
   size?: Size;
+  /** What it weighs, kilograms (plan B6): what can be carried is set against the carrier's capacity (`carryCapacity`). */
+  weight?: number;
   /** What it is worth, in coins (a first guess until prices come with B6): taking it weighs more against a poor owner. */
   value?: number;
   /** How much it matters to its owner beyond its price (a guard's sword, an heirloom): 0 to 3, each step half as much again. */

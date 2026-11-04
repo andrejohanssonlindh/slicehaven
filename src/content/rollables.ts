@@ -95,5 +95,5 @@ export function heroFromChar(name: string, d: Derived): Hero {
   const tags = [
     d.people && peopleFacet(d.people.id), d.homeland?.id, d.religion?.id, d.background && backgroundFacet(d.background.en),
   ].filter((t): t is string => !!t && t !== 'ovriga');
-  return { name: name || 'Unnamed hero', from: 'Character creator', dice, kind: d.people ? FAMILY_KIND[d.people.family] : undefined, people: d.people?.id, tags };
+  return { name: name || 'Unnamed hero', from: 'Character creator', dice, kind: d.people ? FAMILY_KIND[d.people.family] : undefined, people: d.people?.id, tags, ...(d.derived.load ? { load: d.derived.load } : {}) };
 }

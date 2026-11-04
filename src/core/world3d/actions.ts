@@ -52,6 +52,8 @@ export interface Doer {
   id: string;
   /** The pool they roll for a skill or attribute (`attr:…`); none is `{ n: 0 }`. */
   dice(skill: string): Dice;
+  /** Load points their build adds (negative takes off: a dwarf's −8, the grant `belastning`); none is 0. */
+  load?: number;
 }
 
 /** What the world looks like to the rules, for the facts gates and harder rolls ask (`content/actions/facts.ts`). */

@@ -5,7 +5,13 @@ import { LIBRARY } from '../src/content/skillweb';
 import { THINGS } from '../src/content/things';
 import { Rng } from '../src/core/rng';
 import { type ActTarget, type ActWorld, type Doer, offers, perform } from '../src/core/world3d/actions';
-import { actOfStage, carriable, hideable, returnedRegard, stageOf, stray, turnedHalf, wealthOf, worthOf } from '../src/core/world3d/carry';
+import { HAUL_SKILL, actOfStage, carriable, carryCapacity, hideable, returnedRegard, stageOf, stray, turnedHalf, wealthOf, worthOf } from '../src/core/world3d/carry';
+import type { Dice } from '../src/core/checks';
+import { rollSheet, sheetSpan } from '../src/core/npcsheet';
+import { CONTENT } from '../src/content/chargen';
+import { derive } from '../src/core/chargen/derive';
+import { newChar } from '../src/core/chargen/state';
+import { heroFromChar } from '../src/content/rollables';
 import { BORROW, CLAIM, DEMAND, GIVE_BACK, type TalkCase, type TalkPerson, newTalkMemory, talk, talkOffers } from '../src/core/world3d/talk';
 import { PERSON_KINDS } from '../src/content/people';
 import { BEHAVIOURS } from '../src/content/behaviours';
@@ -33,6 +39,39 @@ const hands = (n: number): Doer => ({ id: 'hero', dice: () => ({ n, mod: 0 }) })
 const piece = (kind: string): ActTarget => ({ id: pieceId('home', 0, kind), kind, x: 0, z: 1, level: 0, house: 'home', rot: 0 });
 const here = { x: 0, z: 0, level: 0, house: 'home' };
 const ids = (t: ActTarget | null, w = world()) => offers(t, t ?? here, hands(3), w, ACTIONS).map((o) => o.id);
+
+describe('carrying capacity (B6)', () => {
+  const body = (physique: Dice, haul: Dice = { n: 0, mod: 0 }, load = 0): Doer =>
+    ({ id: 'hero', dice: (s) => (s === 'attr:Kroppsbyggnad' ? physique : s === HAUL_SKILL ? haul : { n: 0, mod: 0 }), load });
+
+  it('is 5 kg a die of Physique and 1 a pip, half that for toil and haul, a kilogram for each load point the build takes off', () => {
+    expect(carryCapacity({ n: 3, mod: 2 }, { n: 0, mod: 0 })).toBe(17);
+    expect(carryCapacity({ n: 3, mod: 2 }, { n: 4, mod: 0 })).toBe(27);
+    expect(carryCapacity({ n: 3, mod: 2 }, { n: 0, mod: 0 }, -8)).toBe(25);
+    // A build that adds load never takes capacity away here (that is fatigue's, later).
+    expect(carryCapacity({ n: 3, mod: 2 }, { n: 0, mod: 0 }, 8)).toBe(17);
+  });
+
+  it('refuses what is over it, with both weights; toil and haul and a dwarf\'s build lift it', () => {
+    expect(THINGS.get('sacks').weight).toBe(20);
+    expect(perform('verb:pick-up', piece('sacks'), piece('sacks'), body({ n: 3, mod: 2 }), world(), ACTIONS))
+      .toMatchObject({ done: false, reason: 'The sacks is too heavy for you: it weighs 20 kg, and you can carry 17 kg.' });
+    expect(perform('verb:pick-up', piece('sacks'), piece('sacks'), body({ n: 3, mod: 2 }, { n: 4, mod: 0 }), world(), ACTIONS).done).toBe(true);
+    expect(perform('verb:pick-up', piece('sacks'), piece('sacks'), body({ n: 3, mod: 2 }, { n: 0, mod: 0 }, -8), world(), ACTIONS).done).toBe(true);
+  });
+
+  it('every takeable kind has a weight', () => {
+    for (const id of THINGS.placeable) { const k = THINGS.get(id); if (k.size) expect(k.weight, k.id).toBeGreaterThan(0); }
+  });
+
+  it('dwarves take 8 load off, once, on the creator\'s sheet and on map people\'s', () => {
+    expect(PERSON_KINDS.sheet({ is: ['dwarf', 'job-farmer'] }).load).toBe(-8);
+    expect(PERSON_KINDS.sheet({ is: ['human', 'job-farmer'] }).load).toBe(0);
+    expect(rollSheet(sheetSpan(PERSON_KINDS.sheet({ is: ['dwarf', 'job-farmer'] }), 'capable'), 3).load).toBe(-8);
+    const dvarg = CONTENT.peoples.find((p) => p.family === 'dvarg')!;
+    expect(heroFromChar('Test', derive({ ...newChar(), people: dvarg.id } as never, CONTENT)).load).toBe(-8);
+  });
+});
 
 describe('sizes (B3b)', () => {
   it('what has a size can be picked up; heavy things are offered and refused; built-in things are not offered', () => {
@@ -82,7 +121,8 @@ describe('carrying (B3b)', () => {
     expect(good.events).toContainEqual({ kind: 'carry', target: piece('herbs'), hidden: true });
     expect(good.wrongs).toBeUndefined();
     expect(good.transgressions).toEqual(['owner']);
-    const bad = perform('verb:slip-away', piece('herbs'), piece('herbs'), { id: 'hero', dice: () => ({ n: 0, mod: 0 }) }, world(), ACTIONS);
+    const clumsy: Doer = { id: 'hero', dice: (s) => (s === 'attr:Kroppsbyggnad' ? { n: 3, mod: 0 } : { n: 0, mod: 0 }) };
+    const bad = perform('verb:slip-away', piece('herbs'), piece('herbs'), clumsy, world(), ACTIONS);
     expect(bad.success).toBe(false);
     expect(bad.wrongs?.[0]).toMatchObject({ act: 'steal', owner: { house: 'home' } });
   });

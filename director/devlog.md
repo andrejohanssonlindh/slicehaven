@@ -2,6 +2,18 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-04 — B6, first slice: weight and carrying capacity
+
+- **The rule (your call today):** you carry 5 kg for each die of Physique and 1 kg for each pip, without trouble. 3D6+2 carries 17 kg; the default shepherd (2D6+3) carries 13.
+  - **Toil and haul** (*Slita & släpa*, the expertise the book gives for heavy loads and rough work) adds half as much for its own dice: 4D6 adds 10 kg.
+  - **Dwarves** carry 8 kg more. Their *Short and stout* trait takes 8 off their load, and one kilogram over is one load point. It's a new grant in the creator (`belastning -8`), so map dwarves have it too.
+- **What I found in the book:** there's no rule for turning kilograms into load, as you said. But there is a **load scale** that armour, heat and mounts already use, in steps of 8 points (minus dice on movement, reaction and movement skills, and base fatigue). When fatigue comes, each kilogram over your capacity becomes a load point on that scale, so armour, heat and what you carry all add up in one place.
+- **For now nothing over capacity can be carried.** Picking something up says why: "it weighs 20 kg, and you can carry 13 kg".
+- **Everything that can be taken has a weight:** a stool 3 kg, a keg 16, a sack of grain 20, a footlocker 12, herbs 0.2. Tables, beds and anvils are still too bulky to carry alone, whatever you can lift.
+- **Shown:** tap a thing for what it weighs; tap the hero for what you can carry.
+- **Next in B6:** items as kinds with shapes, and the pockets and bag grid.
+- **Try it:** Hamlet. Tap the hero (13 kg with the shepherd), then try to pick up the sacks in a house (20 kg) or a keg (16). A stool or a footlocker (12) works.
+
 ## 2026-11-04 — B3b done: borrow, give back, argue, threaten; found things go home; arms that carry
 
 - **Talk about what you hold.** Holding a stool from a house, tap one of the people who live there:

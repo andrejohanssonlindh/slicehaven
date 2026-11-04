@@ -29,7 +29,7 @@
  *   paket:<name|?> N     equipment packages;  mystikutr N  mystic equipment sets
  *   silver N             silver;  mysterier N  mysteries (not yet learned unless 'lärda')
  *   religion:<id>[/id]   the religion is forced;  doktrin N  extra doctrine picks
- *   grundrustning N  grundskada N  lakningstakt N   derived modifiers
+ *   grundrustning N  grundskada N  lakningstakt N  belastning N   derived modifiers (belastning: load points, a dwarf's −8)
  *   regel:<text>         a rule note for the sheet (our own wording, English)
  *   foremal:<text>       an item
  *   lana:<people>        take one optional trait from another people's list
@@ -77,7 +77,7 @@ export type Token =
   | { k: 'mysterier'; n: number; learned: boolean }
   | { k: 'religion'; ids: string[] }
   | { k: 'doktrin'; n: number }
-  | { k: 'derived'; stat: 'grundrustning' | 'grundskada' | 'lakningstakt'; n: number }
+  | { k: 'derived'; stat: 'grundrustning' | 'grundskada' | 'lakningstakt' | 'belastning'; n: number }
   | { k: 'regel'; text: string }
   | { k: 'foremal'; text: string }
   /** Take one optional trait from another people's list. */
@@ -189,6 +189,7 @@ export function parseToken(raw: string): Token {
     case 'grundrustning':
     case 'grundskada':
     case 'lakningstakt':
+    case 'belastning':
       return { k: 'derived', stat: bh, n };
   }
   if (body === 'Aspekt?') return { k: 'named', kind: 'Aspekt', n };

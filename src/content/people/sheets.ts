@@ -101,9 +101,10 @@ const BASICS: Record<string, number> = Object.fromEntries(SKILLS.filter((s) => s
  * for every one of them; a trait that is a rule is kept by name; one that takes a skill away ("inkomp:Simma",
  * "grund:Rida 0") changes the basic skills; other skills it names are side skills, as before; so are its culture's.
  */
-function peopleSheet(innate: Opt[], culture: Opt[]): Pick<SheetDef, 'skills' | 'gifts' | 'rules' | 'basics'> {
+function peopleSheet(innate: Opt[], culture: Opt[]): Pick<SheetDef, 'skills' | 'gifts' | 'rules' | 'basics' | 'load'> {
   const skills: Record<string, 'side'> = side(culture);
   const gifts: Record<string, number> = {}, basics: Record<string, number> = {}, rules: string[] = [];
+  let load = 0;
   for (const o of innate) {
     for (const item of parseGrants(o.g)) {
       if (item.k !== 'token') continue;
@@ -113,9 +114,10 @@ function peopleSheet(innate: Opt[], culture: Opt[]): Pick<SheetDef, 'skills' | '
       else if (tk.k === 'inkomp') for (const s of tk.skill) basics[s] = 0;
       else if (tk.k === 'grund') basics[tk.skill] = valueUnits(tk.n);
       else if (tk.k === 'regel' && !rules.includes(o.en)) rules.push(o.en);
+      else if (tk.k === 'derived' && tk.stat === 'belastning') load += tk.n;
     }
   }
-  return { skills, gifts, rules, basics };
+  return { skills, gifts, rules, basics, ...(load ? { load } : {}) };
 }
 
 /** A people's attributes as a shift from another set (the creator's order, `ATTRS`); zeros left out. */

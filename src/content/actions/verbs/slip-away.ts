@@ -10,7 +10,7 @@ const slipAway: VerbDef = {
   id: 'slip-away',
   label: 'Slip the {name} away unseen',
   on: { has: 'size' },
-  gates: [{ gate: 'small' }, { gate: 'hands-free' }, { gate: 'owner', act: 'steal' }],
+  gates: [{ gate: 'small' }, { gate: 'weight' }, { gate: 'hands-free' }, { gate: 'owner', act: 'steal' }],
   roll: {
     skills: ['Fingerfärdighet'], attr: 'attr:Förflyttning', difficulty: DIFFICULTY.easy,
     harder: [

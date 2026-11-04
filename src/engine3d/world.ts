@@ -2566,7 +2566,7 @@ export class SpikeWorld {
   /** Someone in the map as a doer: they roll what their sheet says (nothing, for someone with no sheet). */
   doerOf(id: string): Doer {
     const sheet = this.cast.find((c) => c.who.id === id)?.who.sheet ?? null;
-    return { id, dice: (skill) => (sheet ? sheetDice(sheet, skill) : { n: 0, mod: 0 }) };
+    return { id, dice: (skill) => (sheet ? sheetDice(sheet, skill) : { n: 0, mod: 0 }), load: sheet?.load ?? 0 };
   }
 
   /** Set the hero down on a seat: on its top, facing the way it faces, until they walk. */
