@@ -472,8 +472,14 @@ export interface RollUse {
 
 const PAINED_ATTRS = new Set(['Förflyttning', 'Kroppsbyggnad', 'Reaktion', 'Vaksamhet']);
 
-/** One reason a roll loses dice: a short effect, pain, a wounded part, broken ribs, blinded, an eye lost. */
-export type PenaltyWhy = ShortKind | 'pain' | BodyPart | 'ribs' | 'blinded' | 'eye';
+/** One reason a roll loses dice: a short effect, pain, a wounded part, broken ribs, on the ground for good, blinded, an eye lost. */
+export type PenaltyWhy = ShortKind | 'pain' | BodyPart | 'ribs' | 'grounded' | 'blinded' | 'eye';
+
+/**
+ * Can't stand (the director: "I broke his leg, he stands afterwards"): a broken leg is useless, a broken hip can't
+ * walk, a broken spine or neck paralyses. They fight from the ground (−1D6, as someone knocked down) and can't move.
+ */
+export const grounded = (i: Injuries): boolean => i.broken.some((b) => b === 'leftLeg' || b === 'rightLeg' || b === 'hip' || b === 'spine' || b === 'neck');
 
 /** What a person's injuries take off a roll, reason by reason (dice each). */
 export function penaltyParts(i: Injuries, use: RollUse): { why: PenaltyWhy; n: number }[] {
@@ -490,6 +496,7 @@ export function penaltyParts(i: Injuries, use: RollUse): { why: PenaltyWhy; n: n
     add(worst, i.wounds[worst] ?? 0);
     if (i.broken.includes('ribs')) add('ribs', 1);
   }
+  if ((use.kind === 'combat' || use.kind === 'movement') && grounded(i)) add('grounded', 1);
   if (movementish) {
     const leg: BodyPart = (i.wounds.rightLeg ?? 0) > (i.wounds.leftLeg ?? 0) ? 'rightLeg' : 'leftLeg';
     add(leg, i.wounds[leg] ?? 0);

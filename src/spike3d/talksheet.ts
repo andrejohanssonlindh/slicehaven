@@ -154,7 +154,11 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
     nameEl.textContent = p.name;
     whatEl.textContent = '';
     moodEl.textContent = '';
-    canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+    // Their face, as in a talk (drawn from where they stand).
+    const data = w.portrait(renderer(), id, PORTRAIT_PX);
+    canvas.width = canvas.height = PORTRAIT_PX;
+    if (data) canvas.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(data), PORTRAIT_PX, PORTRAIT_PX), 0, 0);
+    else canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
     logEl.replaceChildren();
     log(t('talk.far', '{name} is {m} m away.', { name: p.name, m: Math.round(metres) }), 'info');
     choicesEl.replaceChildren();

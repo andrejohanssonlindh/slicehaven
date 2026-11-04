@@ -2,6 +2,20 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-04 — B8a: your notes on the third fight
+
+- **No walking through each other.** A move now stops where it first comes within reach of a foe, so two fighters closing in meet in the middle.
+- **The first blow gets a tactic.** When blades cross, the round pauses ("Choose how to strike or defend") and you pick a strike or a defence in your role. Then the round goes on.
+- **The log waits for the dice.** The line about a blow is written after the glass dice land, not before.
+- **Advantages as dice:** each is +2 damage, and every +4 is a die, so 2 advantages are +1D6 and 5 are +2D6+2. With a Dangerous weapon each is +1D6, as before.
+- **Yielding costs your weapon.** If your plea is granted you lay your weapon down, and it stays on the sand. **Each time you've yielded to someone, your next plea to them is 6 harder.** This is remembered and saved.
+- **A beaten foe asks to yield.** When they're far enough gone (fatigue against their shock roll, wounds, broken bones, being on the ground, empty hands), they lower their weapon and ask. You get **Accept their surrender**; any other choice fights on, and they won't ask again until they're worse off. The gladiator holds out longer than most. A badly hurt gladiator from an earlier fight asks at once.
+- **A broken leg, hip or spine puts them on the ground**: they lie there awake, can't move or retreat, and fight at −1D6 ("on the ground" in the details). **A broken arm drops what it holds.** You, the hero, limp on outside a fight (as if on a crutch) so you're never stuck before healing exists.
+- **Broken bones and pain:** the rules give a broken leg or arm only **1 pain** (−1D6 on fighting and moving); a hip or spine 2. That's on top of the wound itself, and the leg now also keeps them down. On normal you see "in pain" on the gladiator's card, not the number.
+- **The knocked out see nothing** now (they used to notice you).
+- **The far-away sheet shows their face.**
+- **Moved to B8f** (fights out in the world): a foe waking up deciding to flee or talk their way out, and **attacking someone lowering their view of you** (attacking is a wrong already in the standing rules, as *harm*; it just isn't hooked to fights yet).
+
 ## 2026-11-04 — B8a: your notes on the second fight; a weapon rack and a gong
 
 - **A weapon rack** stands by the west gate (north side). Tap it → *Take something from the weapon rack* → a list of **17 weapons**, each with your skill and dice for it and its properties: arming sword, short sword, sabre, rapier, bastard sword, greatsword, dagger, hand axe, battle axe, great axe, hunting spear, cudgel, steel mace, morning star, war hammer, flail, quarterstaff. The one you pick is in your hand. Put it down (tap yourself) to take another. Any kind can be a rack: it says what family it stocks (`stock`), so an armoury's rack later is the same thing.

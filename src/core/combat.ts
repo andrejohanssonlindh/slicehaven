@@ -2,7 +2,7 @@ import type { Dice } from './chargen/tables';
 import { modify } from './checks';
 import {
   type BodyPart, type DamageType, type HitResult, type Injuries, type PenaltyWhy, type PhaseEnd, type RollUse, type WoundTableDef,
-  addFatigue, endOfPhase, hitPart, penaltyParts, rollHit, withPenalty,
+  addFatigue, endOfPhase, grounded, hitPart, totalFatigue, penaltyParts, rollHit, withPenalty,
 } from './damage';
 import { type Roll, advantages, rollDie, rollOpen, rollTable, rollTest } from './dice';
 import type { Rng } from './rng';
@@ -194,6 +194,12 @@ export interface Fight {
   winner: number | null;
   /** Who yielded and was spared (their plea granted): no killing stroke for them. */
   spared?: string;
+  /** The round stopped when blades crossed, for the roles' choices; the next `resolveRound` finishes it. */
+  midRound?: boolean;
+  /** Someone has offered to yield (a beaten fighter nobody steers): the other side may accept or fight on. */
+  offer?: string;
+  /** Offers to yield already refused, by who offered (they don't ask again until worse off). */
+  refused?: Record<string, number>;
 }
 
 export type AttackTactic = 'standard' | 'quick' | 'powerful';
@@ -403,9 +409,12 @@ export function dropFrom(fight: Fight, f: Fighter, parts: (BodyPart | undefined)
   }
 }
 
+/** How close a move brings you to a foe at most (inside reach, not on top of them). */
+const STOP = ADJACENT * 0.75;
+
 /** Walk (or run) towards a spot, as far as the side action goes; a failed run is a walk. */
-function moveTowards(f: Fighter, to: { x: number; z: number }, run: boolean, rules: FightRules, rng: Rng, log: LogLine[]): void {
-  if (f.injuries.short.includes('fall')) return; // down: can't move until up
+function moveTowards(fight: Fight, f: Fighter, to: { x: number; z: number }, run: boolean, rules: FightRules, rng: Rng, log: LogLine[]): void {
+  if (f.injuries.short.includes('fall') || grounded(f.injuries)) return; // down: can't move until up; a broken leg: not at all
   let roll: Roll | undefined;
   let reach = WALK;
   if (run) {
@@ -415,8 +424,30 @@ function moveTowards(f: Fighter, to: { x: number; z: number }, run: boolean, rul
   }
   const d = dist(f, to);
   const k = d <= reach ? 1 : reach / d;
-  f.x += (to.x - f.x) * k;
-  f.z += (to.z - f.z) * k;
+  // Nobody walks through a foe (the director: both closing in, they passed each other): the move stops where it
+  // first comes within arm's reach of anyone on the other side who can still fight.
+  const dx = (to.x - f.x) * k, dz = (to.z - f.z) * k;
+  let s = 1;
+  const len2 = dx * dx + dz * dz;
+  if (len2 > 1e-9) {
+    for (const o of fight.fighters) {
+      if (o.side === f.side || !canAct(o)) continue;
+      const ox = f.x - o.x, oz = f.z - o.z;
+      // Already within reach: no step nearer them (stepping away is fine).
+      if (dist(f, o) <= STOP) {
+        if (ox * dx + oz * dz < 0) s = 0;
+        continue;
+      }
+      // |f + s·(dx,dz) − o|² = STOP²: the first s it is met.
+      const b = 2 * (ox * dx + oz * dz), c = ox * ox + oz * oz - STOP * STOP;
+      const disc = b * b - 4 * len2 * c;
+      if (disc < 0) continue;
+      const hit = (-b - Math.sqrt(disc)) / (2 * len2);
+      if (hit >= 0 && hit < s) s = hit;
+    }
+  }
+  f.x += dx * s;
+  f.z += dz * s;
   log.push({ k: 'move', who: f.id, to: { x: f.x, z: f.z }, ...(run ? { ran: !!roll?.success } : {}), ...(roll ? { roll } : {}) });
 }
 
@@ -425,6 +456,12 @@ function reactionRoll(f: Fighter, rng: Rng): Roll {
   const reach = weaponOf(f).props.Räckvidd ?? 0;
   const d = withPenalty(plus(pool(f, 'attr:Reaktion'), reach), f.injuries, { kind: 'attr', attr: 'Reaktion' });
   return rollOpen(d, rng, 'Reaktion');
+}
+
+/** More damage for advantages: +2 each (each +4 a die), or +1D6 each with a Dangerous weapon. */
+export function moreDamage(adv: number, dangerous: boolean): Dice {
+  if (dangerous) return { n: adv, mod: 0 };
+  return { n: Math.floor((2 * adv) / 4), mod: (2 * adv) % 4 };
 }
 
 /** One blow, attack against defence, and the damage if it lands. */
@@ -447,7 +484,8 @@ function strike(fight: Fight, a: Fighter, d: Fighter, tactic: AttackTactic, defe
     const { type, dice } = bestDamage(w);
     const tacticDice = tactic === 'quick' ? -1 : tactic === 'powerful' ? 2 + (w.props.Kraftfull ? 1 : 0) : 0;
     // Every advantage buys more damage for now: +2 each, +1D6 each with a Dangerous weapon (choosing edges is B8b).
-    const extra = w.props.Vådlig ? { n: adv, mod: 0 } : { n: 0, mod: 2 * adv };
+    // Every +4 is a die (the director: 2 advantages are +1D6, 5 are +2D6+2), as pools are always written.
+    const extra = moreDamage(adv, !!w.props.Vådlig);
     const damage = { n: Math.max(0, dice.n + tacticDice), mod: dice.mod };
     const part = hitPart(whereRoll.total);
     const armour = armourAgainst(d, part, type, piercingOf(w, type, d));
@@ -463,6 +501,9 @@ function strike(fight: Fight, a: Fighter, d: Fighter, tactic: AttackTactic, defe
     else {
       const drops = (result.serious?.effects ?? []).filter((e) => e.k === 'drop');
       if (drops.length) dropFrom(fight, d, drops.map((e) => ('part' in e ? e.part : undefined)), rng, log);
+      // A broken arm is useless: what it held falls.
+      const arms = result.risks.flatMap((r) => (r.happened && r.effect.k === 'break' && (r.effect.area === 'leftArm' || r.effect.area === 'rightArm') ? [r.effect.area] : []));
+      if (arms.length) dropFrom(fight, d, arms, rng, log);
     }
   } else log.push(line);
   return { hit, margin };
@@ -487,15 +528,18 @@ function winnerOf(fight: Fight): number | null {
  * the defender's tactic, or a retreat), then the end of the phase for everyone (bleeding, the shock roll), and short
  * effects from before this phase wear off. Returns the new fight and the log.
  */
-export function resolveRound(before: Fight, choices: Record<string, Choice>, rules: FightRules, rng: Rng): RoundResult {
+export function resolveRound(before: Fight, choices: Record<string, Choice>, rules: FightRules, rng: Rng, opts: { pauseOnOpen?: boolean } = {}): RoundResult {
   const fight: Fight = structuredClone(before);
   const log: LogLine[] = [];
   const shortBefore = new Map(fight.fighters.map((f) => [f.id, f.injuries.short.length]));
   const inMelee = (f: Fighter) => !!fight.melee && canAct(f);
-  for (const f of fight.fighters) f.drew = false;
+  // The second half of a round that paused when blades crossed: side actions and the opening are done.
+  const resumed = !!fight.midRound;
+  delete fight.midRound;
+  if (!resumed) for (const f of fight.fighters) f.drew = false;
 
   // Side actions: pick up (also in a melee), move (only when free).
-  for (const f of fight.fighters) {
+  for (const f of resumed ? [] : fight.fighters) {
     if (!canAct(f)) continue;
     const c = choices[f.id] ?? {};
     if (c.pickUp) {
@@ -508,7 +552,7 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
         f.drew = true;
         log.push({ k: 'pickUp', who: f.id, item: item.id });
       }
-    } else if (c.move && !inMelee(f)) moveTowards(f, c.move, !!c.move.run, rules, rng, log);
+    } else if (c.move && !inMelee(f)) moveTowards(fight, f, c.move, !!c.move.run, rules, rng, log);
   }
 
   // A melee opens when two foes who can act stand within reach.
@@ -521,6 +565,12 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
       if (first === 0) first = rollDie(2, rng) === 1 ? 1 : -1;
       fight.melee = { attacker: (first > 0 ? pair[0] : pair[1]).side, opened: fight.round };
       log.push({ k: 'open', attacker: fight.melee.attacker, rolls });
+      // Now each side knows its role: the page may stop here to let the player choose a tactic (the director: "my
+      // first move, I cannot choose what type of strike"); the round goes on from here when called again.
+      if (opts.pauseOnOpen) {
+        fight.midRound = true;
+        return { fight, log };
+      }
     }
   }
 
@@ -532,12 +582,7 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
     const roll = rollTest(p.dice, p.difficulty, rng, 'Plea');
     log.push({ k: 'plead', who: f.id, roll, granted: !!roll.success });
     const foe = nearestFoe(fight, f);
-    if (roll.success && foe) {
-      fight.winner = foe.side;
-      fight.spared = f.id;
-      fight.melee = null;
-      log.push({ k: 'over', winner: foe.side });
-    }
+    if (roll.success && foe) yieldTo(fight, f, foe.side, rng, log);
   }
 
   // The main action: the attacking side strikes (or retreats); someone knocked out can be given the mercy stroke.
@@ -558,7 +603,7 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
     if (!fight.melee || a.side !== fight.melee.attacker) continue;
     const d = nearestFoe(fight, a);
     if (!d || dist(a, d) > ADJACENT + 0.5) continue;
-    if (c.retreat && fight.melee.opened !== fight.round && !a.injuries.short.includes('fall')) {
+    if (c.retreat && fight.melee.opened !== fight.round && !a.injuries.short.includes('fall') && !grounded(a.injuries)) {
       const away = dist(a, d) || 1;
       a.x += ((a.x - d.x) / away) * WALK;
       a.z += ((a.z - d.z) / away) * WALK;
@@ -639,6 +684,8 @@ export interface FightStyle {
   run: boolean;
   /** How hard it is to beg them to let you yield (a difficulty; `pleaDifficulty` eases it as the fight goes your way). */
   spare: number;
+  /** How beaten (`beaten`) they must be to offer to yield themselves (Infinity: never). */
+  yieldAt: number;
 }
 
 /** The skills a plea to yield is rolled with: the best of them. */
@@ -646,16 +693,77 @@ export const PLEA_SKILLS = ['Argumentera', 'Charm'];
 
 /**
  * How hard a foe is to talk into letting you yield (the director: "an alternative to try to give up"): their style's
- * `spare`, 2 easier for each advantage-band of fatigue they carry over yours (a winded foe is glad to stop), 4 easier
- * if they are hurt more than you (wounds), never under 6.
+ * `spare`, 2 easier for each 5 fatigue they carry over yours (a winded foe is glad to stop), 4 easier if they are hurt
+ * more than you (wounds), never under 6; and 6 harder for each time you have yielded to them before (the director:
+ * pick up another weapon after yielding, and they won't forgive you so easily).
  */
-export function pleaDifficulty(fight: Fight, pleader: string, style: FightStyle): number {
+export function pleaDifficulty(fight: Fight, pleader: string, style: FightStyle, yieldedBefore = 0): number {
   const me = fight.fighters.find((f) => f.id === pleader);
   const foe = me ? nearestFoe(fight, me) : null;
-  if (!me || !foe) return style.spare;
+  if (!me || !foe) return style.spare + 6 * yieldedBefore;
   const wounds = (f: Fighter) => Object.values(f.injuries.wounds).reduce((s, n) => s + (n ?? 0), 0);
   const tired = Math.max(0, Math.floor((foe.injuries.fatigue - me.injuries.fatigue) / 5));
-  return Math.max(6, style.spare - 2 * tired - (wounds(foe) > wounds(me) ? 4 : 0));
+  return Math.max(6, style.spare - 2 * tired - (wounds(foe) > wounds(me) ? 4 : 0)) + 6 * yieldedBefore;
+}
+
+/**
+ * Yielding: the fight is over, the other side has won, and the one who yielded lays down what they hold (the
+ * director: giving up is no cheap way out of a bad spot). It lies on the ground for the winner.
+ */
+function yieldTo(fight: Fight, f: Fighter, winner: number, rng: Rng, log: LogLine[]): void {
+  fight.winner = winner;
+  fight.spared = f.id;
+  fight.melee = null;
+  delete fight.offer;
+  for (const slot of ['weapon', 'shield'] as const) {
+    const item = f[slot];
+    if (!item) continue;
+    const at = dropSpot(f, rng);
+    fight.ground.push({ ...item, ...at });
+    f[slot] = null;
+    log.push({ k: 'drop', who: f.id, item: item.id, at });
+  }
+  log.push({ k: 'over', winner });
+}
+
+/**
+ * How badly off someone is, about 0 (fresh) to 3 (wrecked): their fatigue against the shock roll, a quarter for each
+ * wound, a half for each broken bone and for being on the ground, a quarter for empty hands.
+ */
+export function beaten(f: Fighter): number {
+  const i = f.injuries;
+  const wounds = Object.values(i.wounds).reduce((s, n) => s + (n ?? 0), 0);
+  return totalFatigue(i) / Math.max(1, poolMean(pool(f, 'attr:Livskraft'))) + 0.25 * wounds + 0.5 * i.broken.length + (grounded(i) ? 0.5 : 0) + (f.weapon ? 0 : 0.25);
+}
+
+/**
+ * Someone nobody steers who is beaten enough offers to yield (the director: a fighter so far under shouldn't just go
+ * on), by their style's `yieldAt`; once refused, only when they are worse off by half again.
+ */
+export function wantsToYield(fight: Fight, id: string, style: FightStyle): boolean {
+  const f = fight.fighters.find((x) => x.id === id);
+  if (!f || !canAct(f) || fight.winner !== null || fight.offer) return false;
+  const b = beaten(f);
+  return b >= style.yieldAt && b >= (fight.refused?.[id] ?? -Infinity) + 0.5;
+}
+
+/** Accept an offer to yield: the one who offered lays down their weapon, and the fight is over. */
+export function acceptYield(before: Fight, id: string, rng: Rng): RoundResult {
+  const fight = structuredClone(before);
+  const log: LogLine[] = [];
+  const f = fight.fighters.find((x) => x.id === id);
+  const other = f ? nearestFoe(fight, f) : null;
+  if (f && other) yieldTo(fight, f, other.side, rng, log);
+  return { fight, log };
+}
+
+/** Refuse it: the fight goes on, and they don't ask again until worse off. */
+export function refuseYield(before: Fight, id: string): Fight {
+  const fight = structuredClone(before);
+  const f = fight.fighters.find((x) => x.id === id);
+  delete fight.offer;
+  if (f) fight.refused = { ...fight.refused, [id]: beaten(f) };
+  return fight;
 }
 
 const weighted = <T extends string>(w: Record<T, number>, rng: Rng): T => {

@@ -44,7 +44,7 @@ import { type HouseEntry, HouseIndex } from '../core/world3d/houses';
 import type { PlacedProp } from '../core/world3d/props';
 import { THINGS } from '../content/things';
 import { modelOf } from '../core/world3d/things';
-import { type Injuries, recoverFatigue } from '../core/damage';
+import { type Injuries, grounded, recoverFatigue } from '../core/damage';
 import { REST_SPEED } from '../core/difficulty';
 import { cloudDrift, cloudThreshold } from '../core/world3d/sky';
 import { type Actor, Walking, newActor } from '../core/world3d/actors';
@@ -2637,6 +2637,8 @@ export class SpikeWorld {
   /** The fight is over: the world goes on. Those left lying stay down. */
   endFight(): void {
     for (const id of this.fighting ?? []) if (this.fightPoses.get(id)?.pose === 'guard' || this.fightPoses.get(id)?.pose === 'swing') this.fightPoses.delete(id);
+    const h = this.hurt.hero;
+    if (h && !h.out && !h.dead && !h.dying) this.fightPoses.delete('hero'); // up on a crutch
     this.fighting = null;
   }
 
@@ -2658,7 +2660,9 @@ export class SpikeWorld {
   /** Someone's injuries after a round: kept (and saved), and they lie down if knocked out, dying or dead. */
   setInjuries(id: string, i: Injuries): void {
     this.hurt[id] = structuredClone(i);
-    const lying = i.dead ? 'dead' : i.out || i.dying ? 'down' : null;
+    // (A broken leg puts them on the ground for good: they lie there, awake. The hero, outside a fight, limps on as if
+    // on a crutch, so they're never stuck before healing exists.)
+    const lying = i.dead ? 'dead' : i.out || i.dying || (grounded(i) && (id !== 'hero' || this.fighting)) ? 'down' : null;
     if (lying) this.fightPoses.set(id, { pose: lying, t: this.time });
     else if (this.fightPoses.get(id)?.pose === 'down') this.fightPoses.set(id, { pose: 'guard', t: this.time });
     if (lying) {
@@ -2685,7 +2689,7 @@ export class SpikeWorld {
       const next = recoverFatigue(i, minutes, per);
       if (next === i) continue;
       this.hurt[id] = next;
-      if (i.out && !next.out) this.fightPoses.delete(id); // up again
+      if (i.out && !next.out && !grounded(next)) this.fightPoses.delete(id); // up again (not on a broken leg)
     }
   }
 
@@ -2794,6 +2798,16 @@ export class SpikeWorld {
     this.showHeld();
     return this.talkPerson(c.who.id)?.name ?? c.who.id;
   }
+  /** How often the hero has yielded to someone in a fight (each time, the next plea to them is harder). */
+  yieldedTo(id: string): number {
+    return this.standing.yielded?.[id] ?? 0;
+  }
+
+  /** The hero yielded to someone (their plea was granted). */
+  noteYield(id: string): void {
+    this.standing.yielded = { ...this.standing.yielded, [id]: this.yieldedTo(id) + 1 };
+  }
+
   /** Fighters called so far (each comes rolled afresh). */
   private called = 0;
 
@@ -3226,7 +3240,7 @@ export class SpikeWorld {
     // What fights left: those knocked out or killed lie where they fell (B8a).
     this.hurt = s.hurt ? structuredClone(s.hurt) : {};
     this.fightPoses.clear();
-    for (const [id, i] of Object.entries(this.hurt)) if (i.dead || i.out || i.dying) this.fightPoses.set(id, { pose: i.dead ? 'dead' : 'down', t: 0 });
+    for (const [id, i] of Object.entries(this.hurt)) if (i.dead || i.out || i.dying || (grounded(i) && id !== 'hero')) this.fightPoses.set(id, { pose: i.dead ? 'dead' : 'down', t: 0 });
     this.carry = s.carry ? structuredClone(s.carry) : newCarry();
     this.standing = s.standing ? structuredClone(s.standing) : newStanding();
     this.talkMemory = s.talk ? structuredClone(s.talk) : newTalkMemory();
@@ -3690,10 +3704,12 @@ export class SpikeWorld {
         c.fig.place.visible = c.blob.visible = c.mark.visible = false;
         continue;
       }
-      if (look) this.perceive(c, PERCEIVE_EVERY, night);
+      // (The knocked out, the dying and the dead notice nothing.)
+      if (look && this.canStand(c.who.id)) this.perceive(c, PERCEIVE_EVERY, night);
       fadeAnswer(c.mind, dt);
       // Someone the hero is talking to stands and faces them; their day waits until the talk ends.
-      const pose = this.fighting || this.hurt[c.who.id]?.out || this.hurt[c.who.id]?.dead
+      const hurt = this.hurt[c.who.id];
+      const pose = this.fighting || hurt?.out || hurt?.dead || (hurt && grounded(hurt))
         ? this.fightStep(c, dt)
         : c.who.id === this.talkingWith
           ? { dx: this.hero.x - a.x, dz: this.hero.z - a.z, moving: false }

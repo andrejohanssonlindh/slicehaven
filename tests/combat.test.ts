@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  type Fight, type Fighter, type FightStyle, attackPool, attackWhy, bestDamage, bonusDice, chooseFor, damageDice, defencePool, dropFrom, fists, parseProps, pleaDifficulty,
+  type Fight, type Fighter, type FightStyle, acceptYield, attackPool, attackWhy, beaten, bestDamage, moreDamage, refuseYield, wantsToYield, bonusDice, chooseFor, damageDice, defencePool, dropFrom, fists, parseProps, pleaDifficulty,
   resolveRound, roleOf, startFight, tacticFatigue, weaponFromRow, weaponOf,
 } from '../src/core/combat';
 import { type Injuries, recoverFatigue, unhurt } from '../src/core/damage';
@@ -21,7 +21,7 @@ const fighter = (id: string, side: number, x: number, over: Partial<Fighter> = {
   injuries: unhurt(), drew: false, ...over,
 });
 
-const STYLE: FightStyle = { id: 'test', attack: { standard: 2, quick: 1, powerful: 1 }, defence: { standard: 3, defensive: 1, counter: 0 }, mercy: true, run: false, spare: 12 };
+const STYLE: FightStyle = { id: 'test', attack: { standard: 2, quick: 1, powerful: 1 }, defence: { standard: 3, defensive: 1, counter: 0 }, mercy: true, run: false, spare: 12, yieldAt: Infinity };
 
 describe('weapons in hand', () => {
   it('reads properties and damage lines', () => {
@@ -109,6 +109,8 @@ describe('fatigue', () => {
     expect(yes.fight.spared).toBe('a');
     expect(yes.log.some((l) => l.k === 'attack')).toBe(false);
     expect(yes.fight.fighters[0].injuries.out || yes.fight.fighters[0].injuries.dead).toBe(false);
+    expect(yes.fight.fighters[0].weapon).toBeNull(); // who yields lays their weapon down
+    expect(pleaDifficulty(f, 'a', STYLE, 2)).toBe(12 + 12); // yielded to them twice before
     const no = resolveRound(f, { a: { plead: { dice: { n: 1, mod: 0 }, difficulty: 40 } } }, RULES, Rng.fromSeed(1));
     expect(no.fight.winner).toBeNull();
     expect(no.log.some((l) => l.k === 'plead' && !l.granted)).toBe(true);
@@ -117,6 +119,53 @@ describe('fatigue', () => {
     const g = structuredClone(f);
     g.fighters[1].injuries = { ...unhurt(), fatigue: 10, wounds: { torso: 1 } };
     expect(pleaDifficulty(g, 'a', STYLE)).toBe(6); // 12 − 4 (tired) − 4 (hurt more), never under 6
+  });
+
+  it('closing in from both sides, nobody walks through the other; the round pauses when blades cross', () => {
+    const f = startFight([fighter('a', 0, 0), fighter('b', 1, 6)]);
+    const r = resolveRound(f, { a: { move: { x: 6, z: 0 } }, b: { move: { x: 0, z: 0 } } }, RULES, Rng.fromSeed(2), { pauseOnOpen: true });
+    const [a, b] = r.fight.fighters;
+    expect(a.x).toBeLessThan(b.x);
+    expect(b.x - a.x).toBeGreaterThanOrEqual(1.49);
+    expect(r.fight.midRound).toBe(true);
+    expect(r.log.some((l) => l.k === 'attack')).toBe(false);
+    // The second half: the tactic chosen now is the one struck with; the round then moves on.
+    const att = r.fight.melee!.attacker === 0 ? 'a' : 'b';
+    const r2 = resolveRound(r.fight, { [att]: { attack: 'powerful', move: { x: 50, z: 0 } } }, RULES, Rng.fromSeed(3), { pauseOnOpen: true });
+    const blow = r2.log.find((l) => l.k === 'attack');
+    expect(blow?.k === 'attack' && blow.tactic).toBe('powerful');
+    expect(r2.log.some((l) => l.k === 'move')).toBe(false);
+    expect(r2.fight.round).toBe(r.fight.round + 1);
+  });
+
+  it('advantages buy damage as dice: 2 are +1D6, 5 are +2D6+2', () => {
+    expect(moreDamage(1, false)).toEqual({ n: 0, mod: 2 });
+    expect(moreDamage(2, false)).toEqual({ n: 1, mod: 0 });
+    expect(moreDamage(5, false)).toEqual({ n: 2, mod: 2 });
+    expect(moreDamage(3, true)).toEqual({ n: 3, mod: 0 });
+  });
+
+  it('a broken leg keeps them on the ground: no moving, −1D6 to fight', () => {
+    const lame = fighter('a', 0, 0, { injuries: { ...unhurt(), broken: ['leftLeg'] } });
+    const f = startFight([lame, fighter('b', 1, 8)]);
+    const r = resolveRound(f, { a: { move: { x: 8, z: 0 } } }, RULES, Rng.fromSeed(1));
+    expect(r.fight.fighters[0].x).toBe(0);
+    expect(attackWhy(lame, 'standard').mods).toContainEqual({ why: 'grounded', n: -1 });
+  });
+
+  it('a beaten foe offers to yield; accepted, they lay down their weapon', () => {
+    const style = { ...STYLE, yieldAt: 1 };
+    const f = startFight([fighter('a', 0, 0), fighter('b', 1, 1.5, { injuries: { ...unhurt(), broken: ['rightLeg'], wounds: { torso: 2 } } })]);
+    expect(beaten(f.fighters[1])).toBeGreaterThanOrEqual(1);
+    expect(wantsToYield(f, 'b', style)).toBe(true);
+    expect(wantsToYield(f, 'a', style)).toBe(false);
+    const no = refuseYield({ ...f, offer: 'b' }, 'b');
+    expect(wantsToYield(no, 'b', style)).toBe(false); // not again until worse off
+    const yes = acceptYield(f, 'b', Rng.fromSeed(1));
+    expect(yes.fight.winner).toBe(0);
+    expect(yes.fight.spared).toBe('b');
+    expect(yes.fight.fighters[1].weapon).toBeNull();
+    expect(yes.fight.ground).toHaveLength(1);
   });
 
   it('a tie goes to the attacker', () => {

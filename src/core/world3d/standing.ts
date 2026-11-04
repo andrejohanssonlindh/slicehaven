@@ -111,6 +111,8 @@ export interface Standing {
   leave: Record<string, number>;
   /** The last world day the views faded on (null before the first). */
   fadedDay?: number | null;
+  /** How often the hero has yielded to each person in a fight (B8a): each time, the next plea is harder. */
+  yielded?: Record<string, number>;
 }
 
 export const newStanding = (): Standing => ({ regard: {}, leave: {}, fadedDay: null });

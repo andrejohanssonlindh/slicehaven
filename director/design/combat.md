@@ -59,13 +59,16 @@
 3. **B8c, several fighters.** Two against one, sub-fights, outnumbering, joining, the group attack. A second gladiator.
 4. **B8d, ranged.** Bows and thrown knives in the arena: range from metres, cover from pillars and walls, aim, nock and load.
 5. **B8e, visible injuries.** Wounds, breaks, blood, bandages and poses on the bodies, hero and others alike.
-6. **B8f, fights out in the world.** The bold who square up (standing) actually fight; guards fetched arrive and join; brigands on a lonely road. Death and its consequences (B3c witnesses).
+6. **B8f, fights out in the world.** The bold who square up (standing) actually fight; guards fetched arrive and join; brigands on a lonely road. Death and its consequences (B3c witnesses). **From the director's third fight:** attacking someone is the *harm* wrong (their view of you drops, and witnesses'); someone who wakes from a knock-out decides to flee, or to talk their way out if seen; someone left on the ground (a broken leg) calls for help.
 7. Then falls (a ledge, a ladder), fire on people (torches, the forge), stopping a bleed and waking someone (Läkekonst), and healing by days.
 
 Mounted combat waits for riding (C4), mystic actions for magic (B9).
 
 ## Readings made while building B8a (to confirm or change)
-- **Advantages** all buy *more damage* until edges can be chosen (B8b); the extra is rolled (or added) on its own so it can be shown (`HitInput.extra`).
+- **Advantages** all buy *more damage* until edges can be chosen (B8b); the extra is rolled (or added) on its own so it can be shown (`HitInput.extra`); every +4 is a die (`moreDamage`, the director).
+- **A broken leg, hip, spine or neck grounds them** (`grounded`): no moving or retreating, −1D6 on fighting and moving; a broken arm drops what it holds. The hero limps outside a fight until healing exists.
+- **A beaten foe offers to yield** (`beaten`, `wantsToYield`, style `yieldAt`); **yielding lays your weapon down**, and each earlier yield to the same person makes the next plea 6 harder (`Standing.yielded`).
+- **The round pauses when blades cross** (`pauseOnOpen`, `Fight.midRound`) so both sides choose a tactic in their roles; a move stops at reach of a foe.
 - **The mercy stroke** kills (someone helpless, a blow meant to kill); no roll.
 - **A defender's side action**: picking something up is allowed while defending (the book gives a side action in your active phase; the defender has no main action).
 - **The knocked out wake when their fatigue is all gone** (`recoverFatigue`); the dying don't.

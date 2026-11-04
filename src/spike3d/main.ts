@@ -484,7 +484,8 @@ function bindInput(): void {
         return;
       }
       // Knocked out (left lying after a fight): nothing to do but come round, as fatigue goes.
-      if (world.injuriesOf('hero')?.out) {
+      const hurt = world.injuriesOf('hero');
+      if (hurt?.out) {
         notify(t('spike.out', 'You are knocked out. You come round when your fatigue is gone ("You" shows it).'));
         down = null;
         return;

@@ -25,7 +25,7 @@ export const partName = (p: string): string => t(`fight.part.${p}`, PART[p] ?? p
 const WHY: Record<ModWhy, string> = {
   quick: 'quick strike', powerful: 'powerful strike', careful: 'careful defence', counter: 'counter', weak: 'too heavy for you',
   drew: 'picked up this round', flexible: 'their weapon bends round', fists: 'bare hands against a weapon', weakWeapon: 'weak weapon',
-  load: 'armour’s load', shield: 'shield', pain: 'pain', ribs: 'broken ribs', blinded: 'blinded', eye: 'one eye',
+  load: 'armour’s load', shield: 'shield', pain: 'pain', ribs: 'broken ribs', grounded: 'on the ground (a broken leg)', blinded: 'blinded', eye: 'one eye',
   head: 'head wound', torso: 'body wound', leftArm: 'left arm wound', rightArm: 'right arm wound', leftLeg: 'left leg wound', rightLeg: 'right leg wound',
   dazed: 'dazed', back: 'knocked back', drop: 'lost grip', fall: 'down', armour: 'armour torn', grabbed: 'grabbed',
 };

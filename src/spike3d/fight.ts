@@ -6,7 +6,8 @@ import { WOUND_TABLES } from '../content/wounds';
 import { baseArmour, baseDamage, type Dice, diceText } from '../core/chargen/tables';
 import {
   ADJACENT, type Choice, type Fight, type Fighter, type FightItem, type FightRules, type LogLine, PICKUP_REACH, UNTRAINED, attackTactics,
-  PLEA_SKILLS, between, canAct, chooseFor, loadDiceOf, pleaDifficulty, resolveRound, roleOf, startFight, weaponOf,
+  type FightStyle, PLEA_SKILLS, acceptYield, between, canAct, chooseFor, loadDiceOf, pleaDifficulty, refuseYield, resolveRound, roleOf,
+  startFight, wantsToYield, weaponOf,
 } from '../core/combat';
 import { type Injuries, totalFatigue, unhurt } from '../core/damage';
 import { DIFFICULTY_RULES } from '../core/difficulty';
@@ -205,6 +206,8 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       return out;
     }
     if (!canAct(me)) return [{ label: t('fight.wait', 'Lie still…'), go: () => play({}) }];
+    // They offered to yield: accept, or choose anything else and fight on.
+    if (fight.offer === foeId) out.push({ label: t('fight.accept', 'Accept their surrender'), go: accept });
     const role = roleOf(fight, 'hero');
     // Something to pick up within reach (only empty-handed: one thing at a time).
     const near = !me.weapon ? fight.ground.filter((g) => Math.hypot(g.x - me.x, g.z - me.z) <= PICKUP_REACH) : [];
@@ -242,7 +245,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     const style = styleFor(world().talkPerson(foeId)?.tags ?? []);
     const best = PLEA_SKILLS.map((s) => ({ s, d: hero.dice[s] ?? { n: 0, mod: 0 } })).reduce((a, b) => (units(b.d) > units(a.d) ? b : a));
     const dice = best.d.n > 0 ? best.d : { n: 1, mod: 0 };
-    const difficulty = pleaDifficulty(fight!, 'hero', style);
+    const difficulty = pleaDifficulty(fight!, 'hero', style, world().yieldedTo(foeId));
     const easy = level().foeExact;
     const label = t('fight.plead', 'Ask to yield ({skill} {dice}{vs})', { skill: rollableName(best.s), dice: diceText(dice), vs: easy ? t('fight.pleavs', ' against {d}', { d: difficulty }) : '' });
     return { label, go: () => play({ plead: { dice, difficulty }, ...(defending ? { defend: 'standard' as const } : {}) }) };
@@ -265,19 +268,45 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       if (at) { f.x = at.x; f.z = at.z; }
     }
     const style = styleFor(w.talkPerson(foeId)?.tags ?? []);
+    // Choosing anything but accepting their offer to yield refuses it: they fight on.
+    if (fight.offer) fight = refuseYield(fight, fight.offer);
     const theirs = chooseFor(fight, foeId, style, rng);
-    const r = resolveRound(fight, { hero: mine, [foeId]: theirs }, rules, rng);
+    // (The round stops when blades cross, so both choose a tactic in their roles: `midRound`.)
+    const r = resolveRound(fight, { hero: mine, [foeId]: theirs }, rules, rng, { pauseOnOpen: true });
     fight = r.fight;
     await show(r.log, w);
     for (const f of fight.fighters) w.setInjuries(f.id, f.injuries);
     save();
     busy = false;
+    if (fight.midRound) log(t('fight.choose', 'Choose how to strike or defend.'), 'info');
+    // Beaten badly enough, they offer to yield (the director: "some type of plead cutoff").
+    offerYield(style);
     if (fight.winner !== null && fight.winner !== 0 && fight.fighters[0].injuries.out && !fight.fighters[0].injuries.dead) {
       // They won and you are down: they finish it if their style does, else they leave you be.
       if (style.mercy) return play({});
       log(t('fight.spared', '{name} leaves you lying there.', { name: Name(foeId) }), 'bad');
     }
     if (fight.fighters[0].injuries.dead) log(t('fight.youdie', 'You are dead.'), 'bad');
+    refresh();
+  }
+
+  /** If the foe is beaten enough, they offer to yield: the choices then lead with accepting it. */
+  function offerYield(style: FightStyle): void {
+    if (!fight || !wantsToYield(fight, foeId, style)) return;
+    fight = { ...fight, offer: foeId };
+    log(t('fight.offers', '{who} lowers their weapon and asks to yield.', { who: Name(foeId) }), 'good');
+  }
+
+  /** Accept their surrender: they lay down their weapon; the fight is won. */
+  async function accept(): Promise<void> {
+    if (!fight || busy) return;
+    busy = true;
+    const r = acceptYield(fight, foeId, rng);
+    fight = r.fight;
+    await show(r.log, world());
+    log(t('fight.accepted', 'You let {who} yield.', { who: Name(foeId) }), 'info');
+    save();
+    busy = false;
     refresh();
   }
 
@@ -308,7 +337,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     const verdict = l.hit
       ? l.defend && l.attack.total === l.defend.total ? t('fight.tie', 'a tie: the attacker wins it') : t('fight.hits', 'it hits')
       : t(`fight.verdict.${l.how}`, VERDICT[l.how]);
-    log(`${of(l.who, ['fight.strike.you', 'You strike{tactic}'], ['fight.strikes', '{who} strikes{tactic}'], { tactic })}: ${atkText} ${t('fight.against', 'against {whose}', { whose: whose(l.target) })} ${defText}: ${verdict}.`, atkMine ? 'you' : 'they');
+    const line = `${of(l.who, ['fight.strike.you', 'You strike{tactic}'], ['fight.strikes', '{who} strikes{tactic}'], { tactic })}: ${atkText} ${t('fight.against', 'against {whose}', { whose: whose(l.target) })} ${defText}: ${verdict}.`;
     w.swing(l.who);
 
     // 1. Who hits.
@@ -317,6 +346,8 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     if (l.defend) { rolls.push({ ...l.defend, label: t('fight.defroll', '{who}: {how}', { who: Name(l.target), how }) }); mine.push(defMine); }
     const adv = l.advantages ? [l.advantages === 1 ? t('fight.adv1', '1 advantage: more damage') : t('fight.advn', '{n} advantages: more damage', { n: l.advantages })] : [];
     await reveal(rolls, mine, [`${verdict.charAt(0).toUpperCase()}${verdict.slice(1)}.`, ...adv]);
+    // (Written once the dice have landed, so the log doesn't give it away.)
+    log(line, atkMine ? 'you' : 'they');
     if (!l.hit || !l.result || !l.damage) return;
 
     // 2. Where, and the damage (the extra from advantages on its own, then armour).
@@ -402,6 +433,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
           log(of(l.who, ['fight.pleads.you', 'You ask to yield.'], ['fight.pleads', '{who} asks to yield.']), mine ? 'you' : 'they');
           await reveal([{ ...l.roll, label: t('fight.plearoll', '{who}: plea', { who: Name(l.who) }) }], [mine], [said]);
           log(said, l.granted ? 'info' : 'bad');
+          if (l.granted && mine) w.noteYield(foeId);
           break;
         }
         case 'mercy':
@@ -452,6 +484,8 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     el.hidden = false;
     log(t('fight.begins', 'You face {name}. The fight is on.', { name: p.name }), 'info');
     if (!fight.fighters[0].weapon) log(t('fight.nohands', 'You have no weapon: you fight with your fists. Weapons lie on the ground nearby.'), 'info');
+    // Beaten in an earlier fight, they may ask to yield at once.
+    offerYield(styleFor(p.tags));
     refresh();
   }
 
