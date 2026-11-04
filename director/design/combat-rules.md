@@ -178,7 +178,7 @@ Always at least 1 advantage, even if a weapon lowers the cost to 0.
 | **Falls from the saddle** | 2D6 fall damage (+1D6 at speed), `Reaktion` or `Rida` against 14 (rider hit) or 18 (mount fell) | |
 | **Bolts** (`Skenar`, mounts) | the mount flees on its own | |
 
-**Several short effects at once (reading):** the book doesn't say whether *dazed* and *drops* from the same row add up to −2D6. I take it they do (different effects each give their own −1D6), and the same effect twice doesn't (it just lasts). *Question for the director when it matters.*
+**Several short effects at once:** the book doesn't say. **Decided (Q47): negative effects stack**, the same one twice too: *dazed* and *drops* from one row are −2D6.
 
 ## 8. Strain (p. 118)
 Hunger, thirst, cold, lack of air count in their own points. Each increase: a shock roll against them; fail, knocked out (or −3 well-being; not for air). Once out, the shock rolls turn into death rolls. Lack of air: 4 a round, 4 back a round once breathing (not until the next scene if knocked out).

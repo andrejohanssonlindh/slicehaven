@@ -121,6 +121,14 @@ describe('after-effects on a person', () => {
     expect(applyEffects(unhurt(), [{ k: 'cut', diff: 18, area: 'neck' }], loaded(1, 1, 1)).injuries.dead).toBe(true);
   });
 
+  it('negative effects stack: dazed and drops are −2D6, dazed twice is −2D6 too (Q47)', () => {
+    const rng = Rng.fromSeed(1);
+    const two = applyEffects(unhurt(), [{ k: 'dazed' }, { k: 'drop', part: 'rightArm' }], rng).injuries;
+    expect(penaltyDice(two, { kind: 'other' })).toBe(2);
+    const twice = applyEffects(applyEffects(unhurt(), [{ k: 'dazed' }], rng).injuries, [{ k: 'dazed' }], rng).injuries;
+    expect(penaltyDice(twice, { kind: 'other' })).toBe(2);
+  });
+
   it('weighs on the right rolls', () => {
     const i = { ...unhurt(), pain: 1, short: ['dazed' as const], wounds: { head: 1, torso: 2, rightArm: 1, leftLeg: 2 } };
     expect(penaltyDice(i, { kind: 'other' })).toBe(1); // dazed only

@@ -2,6 +2,11 @@
 
 *Archive of the questions in [questions](../questions.md) once answered or dropped. Newest on top. What they decided, if it still stands, is in the [decisions](../decisions.md).*
 
+## 2026-11-04
+- **Q45 The bands in metres** → **yes** (adjacent ≤ 2 m, short ≤ 10, medium ≤ 25, long ≤ 50; walk 5 m, run 10 m a round). The director asked whether moving as the side action was noted: it is.
+- **Q46 A sparring match where no one dies?** → **no**: rather someone dies and the director resets (New game), to see the full flow.
+- **Q47 Do two short effects add up?** → **both**: negative effects stack. And a dropped weapon is really gone from the hand until picked up, a side action.
+
 ## 2026-11-03
 - **Q43 On easy, mark people who notice you even when you can't see them?** → **B**: "for easy that's reasonable." (Built: on easy the eye or question mark floats over anyone within 30 m who noticed you, seen or not.)
 - **Q44 Does a bad view fade with time?** → **yes**, but likely very differently by culture, and it should take **a lot of time: weeks**. (Built: each culture says points a day; country folk, a point a day.) Asked alongside: *are some parts of houses off limits, like the inn's upper floor without paying?* (Built: each kind of room says what it welcomes; the inn's guest rooms need a room from the keeper.)

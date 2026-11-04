@@ -17,7 +17,7 @@
 ## How a fight fits our world
 - **Live until it starts.** The world runs freely (A3). A fight starts when someone attacks or squares up and the other answers. Then **the world stops and plays in rounds of 4 seconds** of world time (decided 2026-11-02), with everyone within reach of it drawn in; the rest of the map waits.
 - **Rounds and phases** as in the rules: ranged, melee, mystic (later, B9), end. The phone shows one decision at a time: *which phase* → *side action* → *main action* → *tactic*. A fight with no choice to make for the hero plays itself, slowly enough to follow.
-- **Metres, not bands** (principle 6). The rules' five bands become measured ranges, read from the real distance between two people (a proposal, Q45):
+- **Metres, not bands** (principle 6). The rules' five bands become measured ranges, read from the real distance between two people (decided, Q45):
 
 | Band | Metres | Notes |
 |---|---|---|
@@ -37,14 +37,20 @@
 
 ## What's missing before a fight can run (the pattern check)
 1. **Combat rules core** (`src/core/combat.ts`, to write): a fight's state as plain JSON (who, sides, sub-fights, roles, round, phase, choices), opening a melee (Reaktion, outnumbering), attack and defence with tactics, who attacks next round, edges bought with advantages, ranged difficulty from metres and cover, retreat. Pure, deterministic, tested. Calls `damage.ts`.
-2. **A weapon in hand** for a person: from their sheet's gear now (the first weapon); B6 items later turn it into a real thing held. Drawn or not is a flag.
+2. **Hands, and weapons as things** (the director, Q47: a dropped weapon is really on the ground, and picking it up is a side action). What exists: *Pick up* and *Put down* (`content/actions/verbs/`, rules `core/world3d/carry.ts`) take any thing with a `size` into **both arms**, one thing at a time, saved where it lies when put down. What's missing:
+   - **Weapons as kinds of thing** (under `item`): a `weapon` property naming its row in `WEAPONS` (`content/chargen/equipment.ts`), a `size`, a weight, a model. A sword in the world is then a thing like a stool.
+   - **Hands**: a person holds things in a **right and a left hand** (a weapon one-handed, a shield, a torch), or in **both** (a two-handed weapon, a stool, a keg). Carrying in the arms as today is "both hands". A weapon in hand is what they fight with; with none, they brawl.
+   - **Wield / sheathe** (a belt or back slot: *strapped*), so drawing is the rules' draw (−1D6 unless quick-draw), and *pick up* in a fight is the **side action**.
+   - **Drop**: the *drops* after-effect puts what's in the hit arm (everything, for a head or torso hit) on the ground 1–3 m away as a loose thing; *Secure* items and two-handed grips stay. Whoever picks it up holds it, the other side too.
+   - **Use what you hold**: a held thing with a damage line on its kind (a stool: crush) is an improvised weapon; a real weapon reads its row.
+   This is a slice of B6 (items) that combat needs first: built at the start of B8a, agreed now.
 3. **Effects (B7)**: the after-effects in `damage.ts` are the first effects on a person. When B7 comes, burning on a *thing* and wet/afraid join; `Injuries` may then become one effect kind among others. Not needed for the first duel.
 4. **The world's side**: `SpikeWorld` starts a fight, freezes the clock, gathers people, moves them by the metres they chose, and resumes. The page shows choices and the log; the engine plays swings and hits as poses.
 
 ## Order to build (each a vignette the director can try on the phone)
-1. **B8a, a sparring match in the arena.** One sparring partner (a kind of person: a gladiator, sword, light armour) waits in the arena. Tap them → *Fight*. Melee only: the round's choice is the tactic (standard, quick, powerful; defence standard, defensive, counter). Rolls on the dice glass, a fight log, injuries on the hero card, knocked out ends it. No death in sparring (*Mark* at 1 advantage ends it, a rule of the arena), so it can be tried over and over. *Tests:* `core/combat.ts` unit tests; one e2e in the arena.
+1. **B8a, a fight to the death in the arena** (Q46: the full flow, death included; *New game* resets). A gladiator (a kind of person: sword, light armour) waits in the arena, and a weapon rack holds a sword or two for the hero. Tap them → *Fight*. Melee only: each round the choice is moving (side action, 5 m walk, 10 m run) and the tactic (standard, quick, powerful; defence standard, defensive, counter). Rolls on the dice glass, a fight log, injuries on the hero card; drops put the weapon on the sand, to pick up as a side action; knocked out, bleeding out, killed. *Tests:* `core/combat.ts` unit tests; one e2e in the arena.
 2. **B8b, edges.** Advantages bought: precision, more damage, find a gap, trip, disarm, follow-up. Weapon properties that change them (precise, measured, snaring).
-3. **B8c, several fighters.** Two against one, sub-fights, outnumbering, joining, the group attack. A second sparring partner.
+3. **B8c, several fighters.** Two against one, sub-fights, outnumbering, joining, the group attack. A second gladiator.
 4. **B8d, ranged.** Bows and thrown knives in the arena: range from metres, cover from pillars and walls, aim, nock and load.
 5. **B8e, visible injuries.** Wounds, breaks, blood, bandages and poses on the bodies, hero and others alike.
 6. **B8f, fights out in the world.** The bold who square up (standing) actually fight; guards fetched arrive and join; brigands on a lonely road. Death and its consequences (B3c witnesses).
@@ -52,7 +58,7 @@
 
 Mounted combat waits for riding (C4), mystic actions for magic (B9).
 
-## Open questions (in [questions](../questions.md))
-- **Q45** the bands in metres (table above), and walking 5 / running 10 m a round.
-- **Q46** the first vignette: a sparring match with no death, as above?
-- **Q47** two short after-effects from one blow (dazed and drops): −2D6 together, or −1D6? (I read them as adding up.)
+## Decided (2026-11-04)
+- **Q45** the bands in metres as in the table; moving is the side action (walk 5 m, run 10 m).
+- **Q46** the first fight is to the death; New game resets.
+- **Q47** negative effects stack (repeats too); a dropped weapon is on the ground until picked up, a side action.

@@ -284,7 +284,7 @@ export interface Injuries {
   baseFatigue: number;
   /** A shock roll is owed at the end of this phase (damage gave fatigue). */
   shockDue: boolean;
-  /** Short effects (−1D6 each, to the end of their next active phase), by kind. */
+  /** Short effects (−1D6 each, to the end of their next active phase); they stack, repeats included (Q47). */
   short: ShortKind[];
   /** Blinded: −2D6 on what needs sight, for one round. */
   blinded: boolean;
@@ -363,7 +363,7 @@ export function applyEffects(before: Injuries, effects: Effect[], rng: Rng): { i
   for (const e of effects) {
     switch (e.k) {
       case 'dazed': case 'back': case 'drop': case 'fall': case 'grabbed': case 'armour':
-        if (!i.short.includes(e.k)) i.short.push(e.k);
+        i.short.push(e.k); // negative effects stack, the same one twice too (director, Q47)
         if (e.k === 'armour' && e.part && !i.armourOff.includes(e.part)) i.armourOff.push(e.part);
         break;
       case 'blinded': i.blinded = true; break;
@@ -432,7 +432,7 @@ const PAINED_ATTRS = new Set(['Förflyttning', 'Kroppsbyggnad', 'Reaktion', 'Vak
 
 /** How many D6 a person's injuries take off a roll. */
 export function penaltyDice(i: Injuries, use: RollUse): number {
-  let d = i.short.length; // each short effect −1D6 on everything (combat-rules.md §7: reading)
+  let d = i.short.length; // each short effect −1D6 on everything; they stack (Q47)
   const movementish = use.kind === 'movement' || (use.kind === 'attr' && use.attr === 'Förflyttning');
   if (use.kind === 'combat' || use.kind === 'movement' || use.kind === 'mystic' || (use.kind === 'attr' && PAINED_ATTRS.has(use.attr ?? ''))) d += i.pain;
   if (use.kind === 'shock') d += i.wounds.head ?? 0;
