@@ -12,7 +12,10 @@
 | Rolls | `core/dice.ts` (open rolls, advantages), shown by `ui/dice/` | ✅ |
 | Seeing, hearing; answering a wrong (fight or fetch) | `core/world3d/perceive.ts`, `standing.ts`; `does/confront.ts` | ✅ "Square up" exists as an answer, with nothing to do yet |
 | Load and base fatigue | `ENCUMBRANCE` in `tables.ts`, `carry.ts` | ✅ |
-| **Test ground** | `/spike3d/?map=arena`: a 30 × 15 m oval behind a palisade, gates east and west, pillars (block sight), low walls (not sight), barrels, crates, a woodpile | ✅ No people yet. New map rule `oval` (`content/maps/rules/oval.ts`) |
+| **Test ground** | `/spike3d/?map=arena`: a 30 × 15 m oval behind a palisade, gates east and west, pillars (block sight), low walls (not sight), barrels, crates, a woodpile | ✅ Weapons on the sand by the west gate, a gladiator at the far end. Map rule `oval` (`content/maps/rules/oval.ts`) |
+| **Combat rules core** | `src/core/combat.ts` | ✅ B8a (2026-11-04): one against one in melee. Moving (walk 5, run 10), picking up (3 m), opening on Reaktion, attack against the best defence (parry, block, dodge), tactics and their fatigue, roles swapping, retreat, drops, the end of the phase, the mercy stroke; a fighting style for those nobody steers. Tested (`tests/combat.test.ts`) |
+| **Weapons as things, the right hand** | `content/things/kinds/weapons.ts`, models `things/models/`; `Loose.wield` for people's weapons | ✅ Held in the right hand (`BodyRig.hand`, `model.grip`), dropped and picked up in a fight, saved |
+| **The fight in the world and on the page** | `SpikeWorld` (fights section), `src/spike3d/fight.ts`, `#fight` panel | ✅ The world stops; one choice a round; dice; walking, swings, lying down; injuries saved (`hurt`, save v7); a dead hero gets New game. `e2e/spike3d-fight.e2e.ts` |
 
 ## How a fight fits our world
 - **Live until it starts.** The world runs freely (A3). A fight starts when someone attacks or squares up and the other answers. Then **the world stops and plays in rounds of 4 seconds** of world time (decided 2026-11-02), with everyone within reach of it drawn in; the rest of the map waits.
@@ -36,8 +39,8 @@
 - **Improvised weapons** (plan B8): a swung stool reads a property off its kind (a damage string and type on `ThingDef`, like `size` and `weight`), never an `if` on its name.
 
 ## What's missing before a fight can run (the pattern check)
-1. **Combat rules core** (`src/core/combat.ts`, to write): a fight's state as plain JSON (who, sides, sub-fights, roles, round, phase, choices), opening a melee (Reaktion, outnumbering), attack and defence with tactics, who attacks next round, edges bought with advantages, ranged difficulty from metres and cover, retreat. Pure, deterministic, tested. Calls `damage.ts`.
-2. **Hands, and weapons as things** (the director, Q47: a dropped weapon is really on the ground, and picking it up is a side action). What exists: *Pick up* and *Put down* (`content/actions/verbs/`, rules `core/world3d/carry.ts`) take any thing with a `size` into **both arms**, one thing at a time, saved where it lies when put down. What's missing:
+1. ✅ *(B8a, one against one; sub-fights, outnumbering, edges and ranged still to come)* **Combat rules core** (`src/core/combat.ts`): a fight's state as plain JSON (who, sides, sub-fights, roles, round, phase, choices), opening a melee (Reaktion, outnumbering), attack and defence with tactics, who attacks next round, edges bought with advantages, ranged difficulty from metres and cover, retreat. Pure, deterministic, tested. Calls `damage.ts`.
+2. 🔶 *(B8a: weapons as kinds, the right hand, drop and pick up in a fight are built; the left hand, shields, belts and drawing are not)* **Hands, and weapons as things** (the director, Q47: a dropped weapon is really on the ground, and picking it up is a side action). What exists: *Pick up* and *Put down* (`content/actions/verbs/`, rules `core/world3d/carry.ts`) take any thing with a `size` into **both arms**, one thing at a time, saved where it lies when put down. What's missing:
    - **Weapons as kinds of thing** (under `item`): a `weapon` property naming its row in `WEAPONS` (`content/chargen/equipment.ts`), a `size`, a weight, a model. A sword in the world is then a thing like a stool.
    - **Hands**: a person holds things in a **right and a left hand** (a weapon one-handed, a shield, a torch), or in **both** (a two-handed weapon, a stool, a keg). Carrying in the arms as today is "both hands". A weapon in hand is what they fight with; with none, they brawl.
    - **Wield / sheathe** (a belt or back slot: *strapped*), so drawing is the rules' draw (−1D6 unless quick-draw), and *pick up* in a fight is the **side action**.
@@ -45,7 +48,7 @@
    - **Use what you hold**: a held thing with a damage line on its kind (a stool: crush) is an improvised weapon; a real weapon reads its row.
    This is a slice of B6 (items) that combat needs first: built at the start of B8a, agreed now.
 3. **Effects (B7)**: the after-effects in `damage.ts` are the first effects on a person. When B7 comes, burning on a *thing* and wet/afraid join; `Injuries` may then become one effect kind among others. Not needed for the first duel.
-4. **The world's side**: `SpikeWorld` starts a fight, freezes the clock, gathers people, moves them by the metres they chose, and resumes. The page shows choices and the log; the engine plays swings and hits as poses.
+4. ✅ *(B8a)* **The world's side**: `SpikeWorld` starts a fight, freezes the clock, gathers people, moves them by the metres they chose, and resumes. The page shows choices and the log; the engine plays swings and hits as poses.
 
 ## Order to build (each a vignette the director can try on the phone)
 1. **B8a, a fight to the death in the arena** (Q46: the full flow, death included; *New game* resets). A gladiator (a kind of person: sword, light armour) waits in the arena, and a weapon rack holds a sword or two for the hero. Tap them → *Fight*. Melee only: each round the choice is moving (side action, 5 m walk, 10 m run) and the tactic (standard, quick, powerful; defence standard, defensive, counter). Rolls on the dice glass, a fight log, injuries on the hero card; drops put the weapon on the sand, to pick up as a side action; knocked out, bleeding out, killed. *Tests:* `core/combat.ts` unit tests; one e2e in the arena.
@@ -57,6 +60,14 @@
 7. Then falls (a ledge, a ladder), fire on people (torches, the forge), stopping a bleed and waking someone (Läkekonst), and healing by days.
 
 Mounted combat waits for riding (C4), mystic actions for magic (B9).
+
+## Readings made while building B8a (to confirm or change)
+- **Untrained**: a combat skill you have no value in rolls 1D6 (Q48).
+- **Advantages** all buy *more damage* until edges can be chosen (B8b).
+- **The mercy stroke** kills (someone helpless, a blow meant to kill); no roll.
+- **A defender's side action**: picking something up is allowed while defending (the book gives a side action in your active phase; the defender has no main action).
+- **The scene ends when you walk away** from a fight: fatigue goes, the knocked out wake (Q49).
+- **The hero wears no armour yet** (there is none on them in the world); people wear their sheet's armour as one suit.
 
 ## Decided (2026-11-04)
 - **Q45** the bands in metres as in the table; moving is the side action (walk 5 m, run 10 m).

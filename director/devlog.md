@@ -2,6 +2,19 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-04 — B8a: a fight to the death in the arena (first playable)
+
+- **Try it:** `/spike3d/?map=arena`. Weapons lie on the sand by the west gate: an arming sword, a quarterstaff, a hand axe, a cudgel. Tap one → *Pick up*. Walk to the gladiator at the far end, tap them → **Fight**. (The default shepherd fights best with the **quarterstaff**: staff is their skill. With a sword they roll 1D6, see Q48.)
+- **One choice a round**, in a panel low on the screen: *close in* (walk up to 5 m) or *run in* (10 m, a roll), *pick up* a weapon within 3 m, and once blades cross either a strike (*standard*, *quick*, *powerful*) or a defence (*defend*, *defend carefully*, *counter*), or *retreat*. The panel shows the round, the distance, your role, and both sides: weapon, skill dice, fatigue, wounds, pain, bleeding, what holds you back.
+- **The rules run it** (`core/combat.ts`, new, tested): a melee opens within 2 m on Reaktion rolls; attack against the best defence you have (parry, block, or dodge); tactics change the dice and cost fatigue; who attacks next round follows the defence tactic; hits go through the wound tables and death rolls; the end of each phase brings bleeding and the shock roll. Advantages all buy **more damage** for now (choosing edges is B8b).
+- **The world plays it out.** The clock stops and everyone else waits. The fighters walk round pillars to where the round sent them, the striker swings, a blow that makes you drop puts the weapon on the sand 1–3 m away (pick it up as your round's side action), the knocked out and the dead lie on their backs.
+- **To the death (Q46).** The gladiator finishes you if you go down. If you win, you choose: *Finish them* or *Walk away*. Who died stays dead through a reload (injuries are saved on everyone, save version 7). A dead hero gets only *New game*.
+- **Weapons are things now:** each is a kind (under a new `weapon` family) that names its row in the weapon table, so its skill, damage and properties come from there. They lie where they fall and are saved. Held, a weapon is in the **right hand** (the arm forward, the blade out), and doesn't slow you like something in both arms. Things a map lays outdoors can now be picked up generally.
+- **The gladiator** is a new kind of person (a soldier: sword main, dodge side, soft leather), novice here so you have a chance. How someone fights when nobody steers them is a **fighting style** (`content/combat/styles.ts`): the gladiator presses hard, runs in, and finishes what it starts; anyone else doesn't kill someone who is down.
+- **Anyone can be fought**: *Fight* is in everyone's talk sheet. Fighting villagers has no consequences yet (that's B8f).
+- **Not yet:** shields and the left hand, armour on the hero, wounds shown on the hero card or on bodies (B8e), edges (B8b), several fighters (B8c).
+- **Questions:** Q48 (rolling an untrained combat skill), Q49 (when the scene ends after a fight).
+
 ## 2026-11-04 — Combat prework: the rules, damage and wounds, an arena
 
 - **The rules in our words.** I read the fight and damage chapters and wrote them up as a working summary: [combat rules](design/combat-rules.md). It covers rounds and phases, melee roles and tactics, several fighters, ranged, edges, weapon properties, damage, the after-effects, falls and burns. It's mechanics only, with book pages so you can check a rule. Where the book is unclear, the page says "reading".

@@ -2,7 +2,17 @@
 
 Newest on top. Answer in chat (just reference the number, e.g. "Q31: A"). Answered questions move to the [archive](archive/questions-answered.md); what they decided goes to the [decisions](decisions.md). Each question names the [plan](todo.md) item it holds up.
 
-*No open questions right now.*
+## Q49 — When does the scene end after a fight? (B8a)
+The rules say fatigue all comes back, and the knocked out wake, when the **scene** ends (a short rest). For now **the scene ends when you walk away from the fight**: your fatigue is gone at once, and a gladiator you only knocked out gets up and goes back to their spot. Wounds, pain, bleeding and breaks stay.
+- **A.** Keep it: walking away ends the scene. *(my pick for now: simple to test)*
+- **B.** The scene ends after a while of world time (say ten minutes) with no fight; until then fatigue stays and the knocked out lie there.
+- **C.** Something else.
+
+## Q48 — Fighting with a skill you don't have (B8a)
+The book doesn't say (that I can find) what you roll for a combat skill you have no value in. I made it **1D6**, so the shepherd with a sword rolls 1D6 against the gladiator's 2D6+2, and loses badly. With the quarterstaff (their own skill, 3D6) it's a real fight.
+- **A.** Keep 1D6 for untrained. *(my pick)*
+- **B.** Roll the attribute behind it instead (e.g. Reaktion), with a penalty.
+- **C.** Untrained can't attack at all, only brawl.
 
 ---
 
