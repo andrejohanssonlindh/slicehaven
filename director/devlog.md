@@ -2,6 +2,15 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-04 — B8a: the upper hand sees the other's choice
+
+- **Choices are declared in reverse order** (your note). At the start of each round, whoever has the upper hand knows what the other means to do before choosing. The line sits above your buttons: *"Arruns means to strike with all their strength."*
+- **Who has it:** in a melee, the **attacker** (no roll: they have the fight in hand). Before blades cross, the two of you roll **Reaktion** once you're within 12 m (a run and a reach). Further apart nobody has it, and both choose blind. The log says *"You are quicker: you see what Arruns means to do"* or *"Arruns is quicker: they will see what you do."*
+- **When they have it, they choose knowing yours.** Counter or defend carefully, and they're likelier to strike quickly. Strike hard, and they're likelier to defend carefully or counter. A fighter whose style never counters still won't.
+- **That Reaktion roll also decides who attacks if blades cross that round**, so there's no second roll. **The quicker side also goes first in side actions**: if you both go for the sword on the sand, they get it.
+- **A note on the book:** the text we have says turn order is by Reaktion and tactics *may* be chosen hidden. I didn't find "declared in reverse order" written out, so it's down as your rule (decisions).
+- **Tried:** unit tests for who has it, the roles, the sword race, the answers; the arena test now makes the hero quick and checks the line shows.
+
 ## 2026-11-04 — B8a: your notes on the third fight
 
 - **No walking through each other.** A move now stops where it first comes within reach of a foe, so two fighters closing in meet in the middle.

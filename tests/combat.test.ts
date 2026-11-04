@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   type Fight, type Fighter, type FightStyle, acceptYield, attackPool, attackWhy, beaten, bestDamage, moreDamage, refuseYield, wantsToYield, bonusDice, chooseFor, damageDice, defencePool, dropFrom, fists, parseProps, pleaDifficulty,
-  resolveRound, roleOf, startFight, tacticFatigue, weaponFromRow, weaponOf,
+  resolveRound, roleOf, seizeInitiative, startFight, tacticFatigue, weaponFromRow, weaponOf,
 } from '../src/core/combat';
 import { type Injuries, recoverFatigue, unhurt } from '../src/core/damage';
 import { Rng } from '../src/core/rng';
@@ -181,6 +181,52 @@ describe('fatigue', () => {
       }
     }
     expect(seen).toBeGreaterThan(0);
+  });
+});
+
+describe('the upper hand (declared in reverse order)', () => {
+  it('belongs to the attacker in a melee, with no roll', () => {
+    const f = { ...startFight([fighter('a', 0, 0), fighter('b', 1, 1.5)]), melee: { attacker: 1, opened: 1 } };
+    const r = seizeInitiative(f, Rng.fromSeed(1));
+    expect(r.fight.upper).toBe(1);
+    expect(r.log).toEqual([]);
+  });
+
+  it('is rolled on Reaktion when free and near, and nobody has it far apart', () => {
+    const near = seizeInitiative(startFight([fighter('a', 0, 0), fighter('b', 1, 8)]), Rng.fromSeed(3));
+    expect([0, 1]).toContain(near.fight.upper);
+    expect(near.log[0]).toMatchObject({ k: 'initiative', ids: ['a', 'b'] });
+    const far = seizeInitiative(startFight([fighter('a', 0, 0), fighter('b', 1, 30)]), Rng.fromSeed(3));
+    expect(far.fight.upper).toBeUndefined();
+  });
+
+  it('decides the roles when blades cross that round, goes first for a weapon, and lasts one round', () => {
+    for (const upper of [0, 1]) {
+      const f = { ...startFight([fighter('a', 0, 0), fighter('b', 1, 4)]), upper };
+      const r = resolveRound(f, { a: { move: { x: 2.5, z: 0 } } }, RULES, Rng.fromSeed(5), { pauseOnOpen: true });
+      expect(r.fight.melee?.attacker).toBe(upper);
+      expect(r.log.find((l) => l.k === 'open')).toMatchObject({ rolls: [] });
+    }
+    // Both reach for the one sword on the ground: whoever has the upper hand gets it.
+    for (const upper of [0, 1]) {
+      const f: Fight = { ...startFight([fighter('a', 0, 0, { weapon: null }), fighter('b', 1, 2.5, { weapon: null })]), upper, ground: [{ id: 'sw', weapon: row('Stridssvärd'), x: 1.2, z: 0 }] };
+      const r = resolveRound(f, { a: { pickUp: 'sw' }, b: { pickUp: 'sw' } }, RULES, Rng.fromSeed(2));
+      expect(r.fight.fighters[upper].weapon?.id).toBe('sw');
+      expect(r.fight.upper).toBeUndefined();
+    }
+  });
+
+  it('lets someone who knows the other’s tactic lean to the answer', () => {
+    const f = { ...startFight([fighter('a', 0, 0), fighter('b', 1, 1.5)]), melee: { attacker: 0, opened: 1 } };
+    const style: FightStyle = { ...STYLE, attack: { standard: 1, quick: 1, powerful: 1 }, defence: { standard: 1, defensive: 1, counter: 1 } };
+    const count = (known: Parameters<typeof chooseFor>[4], key: 'attack' | 'defend', value: string) => {
+      const rng = Rng.fromSeed(11);
+      let n = 0;
+      for (let i = 0; i < 400; i++) if (chooseFor(f, key === 'attack' ? 'a' : 'b', style, rng, known)[key] === value) n++;
+      return n;
+    };
+    expect(count({ defend: 'counter' }, 'attack', 'quick')).toBeGreaterThan(count(undefined, 'attack', 'quick') + 60);
+    expect(count({ attack: 'powerful' }, 'defend', 'counter')).toBeGreaterThan(count(undefined, 'defend', 'counter') + 60);
   });
 });
 

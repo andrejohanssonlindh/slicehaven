@@ -4,6 +4,7 @@ Only decisions that still stand. Ones that were replaced are removed (git histor
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-11-04 | **In a fight, choices are declared in reverse order**: whoever has the upper hand sees what the other means to do before choosing. In a melee that is the attacker; free and near (12 m), a Reaktion roll, which also decides the roles if blades cross that round. The quicker side's side actions go first | Director, after the third fight. The book text we have gives order by Reaktion and hidden tactics; reverse declaration is our rule. |
 | 2026-11-04 | **An untrained combat skill rolls 2D6 (Q48)**, the base value of every combat skill | Director. |
 | 2026-11-04 | **A fight ends when no enemies are left and you press OK (Q49)**, like Fallout; no "end of scene" restores anyone. **Fatigue comes back one point per stretch of world time**, faster when actively resting (sat down: three times as fast); the stretch is the difficulty's (easy 1 minute, normal 2, hard 4). The knocked out lie there until their fatigue is gone | Director: the scene isn't the point; time and rest are. |
 | 2026-11-04 | **In a fight, you throw only your own dice**; the other side's rolls are written beside them. A blow is shown in steps: who hits, then where (the D10) and the damage, then the extra damage and any serious wound. **What you see follows the difficulty**: easy, both sides in numbers; normal, your own in numbers and the foe in words; hard, your fatigue too in words ("very tired") | Director, after the first fight. |

@@ -200,6 +200,13 @@ export interface Fight {
   offer?: string;
   /** Offers to yield already refused, by who offered (they don't ask again until worse off). */
   refused?: Record<string, number>;
+  /**
+   * The side with the upper hand this round (`seizeInitiative`): the others declare what they mean to do first, and
+   * this side chooses knowing it (the director: "if I get the upper hand I should know what the ones below me will
+   * attempt"). In a melee it is the attacking side; free, a Reaktion roll. Their side actions go first. Unset: both
+   * choose blind (nobody near enough for it to matter).
+   */
+  upper?: number;
 }
 
 export type AttackTactic = 'standard' | 'quick' | 'powerful';
@@ -236,6 +243,8 @@ export type LogLine =
   | { k: 'move'; who: string; to: { x: number; z: number }; ran?: boolean; roll?: Roll }
   | { k: 'pickUp'; who: string; item: string }
   | { k: 'open'; attacker: number; rolls: Roll[] }
+  /** Who has the upper hand this round, and the Reaktion rolls that decided it (none in a melee: the attacker has it). */
+  | { k: 'initiative'; upper: number; rolls: Roll[]; ids: string[] }
   | {
     k: 'attack'; who: string; target: string; tactic: AttackTactic; defence: DefenceTactic; how: Defence;
     attack: Roll; attackWhy: PoolWhy; defend: Roll | null; defendWhy?: PoolWhy; hit: boolean; advantages: number;
@@ -458,6 +467,40 @@ function reactionRoll(f: Fighter, rng: Rng): Roll {
   return rollOpen(d, rng, 'Reaktion');
 }
 
+/** Which of two Reaktion rolls is higher (1: the first, −1: the second); a tie goes to the better Reaktion, then a coin (p. 83). */
+function higher(a: Fighter, b: Fighter, ra: Roll, rb: Roll, rng: Rng): number {
+  const d = ra.total === rb.total ? poolMean(pool(a, 'attr:Reaktion')) - poolMean(pool(b, 'attr:Reaktion')) : ra.total - rb.total;
+  return d !== 0 ? Math.sign(d) : rollDie(2, rng) === 1 ? 1 : -1;
+}
+
+/** How near a foe must be, free, for who goes first to matter (a run and a reach): further off, both choose blind. */
+export const INITIATIVE_RANGE = RUN + ADJACENT;
+
+/**
+ * Who has the upper hand this round, before anyone chooses (the director: choices are declared in reverse order, so
+ * whoever is ahead knows what those behind mean to do). In a melee the attacking side has it (they have the fight in
+ * hand); free, the nearest two foes roll Reaktion if they are near enough for it to matter, and that roll also
+ * decides the roles if blades cross this round. Sets `Fight.upper`.
+ */
+export function seizeInitiative(before: Fight, rng: Rng): RoundResult {
+  const fight: Fight = structuredClone(before);
+  const log: LogLine[] = [];
+  if (fight.winner !== null || fight.upper !== undefined) return { fight, log };
+  if (fight.melee) {
+    fight.upper = fight.melee.attacker;
+    return { fight, log };
+  }
+  const able = fight.fighters.filter(canAct);
+  const pair = able
+    .flatMap((a) => able.filter((b) => b.side > a.side && dist(a, b) <= INITIATIVE_RANGE).map((b) => [a, b] as const))
+    .sort((p, q) => dist(...p) - dist(...q))[0];
+  if (!pair) return { fight, log };
+  const rolls = pair.map((f) => reactionRoll(f, rng));
+  fight.upper = (higher(pair[0], pair[1], rolls[0], rolls[1], rng) > 0 ? pair[0] : pair[1]).side;
+  log.push({ k: 'initiative', upper: fight.upper, rolls, ids: pair.map((f) => f.id) });
+  return { fight, log };
+}
+
 /** More damage for advantages: +2 each (each +4 a die), or +1D6 each with a Dangerous weapon. */
 export function moreDamage(adv: number, dangerous: boolean): Dice {
   if (dangerous) return { n: adv, mod: 0 };
@@ -538,8 +581,10 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
   delete fight.midRound;
   if (!resumed) for (const f of fight.fighters) f.drew = false;
 
-  // Side actions: pick up (also in a melee), move (only when free).
-  for (const f of resumed ? [] : fight.fighters) {
+  // Side actions: pick up (also in a melee), move (only when free). The side with the upper hand goes first (the
+  // book's order by Reaktion: they reach the sword on the sand first).
+  const order = fight.upper === undefined ? fight.fighters : [...fight.fighters].sort((a, b) => Number(b.side === fight.upper) - Number(a.side === fight.upper));
+  for (const f of resumed ? [] : order) {
     if (!canAct(f)) continue;
     const c = choices[f.id] ?? {};
     if (c.pickUp) {
@@ -560,10 +605,12 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
     const able = fight.fighters.filter(canAct);
     const pair = able.flatMap((a) => able.filter((b) => b.side > a.side && dist(a, b) <= ADJACENT).map((b) => [a, b] as const))[0];
     if (pair) {
-      const rolls = pair.map((f) => reactionRoll(f, rng));
-      let first = rolls[0].total === rolls[1].total ? poolMean(pool(pair[0], 'attr:Reaktion')) - poolMean(pool(pair[1], 'attr:Reaktion')) : rolls[0].total - rolls[1].total;
-      if (first === 0) first = rollDie(2, rng) === 1 ? 1 : -1;
+      // Whoever won this round's Reaktion roll already (`seizeInitiative`) has the upper hand as blades cross.
+      const won = pair.find((f) => f.side === fight.upper);
+      const rolls = won ? [] : pair.map((f) => reactionRoll(f, rng));
+      const first = won ? (won === pair[0] ? 1 : -1) : higher(pair[0], pair[1], rolls[0], rolls[1], rng);
       fight.melee = { attacker: (first > 0 ? pair[0] : pair[1]).side, opened: fight.round };
+      fight.upper = fight.melee.attacker;
       log.push({ k: 'open', attacker: fight.melee.attacker, rolls });
       // Now each side knows its role: the page may stop here to let the player choose a tactic (the director: "my
       // first move, I cannot choose what type of strike"); the round goes on from here when called again.
@@ -643,6 +690,7 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
       log.push({ k: 'roles', attacker: nextAttacker });
     }
   }
+  delete fight.upper;
   const w = winnerOf(fight);
   if (w !== null && fight.winner === null) {
     fight.winner = w;
@@ -774,11 +822,26 @@ const weighted = <T extends string>(w: Record<T, number>, rng: Rng): T => {
 };
 
 /**
+ * How a fighter who knows the other's tactic leans (they have the upper hand: `Fight.upper`): each weight of their
+ * style is multiplied (a style that never counters still won't). Against careful or countering defence, a quick
+ * blow (more dice to get through); against a powerful blow, defend carefully or counter (it is slow); against a
+ * quick one, defend carefully. (Reading: the book gives no answers; these follow from what each tactic does.)
+ */
+export const ANSWER_ATTACK: Record<DefenceTactic, Partial<Record<AttackTactic, number>>> = {
+  standard: {}, defensive: { quick: 2, powerful: 0.5 }, counter: { quick: 2, powerful: 0.5 },
+};
+export const ANSWER_DEFENCE: Record<AttackTactic, Partial<Record<DefenceTactic, number>>> = {
+  standard: {}, quick: { defensive: 2 }, powerful: { defensive: 2, counter: 3 },
+};
+const lean = <T extends string>(w: Record<T, number>, by: Partial<Record<T, number>>): Record<T, number> =>
+  Object.fromEntries(Object.entries(w).map(([k, v]) => [k, (v as number) * (by[k as T] ?? 1)])) as Record<T, number>;
+
+/**
  * What a fighter the page doesn't steer does this round (the gladiator): pick up a weapon if empty-handed and one
  * lies near, close in on the nearest foe, strike with a tactic by their style, defend by their style, and finish
- * someone knocked out if their style says so.
+ * someone knocked out if their style says so. `known`: what the foe declared, when this fighter has the upper hand.
  */
-export function chooseFor(fight: Fight, id: string, style: FightStyle, rng: Rng): Choice {
+export function chooseFor(fight: Fight, id: string, style: FightStyle, rng: Rng, known?: Choice): Choice {
   const f = fight.fighters.find((x) => x.id === id);
   if (!f || !canAct(f)) return {};
   const c: Choice = {};
@@ -801,8 +864,8 @@ export function chooseFor(fight: Fight, id: string, style: FightStyle, rng: Rng)
   }
   const tactics = attackTactics(f);
   const w = Object.fromEntries(tactics.map((t) => [t, style.attack[t]])) as Record<AttackTactic, number>;
-  c.attack = weighted(w, rng);
-  c.defend = weighted(style.defence, rng);
+  c.attack = weighted(known?.defend ? lean(w, ANSWER_ATTACK[known.defend]) : w, rng);
+  c.defend = weighted(known?.attack ? lean(style.defence, ANSWER_DEFENCE[known.attack]) : style.defence, rng);
   return c;
 }
 

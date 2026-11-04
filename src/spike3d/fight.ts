@@ -7,7 +7,7 @@ import { baseArmour, baseDamage, type Dice, diceText } from '../core/chargen/tab
 import {
   ADJACENT, type Choice, type Fight, type Fighter, type FightItem, type FightRules, type LogLine, PICKUP_REACH, UNTRAINED, attackTactics,
   type FightStyle, PLEA_SKILLS, acceptYield, between, canAct, chooseFor, loadDiceOf, pleaDifficulty, refuseYield, resolveRound, roleOf,
-  startFight, wantsToYield, weaponOf,
+  seizeInitiative, startFight, wantsToYield, weaponOf,
 } from '../core/combat';
 import { type Injuries, totalFatigue, unhurt } from '../core/damage';
 import { DIFFICULTY_RULES } from '../core/difficulty';
@@ -65,6 +65,8 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
   let fight: Fight | null = null;
   let foeId = '';
   let busy = false;
+  /** What the foe declared this round, when the hero has the upper hand and so knows it before choosing. */
+  let pending: Choice | null = null;
   const rng = Rng.fromSeed(`fight:${Date.now()}`);
   const rules: FightRules = { tables: WOUND_TABLES, ground: GROUND };
   const names = new Map<string, string>();
@@ -181,6 +183,13 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     card(usEl, me, t('fight.You', 'You'), true);
     card(themEl, foe, Name(foeId), false);
     choicesEl.replaceChildren();
+    const intent = pending && fight.winner === null ? intentOf(foeId, pending) : null;
+    if (intent) {
+      const p = document.createElement('p');
+      p.className = 'intent';
+      p.textContent = t('fight.intent', '{who} means to {what}.', { who: Name(foeId), what: intent });
+      choicesEl.appendChild(p);
+    }
     for (const c of choices()) {
       const b = document.createElement('button');
       b.type = 'button';
@@ -189,6 +198,45 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       choicesEl.appendChild(b);
     }
     logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  /**
+   * What someone means to do this round, in words ("strike hard", "pick up the sword and then close in"), as the hero
+   * reads it when they have the upper hand: the side action and, by their role, the tactic.
+   */
+  function intentOf(id: string, c: Choice): string {
+    const parts: string[] = [];
+    if (c.plead) return t('fight.means.plead', 'ask to yield');
+    if (c.mercy) return t('fight.means.mercy', 'give the killing stroke');
+    if (c.pickUp) parts.push(t('fight.means.pickup', 'pick up the {thing}', { thing: kindName(c.pickUp) }));
+    const role = roleOf(fight!, id);
+    if (role === 'attacker') {
+      if (c.retreat) parts.push(t('fight.means.retreat', 'break off'));
+      else parts.push({ standard: t('fight.means.strike', 'strike'), quick: t('fight.means.quick', 'strike quickly'), powerful: t('fight.means.powerful', 'strike with all their strength') }[c.attack ?? 'standard']);
+    } else if (role === 'defender') {
+      parts.push({ standard: t('fight.means.defend', 'defend'), defensive: t('fight.means.careful', 'defend carefully'), counter: t('fight.means.counter', 'wait for a chance to counter') }[c.defend ?? 'standard']);
+    } else if (c.move) parts.push(c.move.run ? t('fight.means.run', 'run at you') : t('fight.means.close', 'close in'));
+    else if (!c.pickUp) parts.push(t('fight.means.hold', 'hold their ground'));
+    return parts.join(t('fight.means.then', ' and then '));
+  }
+
+  /**
+   * The start of a round (or of its second half, once blades crossed): who has the upper hand (a Reaktion roll if
+   * free and near; the attacker in a melee). With it, the hero sees what the foe means to do before choosing; without
+   * it, the foe will choose knowing the hero's choice (the director: declared in reverse order).
+   */
+  async function beginRound(): Promise<void> {
+    if (!fight) return;
+    pending = null;
+    if (fight.winner === null && canAct(fight.fighters[0])) {
+      busy = true;
+      const r = seizeInitiative(fight, rng);
+      fight = r.fight;
+      await show(r.log, world());
+      if (fight.upper === 0) pending = chooseFor(fight, foeId, styleFor(world().talkPerson(foeId)?.tags ?? []), rng);
+      busy = false;
+    }
+    refresh();
   }
 
   /** What the hero can choose now, one button each: the round's whole choice in a tap. */
@@ -270,7 +318,9 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     const style = styleFor(w.talkPerson(foeId)?.tags ?? []);
     // Choosing anything but accepting their offer to yield refuses it: they fight on.
     if (fight.offer) fight = refuseYield(fight, fight.offer);
-    const theirs = chooseFor(fight, foeId, style, rng);
+    // With the upper hand they declared already (`pending`); without it, they choose knowing yours.
+    const theirs = pending ?? chooseFor(fight, foeId, style, rng, fight.upper === 1 ? mine : undefined);
+    pending = null;
     // (The round stops when blades cross, so both choose a tactic in their roles: `midRound`.)
     const r = resolveRound(fight, { hero: mine, [foeId]: theirs }, rules, rng, { pauseOnOpen: true });
     fight = r.fight;
@@ -287,7 +337,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       log(t('fight.spared', '{name} leaves you lying there.', { name: Name(foeId) }), 'bad');
     }
     if (fight.fighters[0].injuries.dead) log(t('fight.youdie', 'You are dead.'), 'bad');
-    refresh();
+    await beginRound();
   }
 
   /** If the foe is beaten enough, they offer to yield: the choices then lead with accepting it. */
@@ -398,10 +448,18 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
           w.takeUp(l.who, l.item);
           log(of(l.who, ['fight.pickedup.you', 'You pick up the {thing}.'], ['fight.pickedup', '{who} picks up the {thing}.'], { thing: kindName(l.item) }), l.who === 'hero' ? 'you' : 'they');
           break;
+        case 'initiative': {
+          await settle(w);
+          await reveal(l.rolls.map((r, i) => ({ ...r, label: `${Name(l.ids[i] ?? '')}: ${rollableName('attr:Reaktion')}` })), l.ids.map((id) => id === 'hero'));
+          log(l.upper === 0
+            ? t('fight.upper.you', 'You are quicker: you see what {who} means to do.', { who: nameOf(foeId) })
+            : t('fight.upper.they', '{who} is quicker: they will see what you do.', { who: Name(foeId) }), 'info');
+          break;
+        }
         case 'open': {
           await settle(w);
           const ids = fight!.fighters.map((f) => f.id);
-          await reveal(l.rolls.map((r, i) => ({ ...r, label: `${Name(ids[i] ?? '')}: ${rollableName('attr:Reaktion')}` })), ids.map((id) => id === 'hero'));
+          if (l.rolls.length) await reveal(l.rolls.map((r, i) => ({ ...r, label: `${Name(ids[i] ?? '')}: ${rollableName('attr:Reaktion')}` })), ids.map((id) => id === 'hero'));
           log(of(l.attacker === 0 ? 'hero' : foeId, ['fight.opens.you', 'Blades cross. You have the upper hand.'], ['fight.opens', 'Blades cross. {who} has the upper hand.']), 'info');
           break;
         }
@@ -486,7 +544,8 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     if (!fight.fighters[0].weapon) log(t('fight.nohands', 'You have no weapon: you fight with your fists. Weapons lie on the ground nearby.'), 'info');
     // Beaten in an earlier fight, they may ask to yield at once.
     offerYield(styleFor(p.tags));
-    refresh();
+    pending = null;
+    void beginRound();
   }
 
   return {

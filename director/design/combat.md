@@ -17,6 +17,7 @@
 | **Weapons as things, the right hand** | `content/things/kinds/weapons.ts`, models `things/models/`; `Loose.wield` for people's weapons | ✅ Held in the right hand (`BodyRig.hand`, `model.grip`), dropped and picked up in a fight, saved |
 | **The fight in the world and on the page** | `SpikeWorld` (fights section), `src/spike3d/fight.ts`, `#fight` panel | ✅ The world stops; one choice a round; your own dice, a blow in steps; walking, swings, lying down; cards by difficulty; injuries saved (`hurt`, save v8); OK ends it; a dead hero gets New game. `e2e/spike3d-fight.e2e.ts` |
 | **Choosing a weapon, calling a foe** | kinds `weapon-rack` (`stock`) and `gong` (`calls`) in `content/things/kinds/arena.ts`; verbs `take-from`, `strike-gong` (outcome `choose`, the picker in `actsheet.ts`); `SpikeWorld.takeFromStock`, `callFighter` | ✅ 17 weapons; a gladiator at any level (not saved) |
+| **The upper hand** | `seizeInitiative`, `Fight.upper`, `chooseFor(…, known)`; the page's `beginRound`, `intentOf` | ✅ Declared in reverse order: whoever is ahead sees the other's choice |
 | **Yielding** | `Choice.plead`, `pleaDifficulty`, `FightStyle.spare`, `Fight.spared` | ✅ The best of Argue and Charm against the foe's style, eased if they're more tired and hurt than you |
 | **Your condition** | `src/spike3d/condition.ts`, the **You** button; fatigue back with time in `SpikeWorld.recover` | ✅ Fatigue and its sources, dice off rolls and why, wounds |
 
@@ -65,6 +66,7 @@
 Mounted combat waits for riding (C4), mystic actions for magic (B9).
 
 ## Readings made while building B8a (to confirm or change)
+- **The upper hand, declared in reverse order** (the director, 2026-11-04; `seizeInitiative`, `Fight.upper`): at the start of a round, in a melee the **attacker** has the upper hand (no roll); free, the two nearest foes roll **Reaktion** if they are within 12 m (a run and a reach), else nobody has it and both choose blind. **Whoever has it sees what the other means to do** before choosing ("Arruns means to strike with all their strength"); a foe who has it chooses knowing yours, leaning to the answer (`ANSWER_ATTACK`, `ANSWER_DEFENCE`: against careful or countering defence a quick blow; against a powerful blow careful defence or a counter; a style that never counters still won't). That round's Reaktion roll also **decides the roles if blades cross** (no second roll), and the side with the upper hand **goes first in side actions** (reaches the sword on the sand first).
 - **Advantages** all buy *more damage* until edges can be chosen (B8b); the extra is rolled (or added) on its own so it can be shown (`HitInput.extra`); every +4 is a die (`moreDamage`, the director).
 - **A broken leg, hip, spine or neck grounds them** (`grounded`): no moving or retreating, −1D6 on fighting and moving; a broken arm drops what it holds. The hero limps outside a fight until healing exists.
 - **A beaten foe offers to yield** (`beaten`, `wantsToYield`, style `yieldAt`); **yielding lays your weapon down**, and each earlier yield to the same person makes the next plea 6 harder (`Standing.yielded`).

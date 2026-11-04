@@ -1,4 +1,4 @@
-/* Browser test: a fight in the arena (B8a): pick a sword up off the sand (held in the right hand, not slowing you), fight the gladiator round by round from the fight panel until one side wins, and what it left (the dead, the injuries) is kept through a reload. */
+/* Browser test: a fight in the arena (B8a): pick a sword up off the sand (held in the right hand, not slowing you), fight the gladiator round by round from the fight panel until one side wins (the upper hand: whoever is quicker sees the other's choice), and what it left (the dead, the injuries) is kept through a reload. */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { OUT, openPage, startEnv, stopEnv, type Env } from './harness';
 
@@ -62,6 +62,8 @@ describe('spike3d fight', () => {
     await page.waitForTimeout(400);
     await page.screenshot({ path: `${OUT}/fight-sword.png` });
 
+    // A quick hero (Reaktion 8D6): quicker when it is rolled, so they see what the gladiator means to do.
+    await w(`(window.spike.hero.dice['attr:Reaktion'] = { n: 8, mod: 0 }, 0)`);
     // Fight the gladiator: the panel opens, the world waits, they draw their own sword.
     await w(`(fight.start('gladiator'), 0)`);
     expect(await page.isVisible('#fight')).toBe(true);
@@ -70,11 +72,17 @@ describe('spike3d fight', () => {
     const hour = await w('w.weather.hour');
 
     // Take the first choice each round (close in, strike, defend…) until it is over.
-    let rounds = 0;
+    let rounds = 0, sawIntent = false;
     for (; rounds < 60; rounds++) {
       await page.waitForSelector('#fight .choices button', { timeout: 60_000 });
       const labels = await page.$$eval('#fight .choices button', (bs) => bs.map((b) => b.textContent ?? ''));
       if (labels.some((l) => /^OK$|New game/.test(l))) break;
+      // With the upper hand you see what they mean to do before you choose.
+      if (!sawIntent && (await page.isVisible('#fight .choices .intent'))) {
+        sawIntent = true;
+        expect(await page.textContent('#fight .choices .intent')).toMatch(/means to/);
+        await page.screenshot({ path: `${OUT}/fight-intent.png` });
+      }
       if (rounds === 3) {
         await page.screenshot({ path: `${OUT}/fight-round.png` });
         // Your card opens the condition sheet: fatigue and where it came from, dice off rolls, wounds.
@@ -83,7 +91,8 @@ describe('spike3d fight', () => {
         await page.screenshot({ path: `${OUT}/fight-condition.png` });
         await page.click('#condition .close');
       }
-      await page.click('#fight .choices button');
+      // Counter when defending (to win the attack back, and with it the upper hand); else the first choice.
+      await page.click(labels.some((l) => l.startsWith('Counter')) ? '#fight .choices button:has-text("Counter")' : '#fight .choices button');
       await page.waitForTimeout(100);
     }
     expect(rounds).toBeLessThan(60);
@@ -91,6 +100,10 @@ describe('spike3d fight', () => {
     await page.screenshot({ path: `${OUT}/fight-end.png` });
     const log = await page.$$eval('#fight .log p', (ps) => ps.map((p) => p.textContent ?? ''));
     expect(log.some((l) => /strike.*against/i.test(l))).toBe(true);
+    // Near enough, someone was quicker (Reaktion) and so saw the other's choice first.
+    expect(log.some((l) => /is quicker|are quicker/.test(l))).toBe(true);
+    expect(log.some((l) => /You are quicker/.test(l))).toBe(true);
+    expect(sawIntent).toBe(true);
     const heroDead = (await w('!!w.injuriesOf("hero")?.dead')) as boolean;
     const labels = await page.$$eval('#fight .choices button', (bs) => bs.map((b) => b.textContent ?? ''));
     if (heroDead) expect(labels).toContain('New game');

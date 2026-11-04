@@ -11,7 +11,8 @@
 - **Defending is not an action**: you can always defend, in any phase, if you know the attack is coming and are able to. One defence roll counts for the whole phase against every attacker.
   - Defending **outside your active phase** costs **+1 fatigue** (no shock roll for it). Attacked in two such phases: +2.
   - Choosing not to defend counts as a defence of 0.
-- **Order** inside a phase, when it matters: everyone rolls **Reaktion**; highest first. A tie: what makes sense, or highest Reaktion value wins (p. 83).
+- **Order** inside a phase, when it matters: everyone rolls **Reaktion**; highest first. A tie: what makes sense, or highest Reaktion value wins (p. 83). The order holds only for that phase; roll again next time.
+- **Tactics may be chosen hidden** when it matters (p. 88). **Our rule (the director, 2026-11-04): choices are declared in reverse order**, lowest first, so whoever is ahead knows what those behind mean to do. The book text we have doesn't say this outright; it is the director's call.
 - **Drawing** a weapon, shield or anything else: −1D6 on your next main action or defence, unless it is *quick-draw* (`Snabbdragen`).
 
 ### The attack, in short
