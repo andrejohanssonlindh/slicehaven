@@ -478,8 +478,13 @@ function bindInput(): void {
     endTouch(e);
     if (!down || e.pointerId !== down.id) return;
     if (down.moved < 8) {
-      // (In a fight, the fight panel decides what the hero does: taps on the world wait.)
+      // In a fight a tap plans the round's move: a spot on the ground, or a weapon lying there (the panel offers it).
       if (fight.on) {
+        const r = canvas.getBoundingClientRect();
+        const nx = ((e.clientX - r.left) / r.width) * 2 - 1, ny = -(((e.clientY - r.top) / r.height) * 2 - 1);
+        const slack = { x: TAP_SLACK / (r.width / 2), y: TAP_SLACK / (r.height / 2) };
+        const hit = world.tapped(nx, ny, slack);
+        fight.tap(hit && typeof hit === 'object' && !('person' in hit) ? hit.id : null, world.groundAt(nx, ny));
         down = null;
         return;
       }

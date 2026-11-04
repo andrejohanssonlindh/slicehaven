@@ -5,7 +5,7 @@ import { THINGS } from '../content/things';
 import { WOUND_TABLES } from '../content/wounds';
 import { baseArmour, baseDamage, type Dice, diceText } from '../core/chargen/tables';
 import {
-  ADJACENT, type Choice, type Fight, type Fighter, type FightItem, type FightRules, type LogLine, PICKUP_REACH, UNTRAINED, attackTactics,
+  ADJACENT, RUN, WALK, type Choice, type Fight, type Fighter, type FightItem, type FightRules, type LogLine, PICKUP_REACH, UNTRAINED, attackTactics,
   type FightStyle, PLEA_SKILLS, acceptYield, between, canAct, chooseFor, loadDiceOf, pleaDifficulty, refuseYield, resolveRound, roleOf,
   seizeInitiative, startFight, wantsToYield, weaponOf,
 } from '../core/combat';
@@ -49,6 +49,8 @@ export interface FightUI {
   readonly on: boolean;
   /** At load: if the hero died, say so. */
   check(): void;
+  /** A tap on the world during the fight: a thing (its id) and/or the ground there. Plans the round's move. */
+  tap(thing: string | null, ground: { x: number; z: number } | null): void;
 }
 
 const rowOf = (sv: string) => WEAPONS.find((w) => w.sv === sv);
@@ -67,6 +69,40 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
   let busy = false;
   /** What the foe declared this round, when the hero has the upper hand and so knows it before choosing. */
   let pending: Choice | null = null;
+  /** Where the hero means to go this round (a tapped spot, or a weapon lying there), shown with a mark. */
+  let plan: { x: number; z: number; item?: string } | null = null;
+
+  /**
+   * Keep the fighters in the part of the screen the panel leaves free (the director: the panel covered them): on a
+   * phone the panel sits at the bottom and the fight above it; on a wide screen it docks at the side.
+   */
+  function aimView(): void {
+    const w = world();
+    const canvas = document.getElementById('stage');
+    if (!fight || el.hidden || !canvas) return void (w.viewAim = { x: 0, y: 0 });
+    const c = canvas.getBoundingClientRect(), p = el.getBoundingClientRect();
+    const side = p.left > c.left + c.width * 0.3; // docked at the right
+    const free = side ? { x: (c.left + p.left) / 2, y: c.top + c.height / 2 } : { x: c.left + c.width / 2, y: (c.top + p.top) / 2 };
+    w.viewAim = { x: ((free.x - c.left) / c.width) * 2 - 1, y: -(((free.y - c.top) / c.height) * 2 - 1) };
+  }
+  window.addEventListener('resize', aimView);
+
+  /** A tap on the world: plan to go there (free), or to the weapon tapped; in reach of a foe, only breaking off moves you. */
+  function tap(thing: string | null, ground: { x: number; z: number } | null): void {
+    if (!fight || busy || fight.winner !== null) return;
+    world().recentre();
+    const item = thing ? fight.ground.find((g) => g.id === thing) : undefined;
+    if (roleOf(fight, 'hero') !== 'free' && !(item && within(item, PICKUP_REACH))) {
+      log(t('fight.noroam', 'In reach of {who} you can’t walk off: break off (retreat) first.', { who: nameOf(foeId) }), 'info');
+      return;
+    }
+    plan = item ? { x: item.x, z: item.z, item: item.id } : ground ? { ...ground } : null;
+    world().markSpot(plan);
+    refresh();
+  }
+
+  /** Is a spot within so many metres of the hero? */
+  const within = (p: { x: number; z: number }, m: number): boolean => !!fight && Math.hypot(p.x - fight.fighters[0].x, p.z - fight.fighters[0].z) <= m;
   const rng = Rng.fromSeed(`fight:${Date.now()}`);
   const rules: FightRules = { tables: WOUND_TABLES, ground: GROUND };
   const names = new Map<string, string>();
@@ -173,6 +209,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
 
   function refresh(): void {
     if (!fight) return;
+    aimView();
     const me = fight.fighters[0], foe = fight.fighters[1];
     const role = roleOf(fight, 'hero');
     const d = between(fight, 'hero', foeId);
@@ -188,6 +225,12 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       const p = document.createElement('p');
       p.className = 'intent';
       p.textContent = t('fight.intent', '{who} means to {what}.', { who: Name(foeId), what: intent });
+      choicesEl.appendChild(p);
+    }
+    if (fight.winner === null && !plan && roleOf(fight, 'hero') === 'free' && canAct(fight.fighters[0])) {
+      const p = document.createElement('p');
+      p.className = 'hint';
+      p.textContent = t('fight.taphint', 'Tap the ground to go there, or a weapon to go to it.');
       choicesEl.appendChild(p);
     }
     for (const c of choices()) {
@@ -261,6 +304,12 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     const near = !me.weapon ? fight.ground.filter((g) => Math.hypot(g.x - me.x, g.z - me.z) <= PICKUP_REACH) : [];
     const pick = near.map((g) => ({ label: t('fight.pickup', 'Pick up the {name}', { name: kindName(g.id) }), go: () => play({ pickUp: g.id, defend: 'standard' }) }));
     if (role === 'free') {
+      out.push(...planned());
+      // Weapons lying about, not yet in reach: go to one (empty-handed only, as picking up is).
+      if (!me.weapon && !plan) {
+        const lying = fight.ground.filter((g) => !within(g, PICKUP_REACH)).sort((a, b) => Math.hypot(a.x - me.x, a.z - me.z) - Math.hypot(b.x - me.x, b.z - me.z)).slice(0, 2);
+        for (const g of lying) out.push(...goTo({ x: g.x, z: g.z, item: g.id }));
+      }
       const d = between(fight, 'hero', foeId);
       const k = Math.max(0, (d - ADJACENT * 0.75) / d);
       const to = { x: me.x + (foe.x - me.x) * k, z: me.z + (foe.z - me.z) * k };
@@ -282,6 +331,34 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       out.push(...pick);
       out.push(plea(true));
     }
+    return out;
+  }
+
+  /** The choices for the tapped plan: pick up the weapon if in reach, else walk (5 m) or run (10 m, a roll) there. */
+  function planned(): { label: string; go: () => Promise<void> | void }[] {
+    if (!fight || !plan) return [];
+    const me = fight.fighters[0];
+    if (plan.item && within(plan, PICKUP_REACH)) {
+      const id = plan.item;
+      return me.weapon ? [] : [{ label: t('fight.pickup', 'Pick up the {name}', { name: kindName(id) }), go: () => play({ pickUp: id, defend: 'standard' }) }];
+    }
+    return goTo(plan);
+  }
+
+  /** Walk or run towards a spot (or a weapon lying there: stop beside it). */
+  function goTo(p: { x: number; z: number; item?: string }): { label: string; go: () => Promise<void> }[] {
+    const me = fight!.fighters[0];
+    const d = Math.hypot(p.x - me.x, p.z - me.z);
+    const stop = p.item ? Math.max(0, d - 1) : d; // beside a weapon, not on it
+    const to = d > 0 ? { x: me.x + ((p.x - me.x) * stop) / d, z: me.z + ((p.z - me.z) * stop) / d } : { x: me.x, z: me.z };
+    const what = p.item ? t('fight.tothe', 'to the {name}', { name: kindName(p.item) }) : t('fight.there', 'there');
+    const out = [{
+      label: stop <= WALK
+        ? t('fight.walkto', 'Walk {what} ({m} m)', { what, m: stop.toFixed(1) })
+        : t('fight.walktoward', 'Walk {what} (5 of {m} m)', { what, m: stop.toFixed(1) }),
+      go: () => play({ move: to }),
+    }];
+    if (stop > WALK) out.push({ label: t('fight.runto', 'Run {what} ({m} m, a roll)', { what, m: Math.min(stop, RUN).toFixed(1) }), go: () => play({ move: { ...to, run: true } }) });
     return out;
   }
 
@@ -321,6 +398,9 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     // With the upper hand they declared already (`pending`); without it, they choose knowing yours.
     const theirs = pending ?? chooseFor(fight, foeId, style, rng, fight.upper === 1 ? mine : undefined);
     pending = null;
+    plan = null;
+    w.markSpot(null);
+    w.recentre();
     // (The round stops when blades cross, so both choose a tactic in their roles: `midRound`.)
     const r = resolveRound(fight, { hero: mine, [foeId]: theirs }, rules, rng, { pauseOnOpen: true });
     fight = r.fight;
@@ -519,7 +599,10 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     if (fight) for (const f of fight.fighters) w.setInjuries(f.id, { ...f.injuries, short: [], shockDue: false, blinded: false });
     w.endFight();
     fight = null;
+    plan = null;
+    w.markSpot(null);
     el.hidden = true;
+    w.viewAim = { x: 0, y: 0 };
     save();
   }
 
@@ -550,6 +633,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
 
   return {
     start,
+    tap,
     get on() {
       return fight !== null;
     },

@@ -2,6 +2,13 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-04 — B8a: seeing the fight, and moving on purpose
+
+- **The panel no longer covers the fight.** On a phone it stays at the bottom, and the view now keeps the fighters in the part above it. On a computer (a wide window) it docks on the right, clear of the zoom and turn buttons, and the fight sits in the rest of the screen. The view follows the fight: halfway between you and your foe, but never more than 5 m from you, so you stay in view when you're far apart. If you drag the view away, your next tap or round brings it back.
+- **Tap to move.** While you're not in reach of your foe, tap the ground: a ring marks the spot and you get **Walk there (3.2 m)**, or for a far spot **Walk there (5 of 8.4 m)** and **Run there (a roll)**. Tap a weapon lying on the sand and you get **Walk / Run to the hunting spear**, which stops beside it, and then **Pick up** once you're within 3 m. With empty hands, the two nearest weapons are offered as buttons too. A line says *"Tap the ground to go there, or a weapon to go to it."*
+- **In reach of a foe** a tap only tells you that you have to break off (retreat) first, as the rules say. You can still pick up a weapon lying within reach.
+- **Tried:** the arena test taps a spot and checks the choice, the view's aim on a phone and on a wide screen (pictures `fight-plan`, `fight-wide`).
+
 ## 2026-11-04 — B8a: the upper hand sees the other's choice
 
 - **Choices are declared in reverse order** (your note). At the start of each round, whoever has the upper hand knows what the other means to do before choosing. The line sits above your buttons: *"Arruns means to strike with all their strength."*

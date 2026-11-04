@@ -1,6 +1,6 @@
 # How people fight: styles as "when this, do that" (proposal)
 
-*2026-11-04. The director: "extract the AI, their actions… a type of strategy as a thing. On A do B. Also how and when they give up. Then apply it to a character." **Proposal, to agree before building.***
+*2026-11-04. The director: "extract the AI, their actions… a type of strategy as a thing. On A do B. Also how and when they give up. Then apply it to a character." **Agreed 2026-11-04; building next.***
 
 ## Today
 A fighting style (`content/combat/styles.ts`) is a handful of numbers: how often each tactic, run or not, finish the downed or not, how hard to beg off, how beaten before offering to yield. The *decisions* are code in `chooseFor` (`core/combat.ts`): pick up a weapon if empty-handed, close in, answer a known tactic. Every new piece (shields, two against one, bows) would add another `if` there, the same for everyone.

@@ -1,4 +1,4 @@
-/* Browser test: a fight in the arena (B8a): pick a sword up off the sand (held in the right hand, not slowing you), fight the gladiator round by round from the fight panel until one side wins (the upper hand: whoever is quicker sees the other's choice), and what it left (the dead, the injuries) is kept through a reload. */
+/* Browser test: a fight in the arena (B8a): pick a sword up off the sand (held in the right hand, not slowing you), fight the gladiator round by round from the fight panel until one side wins (the upper hand: whoever is quicker sees the other's choice; a tap plans a move; the panel leaves the fight in view), and what it left (the dead, the injuries) is kept through a reload. */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { OUT, openPage, startEnv, stopEnv, type Env } from './harness';
 
@@ -70,6 +70,21 @@ describe('spike3d fight', () => {
     expect(await w('w.inFight')).toBe(true);
     expect(await w('w.wieldedBy("gladiator")?.kind')).toMatch(/sword/);
     const hour = await w('w.weather.hour');
+
+    // Moving on purpose: a tap on the ground plans the round's move (a mark there), offered as a choice.
+    await page.waitForSelector('#fight .choices button', { timeout: 60_000 });
+    await w(`(() => { const h = w.fighterAt('hero'); fight.tap(null, { x: h.x + 3, z: h.z + 1 }); return 0; })()`);
+    expect(await page.$$eval('#fight .choices button', (bs) => bs.map((b) => b.textContent ?? ''))).toContainEqual(expect.stringMatching(/^Walk there \(3\.\d m\)/));
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: `${OUT}/fight-plan.png` });
+    // The panel leaves the fighters in view: at the bottom on a phone (the view aims above it), at the side when wide.
+    expect((await w('w.viewAim.y')) as number).toBeGreaterThan(0.3);
+    await page.setViewportSize({ width: 1200, height: 760 });
+    await page.waitForTimeout(1200);
+    expect((await w('w.viewAim.x')) as number).toBeLessThan(-0.2);
+    await page.screenshot({ path: `${OUT}/fight-wide.png` });
+    await page.setViewportSize({ width: 400, height: 720 });
+    await page.waitForTimeout(600);
 
     // Take the first choice each round (close in, strike, defend…) until it is over.
     let rounds = 0, sawIntent = false;

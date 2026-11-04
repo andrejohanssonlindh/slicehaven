@@ -636,6 +636,11 @@ export class SpikeWorld {
   private marker: THREE.Mesh;
   /** The camera follows the hero while it walks, until the player drags the view. */
   follow = false;
+  /**
+   * Where on the screen the followed spot sits (NDC, 0,0 the middle): a panel over part of the view moves it into what
+   * is left (the fight panel at the bottom on a phone, at the side on a computer).
+   */
+  viewAim = { x: 0, y: 0 };
   /** The view's turn about the vertical, radians (see `core/world3d/view.ts`). Turn it with `turn` or `turnInput`. */
   yaw = VIEW_YAW;
   /** Held turn buttons or keys: -1 turns the world anticlockwise on screen, 1 clockwise. Set by the page. */
@@ -2630,6 +2635,7 @@ export class SpikeWorld {
    */
   beginFight(ids: string[]): void {
     this.fighting = new Set(ids);
+    this.follow = true;
     this.talkingWith = null;
     for (const id of ids) if (this.canStand(id)) this.fightPoses.set(id, { pose: 'guard', t: this.time });
   }
@@ -2640,6 +2646,36 @@ export class SpikeWorld {
     const h = this.hurt.hero;
     if (h && !h.out && !h.dead && !h.dying) this.fightPoses.delete('hero'); // up on a crutch
     this.fighting = null;
+  }
+
+  /**
+   * Where the view looks in a fight, or null outside one: the middle between the hero and the others, but never more
+   * than 5 m from the hero (far apart, the hero stays in view and the view leans towards the foe).
+   */
+  private fightCentre(): { x: number; z: number } | null {
+    if (!this.fighting) return null;
+    let x = 0, z = 0, n = 0;
+    for (const id of this.fighting) {
+      const p = id === 'hero' ? null : this.fighterAt(id);
+      if (p) { x += p.x; z += p.z; n++; }
+    }
+    const h = this.hero;
+    if (!n) return { x: h.x, z: h.z };
+    const dx = x / n - h.x, dz = z / n - h.z, d = Math.hypot(dx, dz);
+    const k = d > 0 ? Math.min(d / 2, 5) / d : 0;
+    return { x: h.x + dx * k, z: h.z + dz * k };
+  }
+
+  /** Bring the view back onto the fight (or the hero) after the player panned away. */
+  recentre(): void {
+    this.follow = true;
+  }
+
+  /** Mark a spot on the ground (where the hero means to go this round), or hide the mark (null). */
+  markSpot(at: { x: number; z: number } | null): void {
+    if (!at) return void (this.marker.visible = false);
+    this.marker.position.set(at.x, this.store.heightAt(at.x, at.z) + 0.04, at.z);
+    this.marker.visible = true;
   }
 
   get inFight(): boolean {
@@ -3574,9 +3610,14 @@ export class SpikeWorld {
     this.stepFootsteps();
     this.focus.y = 0.5 + this.focusLift;
     if (this.follow) {
+      // In a fight the view follows the middle of the fighters; the aim puts it where no panel covers it.
+      const c = this.fightCentre() ?? this.hero;
+      const R = { x: Math.cos(this.yaw), z: -Math.sin(this.yaw) }, F = { x: -Math.sin(this.yaw), z: -Math.cos(this.yaw) };
+      const ax = this.viewAim.x * this.camera.right, ay = (this.viewAim.y * this.camera.top) / Math.sin(PITCH);
+      const tx = c.x - R.x * ax - F.x * ay, tz = c.z - R.z * ax - F.z * ay;
       const k = 1 - Math.exp(-dt / 0.25);
-      this.focus.x += (this.hero.x - this.focus.x) * k;
-      this.focus.z += (this.hero.z - this.focus.z) * k;
+      this.focus.x += (tx - this.focus.x) * k;
+      this.focus.z += (tz - this.focus.z) * k;
     }
     this.stepFigures(dt);
 

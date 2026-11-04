@@ -248,4 +248,10 @@
 #fight .choices { flex-shrink: 0; max-height: 45%; overflow-y: auto; padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 5px; border-top: 1px solid #b0503a55; }
 #fight .choices button { min-height: 42px; text-align: left; font-size: 14px; }
 /* What the foe means to do, when you have the upper hand and so know it before choosing. */
+#fight .choices .hint { margin: 0 0 2px; font-size: 12px; opacity: 0.65; }
+/* On a wide screen the fight panel docks at the right, and the view keeps the fighters in the rest. */
+@media (min-width: 760px) and (min-aspect-ratio: 1/1) {
+  #fight { left: auto; right: 64px; top: 56px; bottom: 8px; height: auto; transform: none; width: 400px; } /* clear of the zoom and turn buttons */
+  #fight .choices { max-height: 55%; }
+}
 #fight .choices .intent { margin: 0 0 2px; padding: 4px 6px; font-size: 13px; color: #f0c080; border-left: 2px solid #e0b050; }
