@@ -49,6 +49,87 @@ export function axe(len: number, head: number): FurnitureModel {
   };
 }
 
+/** A two-handed axe or a broad one: a long haft, a deep head (two bits, for a double axe). */
+export function bigAxe(len: number, head: number, double = false): FurnitureModel {
+  const x0 = -len / 2;
+  return {
+    w: len,
+    d: head * (double ? 2 : 1),
+    grip: x0 + 0.12,
+    draw() {
+      const m = new ModelBuilder();
+      const wood = m.mesh('plank'), iron = m.mesh('iron');
+      addBox(wood, [x0, 0, -0.02], [len / 2 - 0.02, 0.038, 0.02]);
+      addBox(iron, [len / 2 - 0.16, 0, -0.035], [len / 2, 0.04, head]);
+      if (double) addBox(iron, [len / 2 - 0.16, 0, -head], [len / 2, 0.04, 0.035]);
+      return m.done();
+    },
+  };
+}
+
+/** A spear: a long ash shaft and a leaf-shaped iron head. */
+export function spear(len: number, head: number): FurnitureModel {
+  const x0 = -len / 2;
+  return {
+    w: len,
+    d: 0.06,
+    grip: x0 + len * 0.35,
+    draw() {
+      const m = new ModelBuilder();
+      const wood = m.mesh('plank'), iron = m.mesh('iron', STEEL);
+      addBox(wood, [x0, 0, -0.016], [len / 2 - head, 0.032, 0.016]);
+      addBox(iron, [len / 2 - head, 0.004, -0.028], [len / 2 - head * 0.3, 0.028, 0.028]);
+      addBox(iron, [len / 2 - head * 0.3, 0.008, -0.014], [len / 2, 0.024, 0.014]);
+      return m.done();
+    },
+  };
+}
+
+/** A mace or hammer: a haft and an iron head, square (`flat`: a hammer's face and spike) or studded. */
+export function mace(len: number, head: number, hammer = false): FurnitureModel {
+  const x0 = -len / 2;
+  return {
+    w: len,
+    d: hammer ? head * 1.6 : head,
+    grip: x0 + 0.1,
+    draw() {
+      const m = new ModelBuilder();
+      const wood = m.mesh('plank'), iron = m.mesh('iron'), fit = m.mesh('iron', BRASS);
+      addBox(wood, [x0, 0, -0.018], [len / 2 - head * 0.6, 0.034, 0.018]);
+      if (hammer) {
+        addBox(iron, [len / 2 - head * 0.7, 0, -head * 0.8], [len / 2, head * 0.7, -0.02]);
+        addBox(iron, [len / 2 - head * 0.5, head * 0.15, 0.02], [len / 2 - head * 0.2, head * 0.45, head * 0.8]);
+      } else {
+        addBox(iron, [len / 2 - head, 0, -head / 2], [len / 2, head, head / 2]);
+        for (const z of [-1, 1]) addBox(fit, [len / 2 - head * 0.7, head * 0.3, z * head * 0.5], [len / 2 - head * 0.3, head * 0.7, z * (head * 0.5 + 0.02)]);
+      }
+      return m.done();
+    },
+  };
+}
+
+/** A flail: a short haft, a chain, and an iron ball lying beside it. */
+export function flail(len: number, ball: number): FurnitureModel {
+  const x0 = -len / 2;
+  return {
+    w: len,
+    d: ball + 0.1,
+    grip: x0 + 0.08,
+    draw() {
+      const m = new ModelBuilder();
+      const wood = m.mesh('plank'), iron = m.mesh('iron');
+      const haft = x0 + len * 0.55;
+      addBox(wood, [x0, 0, -0.018], [haft, 0.034, 0.018]);
+      for (let k = 0; k < 4; k++) {
+        const a = haft + k * 0.045;
+        addBox(iron, [a, 0.008, 0.01 + k * 0.012], [a + 0.035, 0.02, 0.022 + k * 0.012]);
+      }
+      addBox(iron, [len / 2 - ball, 0, 0.05], [len / 2, ball, 0.05 + ball]);
+      return m.done();
+    },
+  };
+}
+
 /** A club: a stout stick thickening toward its end, lying on its side. */
 export function club(len: number, end: number): FurnitureModel {
   return {

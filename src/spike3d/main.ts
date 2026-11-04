@@ -701,7 +701,7 @@ setTimeout(() => {
   loading.hidden = true;
   const built = performance.now() - t0;
   console.info(`spike3d: world built in ${built.toFixed(0)} ms`);
-  (window as unknown as { spike: unknown }).spike = { world, pipeline, setTier, built, governor, fight, get tier() { return tier; } };
+  (window as unknown as { spike: unknown }).spike = { world, pipeline, setTier, built, governor, fight, sheet, get tier() { return tier; } };
   requestAnimationFrame((n) => {
     last = n;
     loop(n);

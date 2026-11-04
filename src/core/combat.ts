@@ -192,6 +192,8 @@ export interface Fight {
   ground: (FightItem & { x: number; z: number })[];
   /** The side that won, once only one side can still fight (null: none yet). */
   winner: number | null;
+  /** Who yielded and was spared (their plea granted): no killing stroke for them. */
+  spared?: string;
 }
 
 export type AttackTactic = 'standard' | 'quick' | 'powerful';
@@ -209,6 +211,11 @@ export interface Choice {
   defend?: DefenceTactic;
   /** Strike someone knocked out (no defence; armour doesn't help against cut and thrust). */
   mercy?: string;
+  /**
+   * Beg to yield, as the round's main action (a defender still defends): a roll with the pool given (the best of
+   * `PLEA_SKILLS`) against the foe's `pleaDifficulty`. Granted, the fight ends and the foe has won, sparing them.
+   */
+  plead?: { dice: Dice; difficulty: number };
 }
 
 /** The rules a fight is played by that come from content: the wound tables, the ground's difficulty to run on. */
@@ -235,6 +242,7 @@ export type LogLine =
   | { k: 'roles'; attacker: number }
   | { k: 'end'; who: string; end: PhaseEnd }
   | { k: 'mercy'; who: string; target: string }
+  | { k: 'plead'; who: string; roll: Roll; granted: boolean }
   | { k: 'over'; winner: number };
 
 export type Defence = 'parry' | 'block' | 'dodge' | 'none';
@@ -516,11 +524,28 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
     }
   }
 
+  // A plea to yield (the director: a way to give up): the pleader's main action. Granted, the fight is over, the foe
+  // the winner, and no blow falls this round; refused, a defender still defends, an attacker has lost their blow.
+  for (const f of fight.fighters) {
+    const p = choices[f.id]?.plead;
+    if (!p || !canAct(f) || fight.winner !== null) continue;
+    const roll = rollTest(p.dice, p.difficulty, rng, 'Plea');
+    log.push({ k: 'plead', who: f.id, roll, granted: !!roll.success });
+    const foe = nearestFoe(fight, f);
+    if (roll.success && foe) {
+      fight.winner = foe.side;
+      fight.spared = f.id;
+      fight.melee = null;
+      log.push({ k: 'over', winner: foe.side });
+    }
+  }
+
   // The main action: the attacking side strikes (or retreats); someone knocked out can be given the mercy stroke.
   let nextAttacker: number | null = fight.melee?.attacker ?? null;
   for (const a of fight.fighters) {
-    if (!canAct(a)) continue;
+    if (!canAct(a) || fight.spared) continue;
     const c = choices[a.id] ?? {};
+    if (c.plead) continue;
     if (c.mercy) {
       const v = fight.fighters.find((f) => f.id === c.mercy);
       // The mercy stroke (p. 101): someone knocked out can't defend, and it is given to kill (reading: it does).
@@ -612,6 +637,25 @@ export interface FightStyle {
   mercy: boolean;
   /** Run when closing in, if far. */
   run: boolean;
+  /** How hard it is to beg them to let you yield (a difficulty; `pleaDifficulty` eases it as the fight goes your way). */
+  spare: number;
+}
+
+/** The skills a plea to yield is rolled with: the best of them. */
+export const PLEA_SKILLS = ['Argumentera', 'Charm'];
+
+/**
+ * How hard a foe is to talk into letting you yield (the director: "an alternative to try to give up"): their style's
+ * `spare`, 2 easier for each advantage-band of fatigue they carry over yours (a winded foe is glad to stop), 4 easier
+ * if they are hurt more than you (wounds), never under 6.
+ */
+export function pleaDifficulty(fight: Fight, pleader: string, style: FightStyle): number {
+  const me = fight.fighters.find((f) => f.id === pleader);
+  const foe = me ? nearestFoe(fight, me) : null;
+  if (!me || !foe) return style.spare;
+  const wounds = (f: Fighter) => Object.values(f.injuries.wounds).reduce((s, n) => s + (n ?? 0), 0);
+  const tired = Math.max(0, Math.floor((foe.injuries.fatigue - me.injuries.fatigue) / 5));
+  return Math.max(6, style.spare - 2 * tired - (wounds(foe) > wounds(me) ? 4 : 0));
 }
 
 const weighted = <T extends string>(w: Record<T, number>, rng: Rng): T => {

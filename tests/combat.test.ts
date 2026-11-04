@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  type Fight, type Fighter, type FightStyle, attackPool, attackWhy, bestDamage, bonusDice, chooseFor, damageDice, defencePool, dropFrom, fists, parseProps,
+  type Fight, type Fighter, type FightStyle, attackPool, attackWhy, bestDamage, bonusDice, chooseFor, damageDice, defencePool, dropFrom, fists, parseProps, pleaDifficulty,
   resolveRound, roleOf, startFight, tacticFatigue, weaponFromRow, weaponOf,
 } from '../src/core/combat';
 import { type Injuries, recoverFatigue, unhurt } from '../src/core/damage';
@@ -21,7 +21,7 @@ const fighter = (id: string, side: number, x: number, over: Partial<Fighter> = {
   injuries: unhurt(), drew: false, ...over,
 });
 
-const STYLE: FightStyle = { id: 'test', attack: { standard: 2, quick: 1, powerful: 1 }, defence: { standard: 3, defensive: 1, counter: 0 }, mercy: true, run: false };
+const STYLE: FightStyle = { id: 'test', attack: { standard: 2, quick: 1, powerful: 1 }, defence: { standard: 3, defensive: 1, counter: 0 }, mercy: true, run: false, spare: 12 };
 
 describe('weapons in hand', () => {
   it('reads properties and damage lines', () => {
@@ -98,6 +98,25 @@ describe('fatigue', () => {
     i = recoverFatigue(i, 7, 2);
     expect(i).toMatchObject({ fatigue: 0, fatigueFrom: {}, out: false });
     expect(recoverFatigue({ ...unhurt(), out: true, dying: true, fatigue: 1, fatigueFrom: { hits: 1 } }, 9, 1).out).toBe(true);
+  });
+
+  it('a plea to yield: granted ends the fight with the pleader spared; refused, an attacker loses their blow', () => {
+    const f = startFight([fighter('a', 0, 0), fighter('b', 1, 1.5)]);
+    f.melee = { attacker: 0, opened: 0 };
+    expect(pleaDifficulty(f, 'a', STYLE)).toBe(12);
+    const yes = resolveRound(f, { a: { plead: { dice: { n: 9, mod: 0 }, difficulty: 6 } } }, RULES, Rng.fromSeed(1));
+    expect(yes.fight.winner).toBe(1);
+    expect(yes.fight.spared).toBe('a');
+    expect(yes.log.some((l) => l.k === 'attack')).toBe(false);
+    expect(yes.fight.fighters[0].injuries.out || yes.fight.fighters[0].injuries.dead).toBe(false);
+    const no = resolveRound(f, { a: { plead: { dice: { n: 1, mod: 0 }, difficulty: 40 } } }, RULES, Rng.fromSeed(1));
+    expect(no.fight.winner).toBeNull();
+    expect(no.log.some((l) => l.k === 'plead' && !l.granted)).toBe(true);
+    expect(no.log.some((l) => l.k === 'attack')).toBe(false);
+    // A foe far more tired and hurt is easier to talk down.
+    const g = structuredClone(f);
+    g.fighters[1].injuries = { ...unhurt(), fatigue: 10, wounds: { torso: 1 } };
+    expect(pleaDifficulty(g, 'a', STYLE)).toBe(6); // 12 − 4 (tired) − 4 (hurt more), never under 6
   });
 
   it('a tie goes to the attacker', () => {

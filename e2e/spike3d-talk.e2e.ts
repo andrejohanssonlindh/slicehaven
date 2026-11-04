@@ -35,7 +35,11 @@ describe('spike3d talking', () => {
     })()`)) as { x: number; y: number; shown: boolean };
     expect(p.shown).toBe(true);
     await page.mouse.click(p.x, p.y);
-    // The hero walks up to them first (they may be wandering).
+    // From afar: talk (walk up first) or attack (B8a). The hero walks up to them (they may be wandering).
+    const walkUp = page.locator('#talk .choices button', { hasText: 'Walk up and talk' });
+    await walkUp.waitFor({ timeout: 15_000 });
+    expect(await page.locator('#talk .choices button', { hasText: 'Attack' }).count()).toBe(1);
+    await walkUp.click();
     await page.waitForSelector('#talk:not([hidden])', { timeout: 45_000 });
     expect(await w('w.talkingWith')).toBe(someone!.id);
     await page.waitForTimeout(600);
@@ -76,7 +80,9 @@ describe('spike3d talking', () => {
       return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
     })()`)) as { x: number; y: number };
     await page.mouse.click(p.x, p.y);
-    await page.waitForSelector('#talk:not([hidden])', { timeout: 45_000 });
+    // From afar, walk up first (B8a: or attack).
+    await page.locator('#talk .choices button', { hasText: 'Walk up and talk' }).click({ timeout: 15_000 });
+    await page.waitForSelector('#talk .choices button:has-text("Size up")', { timeout: 45_000 });
     await page.waitForTimeout(600);
     for (let i = 0; i < 3; i++) {
       await page.locator('#talk .choices button', { hasText: /^(Ask|Size up)/ }).first().click();

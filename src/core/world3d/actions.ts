@@ -161,7 +161,9 @@ export type Outcome =
   /** The doer picks the thing up and holds it: openly, or out of sight (slipped away unseen). Plan B3b. */
   | { carry: 'open' | 'hidden' }
   /** The doer puts down what they hold, where they stand. */
-  | { putDown: true };
+  | { putDown: true }
+  /** The doer picks one of what the thing offers (its `stock` or the levels of whom it `calls`); the page asks which. */
+  | { choose: 'stock' | 'calls' };
 
 /** A roll to resolve an action: the doer's best of these skills, against a difficulty. */
 export interface ActRoll {
@@ -232,6 +234,8 @@ export type ActEvent =
   /** The doer picked up the thing (held openly, or out of sight); they put down what they held, here. */
   | { kind: 'carry'; target: ActTarget; hidden: boolean }
   | { kind: 'putdown'; at: Spot }
+  /** Something to pick from the thing: which of its stock to take, or how good a fighter to call (the page asks). */
+  | { kind: 'choose'; what: 'stock' | 'calls'; target: ActTarget }
   /** Who saw a wrong the hero did, and how far it moved their view of them (B3c; the page shows it on easy). */
   | { kind: 'seen'; by: { id: string; name: string; by: number }[] };
 
@@ -373,6 +377,10 @@ function apply(outs: readonly Outcome[], target: ActTarget | null, at: Spot, nam
       if (!target) throw new Error('carrying needs a thing to pick up');
       events.push({ kind: 'carry', target, hidden: o.carry === 'hidden' });
     } else if ('putDown' in o) events.push({ kind: 'putdown', at });
+    else if ('choose' in o) {
+      if (!target) throw new Error('choosing needs a thing to choose from');
+      events.push({ kind: 'choose', what: o.choose, target });
+    }
   }
 }
 

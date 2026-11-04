@@ -7,9 +7,9 @@ import type { FightStyle } from '../../core/combat';
  */
 export const FIGHT_STYLES: Record<string, FightStyle> = {
   /** Anyone: mostly plain blows, now and then a hard one; doesn't kill someone who is down. */
-  default: { id: 'default', attack: { standard: 4, quick: 1, powerful: 1 }, defence: { standard: 4, defensive: 2, counter: 0 }, mercy: false, run: false },
-  /** The arena's own: presses hard, runs in, and finishes what it starts (the first fight is to the death, Q46). */
-  gladiator: { id: 'gladiator', attack: { standard: 3, quick: 2, powerful: 2 }, defence: { standard: 3, defensive: 1, counter: 1 }, mercy: true, run: true },
+  default: { id: 'default', attack: { standard: 4, quick: 1, powerful: 1 }, defence: { standard: 4, defensive: 2, counter: 0 }, mercy: false, run: false, spare: 8 },
+  /** The arena's own: presses hard, runs in, and finishes what it starts (the first fight is to the death, Q46); hard to beg off. */
+  gladiator: { id: 'gladiator', attack: { standard: 3, quick: 2, powerful: 2 }, defence: { standard: 3, defensive: 1, counter: 1 }, mercy: true, run: true, spare: 16 },
 };
 
 /** The style for someone of this chain of kinds (most general first, as `PERSON_KINDS.resolve` gives it). */

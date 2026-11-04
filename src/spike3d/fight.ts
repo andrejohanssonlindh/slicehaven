@@ -6,7 +6,7 @@ import { WOUND_TABLES } from '../content/wounds';
 import { baseArmour, baseDamage, type Dice, diceText } from '../core/chargen/tables';
 import {
   ADJACENT, type Choice, type Fight, type Fighter, type FightItem, type FightRules, type LogLine, PICKUP_REACH, UNTRAINED, attackTactics,
-  between, canAct, chooseFor, loadDiceOf, resolveRound, roleOf, startFight, weaponOf,
+  PLEA_SKILLS, between, canAct, chooseFor, loadDiceOf, pleaDifficulty, resolveRound, roleOf, startFight, weaponOf,
 } from '../core/combat';
 import { type Injuries, totalFatigue, unhurt } from '../core/damage';
 import { DIFFICULTY_RULES } from '../core/difficulty';
@@ -19,7 +19,9 @@ import type { SpikeWorld } from '../engine3d/world';
 import { t } from '../i18n';
 import { showRolls } from '../ui/dice';
 import { loadSettings } from '../ui/settings';
-import { type ConditionSheet, fatigueShare, fatigueWord, harmBits, partName, poolText } from './condition';
+import { type ConditionSheet, effectText, fatigueShare, fatigueWord, harmBits, partName, poolText } from './condition';
+
+const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
 /**
  * A fight on the page (plan B8a): the hero against someone of the map, played in rounds by the rules
@@ -221,13 +223,29 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       for (const tac of attackTactics(me)) out.push({ label: words[tac], go: () => play({ attack: tac }) });
       out.push(...pick);
       if (fight.melee) out.push({ label: t('fight.retreat', 'Retreat (break off, 5 m back)'), go: () => play({ retreat: true }) });
+      out.push(plea(false));
     } else {
       out.push({ label: t('fight.defend', 'Defend'), go: () => play({ defend: 'standard' }) });
       out.push({ label: t('fight.defensive', 'Defend carefully (+1D6, +1 fatigue)'), go: () => play({ defend: 'defensive' }) });
       out.push({ label: t('fight.counter', 'Counter (−1D6, attack next round, +1 fatigue)'), go: () => play({ defend: 'counter' }) });
       out.push(...pick);
+      out.push(plea(true));
     }
     return out;
+  }
+
+  /**
+   * Beg to yield (the director: a way to give up, "some type of argue"): the best of arguing and charm against how
+   * hard the foe is to talk down (their style, eased if the fight has gone your way). On easy the difficulty shows.
+   */
+  function plea(defending: boolean): { label: string; go: () => Promise<void> } {
+    const style = styleFor(world().talkPerson(foeId)?.tags ?? []);
+    const best = PLEA_SKILLS.map((s) => ({ s, d: hero.dice[s] ?? { n: 0, mod: 0 } })).reduce((a, b) => (units(b.d) > units(a.d) ? b : a));
+    const dice = best.d.n > 0 ? best.d : { n: 1, mod: 0 };
+    const difficulty = pleaDifficulty(fight!, 'hero', style);
+    const easy = level().foeExact;
+    const label = t('fight.plead', 'Ask to yield ({skill} {dice}{vs})', { skill: rollableName(best.s), dice: diceText(dice), vs: easy ? t('fight.pleavs', ' against {d}', { d: difficulty }) : '' });
+    return { label, go: () => play({ plead: { dice, difficulty }, ...(defending ? { defend: 'standard' as const } : {}) }) };
   }
 
   /** Wait until the fighters have walked where the round sent them (or a while, at most). */
@@ -323,8 +341,12 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       if (s.deathRoll) { wRolls.push({ ...s.deathRoll, label: t('fight.deathroll', '{who}: death roll', { who: Name(l.target) }) }); wMine.push(defMine); }
       for (const rk of res.risks) { wRolls.push({ ...rk.roll, label: rk.effect.k === 'break' ? t('fight.breakroll', 'Bone holds?') : t('fight.cutroll', 'Limb holds?') }); wMine.push(defMine); }
       const notes = [t('fight.woundsum', 'Wound table: {d} + {b} = {r}', { d: res.woundD10, b: s.result - res.woundD10, r: s.result })];
+      // What the wound does, in words ("a wound to the right arm, bleeding 2 a round, dazed").
+      const fx = s.died ? '' : s.effects.map(effectText).join(', ');
+      if (fx) notes.push(cap(fx));
       if (s.died) notes.push(of(l.target, ['fight.killed.you', 'You fall.'], ['fight.killed', '{who} falls dead.']));
       await reveal(wRolls, wMine, notes);
+      if (fx) log(t('fight.woundfx', 'Serious wound: {fx}.', { fx }), atkMine ? 'good' : 'bad');
       if (s.died) log(of(l.target, ['fight.killed.you', 'You fall.'], ['fight.killed', '{who} falls dead.']), atkMine ? 'good' : 'bad');
       for (const rk of res.risks) if (rk.happened) log(rk.effect.k === 'break' ? t('fight.breaks', 'Bone breaks.') : t('fight.severed', 'Something is cut off.'), 'bad');
     }
@@ -370,6 +392,16 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
         case 'end': {
           if (l.end.rolls.length) await reveal(l.end.rolls.map((r) => ({ ...r, label: `${Name(l.who)}: ${r.label ?? ''}` })), l.end.rolls.map(() => l.who === 'hero'));
           for (const n of l.end.notes) if (n !== 'stayed up') log(`${Name(l.who)}: ${t(`fight.note.${n.replace(/ /g, '')}`, n)}.`, l.who === 'hero' ? 'bad' : 'good');
+          break;
+        }
+        case 'plead': {
+          const mine = l.who === 'hero';
+          const said = l.granted
+            ? of(l.who, ['fight.spared.you', '{foe} lowers their weapon and lets you yield.'], ['fight.spared.they', 'You let {who} yield.'], { foe: Name(foeId) })
+            : of(l.who, ['fight.refused.you', '{foe} won’t hear of it.'], ['fight.refused.they', '{who} begs; you fight on.'], { foe: Name(foeId) });
+          log(of(l.who, ['fight.pleads.you', 'You ask to yield.'], ['fight.pleads', '{who} asks to yield.']), mine ? 'you' : 'they');
+          await reveal([{ ...l.roll, label: t('fight.plearoll', '{who}: plea', { who: Name(l.who) }) }], [mine], [said]);
+          log(said, l.granted ? 'info' : 'bad');
           break;
         }
         case 'mercy':

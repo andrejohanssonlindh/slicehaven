@@ -95,7 +95,7 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'fight';
-      b.textContent = t('talk.fight', 'Fight');
+      b.textContent = t('talk.attack', 'Attack');
       const id = who;
       b.addEventListener('click', () => {
         close();
@@ -144,6 +144,39 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
     setTimeout(drawPortrait, 350);
   }
 
+  /**
+   * Someone tapped from afar: talk (walk up to them first) or attack from where you stand (the director: how far
+   * away you are shouldn't matter for an attack; with a bow later it really won't).
+   */
+  function far(id: string, metres: number): void {
+    const w = world(), p = w.talkPerson(id);
+    if (!p) return;
+    nameEl.textContent = p.name;
+    whatEl.textContent = '';
+    moodEl.textContent = '';
+    canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+    logEl.replaceChildren();
+    log(t('talk.far', '{name} is {m} m away.', { name: p.name, m: Math.round(metres) }), 'info');
+    choicesEl.replaceChildren();
+    const button = (label: string, cls: string, go: () => void): void => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      if (cls) b.className = cls;
+      b.textContent = label;
+      b.addEventListener('click', go);
+      choicesEl.appendChild(b);
+    };
+    button(t('talk.walkup', 'Walk up and talk'), '', () => {
+      close();
+      const at = world().personSpot(id);
+      // Walk up to them; they stop for you once you're close (see `tick`).
+      if (!at || world().walkTo(at.x, at.z, at.level) === null) return notify(t('talk.noway', 'You can\'t get to them.'));
+      pending = id;
+    });
+    if (onFight) button(t('talk.attack', 'Attack'), 'fight', () => { close(); onFight(id); });
+    el.hidden = false;
+  }
+
   function close(): void {
     el.hidden = true;
     who = null;
@@ -161,10 +194,13 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
       close();
       const w = world(), at = w.personSpot(id);
       if (!at) return;
+      // The dead and the senseless don't talk (the director: "using skills on dead people works").
+      const hurt = w.injuriesOf(id);
+      const name = w.talkPerson(id)?.name ?? id;
+      if (hurt?.dead) return notify(t('talk.dead', '{name} is dead.', { name }));
+      if (hurt?.out) return notify(t('talk.out', '{name} lies senseless.', { name }));
       if (w.reachTo(at) <= TALK_REACH) return start(id);
-      // Walk up to them; they stop for you once you're close (see `tick`).
-      if (w.walkTo(at.x, at.z, at.level) === null) return notify(t('talk.noway', 'You can\'t get to them.'));
-      pending = id;
+      far(id, w.reachTo(at));
     },
     close,
     tick() {

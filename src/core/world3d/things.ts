@@ -144,6 +144,13 @@ export interface ThingDef {
    * gives its skill, damage and properties in a fight (`core/combat.ts`). Held in a hand.
    */
   weapon?: string;
+  /**
+   * A rack or chest that hands out things of a family (a weapon rack: `weapon`): *take from it* lists every kind under
+   * it to pick from, and the one picked is put in your hand. Never runs out (a test ground's, for now).
+   */
+  stock?: string;
+  /** A gong or a bell that calls someone (a kind of person: `gladiator`): strike it, pick how good, and a fresh one comes. */
+  calls?: string;
   /** A kind of building: how it is put together (`buildHouse` reads this). */
   building?: BuildingPlan;
   /**

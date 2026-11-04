@@ -19,6 +19,33 @@ describe('spike3d fight', () => {
     const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; const fight = window.spike.fight; return ${fn}; })()`);
     await page.waitForTimeout(1500);
 
+    // The gong calls a fresh gladiator at the level picked; the rack hands out any weapon (then put it back down).
+    const thing = async (kind: string) => (await w(`(() => {
+      for (const lc of w.chunks.values()) for (const g of lc.standing.objects) if (g.userData.thing?.kind === '${kind}') return w.targetOf(g);
+      return null;
+    })()`)) as { id: string; x: number; z: number } | null;
+    const gong = await thing('gong'), rack = await thing('weapon-rack');
+    expect(gong && rack).toBeTruthy();
+    const level0 = await w('w.sheetOf("gladiator").level');
+    await w(`(w.placeHeroAt(${gong!.x}, ${gong!.z + 1.4}), window.spike.sheet.open(${JSON.stringify(gong)}), 0)`);
+    await page.click('#act .offers button:has-text("call a fighter")');
+    await page.waitForSelector('#act .offers button:has-text("Master")', { timeout: 15_000 });
+    await page.screenshot({ path: `${OUT}/fight-gong.png` });
+    await page.click('#act .offers button:has-text("Capable")');
+    expect(await w('w.sheetOf("gladiator").level')).toBe('capable');
+    expect(level0).toBe('novice');
+    await w(`(w.placeHeroAt(${rack!.x}, ${rack!.z - 1.4}), window.spike.sheet.open(${JSON.stringify(rack)}), 0)`);
+    await page.click('#act .offers button:has-text("Take something")');
+    await page.waitForSelector('#act .offers button:has-text("Greatsword")', { timeout: 15_000 });
+    await page.screenshot({ path: `${OUT}/fight-rack.png` });
+    await page.click('#act .offers button:has-text("Hunting spear")');
+    expect(await w('w.holding')).toBe('hunting-spear');
+    expect(await w('w.inHand.has("hero")')).toBe(true);
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `${OUT}/fight-spear.png` });
+    await w(`(w.act('verb:put-down', null, { id: 'hero', dice: () => ({ n: 3, mod: 0 }) }), 0)`);
+    expect(await w('w.holding')).toBeNull();
+
     // The sword on the sand by the west gate, as something to act on.
     const sword = (await w(`(() => {
       for (const lc of w.chunks.values()) for (const g of lc.standing.objects) if (g.userData.thing?.kind === 'arming-sword') return w.targetOf(g);

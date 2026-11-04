@@ -19,6 +19,18 @@ const ROWS: Record<string, { row: string; look: string }> = {
   'hand-axe': { row: 'Handyxa', look: 'A hand axe with a worn haft.' },
   cudgel: { row: 'Påk', look: 'A cudgel of hard wood.' },
   quarterstaff: { row: 'Stridsstav', look: 'A quarterstaff, shod with iron at both ends.' },
+  dagger: { row: 'Dolk', look: 'A dagger with a double edge.' },
+  sabre: { row: 'Kroksabel', look: 'A sabre, its blade gently curved.' },
+  rapier: { row: 'Värja', look: 'A rapier, long and thin, with a swept guard.' },
+  'bastard-sword': { row: 'Slagsvärd', look: 'A bastard sword, its grip long enough for two hands.' },
+  greatsword: { row: 'Storsvärd', look: 'A greatsword, nearly as tall as a man.' },
+  'battle-axe': { row: 'Stridsyxa', look: 'A battle axe with a deep, bearded head.' },
+  'great-axe': { row: 'Storyxa', look: 'A great axe, double-bitted, on a long haft.' },
+  'hunting-spear': { row: 'Jaktspjut', look: 'A hunting spear with a broad leaf head.' },
+  'war-hammer': { row: 'Stridshammare', look: 'A war hammer: a square face, a spike behind.' },
+  'morning-star': { row: 'Morgonstjärna', look: 'A morning star, its head set with studs.' },
+  'steel-mace': { row: 'Stålklubba', look: 'A short mace of steel.' },
+  flail: { row: 'Stridsgissel', look: 'A flail: an iron ball on a short chain.' },
 };
 
 const kg = (s: string): number => Number(/[\d.]+/.exec(s)?.[0] ?? 1);

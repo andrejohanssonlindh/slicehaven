@@ -16,6 +16,8 @@
 | **Combat rules core** | `src/core/combat.ts` | ✅ B8a (2026-11-04): one against one in melee. Moving (walk 5, run 10), picking up (3 m), opening on Reaktion, attack against the best defence (parry, block, dodge), tactics and their fatigue, roles swapping, retreat, drops, the end of the phase, the mercy stroke; a fighting style for those nobody steers. Tested (`tests/combat.test.ts`) |
 | **Weapons as things, the right hand** | `content/things/kinds/weapons.ts`, models `things/models/`; `Loose.wield` for people's weapons | ✅ Held in the right hand (`BodyRig.hand`, `model.grip`), dropped and picked up in a fight, saved |
 | **The fight in the world and on the page** | `SpikeWorld` (fights section), `src/spike3d/fight.ts`, `#fight` panel | ✅ The world stops; one choice a round; your own dice, a blow in steps; walking, swings, lying down; cards by difficulty; injuries saved (`hurt`, save v8); OK ends it; a dead hero gets New game. `e2e/spike3d-fight.e2e.ts` |
+| **Choosing a weapon, calling a foe** | kinds `weapon-rack` (`stock`) and `gong` (`calls`) in `content/things/kinds/arena.ts`; verbs `take-from`, `strike-gong` (outcome `choose`, the picker in `actsheet.ts`); `SpikeWorld.takeFromStock`, `callFighter` | ✅ 17 weapons; a gladiator at any level (not saved) |
+| **Yielding** | `Choice.plead`, `pleaDifficulty`, `FightStyle.spare`, `Fight.spared` | ✅ The best of Argue and Charm against the foe's style, eased if they're more tired and hurt than you |
 | **Your condition** | `src/spike3d/condition.ts`, the **You** button; fatigue back with time in `SpikeWorld.recover` | ✅ Fatigue and its sources, dice off rolls and why, wounds |
 
 ## How a fight fits our world

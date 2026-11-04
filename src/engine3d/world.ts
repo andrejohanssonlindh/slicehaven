@@ -22,7 +22,7 @@ import { Explored } from '../core/world3d/explored';
 import { type StatesJSON, ThingStates, pieceId, placedId } from '../core/world3d/state';
 import { type ActResult, type ActTarget, type ActWorld, type Doer, type Offer, type Spot, offers, perform, thingName } from '../core/world3d/actions';
 import { ACTIONS } from '../content/actions';
-import { type RolledSheet, sheetDice, unitsDice } from '../core/npcsheet';
+import { type PersonLevel, type RolledSheet, sheetDice, unitsDice } from '../core/npcsheet';
 import type { Roll } from '../core/dice';
 import { type Cares, type LeadStatus, type LeadsState, giveLead, leadStatus, studied } from '../core/world3d/leads';
 import { LEADS } from '../content/leads';
@@ -2756,6 +2756,46 @@ export class SpikeWorld {
     this.showHeld();
     return id;
   }
+
+  /**
+   * The hero takes one of a rack's stock (a weapon rack: any weapon): a new thing of that kind, in their hand, theirs
+   * from now on (saved like anything loose). Their hands must be free. Returns its id, or null.
+   */
+  takeFromStock(rack: ActTarget, kind: string): string | null {
+    const stock = THINGS.has(rack.kind) ? THINGS.get(rack.kind).stock : undefined;
+    if (this.carry.held || !stock || !THINGS.has(kind) || !THINGS.get(kind).chain.includes(stock)) return null;
+    let n = 1;
+    while (this.carry.loose[`${rack.id}:${kind}:${n}`]) n++;
+    const id = `${rack.id}:${kind}:${n}`;
+    this.carry.loose[id] = { kind, seed: n, home: { x: rack.x, z: rack.z, level: rack.level, house: rack.house, rot: 0, room: null }, at: null };
+    this.carry.held = id;
+    this.carry.hidden = false;
+    this.showHeld();
+    return id;
+  }
+
+  /**
+   * A fresh fighter answers a gong (the director: pick the enemy's difficulty): the first of the map's people of that
+   * kind is rolled again at this level, healed (dead or not), their old weapon left wherever it is, and stands at
+   * their place again. Returns their name, or null if the map has no one of that kind.
+   */
+  callFighter(kind: string, level: PersonLevel): string | null {
+    const c = this.cast.find((x) => PERSON_KINDS.resolve(x.who).chain.includes(kind));
+    if (!c || this.fighting) return null;
+    this.called = (this.called ?? 0) + 1;
+    c.who.sheet = PERSON_KINDS.rolled({ ...c.who, level, seed: (c.who.seed ?? 0) + this.called * 101 }, c.who.id);
+    delete this.hurt[c.who.id];
+    this.fightPoses.delete(c.who.id);
+    for (const [id, l] of Object.entries(this.carry.loose)) if (l.wield === c.who.id) delete this.carry.loose[id];
+    const a = c.mind.actor;
+    a.x = c.who.start[0];
+    a.z = c.who.start[1];
+    a.legs = [];
+    this.showHeld();
+    return this.talkPerson(c.who.id)?.name ?? c.who.id;
+  }
+  /** Fighters called so far (each comes rolled afresh). */
+  private called = 0;
 
   /** What kind a loose thing (or one the map laid) is, by its id. */
   thingKind(id: string): string | null {

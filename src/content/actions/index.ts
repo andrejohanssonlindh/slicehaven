@@ -6,7 +6,7 @@ import { FACTS } from './facts';
  * `verbs/` and gates in `gates/`, one file each, found by themselves; the facts gates ask in `facts.ts`. A new verb is
  * a new file. (A vitest run that misses a brand-new file has a stale glob: edit this file once.) A verb may make a
  * sound (`noise`), heard by those near (plan B5). Taking and carrying (B3b): `pick-up`, `slip-away`, `put-down`, and
- * the gates in `hands.ts`.
+ * the gates in `hands.ts`. Choosing from a thing (B8a): `take-from` (a rack's stock), `strike-gong` (call a fighter).
  */
 const verbFiles = import.meta.glob<{ default: VerbDef | VerbDef[] }>('./verbs/*.ts', { eager: true });
 const gateFiles = import.meta.glob<{ default: GateDef | GateDef[] }>('./gates/*.ts', { eager: true });

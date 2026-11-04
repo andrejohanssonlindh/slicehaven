@@ -2,6 +2,20 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-04 — B8a: your notes on the second fight; a weapon rack and a gong
+
+- **A weapon rack** stands by the west gate (north side). Tap it → *Take something from the weapon rack* → a list of **17 weapons**, each with your skill and dice for it and its properties: arming sword, short sword, sabre, rapier, bastard sword, greatsword, dagger, hand axe, battle axe, great axe, hunting spear, cudgel, steel mace, morning star, war hammer, flail, quarterstaff. The one you pick is in your hand. Put it down (tap yourself) to take another. Any kind can be a rack: it says what family it stocks (`stock`), so an armoury's rack later is the same thing.
+- **A gong** stands by the west gate (south side). Tap it → *Strike the gong: call a fighter* → **novice, capable, skilled or master**. A fresh gladiator rolled at that level takes the old one's place, healed (or alive again). The level isn't saved yet: after a reload it's the map's novice again.
+- **Attack from anywhere.** Tapping someone far off now asks *Walk up and talk* or **Attack**, so you don't walk up first. In a talk the button is *Attack* too (it was *Fight*).
+- **Ask to yield**, every round: the best of Argue and Charm against how hard your foe is to talk down. The gladiator is hard (16); anyone else is easier (8). It gets easier the more tired and hurt they are than you, but never below 6. On easy the button shows the number. If they grant it, the fight ends and they spare you. If they refuse, an attacker has lost the blow and a defender still defends.
+- **A serious wound says what it does**, in our own short words: "a wound to the right arm, bleeding 2 a round, dazed, may break the ribs". This shows in the third step and in the log.
+- **The dead and the senseless don't talk.** Tapping them says "Arruns is dead" or "lies senseless", with no skills to try.
+- **Your questions:**
+  - *Melee, ranged or mystic phase?* Not yet. There is only melee. Choosing the phase comes with ranged (B8d), and mystic with magic (B9).
+  - *1 against 2?* Not yet; that's B8c, after 1v1 feels right, as you said.
+  - *Does the weapon count in the opening roll?* Yes, one property does: **Reach** adds its number in D6 to the Reaktion roll when blades first cross. The hunting spear (Reach 2) and the greatsword (Reach 1) now let you try it. Nothing else about a weapon counts there.
+  - *A heavy hit kept them the attacker even though it was parried?* If it hit, it wasn't parried. Each blow is attack against defence, and a tie goes to the attacker. With a plain defence, **you take over only if your defence beats the attack**. *Defend carefully* needs to beat it by 10. *Counter* always takes over, hit or not. So after a blow that landed, the attacker keeps going. The log line now says "against your parry … : it hits", which may have read as a parry.
+
 ## 2026-11-04 — B8a: your notes on the first fight
 
 - **You throw only your own dice.** The gladiator's rolls are written beside yours, not thrown.

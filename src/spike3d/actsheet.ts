@@ -1,4 +1,8 @@
 import { CONTENT } from '../content/chargen';
+import { WEAPONS, propList } from '../content/chargen/equipment';
+import { diceText } from '../core/chargen/tables';
+import { UNTRAINED } from '../core/combat';
+import { PERSON_LEVELS, type PersonLevel } from '../core/npcsheet';
 import { THINGS } from '../content/things';
 import { defaultHero, heroFromChar, rollableName } from '../content/rollables';
 import { derive } from '../core/chargen/derive';
@@ -94,7 +98,58 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
     });
     if (lines.length) notify(lines.join(' '));
     if (r.events.some((e) => e.kind === 'lead')) onLead();
+    for (const e of r.events) if (e.kind === 'choose') pick(e.what, e.target);
     save();
+  }
+
+  /**
+   * Pick one of what a thing offers, in the same sheet (plan B8a): a rack's stock (every weapon, with its skill and
+   * damage), or how good a fighter a gong calls (the levels).
+   */
+  function pick(what: 'stock' | 'calls', target: ActTarget): void {
+    const w = world();
+    const kind = THINGS.get(target.kind);
+    offersEl.replaceChildren();
+    const add = (label: string, small: string, go: () => void): void => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      const s = document.createElement('span');
+      s.textContent = label;
+      b.appendChild(s);
+      if (small) {
+        const m = document.createElement('small');
+        m.textContent = small;
+        b.appendChild(m);
+      }
+      b.addEventListener('click', () => { close(); go(); save(); });
+      offersEl.appendChild(b);
+    };
+    if (what === 'stock' && kind.stock) {
+      nameEl.textContent = t('act.pick.stock', 'Take which?');
+      lookEl.textContent = t('act.pick.stocklook', 'Your skill with each is in brackets.');
+      const kinds = THINGS.placeable.filter((k) => k !== kind.id && THINGS.get(k).chain.includes(kind.stock!));
+      for (const k of kinds) {
+        const thing = THINGS.get(k);
+        const row = thing.weapon ? WEAPONS.find((x) => x.sv === thing.weapon) : undefined;
+        const skill = row ? `${rollableName(row.skill)} ${diceText(doer.dice(row.skill).n > 0 ? doer.dice(row.skill) : UNTRAINED)}` : '';
+        const hands = row ? (row.h1 === '–' ? t('act.pick.two', 'two hands') : '') : '';
+        add(cap(t(`thing.${k}.name`, thingName(thing))), [skill, hands, row?.props ? propList(row.props).map((p) => p.en).join(', ') : ''].filter(Boolean).join(' · '), () => {
+          if (!w.takeFromStock(target, k)) notify(t('act.pick.nohands', 'Your hands are full.'));
+          else notify(t('act.pick.took', 'You take the {name}.', { name: thingName(thing) }));
+        });
+      }
+    } else if (what === 'calls' && kind.calls) {
+      nameEl.textContent = t('act.pick.calls', 'Call a fighter: how good?');
+      lookEl.textContent = t('act.pick.callslook', 'A fresh fighter takes the place of the last, rolled at the level you pick.');
+      for (const level of PERSON_LEVELS) {
+        add(cap(t(`level.${level}`, level)), t(`act.pick.level.${level}`, LEVEL_HINT[level]), () => {
+          const name = w.callFighter(kind.calls!, level);
+          notify(name ? t('act.pick.called', '{name} steps out onto the sand ({level}).', { name, level: t(`level.${level}`, level) }) : t('act.pick.nobody', 'No one answers.'));
+        });
+      }
+    } else return;
+    el.hidden = false;
+    notice.classList.add('above');
   }
 
   function doIt(offer: string, target: ActTarget | null): void {
@@ -176,3 +231,11 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
 }
 
 const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** What each level means for a fighter's main skill, to choose by. */
+const LEVEL_HINT: Record<PersonLevel, string> = {
+  novice: 'main skill about 2D6–3D6',
+  capable: 'main skill about 3D6+1–4D6+1',
+  skilled: 'main skill about 4D6+2–5D6',
+  master: 'main skill about 5D6+1–6D6',
+};

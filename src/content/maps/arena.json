@@ -17,7 +17,9 @@
     { "kind": "arming-sword", "x": -11, "z": 1.4, "rot": 0.3, "seed": 1 },
     { "kind": "quarterstaff", "x": -11.3, "z": -1.5, "rot": -0.2, "seed": 2 },
     { "kind": "hand-axe", "x": -10.2, "z": 2.4, "rot": 1.2, "seed": 3 },
-    { "kind": "cudgel", "x": -10.4, "z": -2.6, "rot": 0.9, "seed": 4 }
+    { "kind": "cudgel", "x": -10.4, "z": -2.6, "rot": 0.9, "seed": 4 },
+    { "kind": "weapon-rack", "x": -9.5, "z": 5.0, "rot": 0, "seed": 5 },
+    { "kind": "gong", "x": -9.5, "z": -5.0, "rot": 0, "seed": 6 }
   ],
   "places": {
     "mark": { "at": [8, 0] },

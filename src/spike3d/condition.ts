@@ -2,7 +2,7 @@ import { rollableName } from '../content/rollables';
 import { type Dice, diceText } from '../core/chargen/tables';
 import { type ModWhy, type PoolWhy, poolMean } from '../core/combat';
 import {
-  type FatigueWhy, FATIGUE_WHYS, type Injuries, type PenaltyWhy, type RollUse, penaltyParts, totalFatigue, unhurt,
+  type Effect, type FatigueWhy, FATIGUE_WHYS, type Injuries, type PenaltyWhy, type RollUse, penaltyParts, totalFatigue, unhurt,
 } from '../core/damage';
 import { DIFFICULTY_RULES, REST_SPEED } from '../core/difficulty';
 import type { Hero } from '../core/hero';
@@ -67,6 +67,39 @@ export function harmBits(i: Injuries, exact: boolean): string[] {
   for (const b of i.broken) bits.push(t('fight.brokenpart', 'broken {b}', { b }));
   for (const s of i.short) bits.push(t(`fight.short.${s}`, SHORT[s]));
   return bits;
+}
+
+const BONE: Record<string, string> = { neck: 'neck', skull: 'skull', ribs: 'ribs', spine: 'spine', hip: 'hip', leftArm: 'left arm', rightArm: 'right arm', leftLeg: 'left leg', rightLeg: 'right leg' };
+
+/**
+ * What one after-effect of a serious wound does, in a few words of our own (the director: "breaks ribs", rather than
+ * a bare number): shown when the wound is dealt, in the fight's third step and the log.
+ */
+export function effectText(e: Effect): string {
+  const p = 'part' in e && e.part ? partName(e.part) : '';
+  switch (e.k) {
+    case 'dazed': return t('fx.dazed', 'dazed');
+    case 'back': return t('fx.back', 'knocked back');
+    case 'drop': return p ? t('fx.dropin', 'loses grip with the {p}', { p }) : t('fx.drop', 'loses their grip');
+    case 'fall': return t('fx.fall', 'knocked down');
+    case 'armour': return p ? t('fx.armourin', 'armour torn from the {p}', { p }) : t('fx.armour', 'armour torn');
+    case 'grabbed': return t('fx.grabbed', 'caught and held');
+    case 'blinded': return t('fx.blinded', 'blinded by blood');
+    case 'internal': return t('fx.internal', 'bleeding inside');
+    case 'eye': return t('fx.eye', 'an eye lost');
+    case 'feature': return t('fx.feature', 'a nose or ear ruined');
+    case 'genitals': return t('fx.genitals', 'a crippling groin wound');
+    case 'pain': return t('fx.pain', 'pain +{n}', { n: e.n });
+    case 'wound': return e.n === 1 ? t('fx.wound1', 'a wound to the {p}', { p }) : t('fx.woundn', '{n} wounds to the {p}', { n: e.n, p });
+    case 'bleed': return t('fx.bleed', 'bleeding {n} a round', { n: e.rate });
+    case 'infect': return t('fx.infect', 'the wound may fester');
+    case 'ignite': return t('fx.ignite', 'set alight');
+    case 'break': return t('fx.break', 'may break the {b}', { b: BONE[e.area] ?? e.area });
+    case 'cut': return t('fx.cut', 'may lose the {a}', { a: `${e.side ? `${e.side} ` : ''}${e.area}` });
+    case 'teeth': return t('fx.teeth', '{n} teeth knocked out', { n: e.n });
+    case 'attr': return t('fx.attr', '{a} lowered for good', { a: rollableName(`attr:${e.attr}`) });
+    case 'hands': return t('fx.hands', 'hands crippled');
+  }
 }
 
 /** The rolls injuries weigh on, for the sheet. */
