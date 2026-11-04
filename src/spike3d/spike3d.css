@@ -182,3 +182,34 @@
 #stairs[hidden] { display: none; }
 #stairs button { min-width: 84px; height: 46px; font-size: 16px; }
 #stairs button[hidden] { display: none; }
+
+/* A fight (plan B8a): the round, how both sides are, what happened, and the hero's choices for the round. Kept low so
+   the fighters show above it. */
+#talk .choices button.fight { color: #f0a080; }
+#fight {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  width: min(440px, calc(100% - 16px));
+  height: min(48%, 420px);
+  display: flex;
+  flex-direction: column;
+  color: #e6dbb9;
+  background: #140a0aee;
+  border: 1px solid #b0503a;
+  border-radius: 6px;
+  z-index: 4;
+  overflow: hidden;
+}
+#fight[hidden] { display: none; }
+#fight .head { padding: 8px 10px 2px; font-size: 15px; font-weight: bold; }
+#fight .us, #fight .them { padding: 0 10px; font-size: 12px; line-height: 1.35; opacity: 0.85; }
+#fight .log { flex: 1; min-height: 48px; overflow-y: auto; padding: 6px 10px 12px; font-size: 13px; line-height: 1.4; }
+#fight .log p { margin: 0 0 5px; }
+#fight .log p.you { color: #e0b050; }
+#fight .log p.info { opacity: 0.65; font-size: 12px; }
+#fight .log p.good { color: #b8d890; }
+#fight .log p.bad { color: #e09a80; }
+#fight .choices { flex-shrink: 0; max-height: 45%; overflow-y: auto; padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 5px; border-top: 1px solid #b0503a55; }
+#fight .choices button { min-height: 42px; text-align: left; font-size: 14px; }

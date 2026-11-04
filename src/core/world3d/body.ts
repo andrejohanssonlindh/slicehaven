@@ -99,6 +99,8 @@ export interface BodyModel {
   parts: BodyPart[];
   /** How far one loop of the walk carries the body, metres (two steps). */
   stride: number;
+  /** Where a hand holds something, in its forearm's (elbow joint's) space: a sword is drawn from here. */
+  grip: Vec3;
 }
 
 /**
@@ -272,7 +274,7 @@ export function buildBody(s: BodySpec): BodyModel {
     box(part(kn, C.boots, false), [-limb * 0.55 * P.hands, -kneeY, -limb * 0.55], [limb * 0.55 * P.hands, -kneeY + footH, footL - limb * 0.55], 0.7, 1);
   }
 
-  return { height: H, joints, parts, stride: 1.6 * hipY };
+  return { height: H, joints, parts, stride: 1.6 * hipY, grip: [0, -fore - hand * 0.55, limb * 0.1] };
 }
 
 /** Something held upright in the hand (a pole with whatever is on its end), or hanging from it (a basket, a bucket). */

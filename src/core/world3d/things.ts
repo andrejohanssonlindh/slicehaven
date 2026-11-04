@@ -34,7 +34,12 @@ export interface FurnitureModel {
   d: number;
   /** The meshes, for a seed (so two of a kind can differ) and a recipe line's variant (which counter, which shelf). */
   draw(seed: number, variant?: string): ThingParts;
+  /** Something held in one hand (a sword): where along x the hand holds it. Drawn in the right hand, not in both arms. */
+  grip?: number;
 }
+
+/** The 3D model of a kind, if it has one: a piece of furniture's, or a loose item's own (a sword). */
+export const modelOf = (t: Pick<ThingDef, 'furniture' | 'model'>): FurnitureModel | undefined => t.furniture?.model ?? t.model;
 
 export interface ThingParts {
   /** Meshes, each with its material (cloth in a colour, sRGB hex). Local metres, x along the thing's length. */
@@ -129,6 +134,16 @@ export interface ThingDef {
     mount: 'floor' | 'hung' | 'flat';
     model: FurnitureModel;
   };
+  /**
+   * A loose item's 3D model (one file in `content/things/models/`, like furniture's), for something that is no piece of
+   * a room: a sword lying on the sand, or in a hand. Read with `modelOf`.
+   */
+  model?: FurnitureModel;
+  /**
+   * A weapon (plan B8a): its row in the weapon table (`content/chargen/equipment.ts`, by its Swedish name), which
+   * gives its skill, damage and properties in a fight (`core/combat.ts`). Held in a hand.
+   */
+  weapon?: string;
   /** A kind of building: how it is put together (`buildHouse` reads this). */
   building?: BuildingPlan;
   /**

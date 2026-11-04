@@ -146,10 +146,13 @@ export function bestDamage(w: WeaponStats): { type: DamageType; dice: Dice } {
 
 // ── The fight ───────────────────────────────────────────────────────────────────────────────────────────────────
 
-/** Something held in a fight (or lying on the ground): its id is the world's thing id, so it can be drawn. */
+/**
+ * Something held in a fight (or lying on the ground): its id is the world's thing id, so it can be drawn. A weapon is
+ * its row: what it does is worked out for whoever holds it (their base damage, whether they are strong enough).
+ */
 export interface FightItem {
   id: string;
-  weapon?: WeaponStats;
+  weapon?: WeaponRow;
   shield?: ShieldStats;
 }
 
@@ -161,6 +164,8 @@ export interface Fighter {
   z: number;
   /** The pools they roll: combat skills, `Undvika`, `Sköld`, and `attr:Reaktion`, `attr:Livskraft`, `attr:Förflyttning`. */
   pools: Record<string, Dice>;
+  /** Physique, for the weapons they can wield (and how). */
+  physique: Dice;
   baseDamage: Dice;
   baseArmour: number;
   /** Worn armour against each type (one suit for the whole body until armour pieces come). */
@@ -254,7 +259,7 @@ export function nearestFoe(fight: Fight, f: Fighter): Fighter | null {
 }
 
 /** What a fighter attacks or parries with: the weapon in hand, or fists. */
-export const weaponOf = (f: Fighter): WeaponStats => f.weapon?.weapon ?? fists(f.baseDamage);
+export const weaponOf = (f: Fighter): WeaponStats => (f.weapon?.weapon ? weaponFromRow(f.weapon.weapon, f.baseDamage, f.physique) : fists(f.baseDamage));
 
 /** A pool from a fighter's sheet; with no skill at all, a combat roll still gets 1D6 (reading). */
 function pool(f: Fighter, id: string): Dice {
@@ -349,8 +354,9 @@ export function dropFrom(fight: Fight, f: Fighter, parts: (BodyPart | undefined)
   for (const slot of slots) {
     const item = f[slot];
     if (!item) continue;
-    const props = item.weapon?.props ?? item.shield?.props ?? {};
-    if (props.Säker || item.weapon?.hands === 2) continue;
+    const w = item.weapon ? weaponFromRow(item.weapon, f.baseDamage, f.physique) : null;
+    const props = w?.props ?? item.shield?.props ?? {};
+    if (props.Säker || w?.hands === 2) continue;
     const at = dropSpot(f, rng);
     fight.ground.push({ ...item, ...at });
     f[slot] = null;
@@ -452,7 +458,7 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
       const i = fight.ground.findIndex((g) => g.id === c.pickUp && dist(g, f) <= PICKUP_REACH);
       const item = fight.ground[i];
       const slot = item?.shield ? 'shield' : 'weapon';
-      if (item && !f[slot] && !(slot === 'shield' && f.weapon?.weapon?.hands === 2)) {
+      if (item && !f[slot] && !(slot === 'shield' && weaponOf(f).hands === 2)) {
         fight.ground.splice(i, 1);
         f[slot] = { id: item.id, ...(item.weapon ? { weapon: item.weapon } : {}), ...(item.shield ? { shield: item.shield } : {}) };
         f.drew = true;

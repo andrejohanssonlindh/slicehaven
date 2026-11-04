@@ -3,6 +3,7 @@ import type { TalkMemory } from './talk';
 import type { LeadsState } from './leads';
 import type { Standing } from './standing';
 import type { CarryState } from './carry';
+import type { Injuries } from '../damage';
 
 /**
  * The saved world (plan item B1): one versioned JSON record per map, in the browser's storage. What it holds is what
@@ -12,7 +13,7 @@ import type { CarryState } from './carry';
  * No migrations while the design moves: a save of another version is dropped. Bump `WORLD_SAVE_VERSION` whenever
  * the shape changes or the maps change in a way that moves things (ids are where things stand).
  */
-export const WORLD_SAVE_VERSION = 6;
+export const WORLD_SAVE_VERSION = 7;
 
 export interface WorldSave {
   v: number;
@@ -34,6 +35,8 @@ export interface WorldSave {
   standing: Standing;
   /** What the hero holds and where moved things lie (`core/world3d/carry.ts`, plan B3b). */
   carry: CarryState;
+  /** What fights left on people, the hero too, by id (`core/damage.ts`, plan B8a): the dead stay dead. */
+  hurt: Record<string, Injuries>;
 }
 
 const key = (map: string): string => `slicehaven.world.${map}`;

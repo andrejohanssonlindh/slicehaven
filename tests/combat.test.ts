@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   type Fight, type Fighter, type FightStyle, attackPool, bestDamage, bonusDice, chooseFor, damageDice, defencePool, dropFrom, fists, parseProps,
-  resolveRound, roleOf, startFight, tacticFatigue, weaponFromRow,
+  resolveRound, roleOf, startFight, tacticFatigue, weaponFromRow, weaponOf,
 } from '../src/core/combat';
 import { unhurt } from '../src/core/damage';
 import { Rng } from '../src/core/rng';
@@ -16,8 +16,8 @@ const PHYS = { n: 3, mod: 0 };
 const fighter = (id: string, side: number, x: number, over: Partial<Fighter> = {}): Fighter => ({
   id, side, x, z: 0,
   pools: { Svärd: { n: 4, mod: 0 }, Sköld: { n: 3, mod: 0 }, Undvika: { n: 2, mod: 0 }, 'attr:Reaktion': { n: 3, mod: 0 }, 'attr:Livskraft': { n: 3, mod: 2 }, 'attr:Förflyttning': { n: 3, mod: 0 } },
-  baseDamage: BASE, baseArmour: 2, armour: { cut: 3, crush: 3, thrust: 2 }, loadDice: 0,
-  weapon: { id: `${id}-sword`, weapon: weaponFromRow(row('Stridssvärd'), BASE, PHYS) }, shield: null,
+  baseDamage: BASE, physique: PHYS, baseArmour: 2, armour: { cut: 3, crush: 3, thrust: 2 }, loadDice: 0,
+  weapon: { id: `${id}-sword`, weapon: row('Stridssvärd') }, shield: null,
   injuries: unhurt(), drew: false, ...over,
 });
 
@@ -51,12 +51,12 @@ describe('weapons in hand', () => {
     const shield = SHIELDS.find((s) => s.sv === 'Stor rundsköld')!;
     const a = fighter('a', 0, 0);
     const b = fighter('b', 1, 1.5, { shield: { id: 'b-shield', shield: { name: shield.sv, melee: bonusDice(shield.melee), props: parseProps(shield.props) } } });
-    expect(defencePool({ ...b, pools: { ...b.pools, Sköld: { n: 4, mod: 0 } } }, a.weapon!.weapon!, 'standard')).toEqual({ how: 'block', dice: { n: 5, mod: 0 } });
-    expect(defencePool(a, b.weapon!.weapon!, 'standard').how).toBe('parry');
+    expect(defencePool({ ...b, pools: { ...b.pools, Sköld: { n: 4, mod: 0 } } }, weaponOf(a), 'standard')).toEqual({ how: 'block', dice: { n: 5, mod: 0 } });
+    expect(defencePool(a, weaponOf(b), 'standard').how).toBe('parry');
     // Bare hands parry at −2D6 against a weapon, so a dodger dodges.
     const bare = fighter('c', 1, 1.5, { weapon: null, pools: { Slagsmål: { n: 2, mod: 0 }, Undvika: { n: 3, mod: 0 } } });
-    expect(defencePool(bare, a.weapon!.weapon!, 'standard').how).toBe('dodge');
-    expect(defencePool(bare, a.weapon!.weapon!, 'counter').how).toBe('parry'); // no dodging into a counter
+    expect(defencePool(bare, weaponOf(a), 'standard').how).toBe('dodge');
+    expect(defencePool(bare, weaponOf(a), 'counter').how).toBe('parry'); // no dodging into a counter
   });
 
   it('tactics change the pools and cost fatigue', () => {
@@ -65,7 +65,7 @@ describe('weapons in hand', () => {
     expect(attackPool(a, 'quick')).toEqual({ n: 5, mod: 0 });
     expect(attackPool(a, 'powerful')).toEqual({ n: 3, mod: 0 });
     expect(attackPool({ ...a, drew: true }, 'standard')).toEqual({ n: 3, mod: 0 });
-    const sword = a.weapon!.weapon!;
+    const sword = weaponOf(a);
     expect(tacticFatigue('quick', null, sword)).toBe(1);
     expect(tacticFatigue('quick', null, { ...sword, props: { Snabb: 1 } })).toBe(0);
     expect(tacticFatigue('powerful', 'counter', sword)).toBe(3);
@@ -141,7 +141,7 @@ describe('a round', () => {
     expect(r.fight.ground).toHaveLength(0);
     expect(r.log[0]).toEqual({ k: 'pickUp', who: 'b', item: 'b-sword' });
     // A two-handed grip and a Secure item stay.
-    const two = startFight([fighter('c', 0, 0, { weapon: { id: 'axe', weapon: weaponFromRow(row('Storyxa'), BASE, PHYS) } })]);
+    const two = startFight([fighter('c', 0, 0, { weapon: { id: 'axe', weapon: row('Storyxa') } })]);
     dropFrom(two, two.fighters[0], [undefined], Rng.fromSeed(1), []);
     expect(two.fighters[0].weapon?.id).toBe('axe');
   });

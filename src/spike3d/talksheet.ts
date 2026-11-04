@@ -32,7 +32,7 @@ export interface Talk {
   readonly open_: boolean;
 }
 
-export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRenderer, hero: Hero, doer: Doer, notify: (text: string) => void, save: () => void, onLead: () => void = () => {}): Talk {
+export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRenderer, hero: Hero, doer: Doer, notify: (text: string) => void, save: () => void, onLead: () => void = () => {}, onFight?: (id: string) => void): Talk {
   const el = document.getElementById('talk')!;
   const canvas = el.querySelector<HTMLCanvasElement>('.portrait canvas')!;
   const nameEl = el.querySelector<HTMLElement>('.name')!, whatEl = el.querySelector<HTMLElement>('.what')!, moodEl = el.querySelector<HTMLElement>('.mood')!;
@@ -88,6 +88,19 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
         b.appendChild(s);
       }
       b.addEventListener('click', () => void choose(o.id, o.label));
+      choicesEl.appendChild(b);
+    }
+    // Anyone can be fought (B8a): the fight takes over from the talk.
+    if (onFight && !askingLeads) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'fight';
+      b.textContent = t('talk.fight', 'Fight');
+      const id = who;
+      b.addEventListener('click', () => {
+        close();
+        onFight(id);
+      });
       choicesEl.appendChild(b);
     }
     if (patienceLeft(p, c) === 0) log(t('talk.enough', '{name} has had enough of talking for now.', { name: p.name }), 'info');

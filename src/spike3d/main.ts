@@ -17,6 +17,7 @@ import { t } from '../i18n';
 import { heroDoer, makeSheet, pageHero, whoseText } from './actsheet';
 import { FEARSOME_MARKS } from '../content/people/temper';
 import { makeTalk } from './talksheet';
+import { makeFight } from './fight';
 import { makeJournal } from './journal';
 
 /**
@@ -417,7 +418,13 @@ const doer = heroDoer(hero);
 const journal = makeJournal(() => world);
 const sheet = makeSheet(() => world, notify, save, doer, journal.added);
 /** Talking to someone tapped (plan B3d). */
-const talk = makeTalk(() => world, () => pipeline.renderer, hero, doer, notify, save, journal.added);
+/** A fight with someone tapped (plan B8a): it takes over from the talk, and the world waits while it lasts. */
+const fight = makeFight(() => world, hero, notify, save, () => {
+  saveOff = true;
+  clearWorld(mapName, localStorage);
+  location.reload();
+});
+const talk = makeTalk(() => world, () => pipeline.renderer, hero, doer, notify, save, journal.added, (id) => fight.start(id));
 
 function bindInput(): void {
   let down: { x: number; y: number; id: number; moved: number } | null = null;
@@ -467,6 +474,11 @@ function bindInput(): void {
     endTouch(e);
     if (!down || e.pointerId !== down.id) return;
     if (down.moved < 8) {
+      // (In a fight, the fight panel decides what the hero does: taps on the world wait.)
+      if (fight.on) {
+        down = null;
+        return;
+      }
       const r = canvas.getBoundingClientRect();
       const nx = ((e.clientX - r.left) / r.width) * 2 - 1, ny = -(((e.clientY - r.top) / r.height) * 2 - 1);
       // A tap on a thing (or near enough, on a phone) shows what it is and what can be tried; on the hero, the spot they stand on.
@@ -667,6 +679,7 @@ setTimeout(() => {
     world.loadState(saved);
     notify(t('spike.welcomeback', 'The world is as you left it. (New game in the panel starts over.)'));
   }
+  fight.check();
   if (saving) {
     setInterval(save, 5000);
     addEventListener('pagehide', save);
@@ -677,7 +690,7 @@ setTimeout(() => {
   loading.hidden = true;
   const built = performance.now() - t0;
   console.info(`spike3d: world built in ${built.toFixed(0)} ms`);
-  (window as unknown as { spike: unknown }).spike = { world, pipeline, setTier, built, governor, get tier() { return tier; } };
+  (window as unknown as { spike: unknown }).spike = { world, pipeline, setTier, built, governor, fight, get tier() { return tier; } };
   requestAnimationFrame((n) => {
     last = n;
     loop(n);

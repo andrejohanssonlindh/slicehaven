@@ -22,7 +22,7 @@ import { Explored } from '../core/world3d/explored';
 import { type StatesJSON, ThingStates, pieceId, placedId } from '../core/world3d/state';
 import { type ActResult, type ActTarget, type ActWorld, type Doer, type Offer, type Spot, offers, perform, thingName } from '../core/world3d/actions';
 import { ACTIONS } from '../content/actions';
-import { sheetDice, unitsDice } from '../core/npcsheet';
+import { type RolledSheet, sheetDice, unitsDice } from '../core/npcsheet';
 import type { Roll } from '../core/dice';
 import { type Cares, type LeadStatus, type LeadsState, giveLead, leadStatus, studied } from '../core/world3d/leads';
 import { LEADS } from '../content/leads';
@@ -43,9 +43,11 @@ import { footprints } from '../core/world3d/roomplan';
 import { type HouseEntry, HouseIndex } from '../core/world3d/houses';
 import type { PlacedProp } from '../core/world3d/props';
 import { THINGS } from '../content/things';
+import { modelOf } from '../core/world3d/things';
+import type { Injuries } from '../core/damage';
 import { cloudDrift, cloudThreshold } from '../core/world3d/sky';
 import { type Actor, Walking, newActor } from '../core/world3d/actors';
-import { type Acts, type Answers, type Clock, type Mind, fadeAnswer, newMind, stepMind } from '../core/world3d/behave';
+import { type Acts, type Answers, type Clock, type Mind, fadeAnswer, newMind, stepMind, walkOn } from '../core/world3d/behave';
 import { BEHAVIOURS } from '../content/behaviours';
 import { NavGrid, type P2, type Shape, shapeDist } from '../core/world3d/space';
 import { type Ground3D, groundHeight, lakeDist, splatAt } from '../core/world3d/terrain';
@@ -66,7 +68,7 @@ import { blobShadow } from './shadow';
 import { type BodyRig, makeBodyRig } from './body';
 import { geometryOf, thingGroup, thingMaterial } from './things';
 import { bodySpecOf } from '../content/people/bodies';
-import { IDLE, IDLE_SECONDS, SIT, WALK, carrying } from '../content/people/poses';
+import { type FightPose, IDLE, IDLE_SECONDS, SIT, WALK, carrying, fightPose, wielding } from '../content/people/poses';
 import { orderly } from '../content/people/order';
 import { buildBody } from '../core/world3d/body';
 import { cyclePose } from '../core/world3d/pose';
@@ -589,6 +591,14 @@ export class SpikeWorld {
   private readonly looseDrawn = new Map<string, { g: THREE.Object3D; inst: HouseInst | null }>();
   /** The models of what is held, in the arms of whoever holds it (`hero`, or one of the map's people), by their id. */
   private readonly heldGs = new Map<string, THREE.Object3D>();
+  /** Who holds something in the right hand (a sword), not in both arms. */
+  private readonly inHand = new Set<string>();
+  /** A fight going on (plan B8a): who is in it. While it lasts the world waits: the clock, and everyone else stands. */
+  private fighting: Set<string> | null = null;
+  /** How each fighter stands, and since when (`time`): on guard, swinging, down, dead (`content/people/poses.ts`). */
+  private readonly fightPoses = new Map<string, { pose: FightPose; t: number }>();
+  /** What fights left on people (the hero too), by id: their injuries (`core/damage.ts`). Saved. */
+  private hurt: Record<string, Injuries> = {};
   /** How far what the hero holds has gone from home, and who has already answered it (person ids). */
   private carryStage: Stage = 'home';
   private readonly sawCarry = new Set<string>();
@@ -1060,6 +1070,8 @@ export class SpikeWorld {
 
   /** A placed thing, drawn as its kind says (`content/things/kinds/`), standing on the ground where it is placed. */
   private buildProp(p: PlacedProp, st: Standing, y = this.store.heightAt(p.x, p.z)): void {
+    // (Something the map laid here that has been picked up since is drawn where it is now: `drawLoose`.)
+    if (this.carry.loose[placedId(p)]) return;
     const kind = THINGS.get(p.kind), parts = THINGS.parts(p);
     const group = thingGroup(parts);
     if (parts.lumps) {
@@ -2564,6 +2576,11 @@ export class SpikeWorld {
   };
 
   /** Someone in the map as a doer: they roll what their sheet says (nothing, for someone with no sheet). */
+  /** Someone's own character sheet (plan B4), their gear in it; null for no one of that name. */
+  sheetOf(id: string): RolledSheet | null {
+    return this.cast.find((c) => c.who.id === id)?.who.sheet ?? null;
+  }
+
   doerOf(id: string): Doer {
     const sheet = this.cast.find((c) => c.who.id === id)?.who.sheet ?? null;
     return { id, dice: (skill) => (sheet ? sheetDice(sheet, skill) : { n: 0, mod: 0 }), load: sheet?.load ?? 0 };
@@ -2600,11 +2617,177 @@ export class SpikeWorld {
     return out;
   }
 
+  // --- fights (plan B8a; the rules are `core/combat.ts`, the page runs the rounds: `src/spike3d/fight.ts`) ---
+
+  /**
+   * A fight begins between these people (`hero` among them): the clock stops and everyone else stands where they are
+   * until it ends. The rules decide each round; the world only walks the fighters, holds their weapons and poses them.
+   */
+  beginFight(ids: string[]): void {
+    this.fighting = new Set(ids);
+    this.talkingWith = null;
+    for (const id of ids) if (this.canStand(id)) this.fightPoses.set(id, { pose: 'guard', t: this.time });
+  }
+
+  /** The fight is over: the world goes on. Those left lying stay down. */
+  endFight(): void {
+    for (const id of this.fighting ?? []) if (this.fightPoses.get(id)?.pose === 'guard' || this.fightPoses.get(id)?.pose === 'swing') this.fightPoses.delete(id);
+    this.fighting = null;
+  }
+
+  get inFight(): boolean {
+    return this.fighting !== null;
+  }
+
+  /** Not knocked out, dying or dead (after a fight). */
+  private canStand(id: string): boolean {
+    const i = this.hurt[id];
+    return !i || (!i.out && !i.dead && !i.dying);
+  }
+
+  /** What fights have done to someone (`hero` too); null if nothing yet. */
+  injuriesOf(id: string): Injuries | null {
+    return this.hurt[id] ? structuredClone(this.hurt[id]) : null;
+  }
+
+  /** Someone's injuries after a round: kept (and saved), and they lie down if knocked out, dying or dead. */
+  setInjuries(id: string, i: Injuries): void {
+    this.hurt[id] = structuredClone(i);
+    const lying = i.dead ? 'dead' : i.out || i.dying ? 'down' : null;
+    if (lying) this.fightPoses.set(id, { pose: lying, t: this.time });
+    else if (this.fightPoses.get(id)?.pose === 'down') this.fightPoses.set(id, { pose: 'guard', t: this.time });
+    if (lying) {
+      const c = this.cast.find((x) => x.who.id === id);
+      if (c) c.mind.actor.legs = [];
+      if (id === 'hero') this.hero.legs = [];
+    }
+  }
+
+  /** A fighter swings (the rules said they strike): the pose plays once and settles back on guard. */
+  swing(id: string): void {
+    if (this.canStand(id)) this.fightPoses.set(id, { pose: 'swing', t: this.time });
+  }
+
+  /** Where a fighter stands now (the hero or one of the map's people). */
+  fighterAt(id: string): { x: number; z: number } | null {
+    if (id === 'hero') return { x: this.hero.x, z: this.hero.z };
+    const a = this.cast.find((c) => c.who.id === id)?.mind.actor;
+    return a ? { x: a.x, z: a.z } : null;
+  }
+
+  /** Walk a fighter to a spot (the rules said how far they go this round); the paths go round pillars and walls. */
+  moveFighter(id: string, x: number, z: number): void {
+    if (id === 'hero') {
+      this.walkTo(x, z);
+      return;
+    }
+    const a = this.cast.find((c) => c.who.id === id)?.mind.actor;
+    if (a) this.moves.walkTo(a, x, z);
+  }
+
+  /** Is a fighter still on their way? */
+  fighterMoving(id: string): boolean {
+    if (id === 'hero') return this.walking;
+    return !!this.cast.find((c) => c.who.id === id)?.mind.actor.legs.length;
+  }
+
+  /** One of the map's people in a fight: walk where the rules sent them, else face the nearest other fighter; lie still if down. */
+  private fightStep(c: CastCard, dt: number): { dx: number; dz: number; moving: boolean } {
+    const a = c.mind.actor;
+    if (!this.canStand(c.who.id) || !this.fighting?.has(c.who.id)) return { dx: a.dir.x, dz: a.dir.z, moving: false };
+    const going = walkOn(c.mind, this.moves, dt, 1.6);
+    if (going) return going;
+    let foe: { x: number; z: number } | null = null, best = Infinity;
+    for (const id of this.fighting) {
+      if (id === c.who.id) continue;
+      const p = this.fighterAt(id);
+      const d = p ? Math.hypot(p.x - a.x, p.z - a.z) : Infinity;
+      if (p && d < best) { best = d; foe = p; }
+    }
+    return foe ? { dx: foe.x - a.x, dz: foe.z - a.z, moving: false } : { dx: a.dir.x, dz: a.dir.z, moving: false };
+  }
+
+  /** The weapon someone holds (a loose thing's id and kind): the hero's held thing if it is one, a person's wielded one. */
+  wieldedBy(who: string): { id: string; kind: string } | null {
+    if (who === 'hero') {
+      const id = this.carry.held, l = id ? this.carry.loose[id] : null;
+      return id && l && !this.carry.hidden ? { id, kind: l.kind } : null;
+    }
+    for (const [id, l] of Object.entries(this.carry.loose)) if (l.wield === who) return { id, kind: l.kind };
+    return null;
+  }
+
+  /**
+   * One of the map's people draws their own weapon (a kind of thing, from their sheet's gear) for a fight: it is a loose
+   * thing from now on, theirs, held in their hand, and saved. Already drawn, or lost (lying somewhere), nothing changes.
+   */
+  drawWeapon(who: string, kind: string): string | null {
+    const id = `${who}:weapon`;
+    if (this.carry.loose[id]) return this.carry.loose[id].wield === who ? id : null;
+    const a = this.cast.find((c) => c.who.id === who)?.mind.actor;
+    if (!a || !THINGS.has(kind)) return null;
+    this.carry.loose[id] = { kind, seed: 1, home: { x: a.x, z: a.z, level: 0, house: null, rot: 0, room: null }, at: null, wield: who };
+    this.showHeld();
+    return id;
+  }
+
+  /** What kind a loose thing (or one the map laid) is, by its id. */
+  thingKind(id: string): string | null {
+    return this.carry.loose[id]?.kind ?? this.layout.props.find((p) => placedId(p) === id)?.kind ?? null;
+  }
+
+  /** Weapons lying on the ground outdoors within `r` metres of a spot: moved ones where they lie, and the map's own not yet touched. */
+  weaponsLying(x: number, z: number, r: number): { id: string; kind: string; x: number; z: number }[] {
+    const out: { id: string; kind: string; x: number; z: number }[] = [];
+    const near = (px: number, pz: number) => Math.hypot(px - x, pz - z) <= r;
+    for (const [id, l] of Object.entries(this.carry.loose)) if (l.at && !l.at.house && THINGS.get(l.kind).weapon && near(l.at.x, l.at.z)) out.push({ id, kind: l.kind, x: l.at.x, z: l.at.z });
+    for (const p of this.layout.props) {
+      const id = placedId(p);
+      if (!this.carry.loose[id] && THINGS.has(p.kind) && THINGS.get(p.kind).weapon && near(p.x, p.z)) out.push({ id, kind: p.kind, x: p.x, z: p.z });
+    }
+    return out;
+  }
+
+  /** What someone holds falls to the ground at a spot (a blow made them drop it, or they fell). */
+  dropAt(who: string, id: string, x: number, z: number): void {
+    const l = this.carry.loose[id];
+    if (!l) return;
+    if (who === 'hero' && this.carry.held === id) {
+      this.carry.held = null;
+      this.carry.hidden = false;
+    }
+    if (l.wield === who) delete l.wield;
+    l.at = { x, z, level: 0, house: null, rot: Math.atan2(x - (this.fighterAt(who)?.x ?? x), z - (this.fighterAt(who)?.z ?? z)) };
+    this.showHeld();
+    this.drawLoose(id, l);
+  }
+
+  /** Someone takes up a thing lying near them as their weapon (a side action in a fight): it leaves the ground for their hand. */
+  takeUp(who: string, id: string): void {
+    let l = this.carry.loose[id];
+    if (!l) {
+      // Something the map laid there, never moved yet.
+      const p = this.layout.props.find((q) => placedId(q) === id);
+      if (!p) return;
+      l = this.carry.loose[id] = { kind: p.kind, seed: p.seed ?? 0, home: { x: p.x, z: p.z, level: 0, house: null, rot: p.rot ?? 0, room: null }, at: null };
+      this.removePiece(id);
+    } else {
+      if (!l.at) return;
+      this.undraw(id);
+      l.at = null;
+    }
+    if (who === 'hero') {
+      this.carry.held = id;
+      this.carry.hidden = false;
+    } else l.wield = who;
+    this.showHeld();
+  }
+
   // --- taking and carrying (plan B3b, `core/world3d/carry.ts`) ---
 
   /** How fast the hero walks: something held in both hands slows them. */
   private get carryPace(): number {
-    return this.carry.held && !this.carry.hidden ? CARRY_PACE : 1;
+    return this.carry.held && !this.carry.hidden && !this.inHand.has('hero') ? CARRY_PACE : 1;
   }
 
   /** What the hero holds (its kind), or null. */
@@ -2618,10 +2801,18 @@ export class SpikeWorld {
     return wealthOf(this.cast.filter((c) => c.who.home === house).flatMap((c) => this.talkPerson(c.who.id)?.tags ?? []));
   }
 
-  /** A thing to pick up, as a loose thing: one already moved, or a piece of furniture (its model's seed and variant, and its home). */
+  /**
+   * A thing to pick up, as a loose thing: one already moved, a piece of furniture (its model's seed and variant, and its
+   * home), or something the map laid outdoors that has a model (a sword on the sand; its home is the wild, no one's).
+   */
   private looseOf(t: ActTarget): Loose | null {
     const have = this.carry.loose[t.id];
     if (have) return have;
+    if (t.house === null) {
+      const p = this.layout.props.find((q) => placedId(q) === t.id);
+      if (!p || !modelOf(THINGS.get(p.kind))) return null;
+      return { kind: p.kind, seed: p.seed ?? 0, home: { x: p.x, z: p.z, level: 0, house: null, rot: p.rot ?? 0, room: null }, at: null };
+    }
     const [house, ri, piece] = t.id.split('/');
     const place = house && piece ? this.houseIndex.byId(house) : null;
     const mp = place ? this.houseIndex.entry(place).room[Number(ri)]?.models.get(piece) : undefined;
@@ -2658,7 +2849,7 @@ export class SpikeWorld {
     if (!id || !l) return false;
     const yaw = this.heroFig.want, s = this.heroSpot();
     // (Far enough ahead that the hero isn't standing in it once it stops feet.)
-    const ahead = PUT_DOWN_AHEAD + (THINGS.get(l.kind).furniture?.model.d ?? 0) / 2;
+    const ahead = PUT_DOWN_AHEAD + (modelOf(THINGS.get(l.kind))?.d ?? 0) / 2;
     l.at = { x: s.x + Math.sin(yaw) * ahead, z: s.z + Math.cos(yaw) * ahead, level: s.level, house: s.house, rot: yaw };
     this.carry.held = null;
     this.carry.hidden = false;
@@ -2688,7 +2879,7 @@ export class SpikeWorld {
   /** Draw a loose thing where it lies: in its house's group (if the house stands now), or on the ground. */
   private drawLoose(id: string, l: Loose): void {
     this.undraw(id);
-    const at: LooseSpot | null = l.at, model = THINGS.get(l.kind).furniture?.model;
+    const at: LooseSpot | null = l.at, model = modelOf(THINGS.get(l.kind));
     if (!at || !model) return;
     const g = thingGroup(model.draw(l.seed, l.variant));
     g.userData.thing = { id, kind: l.kind, house: at.house, level: at.level, rot: at.rot } satisfies Tagged;
@@ -2739,6 +2930,17 @@ export class SpikeWorld {
       const g = hs.furniture.find((f) => (f.userData.thing as Tagged | undefined)?.id === id);
       if (g) this.dropPiece(g, hs);
     }
+    // (Or something the map laid outdoors, as its chunk stood it up.)
+    for (const lc of this.chunks.values()) {
+      const objs = lc.standing.objects, i = objs.findIndex((o) => (o.userData.thing as Tagged | undefined)?.id === id && !this.isLoose(o));
+      if (i >= 0) this.dropPiece(objs.splice(i, 1)[0], null);
+    }
+  }
+
+  /** Is this drawn group a loose thing (drawn where it lies now), not the map's own placing of it? */
+  private isLoose(g: THREE.Object3D): boolean {
+    for (const d of this.looseDrawn.values()) if (d.g === g) return true;
+    return false;
   }
 
   /** The figure of the hero or one of the map's people. */
@@ -2746,27 +2948,44 @@ export class SpikeWorld {
     return id === 'hero' ? this.heroFig : this.cast.find((c) => c.who.id === id)?.fig ?? null;
   }
 
-  /** Who holds what, openly: the hero (unless out of sight), and the map's people carrying found things home. */
+  /** Who holds what, openly: the hero (unless out of sight), the map's people carrying found things home, and their weapons. */
   private holds(): Map<string, Loose> {
     const out = new Map<string, Loose>();
     const id = this.carry.held, l = id ? this.carry.loose[id] : null;
     if (l && !this.carry.hidden) out.set('hero', l);
-    for (const x of Object.values(this.carry.loose)) if (x.by) out.set(x.by, x);
+    for (const x of Object.values(this.carry.loose)) {
+      if (x.by) out.set(x.by, x);
+      if (x.wield) out.set(x.wield, x);
+    }
     return out;
   }
 
-  /** What is held, in the holders' arms (the carrying pose: `stepFigures`): in front of the chest, smaller than life so the body still shows. */
+  /**
+   * What is held: something with a grip (a sword) in the right hand, at the hand's grip, the blade out along the
+   * forearm's front; anything else in the holders' arms (the carrying pose: `stepFigures`), in front of the chest,
+   * smaller than life so the body still shows.
+   */
   private showHeld(): void {
     for (const g of this.heldGs.values()) this.dropPiece(g, null);
     this.heldGs.clear();
+    this.inHand.clear();
     for (const [who, l] of this.holds()) {
-      const model = THINGS.get(l.kind).furniture?.model, fig = this.figureOf(who);
+      const model = modelOf(THINGS.get(l.kind)), fig = this.figureOf(who);
       if (!model || !fig) continue;
       const g = thingGroup(model.draw(l.seed, l.variant));
-      const s = Math.min(1, HELD_SIZE / Math.max(model.w, model.d)), H = fig.rig.model.height;
-      g.scale.setScalar(s);
-      g.position.set(0, HELD_Y * H, HELD_AHEAD * H + (model.d * s) / 2);
-      fig.rig.group.add(g);
+      if (model.grip !== undefined) {
+        // The model's length (x) out along the forearm's front (z), its up (y) to the side (x).
+        const m = new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0));
+        g.quaternion.setFromRotationMatrix(m);
+        g.position.copy(new THREE.Vector3(model.grip, 0.02, 0).applyMatrix4(m).negate());
+        fig.rig.hand.add(g);
+        this.inHand.add(who);
+      } else {
+        const s = Math.min(1, HELD_SIZE / Math.max(model.w, model.d)), H = fig.rig.model.height;
+        g.scale.setScalar(s);
+        g.position.set(0, HELD_Y * H, HELD_AHEAD * H + (model.d * s) / 2);
+        fig.rig.group.add(g);
+      }
       this.heldGs.set(who, g);
     }
   }
@@ -2779,7 +2998,7 @@ export class SpikeWorld {
       for (const f of footprints(r.plan)) if (!this.carry.loose[pieceId(b.place.id, ri, f.id)]) out.push(f);
     });
     for (const l of Object.values(this.carry.loose)) {
-      const model = THINGS.get(l.kind).furniture?.model;
+      const model = modelOf(THINGS.get(l.kind));
       if (!model || l.at?.house !== b.place.id || l.at.level !== level) continue;
       const p = houseToLocal(b.place, l.at.x, l.at.z);
       out.push({ x: p.x, z: p.z, ...turnedHalf(model.w, model.d, l.at.rot - b.place.rot) });
@@ -2791,7 +3010,7 @@ export class SpikeWorld {
   private looseOutdoors(x0: number, z0: number, x1: number, z1: number): Shape[] {
     const out: Shape[] = [];
     for (const l of Object.values(this.carry.loose)) {
-      const at = l.at, model = THINGS.get(l.kind).furniture?.model;
+      const at = l.at, model = modelOf(THINGS.get(l.kind));
       if (!at || at.house || !model || at.x < x0 - 2 || at.x > x1 + 2 || at.z < z0 - 2 || at.z > z1 + 2) continue;
       out.push({ kind: 'box', x: at.x, z: at.z, hw: model.w / 2, hd: model.d / 2, rot: at.rot });
     }
@@ -2930,14 +3149,18 @@ export class SpikeWorld {
   }
 
   /** What the save keeps of the world (the page adds the map and writes it: `core/world3d/save.ts`). */
-  saveState(): { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags: Record<string, boolean>; talk: TalkMemory; leads: LeadsState; standing: HeroStanding; carry: CarryState } {
+  saveState(): { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags: Record<string, boolean>; talk: TalkMemory; leads: LeadsState; standing: HeroStanding; carry: CarryState; hurt: Record<string, Injuries> } {
     const h = this.hero;
-    return { hour: this.weather.hour ?? 12, hero: { x: h.x, z: h.z, level: h.stair ? 0 : h.level }, explored: this.explored.toJSON(), things: this.states.toJSON(), flags: { ...this.flags }, talk: structuredClone(this.talkMemory), leads: structuredClone(this.leads), standing: structuredClone(this.standing), carry: structuredClone(this.carry) };
+    return { hour: this.weather.hour ?? 12, hero: { x: h.x, z: h.z, level: h.stair ? 0 : h.level }, explored: this.explored.toJSON(), things: this.states.toJSON(), flags: { ...this.flags }, talk: structuredClone(this.talkMemory), leads: structuredClone(this.leads), standing: structuredClone(this.standing), carry: structuredClone(this.carry), hurt: structuredClone(this.hurt) };
   }
 
   /** Take a save back: the clock, the hero, what was seen, the things' states, what they know, what was moved. */
-  loadState(s: { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags?: Record<string, boolean>; talk?: TalkMemory; leads?: LeadsState; standing?: HeroStanding; carry?: CarryState }): void {
+  loadState(s: { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags?: Record<string, boolean>; talk?: TalkMemory; leads?: LeadsState; standing?: HeroStanding; carry?: CarryState; hurt?: Record<string, Injuries> }): void {
     this.flags = { ...s.flags };
+    // What fights left: those knocked out or killed lie where they fell (B8a).
+    this.hurt = s.hurt ? structuredClone(s.hurt) : {};
+    this.fightPoses.clear();
+    for (const [id, i] of Object.entries(this.hurt)) if (i.dead || i.out || i.dying) this.fightPoses.set(id, { pose: i.dead ? 'dead' : 'down', t: 0 });
     this.carry = s.carry ? structuredClone(s.carry) : newCarry();
     this.standing = s.standing ? structuredClone(s.standing) : newStanding();
     this.talkMemory = s.talk ? structuredClone(s.talk) : newTalkMemory();
@@ -3118,9 +3341,16 @@ export class SpikeWorld {
       }
       f.yaw += wrapAngle(f.want - f.yaw) * (1 - Math.exp(-dt / 0.08));
       f.rig.group.rotation.y = f.yaw;
-      const pose = seat ? cyclePose(SIT, this.time / IDLE_SECONDS) : f.still < 0.15 ? cyclePose(WALK, f.phase) : cyclePose(IDLE, this.time / IDLE_SECONDS);
-      // Holding something: the arms carry it, whatever the legs do (B3b).
-      f.rig.pose(this.heldGs.has(p.id) ? carrying(pose) : pose);
+      const legs = seat ? cyclePose(SIT, this.time / IDLE_SECONDS) : f.still < 0.15 ? cyclePose(WALK, f.phase) : cyclePose(IDLE, this.time / IDLE_SECONDS);
+      // Holding something: the arms carry it, or the right hand holds it up (a sword), whatever the legs do (B3b, B8a).
+      const pose = this.inHand.has(p.id) ? wielding(legs) : this.heldGs.has(p.id) ? carrying(legs) : legs;
+      // In a fight, or left lying after one: on guard, a swing, or laid on their back (B8a).
+      const fp = this.fightPoses.get(p.id);
+      const lying = fp?.pose === 'down' || fp?.pose === 'dead';
+      f.rig.group.rotation.order = 'YXZ';
+      f.rig.group.rotation.x = lying ? -Math.PI / 2 : 0;
+      f.rig.group.position.y = lying ? 0.12 : 0;
+      f.rig.pose(fp ? fightPose(pose, fp.pose, this.time - fp.t) : pose);
       f.rig.setShells(Math.min(2, this.settings.shells));
     }
   }
@@ -3135,7 +3365,7 @@ export class SpikeWorld {
     this.time += dt;
     if (this.turnInput) this.turn(this.turnInput * TURN_SPEED * dt);
     const w = this.weather;
-    if (this.dayMinutes > 0) w.advance((dt * 24) / (this.dayMinutes * 60));
+    if (this.dayMinutes > 0 && !this.fighting) w.advance((dt * 24) / (this.dayMinutes * 60));
     w.update(dtMs);
     if (this.autoBolts && w.sky === 'storm' && this.skyRng.next() < dt / 5) this.strike();
     this.stepBolt(dt);
@@ -3374,7 +3604,8 @@ export class SpikeWorld {
     const ctx = { walking: this.moves, places: this.places, clock: this.clock, acts: this.acts, whereIs, answers: this.answerHooks };
     // (People look and listen a few times a second, not every frame.)
     this.perceiveIn -= dt;
-    const look = this.perceiveIn <= 0;
+    // (While a fight lasts, no one looks about or gossips: the world waits.)
+    const look = this.perceiveIn <= 0 && !this.fighting;
     if (look) {
       this.perceiveIn = PERCEIVE_EVERY;
       this.gossip();
@@ -3395,9 +3626,11 @@ export class SpikeWorld {
       if (look) this.perceive(c, PERCEIVE_EVERY, night);
       fadeAnswer(c.mind, dt);
       // Someone the hero is talking to stands and faces them; their day waits until the talk ends.
-      const pose = c.who.id === this.talkingWith
-        ? { dx: this.hero.x - a.x, dz: this.hero.z - a.z, moving: false }
-        : stepMind(c.mind, c.who.does, BEHAVIOURS, ctx, dt);
+      const pose = this.fighting || this.hurt[c.who.id]?.out || this.hurt[c.who.id]?.dead
+        ? this.fightStep(c, dt)
+        : c.who.id === this.talkingWith
+          ? { dx: this.hero.x - a.x, dz: this.hero.z - a.z, moving: false }
+          : stepMind(c.mind, c.who.does, BEHAVIOURS, ctx, dt);
       if (Math.abs(pose.dx) + Math.abs(pose.dz) > 1e-6) c.facing = turnToward(c.facing, Math.atan2(pose.dz, pose.dx), 7 * dt);
       const y = this.footY(a);
       this.faceWalker(c.fig, pose.dx, pose.dz, pose.moving);

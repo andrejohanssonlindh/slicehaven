@@ -70,6 +70,8 @@ export interface BodyRig {
   /** Place and turn this; the feet are at its origin, the body faces its +z. */
   group: THREE.Group;
   model: BodyModel;
+  /** The right hand: something held there (a sword) is added to this, at the grip, in the forearm's space. */
+  hand: THREE.Object3D;
   pose(p: Pose): void;
   /** Show 0, 1 or 2 shell layers. */
   setShells(n: number): void;
@@ -107,9 +109,13 @@ export function makeBodyRig(model: BodyModel): BodyRig {
   const fuzzy = model.parts.filter((p) => p.shell);
   const shellGeo = fuzzy.length ? geometry(fuzzy, rest) : null;
   const shellMeshes = shellGeo ? shells.map((mat) => { const s = skinned(shellGeo, mat); s.receiveShadow = true; return s; }) : [];
+  const hand = new THREE.Object3D();
+  hand.position.set(...model.grip);
+  bones[JOINTS.indexOf('elbowR')].add(hand);
   return {
     group,
     model,
+    hand,
     pose(p: Pose) {
       JOINTS.forEach((j, i) => {
         const t = p.joints[j];

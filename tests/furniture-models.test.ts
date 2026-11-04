@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { THINGS } from '../src/content/things';
 import { MODELS } from '../src/content/things/models';
 import { bounds, emptyMesh, merge } from '../src/core/world3d/mesh';
+import { modelOf } from '../src/core/world3d/things';
 
 /**
  * What every furniture model (`content/things/models/`) must get right; the how-to is
@@ -14,7 +15,7 @@ describe('furniture models', () => {
     expect(Object.keys(MODELS).length).toBeGreaterThan(0);
     for (const id of Object.keys(MODELS)) {
       expect(THINGS.has(id), `${id}.ts: no kind of thing is called ${id}`).toBe(true);
-      expect(THINGS.get(id).furniture?.model, `${id}: not a piece of furniture`).toBe(MODELS[id]);
+      expect(modelOf(THINGS.get(id)), `${id}: not a kind with a model`).toBe(MODELS[id]);
     }
   });
 
@@ -30,7 +31,7 @@ describe('furniture models', () => {
             merge(all, p.mesh);
           }
           const b = bounds(all);
-          const mount = THINGS.get(id).furniture!.mount;
+          const mount = THINGS.get(id).furniture?.mount ?? 'flat';
           // Nothing below the floor (or below its lowest point, for hung things), and it reaches up off it.
           expect(b.min[1], 'something is below y = 0').toBeGreaterThanOrEqual(-0.01);
           expect(b.max[1], 'nothing stands up off the floor').toBeGreaterThan(mount === 'flat' ? 0.002 : 0.05);

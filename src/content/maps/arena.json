@@ -1,19 +1,30 @@
 {
   "name": "arena",
-  "about": "A small gladiator arena for trying fights: an oval of packed earth 30 by 15 m inside a palisade, a gate east and west, and things to fight round (pillars that stop the eye, a stub of low wall, barrels, crates, a woodpile). The hero starts on the sand by the west gate.",
+  "about": "A small gladiator arena for trying fights: an oval of packed earth 30 by 15 m inside a palisade, a gate east and west, and things to fight round (pillars that stop the eye, a stub of low wall, barrels, crates, a woodpile). The hero starts on the sand by the west gate, where weapons lie ready; a gladiator waits at the far end.",
   "seed": 5,
   "size": 64,
   "roads": [],
   "rules": [
     { "rule": "oval", "at": [0, 0], "rx": 15, "rz": 7.5, "every": 3, "kind": "palisade", "gaps": [{ "at": 0, "width": 3.4 }, { "at": 180, "width": 3.4 }], "floor": true, "posts": "torchpost" },
-    { "rule": "scatter", "kind": "pillar", "count": 4, "area": { "rect": [-9, -4.5, 9, 4.5] }, "gap": 1.2 },
-    { "rule": "scatter", "kind": "barrel", "count": 4, "area": { "rect": [-10, -5, 10, 5] }, "gap": 0.8 },
-    { "rule": "scatter", "kind": "crates", "count": 2, "area": { "rect": [-10, -5, 10, 5] }, "gap": 0.8 },
-    { "rule": "scatter", "kind": "woodpile", "count": 1, "area": { "rect": [-10, -5, 10, 5] }, "gap": 0.8 }
+    { "rule": "scatter", "kind": "pillar", "count": 4, "area": { "rect": [-7, -4.5, 9, 4.5] }, "gap": 1.2 },
+    { "rule": "scatter", "kind": "barrel", "count": 4, "area": { "rect": [-8, -5, 10, 5] }, "gap": 0.8 },
+    { "rule": "scatter", "kind": "crates", "count": 2, "area": { "rect": [-8, -5, 10, 5] }, "gap": 0.8 },
+    { "rule": "scatter", "kind": "woodpile", "count": 1, "area": { "rect": [-8, -5, 10, 5] }, "gap": 0.8 }
   ],
   "props": [
     { "kind": "lowwall", "x": -3, "z": 2.5, "rot": 0.3, "len": 3.5, "seed": 3 },
-    { "kind": "lowwall", "x": 5, "z": -2.5, "rot": -0.4, "len": 2.5, "seed": 8 }
+    { "kind": "lowwall", "x": 5, "z": -2.5, "rot": -0.4, "len": 2.5, "seed": 8 },
+    { "kind": "arming-sword", "x": -11, "z": 1.4, "rot": 0.3, "seed": 1 },
+    { "kind": "quarterstaff", "x": -11.3, "z": -1.5, "rot": -0.2, "seed": 2 },
+    { "kind": "hand-axe", "x": -10.2, "z": 2.4, "rot": 1.2, "seed": 3 },
+    { "kind": "cudgel", "x": -10.4, "z": -2.6, "rot": 0.9, "seed": 4 }
   ],
-  "hero": [-12, 0]
+  "places": {
+    "mark": { "at": [8, 0] },
+    "westgate": { "at": [-15, 0] }
+  },
+  "people": [
+    { "id": "gladiator", "is": ["human", "gladiator"], "seed": 4, "level": "novice", "does": [{ "do": "stay", "at": "mark", "face": "westgate" }] }
+  ],
+  "hero": [-12.5, 0]
 }

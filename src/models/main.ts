@@ -11,6 +11,7 @@ import { Pipeline } from '../engine3d/pipeline';
 import { thingGroup } from '../engine3d/things';
 import { THINGS } from '../content/things';
 import { MODELS } from '../content/things/models';
+import { modelOf } from '../core/world3d/things';
 import { t } from '../i18n';
 
 /**
@@ -103,7 +104,7 @@ function buildFurniture(): void {
   const rows: THREE.Object3D[][] = [[]];
   entries.forEach(([id, variant]) => {
     const kind = THINGS.get(id);
-    const model = kind.furniture!.model;
+    const model = modelOf(kind)!;
     const parts = model.draw(1, variant);
     const g = thingGroup(parts);
     // A turning model sweeps a circle as wide as its diagonal.
@@ -115,7 +116,7 @@ function buildFurniture(): void {
     }
     const z = 1 - row * 2.4;
     // Hung pieces float at about the height they hang.
-    const y = kind.furniture!.mount === 'hung' ? 1.0 : 0;
+    const y = kind.furniture?.mount === 'hung' ? 1.0 : 0;
     g.position.set(x + sweep / 2, y, z);
     furn.add(g);
     rows[row].push(g);

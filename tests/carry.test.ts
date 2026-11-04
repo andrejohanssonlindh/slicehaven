@@ -8,6 +8,7 @@ import { type ActTarget, type ActWorld, type Doer, offers, perform } from '../sr
 import { HAUL_SKILL, actOfStage, carriable, carryCapacity, hideable, returnedRegard, stageOf, stray, turnedHalf, wealthOf, worthOf } from '../src/core/world3d/carry';
 import type { Dice } from '../src/core/checks';
 import { rollSheet, sheetSpan } from '../src/core/npcsheet';
+import { modelOf } from '../src/core/world3d/things';
 import { CONTENT } from '../src/content/chargen';
 import { derive } from '../src/core/chargen/derive';
 import { newChar } from '../src/core/chargen/state';
@@ -92,7 +93,7 @@ describe('sizes (B3b)', () => {
   it('every size and value a kind says is sane', () => {
     for (const id of THINGS.placeable) {
       const t = THINGS.get(id);
-      if (t.size && t.size !== 'heavy') expect(t.furniture, `${id} can be carried, so it needs a model to be drawn loose`).toBeTruthy();
+      if (t.size && t.size !== 'heavy') expect(modelOf(t), `${id} can be carried, so it needs a model to be drawn loose`).toBeTruthy();
       if (t.value !== undefined) expect(t.value, id).toBeGreaterThanOrEqual(0);
       if (t.importance !== undefined) expect(t.importance, id).toBeLessThanOrEqual(3);
     }

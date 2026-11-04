@@ -71,6 +71,8 @@ export interface Loose {
   mine?: boolean;
   /** One of the map's people carrying it home (found lying about), by id. */
   by?: string;
+  /** One of the map's people holding it as their weapon (plan B8a), by id: their own, drawn for a fight, or picked up in one. */
+  wield?: string;
 }
 
 /**
