@@ -8,7 +8,7 @@ const takeFrom: VerbDef = {
   id: 'take-from',
   label: 'Take something from the {name}',
   on: { has: 'stock' },
-  gates: [{ gate: 'hands-free' }],
+  gates: [{ gate: 'a-hand-free' }],
   success: [{ choose: 'stock' }],
 };
 

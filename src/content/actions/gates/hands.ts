@@ -25,6 +25,32 @@ const handsFree: GateDef = {
   },
 };
 
+/**
+ * A hand free for this thing (plan B8a): a shield goes on the left forearm beside a one-handed weapon, a one-handed
+ * weapon in the right beside a shield; anything else needs the hands empty. Refused with what to put down first.
+ */
+const handForIt: GateDef = {
+  id: 'hand-for',
+  about: 'The doer has a hand free for the thing: a shield beside a one-handed weapon, a one-handed weapon beside a shield, anything else empty hands.',
+  kind: 'requirement',
+  check: (c) => {
+    if (!c.target) return null;
+    const free = c.world.handFor ? c.world.handFor(c.doer.id, c.target.kind) !== null : !heldName(c);
+    return free ? null : `Your hands are full: put the ${heldName(c) ?? 'other thing'} down first.`;
+  },
+};
+
+/** Some hand free (plan B8a): drawing a weapon or taking one from a rack; which one fits is asked when it is picked. */
+const aHandFree: GateDef = {
+  id: 'a-hand-free',
+  about: 'The doer has a hand free: nothing held, or a one-handed weapon with the left free, or a shield with the right free.',
+  kind: 'requirement',
+  check: (c) => {
+    const free = c.world.aHandFree ? c.world.aHandFree(c.doer.id) : !heldName(c);
+    return free ? null : `Your hands are full: put the ${heldName(c)} down first.`;
+  },
+};
+
 /** Holding something: putting it down is offered only then. */
 const holding: GateDef = {
   id: 'holding',
@@ -86,8 +112,8 @@ const holdingOwn: GateDef = {
   check: (c) => {
     const k = c.world.holding?.(c.doer.id);
     const def = k && c.world.things.has(k) ? c.world.things.get(k) : null;
-    return def?.weapon && c.world.holdsOwn?.(c.doer.id) ? null : 'You hold nothing of yours to put away.';
+    return (def?.weapon || def?.shield) && c.world.holdsOwn?.(c.doer.id) ? null : 'You hold nothing of yours to put away.';
   },
 };
 
-export default [handsFree, holding, size, weight, small, hasGear, holdingOwn];
+export default [handsFree, handForIt, aHandFree, holding, size, weight, small, hasGear, holdingOwn];

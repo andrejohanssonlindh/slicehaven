@@ -37,7 +37,7 @@ describe('spike3d taking and carrying', () => {
     expect(r.wrongs).toBeUndefined();
     expect(await w('w.holding')).toBe('stool');
     expect(await w(`w.houses.some((hs) => hs.furniture.some((g) => g.userData.thing.id === ${JSON.stringify(t.id)}))`)).toBe(false);
-    expect(await w('w.heldGs.has("hero") && w.carryPace < 1')).toBe(true);
+    expect(await w('w.inArms.has("hero") && w.carryPace < 1')).toBe(true);
     // With full hands there is no sitting, and where you stand offers putting it down.
     const here = (await w(`w.offersFor(null, ${strong}).map((o) => o.label)`)) as string[];
     expect(here).toContain('Put down the stool');

@@ -44,7 +44,7 @@ const SLOT_EN: Record<string, string> = {
 const dice = (u: number): string => diceText(unitsDice(u));
 const span = ([lo, hi]: readonly [number, number]): string => (lo === hi ? dice(lo) : `${dice(lo)}–${dice(hi)}`);
 const skillName = (id: string): string => esc(rollableName(id).replace(/^[EFHK]:/, ''));
-const gearName = (sv: string): string =>
+const gearName = (sv: string): string => !sv ? esc(t('npcs.nogear', 'none')) :
   esc(WEAPONS.find((w) => w.sv === sv)?.en ?? SHIELDS.find((s) => s.sv === sv)?.en ?? ARMOUR.find((a) => a.sv === sv)?.en ?? sv);
 
 /** Peoples, each family with its peoples under it. */

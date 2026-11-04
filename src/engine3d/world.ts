@@ -33,7 +33,7 @@ import {
   type ActKind, type AnswerStep, type CultureDef, type HeroLook, type Standing as HeroStanding, type Welcome, type WhoToThem, type Wrong, answerFor, answerLines,
   fadeStanding, giveLeave, hasLeave, mayDo, meet, moodsFromScale, newStanding, regardOf, shiftRegard, sizeUp, talkOntoScale, weightOf, withinHours,
 } from '../core/world3d/standing';
-import { type CarryState, type Loose, type LooseSpot, type Stage, actOfStage, newCarry, returnedRegard, stageOf, stray, turnedHalf, wealthOf, worthOf } from '../core/world3d/carry';
+import { type CarryState, type Loose, type LooseSpot, type Stage, actOfStage, aHandFree, handFor, newCarry, returnedRegard, stageOf, stray, turnedHalf, wealthOf, worthOf } from '../core/world3d/carry';
 import { temperOf } from '../content/people/temper';
 import { cultureOf } from '../content/cultures';
 import { personName } from '../content/people/naming';
@@ -591,7 +591,9 @@ export class SpikeWorld {
   /** Loose things drawn now, by id: in a standing house's group (`inst`), or out of doors. */
   private readonly looseDrawn = new Map<string, { g: THREE.Object3D; inst: HouseInst | null }>();
   /** The models of what is held, in the arms of whoever holds it (`hero`, or one of the map's people), by their id. */
-  private readonly heldGs = new Map<string, THREE.Object3D>();
+  private readonly heldGs: THREE.Object3D[] = [];
+  /** Who carries something in both arms (the carrying pose). */
+  private readonly inArms = new Set<string>();
   /** Who holds something in the right hand (a sword), not in both arms. */
   private readonly inHand = new Set<string>();
   /** A fight going on (plan B8a): who is in it. While it lasts the world waits: the clock, and everyone else stands. */
@@ -2428,6 +2430,8 @@ export class SpikeWorld {
       },
       holding: (doer) => (doer === 'hero' ? this.holding : null),
       stowed: (doer) => (doer === 'hero' ? this.stowed.map((s) => s.kind) : []),
+      handFor: (doer, kind) => (doer === 'hero' ? this.handFor(kind) : null),
+      aHandFree: (doer) => doer === 'hero' && this.aHandFree(),
       holdsOwn: (doer) => doer === 'hero' && !!this.carry.held && !!this.carry.loose[this.carry.held]?.mine,
       leadStudy: (t) => {
         const id = this.propLeads.get(t.id), def = id ? LEADS[id] : undefined, rec = id ? this.leads[id] : undefined;
@@ -2783,8 +2787,29 @@ export class SpikeWorld {
       const id = this.carry.held, l = id ? this.carry.loose[id] : null;
       return id && l && !this.carry.hidden ? { id, kind: l.kind } : null;
     }
-    for (const [id, l] of Object.entries(this.carry.loose)) if (l.wield === who) return { id, kind: l.kind };
+    for (const [id, l] of Object.entries(this.carry.loose)) if (l.wield === who && l.hand !== 'left') return { id, kind: l.kind };
     return null;
+  }
+
+  /** The shield someone wears on the left forearm (the hero's, or a person's), or null. */
+  shieldOf(who: string): { id: string; kind: string } | null {
+    if (who === 'hero') {
+      const id = this.carry.left, l = id ? this.carry.loose[id] : null;
+      return id && l ? { id, kind: l.kind } : null;
+    }
+    for (const [id, l] of Object.entries(this.carry.loose)) if (l.wield === who && l.hand === 'left') return { id, kind: l.kind };
+    return null;
+  }
+
+  /** One of the map's people takes up their own shield (from their sheet's gear) for a fight, as `drawWeapon` does a weapon. */
+  drawShield(who: string, kind: string): string | null {
+    const id = `${who}:shield`;
+    if (this.carry.loose[id]) return this.carry.loose[id].wield === who ? id : null;
+    const a = this.cast.find((c) => c.who.id === who)?.mind.actor;
+    if (!a || !THINGS.has(kind)) return null;
+    this.carry.loose[id] = { kind, seed: 1, home: { x: a.x, z: a.z, level: 0, house: null, rot: 0, room: null }, at: null, wield: who, hand: 'left' };
+    this.showHeld();
+    return id;
   }
 
   /**
@@ -2808,14 +2833,36 @@ export class SpikeWorld {
    */
   outfit(kinds: string[], key: string): void {
     if (this.carry.outfit === key) return;
-    for (const [id, l] of Object.entries(this.carry.loose)) if (l.stowed || (id.startsWith('hero:own:') && this.carry.held === id)) delete this.carry.loose[id];
+    for (const [id, l] of Object.entries(this.carry.loose)) if (l.stowed || (id.startsWith('hero:own:') && (this.carry.held === id || this.carry.left === id))) delete this.carry.loose[id];
     if (this.carry.held && !this.carry.loose[this.carry.held]) this.carry.held = null;
+    if (this.carry.left && !this.carry.loose[this.carry.left]) this.carry.left = null;
     kinds.forEach((kind, n) => {
       if (!THINGS.has(kind)) return;
       this.carry.loose[`hero:own:${kind}:${n}`] = { kind, seed: n + 1, home: { x: this.hero.x, z: this.hero.z, level: 0, house: null, rot: 0, room: null }, at: null, mine: true, stowed: true };
     });
     this.carry.outfit = key;
     this.showHeld();
+  }
+
+  /** Which of the hero's hands a thing of this kind would go in now (`handFor`), or null if none is free for it. */
+  handFor(kind: string): 'right' | 'left' | null {
+    const def = (id: string | null | undefined) => { const l = id ? this.carry.loose[id] : null; return l && THINGS.has(l.kind) ? THINGS.get(l.kind) : null; };
+    return THINGS.has(kind) ? handFor(THINGS.get(kind), def(this.carry.held), def(this.carry.left)) : null;
+  }
+
+  /** Has the hero some hand free (for drawing or taking something)? */
+  aHandFree(): boolean {
+    const def = (id: string | null | undefined) => { const l = id ? this.carry.loose[id] : null; return l && THINGS.has(l.kind) ? THINGS.get(l.kind) : null; };
+    return aHandFree(def(this.carry.held), def(this.carry.left));
+  }
+
+  /** Put a loose thing in the hero's hand (the one `handFor` gives). */
+  private intoHand(id: string, hand: 'right' | 'left'): void {
+    if (hand === 'left') this.carry.left = id;
+    else {
+      this.carry.held = id;
+      this.carry.hidden = false;
+    }
   }
 
   /** What the hero carries on them, not in hand (their own gear): id and kind, in the order given. */
@@ -2826,21 +2873,22 @@ export class SpikeWorld {
   /** Draw one of the hero's own things into their hand (hands must be free). Returns false if it can't. */
   drawOwn(id: string): boolean {
     const l = this.carry.loose[id];
-    if (!l?.stowed || this.carry.held) return false;
+    const hand = l?.stowed ? this.handFor(l.kind) : null;
+    if (!l || !hand) return false;
     delete l.stowed;
-    this.carry.held = id;
-    this.carry.hidden = false;
+    this.intoHand(id, hand);
     this.showHeld();
     return true;
   }
 
   /** Put what the hero holds away on them (only their own: something of someone else's is put down or given back). */
   stowHeld(): boolean {
-    const id = this.carry.held;
+    const id = this.carry.held ?? this.carry.left;
     const l = id ? this.carry.loose[id] : null;
     if (!id || !l?.mine) return false;
     l.stowed = true;
-    this.carry.held = null;
+    if (this.carry.held === id) this.carry.held = null;
+    else this.carry.left = null;
     this.showHeld();
     return true;
   }
@@ -2851,13 +2899,13 @@ export class SpikeWorld {
    */
   takeFromStock(rack: ActTarget, kind: string): string | null {
     const stock = THINGS.has(rack.kind) ? THINGS.get(rack.kind).stock : undefined;
-    if (this.carry.held || !stock || !THINGS.has(kind) || !THINGS.get(kind).chain.includes(stock)) return null;
+    const hand = this.handFor(kind);
+    if (!hand || !stock || !THINGS.has(kind) || !THINGS.get(kind).chain.includes(stock)) return null;
     let n = 1;
     while (this.carry.loose[`${rack.id}:${kind}:${n}`]) n++;
     const id = `${rack.id}:${kind}:${n}`;
     this.carry.loose[id] = { kind, seed: n, home: { x: rack.x, z: rack.z, level: rack.level, house: rack.house, rot: 0, room: null }, at: null, mine: true };
-    this.carry.held = id;
-    this.carry.hidden = false;
+    this.intoHand(id, hand);
     this.showHeld();
     return id;
   }
@@ -2904,10 +2952,11 @@ export class SpikeWorld {
   weaponsLying(x: number, z: number, r: number): { id: string; kind: string; x: number; z: number }[] {
     const out: { id: string; kind: string; x: number; z: number }[] = [];
     const near = (px: number, pz: number) => Math.hypot(px - x, pz - z) <= r;
-    for (const [id, l] of Object.entries(this.carry.loose)) if (l.at && !l.at.house && THINGS.get(l.kind).weapon && near(l.at.x, l.at.z)) out.push({ id, kind: l.kind, x: l.at.x, z: l.at.z });
+    const arms = (k: string) => THINGS.has(k) && !!(THINGS.get(k).weapon || THINGS.get(k).shield);
+    for (const [id, l] of Object.entries(this.carry.loose)) if (l.at && !l.at.house && arms(l.kind) && near(l.at.x, l.at.z)) out.push({ id, kind: l.kind, x: l.at.x, z: l.at.z });
     for (const p of this.layout.props) {
       const id = placedId(p);
-      if (!this.carry.loose[id] && THINGS.has(p.kind) && THINGS.get(p.kind).weapon && near(p.x, p.z)) out.push({ id, kind: p.kind, x: p.x, z: p.z });
+      if (!this.carry.loose[id] && arms(p.kind) && near(p.x, p.z)) out.push({ id, kind: p.kind, x: p.x, z: p.z });
     }
     return out;
   }
@@ -2920,7 +2969,11 @@ export class SpikeWorld {
       this.carry.held = null;
       this.carry.hidden = false;
     }
-    if (l.wield === who) delete l.wield;
+    if (who === 'hero' && this.carry.left === id) this.carry.left = null;
+    if (l.wield === who) {
+      delete l.wield;
+      delete l.hand;
+    }
     l.at = { x, z, level: 0, house: null, rot: Math.atan2(x - (this.fighterAt(who)?.x ?? x), z - (this.fighterAt(who)?.z ?? z)) };
     this.showHeld();
     this.drawLoose(id, l);
@@ -2940,10 +2993,11 @@ export class SpikeWorld {
       this.undraw(id);
       l.at = null;
     }
-    if (who === 'hero') {
-      this.carry.held = id;
-      this.carry.hidden = false;
-    } else l.wield = who;
+    if (who === 'hero') this.intoHand(id, this.handFor(l.kind) ?? 'right');
+    else {
+      l.wield = who;
+      if (THINGS.get(l.kind).shield) l.hand = 'left';
+    }
     this.showHeld();
   }
 
@@ -2956,7 +3010,7 @@ export class SpikeWorld {
 
   /** What the hero holds (its kind), or null. */
   get holding(): string | null {
-    const id = this.carry.held;
+    const id = this.carry.held ?? this.carry.left;
     return id ? this.carry.loose[id]?.kind ?? null : null;
   }
 
@@ -2997,8 +3051,9 @@ export class SpikeWorld {
     this.feetChanged(l.at ?? l.home);
     l.at = null;
     this.carry.loose[t.id] = l;
-    this.carry.held = t.id;
-    this.carry.hidden = hidden;
+    const hand = hidden ? 'right' : this.handFor(l.kind) ?? 'right';
+    this.intoHand(t.id, hand);
+    if (hand === 'right') this.carry.hidden = hidden;
     this.sawCarry.clear();
     this.carryStage = this.carryStageNow(l);
     this.undraw(t.id);
@@ -3009,14 +3064,16 @@ export class SpikeWorld {
 
   /** The hero puts down what they hold, just in front of them, turned the way they face. */
   private putDown(): boolean {
-    const id = this.carry.held, l = id ? this.carry.loose[id] : null;
+    const id = this.carry.held ?? this.carry.left, l = id ? this.carry.loose[id] : null;
     if (!id || !l) return false;
     const yaw = this.heroFig.want, s = this.heroSpot();
     // (Far enough ahead that the hero isn't standing in it once it stops feet.)
     const ahead = PUT_DOWN_AHEAD + (modelOf(THINGS.get(l.kind))?.d ?? 0) / 2;
     l.at = { x: s.x + Math.sin(yaw) * ahead, z: s.z + Math.cos(yaw) * ahead, level: s.level, house: s.house, rot: yaw };
-    this.carry.held = null;
-    this.carry.hidden = false;
+    if (this.carry.held === id) {
+      this.carry.held = null;
+      this.carry.hidden = false;
+    } else this.carry.left = null;
     this.showHeld();
     this.drawLoose(id, l);
     this.feetChanged(l.at);
@@ -3031,6 +3088,7 @@ export class SpikeWorld {
       this.carry.held = null;
       this.carry.hidden = false;
     }
+    if (this.carry.left === id) this.carry.left = null;
     delete l.by;
     delete l.loan;
     this.feetChanged(l.at);
@@ -3113,13 +3171,15 @@ export class SpikeWorld {
   }
 
   /** Who holds what, openly: the hero (unless out of sight), the map's people carrying found things home, and their weapons. */
-  private holds(): Map<string, Loose> {
-    const out = new Map<string, Loose>();
+  private holds(): [who: string, l: Loose][] {
+    const out: [string, Loose][] = [];
     const id = this.carry.held, l = id ? this.carry.loose[id] : null;
-    if (l && !this.carry.hidden) out.set('hero', l);
+    if (l && !this.carry.hidden) out.push(['hero', l]);
+    const left = this.carry.left ? this.carry.loose[this.carry.left] : null;
+    if (left) out.push(['hero', left]);
     for (const x of Object.values(this.carry.loose)) {
-      if (x.by) out.set(x.by, x);
-      if (x.wield) out.set(x.wield, x);
+      if (x.by) out.push([x.by, x]);
+      if (x.wield) out.push([x.wield, x]);
     }
     return out;
   }
@@ -3130,14 +3190,21 @@ export class SpikeWorld {
    * smaller than life so the body still shows.
    */
   private showHeld(): void {
-    for (const g of this.heldGs.values()) this.dropPiece(g, null);
-    this.heldGs.clear();
+    for (const g of this.heldGs) this.dropPiece(g, null);
+    this.heldGs.length = 0;
     this.inHand.clear();
+    this.inArms.clear();
     for (const [who, l] of this.holds()) {
       const model = modelOf(THINGS.get(l.kind)), fig = this.figureOf(who);
       if (!model || !fig) continue;
       const g = thingGroup(model.draw(l.seed, l.variant));
-      if (model.grip !== undefined) {
+      if (THINGS.get(l.kind).shield) {
+        // A shield on the left forearm: its face (y) out to the left (x), its length (x) along the forearm (y).
+        const m = new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, -1));
+        g.quaternion.setFromRotationMatrix(m);
+        g.position.set(0.035, 0, 0.02);
+        fig.rig.left.add(g);
+      } else if (model.grip !== undefined) {
         // The model's length (x) out along the forearm's front (z), its up (y) to the side (x).
         const m = new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0));
         g.quaternion.setFromRotationMatrix(m);
@@ -3149,8 +3216,9 @@ export class SpikeWorld {
         g.scale.setScalar(s);
         g.position.set(0, HELD_Y * H, HELD_AHEAD * H + (model.d * s) / 2);
         fig.rig.group.add(g);
+        this.inArms.add(who);
       }
-      this.heldGs.set(who, g);
+      this.heldGs.push(g);
     }
   }
 
@@ -3507,7 +3575,7 @@ export class SpikeWorld {
       f.rig.group.rotation.y = f.yaw;
       const legs = seat ? cyclePose(SIT, this.time / IDLE_SECONDS) : f.still < 0.15 ? cyclePose(WALK, f.phase) : cyclePose(IDLE, this.time / IDLE_SECONDS);
       // Holding something: the arms carry it, or the right hand holds it up (a sword), whatever the legs do (B3b, B8a).
-      const pose = this.inHand.has(p.id) ? wielding(legs) : this.heldGs.has(p.id) ? carrying(legs) : legs;
+      const pose = this.inHand.has(p.id) ? wielding(legs) : this.inArms.has(p.id) ? carrying(legs) : legs;
       // In a fight, or left lying after one: on guard, a swing, or laid on their back (B8a).
       const fp = this.fightPoses.get(p.id);
       const lying = fp?.pose === 'down' || fp?.pose === 'dead';

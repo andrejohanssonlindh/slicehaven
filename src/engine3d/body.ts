@@ -72,6 +72,8 @@ export interface BodyRig {
   model: BodyModel;
   /** The right hand: something held there (a sword) is added to this, at the grip, in the forearm's space. */
   hand: THREE.Object3D;
+  /** The left forearm: a shield is worn on it (plan B8a), at the middle of the forearm, in the forearm's space. */
+  left: THREE.Object3D;
   pose(p: Pose): void;
   /** Show 0, 1 or 2 shell layers. */
   setShells(n: number): void;
@@ -112,10 +114,14 @@ export function makeBodyRig(model: BodyModel): BodyRig {
   const hand = new THREE.Object3D();
   hand.position.set(...model.grip);
   bones[JOINTS.indexOf('elbowR')].add(hand);
+  const left = new THREE.Object3D();
+  left.position.set(model.grip[0], model.grip[1] * 0.6, model.grip[2]);
+  bones[JOINTS.indexOf('elbowL')].add(left);
   return {
     group,
     model,
     hand,
+    left,
     pose(p: Pose) {
       JOINTS.forEach((j, i) => {
         const t = p.joints[j];

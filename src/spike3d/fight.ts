@@ -1,11 +1,11 @@
-import { ARMOUR, WEAPONS } from '../content/chargen/equipment';
+import { ARMOUR, SHIELDS, WEAPONS } from '../content/chargen/equipment';
 import { FIGHT_MINDS, styleFor } from '../content/combat';
 import { rollableName } from '../content/rollables';
 import { THINGS } from '../content/things';
 import { WOUND_TABLES } from '../content/wounds';
 import { baseArmour, baseDamage, type Dice, diceText } from '../core/chargen/tables';
 import {
-  ADJACENT, RUN, WALK, type Choice, type Fight, type Fighter, type FightItem, type FightRules, type LogLine, PICKUP_REACH, UNTRAINED, attackTactics,
+  ADJACENT, RUN, WALK, type Choice, shieldFromRow, type Fight, type Fighter, type FightItem, type FightRules, type LogLine, PICKUP_REACH, UNTRAINED, attackTactics,
   PLEA_SKILLS, acceptYield, between, canAct, loadDiceOf, pleaDifficulty, refuseYield, resolveRound, roleOf,
   seizeInitiative, startFight, weaponOf,
 } from '../core/combat';
@@ -60,6 +60,18 @@ const rowOfKind = (kind: string) => rowOf(THINGS.has(kind) ? THINGS.get(kind).we
 /** The kind of thing that is this row (a sword in the world for the sheet's sword). */
 const kindOfRow = (sv: string): string | null => THINGS.placeable.find((k) => THINGS.get(k).weapon === sv) ?? null;
 const units = (d: Dice) => d.n * 4 + d.mod;
+/** The kind of thing that is this shield row (a buckler in the world for the sheet's buckler). */
+const kindOfShield = (sv: string): string | null => THINGS.placeable.find((k) => THINGS.get(k).shield === sv) ?? null;
+/** A thing as the fight sees it: a shield's block, else a weapon's row (anything else held is an improvised weapon). */
+function itemOf(id: string, kind: string): FightItem | null {
+  const sv = THINGS.has(kind) ? THINGS.get(kind).shield : undefined;
+  const sh = sv ? SHIELDS.find((s) => s.sv === sv) : undefined;
+  if (sh) return { id, shield: shieldFromRow(sh) };
+  const row = rowOfKind(kind);
+  return row ? { id, weapon: row } : null;
+}
+/** Is the hand for this item free (the left for a shield, the right for anything else)? */
+const slotFree = (f: Fighter, item: FightItem): boolean => (item.shield ? !f.shield : !f.weapon);
 
 export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: string) => void, save: () => void, newGame: () => void, condition: ConditionSheet): FightUI {
   const el = document.getElementById('fight')!;
@@ -134,11 +146,12 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     const phys = hero.dice['attr:Kroppsbyggnad'] ?? { n: 2, mod: 0 };
     const held = w.wieldedBy('hero');
     const row = held ? rowOfKind(held.kind) : undefined;
+    const sh = w.shieldOf('hero');
     return {
       id: 'hero', side: 0, x: at.x, z: at.z, pools: Object.fromEntries(FIGHT_IDS.map((id) => [id, hero.dice[id] ?? { n: 0, mod: 0 }])),
       physique: phys, baseDamage: baseDamage(units(phys)), baseArmour: baseArmour(units(phys)), armour: { cut: 0, crush: 0, thrust: 0 }, loadDice: 0,
-      weapon: held && row ? { id: held.id, weapon: row } : null, shield: null, injuries: w.injuriesOf('hero') ?? unhurt(), drew: false,
-      belt: w.stowed.flatMap((s) => { const r = rowOfKind(s.kind); return r && r.sv !== IMPROVISED ? [{ id: s.id, weapon: r }] : []; }),
+      weapon: held && row ? { id: held.id, weapon: row } : null, shield: sh ? itemOf(sh.id, sh.kind) : null, injuries: w.injuriesOf('hero') ?? unhurt(), drew: false,
+      belt: w.stowed.flatMap((s) => { const it = itemOf(s.id, s.kind); return it && it.weapon?.sv !== IMPROVISED ? [it] : []; }),
     };
   }
 
@@ -151,19 +164,22 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     const held = w.wieldedBy(id) ?? (kind ? (w.drawWeapon(id, kind), w.wieldedBy(id)) : null);
     const row = held ? rowOfKind(held.kind) : undefined;
     const armour = sheet?.gear.armour ? ARMOUR.find((a) => a.sv === sheet.gear.armour) : undefined;
+    // Their own shield, if their sheet has one and their weapon leaves a hand for it.
+    const shieldKind = sheet?.gear.shield ? kindOfShield(sheet.gear.shield) : null;
+    const sh = w.shieldOf(id) ?? (shieldKind && THINGS.get(held?.kind ?? '')?.hands !== 2 ? (w.drawShield(id, shieldKind), w.shieldOf(id)) : null);
     return {
       id, side: 1, x: at.x, z: at.z, pools: Object.fromEntries(FIGHT_IDS.map((s) => [s, dice(s)])),
       physique: phys, baseDamage: baseDamage(units(phys)), baseArmour: baseArmour(units(phys)),
       armour: armour ? { cut: armour.h, crush: armour.k, thrust: armour.s } : { cut: 0, crush: 0, thrust: 0 }, loadDice: loadDiceOf(armour?.load ?? 0),
-      weapon: held && row ? { id: held.id, weapon: row } : null, shield: null, injuries: w.injuriesOf(id) ?? unhurt(), drew: false,
+      weapon: held && row ? { id: held.id, weapon: row } : null, shield: sh ? itemOf(sh.id, sh.kind) : null, injuries: w.injuriesOf(id) ?? unhurt(), drew: false,
     };
   }
 
   /** What lies about the fight: weapons on the ground near it, as the rules see them. */
   function groundNear(w: SpikeWorld, x: number, z: number): Fight['ground'] {
     return w.weaponsLying(x, z, GROUND_REACH).flatMap((g) => {
-      const row = rowOfKind(g.kind);
-      return row ? [{ id: g.id, weapon: row, x: g.x, z: g.z } satisfies FightItem & { x: number; z: number }] : [];
+      const it = itemOf(g.id, g.kind);
+      return it ? [{ ...it, x: g.x, z: g.z } satisfies FightItem & { x: number; z: number }] : [];
     });
   }
 
@@ -183,7 +199,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     b.textContent = name;
     const skill = weaponOf(f).skill, pool = f.pools[skill];
     const dice = pool && (pool.n > 0 || pool.mod > 0) ? diceText(pool) : `${diceText(UNTRAINED)} ${t('fight.untrainedtag', 'untrained')}`;
-    const weapon = f.weapon ? kindName(f.weapon.id) : t('fight.bare', 'bare hands');
+    const weapon = (f.weapon ? kindName(f.weapon.id) : t('fight.bare', 'bare hands')) + (f.shield ? t('fight.andshield', ' and {shield}', { shield: kindName(f.shield.id) }) : '');
     top.append(b, document.createTextNode(` · ${exactHarm ? `${weapon} (${rollableName(skill)} ${dice})` : weapon}`));
     if (own || lv.foeExact) {
       const more = document.createElement('span');
@@ -309,15 +325,15 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     if (fight.offer === foeId) out.push({ label: t('fight.accept', 'Accept their surrender'), go: accept });
     const role = roleOf(fight, 'hero');
     // Something to pick up within reach (only empty-handed: one thing at a time).
-    const near = !me.weapon ? fight.ground.filter((g) => Math.hypot(g.x - me.x, g.z - me.z) <= PICKUP_REACH) : [];
+    const near = fight.ground.filter((g) => slotFree(me, g) && Math.hypot(g.x - me.x, g.z - me.z) <= PICKUP_REACH);
     const pick = near.map((g) => ({ label: t('fight.pickup', 'Pick up the {name}', { name: kindName(g.id) }), go: () => play({ pickUp: g.id, defend: 'standard' }) }));
     // Your own weapons, carried at the belt or on the back: draw one (the side action; −1D6 on the next roll unless quick to draw).
-    if (!me.weapon) pick.unshift(...(me.belt ?? []).map((b) => ({ label: t('fight.draw', 'Draw your {name}', { name: kindName(b.id) }), go: () => play({ draw: b.id, defend: 'standard' }) })));
+    pick.unshift(...(me.belt ?? []).filter((b) => slotFree(me, b)).map((b) => ({ label: t('fight.draw', 'Draw your {name}', { name: kindName(b.id) }), go: () => play({ draw: b.id, defend: 'standard' }) })));
     if (role === 'free') {
       out.push(...planned());
       // Weapons lying about, not yet in reach: go to one (empty-handed only, as picking up is).
       if (!me.weapon && !plan) {
-        const lying = fight.ground.filter((g) => !within(g, PICKUP_REACH)).sort((a, b) => Math.hypot(a.x - me.x, a.z - me.z) - Math.hypot(b.x - me.x, b.z - me.z)).slice(0, 2);
+        const lying = fight.ground.filter((g) => g.weapon && !within(g, PICKUP_REACH)).sort((a, b) => Math.hypot(a.x - me.x, a.z - me.z) - Math.hypot(b.x - me.x, b.z - me.z)).slice(0, 2);
         for (const g of lying) out.push(...goTo({ x: g.x, z: g.z, item: g.id }));
       }
       const d = between(fight, 'hero', foeId);
@@ -350,7 +366,8 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     const me = fight.fighters[0];
     if (plan.item && within(plan, PICKUP_REACH)) {
       const id = plan.item;
-      return me.weapon ? [] : [{ label: t('fight.pickup', 'Pick up the {name}', { name: kindName(id) }), go: () => play({ pickUp: id, defend: 'standard' }) }];
+      const item = fight.ground.find((g) => g.id === id);
+      return !item || !slotFree(me, item) ? [] : [{ label: t('fight.pickup', 'Pick up the {name}', { name: kindName(id) }), go: () => play({ pickUp: id, defend: 'standard' }) }];
     }
     return goTo(plan);
   }

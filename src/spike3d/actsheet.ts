@@ -4,6 +4,7 @@ import { diceText } from '../core/chargen/tables';
 import { UNTRAINED } from '../core/combat';
 import { PERSON_LEVELS, type PersonLevel } from '../core/npcsheet';
 import { THINGS } from '../content/things';
+import type { ThingDef } from '../core/world3d/things';
 import { defaultHero, heroFromChar, rollableName } from '../content/rollables';
 import { derive } from '../core/chargen/derive';
 import { loadRoster } from '../core/chargen/state';
@@ -109,6 +110,21 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
    * Pick one of what a thing offers, in the same sheet (plan B8a): a rack's stock (every weapon, with its skill and
    * damage), or how good a fighter a gong calls (the levels).
    */
+  /**
+   * A weapon or shield in a line: your skill and dice with it (untrained 2D6), two hands, its properties; a shield's
+   * block bonus.
+   */
+  function armsLine(thing: ThingDef, props: boolean): string {
+    const row = thing.weapon ? WEAPONS.find((x) => x.sv === thing.weapon) : undefined;
+    const sh = thing.shield ? SHIELDS.find((x) => x.sv === thing.shield) : undefined;
+    const skillId = row?.skill ?? (sh ? 'Sköld' : null);
+    const skill = skillId ? `${rollableName(skillId)} ${diceText(doer.dice(skillId).n > 0 ? doer.dice(skillId) : UNTRAINED)}` : '';
+    const extra = row
+      ? [row.h1 === '–' ? t('act.pick.two', 'two hands') : '', props && row.props ? propList(row.props).map((p) => p.en).join(', ') : '']
+      : sh ? [t('act.pick.block', 'block {b}', { b: sh.melee.replace('T6', 'D6') }), props && sh.props ? propList(sh.props).map((p) => p.en).join(', ') : ''] : [];
+    return [skill, ...extra].filter(Boolean).join(' · ');
+  }
+
   function pick(what: 'stock' | 'calls' | 'gear', target: ActTarget | null): void {
     const w = world();
     const kind = target ? THINGS.get(target.kind) : null;
@@ -138,10 +154,9 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
       lookEl.textContent = t('act.pick.gearlook', 'What you carry. Your skill with each is in brackets.');
       for (const g of gear) {
         const thing = THINGS.get(g.kind);
-        const row = thing.weapon ? WEAPONS.find((x) => x.sv === thing.weapon) : undefined;
-        const skill = row ? `${rollableName(row.skill)} ${diceText(doer.dice(row.skill).n > 0 ? doer.dice(row.skill) : UNTRAINED)}` : '';
-        add(cap(t(`thing.${g.kind}.name`, thingName(thing))), [skill, row && row.h1 === '–' ? t('act.pick.two', 'two hands') : ''].filter(Boolean).join(' · '), () => {
+        add(cap(t(`thing.${g.kind}.name`, thingName(thing))), armsLine(thing, false), () => {
           if (w.drawOwn(g.id)) notify(t('act.drew', 'You draw your {name}.', { name: thingName(thing) }));
+          else notify(t('act.pick.nohand', 'No hand free for the {name}: put away what you hold first.', { name: thingName(thing) }));
         });
       }
     } else if (!kind || !target) return;
@@ -151,11 +166,8 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
       const kinds = THINGS.placeable.filter((k) => k !== kind.id && THINGS.get(k).chain.includes(kind.stock!));
       for (const k of kinds) {
         const thing = THINGS.get(k);
-        const row = thing.weapon ? WEAPONS.find((x) => x.sv === thing.weapon) : undefined;
-        const skill = row ? `${rollableName(row.skill)} ${diceText(doer.dice(row.skill).n > 0 ? doer.dice(row.skill) : UNTRAINED)}` : '';
-        const hands = row ? (row.h1 === '–' ? t('act.pick.two', 'two hands') : '') : '';
-        add(cap(t(`thing.${k}.name`, thingName(thing))), [skill, hands, row?.props ? propList(row.props).map((p) => p.en).join(', ') : ''].filter(Boolean).join(' · '), () => {
-          if (!w.takeFromStock(target, k)) notify(t('act.pick.nohands', 'Your hands are full.'));
+        add(cap(t(`thing.${k}.name`, thingName(thing))), armsLine(thing, true), () => {
+          if (!w.takeFromStock(target, k)) notify(t('act.pick.nohand', 'No hand free for the {name}: put away what you hold first.', { name: thingName(thing) }));
           else notify(t('act.pick.took', 'You take the {name}.', { name: thingName(thing) }));
         });
       }

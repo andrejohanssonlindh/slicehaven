@@ -35,9 +35,10 @@ const kinds: PersonKindDef[] = [
     sheet: { skills: { Båge: 'main', Dolk: 'side' }, gear: { weapon: ['Kortbåge'], sidearm: ['Dolk', 'Huggkniv'], armour: LEATHER } },
   },
   {
-    id: 'gladiator', is: ['job-soldier'], about: 'A fighter of the arena, sword in hand, who fights to the death.',
+    id: 'gladiator', is: ['job-soldier'], about: 'A fighter of the arena, sword in hand and mostly a shield on the arm, who fights to the death.',
     look: { right: 'none', left: 'none', sleeves: 'rolled' },
-    sheet: { skills: { Svärd: 'main', Undvika: 'side' }, gear: { weapon: ['Stridssvärd', 'Kortsvärd'], armour: ['Mjukt läder'] } },
+    // A shield three times in four ('' is none): sword and shield, or the sword alone.
+    sheet: { skills: { Svärd: 'main', Sköld: 'side', Undvika: 'side' }, gear: { weapon: ['Stridssvärd', 'Kortsvärd'], shield: ['Liten rundsköld', 'Bucklare', 'Stor rundsköld', ''], armour: ['Mjukt läder'] } },
   },
   {
     id: 'soldier-pike', is: ['job-soldier'], about: 'A soldier of the line, with a long spear.',

@@ -98,6 +98,9 @@ export interface ShieldStats {
   props: Props;
 }
 
+/** A shield's stats from its row in the shield table (its block bonus "+1T6", its properties). */
+export const shieldFromRow = (row: { sv: string; melee: string; props: string }): ShieldStats => ({ name: row.sv, melee: bonusDice(row.melee), props: parseProps(row.props) });
+
 /** The parts of an equipment row the fight reads (`content/chargen/equipment.ts`). */
 export interface WeaponRow {
   sv: string;
@@ -303,6 +306,9 @@ function pool(f: Fighter, id: string): Dice {
   const d = f.pools[id];
   return d && (d.n > 0 || d.mod > 0) ? d : UNTRAINED;
 }
+
+/** Would this weapon take both of their hands (too heavy for one, or made for two)? Then no shield beside it. */
+const twoHanded = (f: Fighter, row: WeaponRow): boolean => weaponFromRow(row, f.baseDamage, f.physique).hands === 2;
 
 /** Which arm(s) a weapon is in, for the wounds that weigh on it. */
 const armsOf = (w: WeaponStats): ('left' | 'right')[] => (w.hands === 2 ? ['left', 'right'] : ['right']);
@@ -596,7 +602,7 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
       const i = fight.ground.findIndex((g) => g.id === c.pickUp && dist(g, f) <= PICKUP_REACH);
       const item = fight.ground[i];
       const slot = item?.shield ? 'shield' : 'weapon';
-      if (item && !f[slot] && !(slot === 'shield' && weaponOf(f).hands === 2)) {
+      if (item && !f[slot] && !(slot === 'shield' && weaponOf(f).hands === 2) && !(slot === 'weapon' && f.shield && item.weapon && twoHanded(f, item.weapon))) {
         fight.ground.splice(i, 1);
         f[slot] = { id: item.id, ...(item.weapon ? { weapon: item.weapon } : {}), ...(item.shield ? { shield: item.shield } : {}) };
         f.drew = true;
@@ -606,7 +612,7 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
       const i = (f.belt ?? []).findIndex((b) => b.id === c.draw);
       const item = f.belt?.[i];
       const slot = item?.shield ? 'shield' : 'weapon';
-      if (item && !f[slot] && !(slot === 'shield' && weaponOf(f).hands === 2)) {
+      if (item && !f[slot] && !(slot === 'shield' && weaponOf(f).hands === 2) && !(slot === 'weapon' && f.shield && item.weapon && twoHanded(f, item.weapon))) {
         f.belt!.splice(i, 1);
         f[slot] = item;
         f.drew = true;

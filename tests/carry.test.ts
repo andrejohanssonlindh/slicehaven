@@ -5,7 +5,7 @@ import { LIBRARY } from '../src/content/skillweb';
 import { THINGS } from '../src/content/things';
 import { Rng } from '../src/core/rng';
 import { type ActTarget, type ActWorld, type Doer, offers, perform } from '../src/core/world3d/actions';
-import { HAUL_SKILL, actOfStage, carriable, carryCapacity, hideable, returnedRegard, stageOf, stray, turnedHalf, wealthOf, worthOf } from '../src/core/world3d/carry';
+import { HAUL_SKILL, aHandFree, actOfStage, carriable, handFor, carryCapacity, hideable, returnedRegard, stageOf, stray, turnedHalf, wealthOf, worthOf } from '../src/core/world3d/carry';
 import type { Dice } from '../src/core/checks';
 import { rollSheet, sheetSpan } from '../src/core/npcsheet';
 import { modelOf } from '../src/core/world3d/things';
@@ -256,5 +256,26 @@ describe('bringing found things home (B3b)', () => {
     expect(home).toBe(true);
     expect(m.tidy).toBeUndefined();
     expect(Math.hypot(m.actor.x + 6, m.actor.z)).toBeLessThan(1.3);
+  });
+});
+
+describe('hands (plan B8a)', () => {
+  const sword = { hands: 1 as const }, greatsword = { hands: 2 as const }, stool = {}, shield = { hands: 1 as const, shield: 'Bucklare' };
+  it('a shield goes on the left beside a one-handed weapon, not beside a two-handed one or something in both arms', () => {
+    expect(handFor(shield, null, null)).toBe('left');
+    expect(handFor(shield, sword, null)).toBe('left');
+    expect(handFor(shield, greatsword, null)).toBeNull();
+    expect(handFor(shield, stool, null)).toBeNull();
+    expect(handFor(shield, null, shield)).toBeNull();
+  });
+  it('anything else goes in the right; with a shield on, only what takes one hand', () => {
+    expect(handFor(sword, null, shield)).toBe('right');
+    expect(handFor(greatsword, null, shield)).toBeNull();
+    expect(handFor(stool, null, shield)).toBeNull();
+    expect(handFor(sword, sword, null)).toBeNull();
+    expect(aHandFree(sword, null)).toBe(true);
+    expect(aHandFree(sword, shield)).toBe(false);
+    expect(aHandFree(null, shield)).toBe(true);
+    expect(aHandFree(greatsword, null)).toBe(false);
   });
 });

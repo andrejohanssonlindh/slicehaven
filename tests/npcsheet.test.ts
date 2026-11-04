@@ -139,7 +139,8 @@ describe('gifts, basic skills and levels (B4, Q27)', () => {
 
 describe('the data', () => {
   const known = (id: string) => SKILL_BY_ID.has(id) || /^[EFHK]:/.test(id);
-  const gearKnown = (sv: string) => WEAPONS.some((w) => w.sv === sv) || SHIELDS.some((s) => s.sv === sv) || ARMOUR.some((a) => a.sv === sv);
+  // ('' is a choice of nothing in that slot: a gladiator without a shield.)
+  const gearKnown = (sv: string) => sv === '' || WEAPONS.some((w) => w.sv === sv) || SHIELDS.some((s) => s.sv === sv) || ARMOUR.some((a) => a.sv === sv);
 
   it('every group of callings has an archetype, and every archetype is one of the book’s eight', () => {
     for (const f of Object.values(FACETS).filter((x) => x.dim === 'station' && x.parent === 'station')) expect(GROUP_ARCHETYPE[f.id], f.id).toBeTruthy();

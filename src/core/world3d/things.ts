@@ -145,6 +145,16 @@ export interface ThingDef {
    */
   weapon?: string;
   /**
+   * A shield (plan B8a): its row in the shield table (`SHIELDS`, by its Swedish name), which gives its block bonus and
+   * properties in a fight. Worn on the left forearm, beside a one-handed weapon.
+   */
+  shield?: string;
+  /**
+   * How many hands it takes to hold (plan B8a): 1 (a sword, a shield: another can go in the other hand) or 2 (a
+   * greatsword). Left out, it is carried in both arms (a stool) and nothing else can be held with it.
+   */
+  hands?: 1 | 2;
+  /**
    * A rack or chest that hands out things of a family (a weapon rack: `weapon`): *take from it* lists every kind under
    * it to pick from, and the one picked is put in your hand. Never runs out (a test ground's, for now).
    */

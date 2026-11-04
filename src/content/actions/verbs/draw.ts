@@ -6,9 +6,9 @@ import type { VerbDef } from '../../../core/world3d/actions';
  */
 const draw: VerbDef = {
   id: 'draw',
-  label: 'Draw a weapon',
+  label: 'Draw a weapon or shield',
   on: 'here',
-  gates: [{ gate: 'hands-free' }, { gate: 'has-gear' }],
+  gates: [{ gate: 'a-hand-free' }, { gate: 'has-gear' }],
   success: [{ choose: 'gear' }],
 };
 

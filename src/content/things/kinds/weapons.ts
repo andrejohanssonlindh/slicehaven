@@ -42,6 +42,6 @@ export default [
     if (!row) throw new Error(`weapon ${id}: no row ${w.row} in the weapon table`);
     const model = MODELS[id];
     if (!model) throw new Error(`weapon ${id} has no model in content/things/models/${id}.ts`);
-    return { id, is: 'weapon', look: w.look, name: row.en.toLowerCase(), weapon: row.sv, model, weight: kg(row.weight), value: row.price, draw: (p) => model.draw(p.seed) };
+    return { id, is: 'weapon', look: w.look, name: row.en.toLowerCase(), weapon: row.sv, hands: row.h1 === '–' ? 2 : 1, model, weight: kg(row.weight), value: row.price, draw: (p) => model.draw(p.seed) };
   }),
 ] satisfies ThingDef[];

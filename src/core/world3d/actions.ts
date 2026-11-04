@@ -86,6 +86,10 @@ export interface ActWorld {
   owners?: OwnerView;
   /** What a doer holds now (its kind), or null: hands full can't take another or sit (plan B3b). Left out: hands are free. */
   holding?: (doer: string) => string | null;
+  /** Which hand a thing of this kind would go in for the doer now (a shield the left, beside a one-handed weapon), or null. Left out: only empty hands take anything. */
+  handFor?: (doer: string, kind: string) => 'right' | 'left' | null;
+  /** Has the doer some hand free (`aHandFree`)? Left out: only when they hold nothing. */
+  aHandFree?: (doer: string) => boolean;
   /** What a doer carries on them, not in hand (their own gear, by kind; plan B8a). Left out: nothing. */
   stowed?: (doer: string) => string[];
   /** Is what the doer holds their own (it can be put away on them)? */

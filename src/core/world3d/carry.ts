@@ -73,6 +73,8 @@ export interface Loose {
   by?: string;
   /** One of the map's people holding it as their weapon (plan B8a), by id: their own, drawn for a fight, or picked up in one. */
   wield?: string;
+  /** Held in the left hand by one of the map's people (`wield`): a shield. Left out: the right. */
+  hand?: 'left';
   /** Carried on the hero, not in hand (at the belt, on the back): their own gear, drawn when wanted. Not in the world. */
   stowed?: boolean;
 }
@@ -91,8 +93,10 @@ export const stray = (l: Loose, where: Whereabouts): boolean => !!l.at && !l.min
 
 /** What the hero has taken and where things lie. */
 export interface CarryState {
-  /** What the hero holds (a thing's id in `loose`), or null. */
+  /** What the hero holds in the right hand, or in both arms (a thing's id in `loose`), or null. */
   held: string | null;
+  /** On the left forearm: a shield (plan B8a), beside a one-handed weapon or nothing. */
+  left?: string | null;
   /** Held out of sight (slipped away unseen): not drawn, not slowing, never recognised. */
   hidden: boolean;
   /** Every thing that has been moved, by its id. */
@@ -145,3 +149,19 @@ export function worthOf(act: ActKind, value: number, importance: number, wealth:
   const w = Math.max(lo, Math.min(hi, Math.sqrt(Math.max(0, value) / c.wealth[wealth])));
   return w * (1 + 0.5 * Math.max(0, importance));
 }
+
+/** What `handFor` needs of a kind: one hand or two (left out: both arms), and whether it is a shield. */
+export type HandsOf = { hands?: 1 | 2; shield?: string };
+
+/**
+ * Which hand a thing goes in (plan B8a), given what is held: a shield on the left forearm, if it is free and the right
+ * holds nothing or something one-handed; anything else in the right, if it is free and, with a shield on, it takes
+ * one hand (a two-handed weapon or something carried in both arms needs the shield off first). Null: no hand for it.
+ */
+export function handFor(kind: HandsOf, right: HandsOf | null, left: HandsOf | null): 'right' | 'left' | null {
+  if (kind.shield) return !left && (!right || right.hands === 1) ? 'left' : null;
+  return !right && (!left || kind.hands === 1) ? 'right' : null;
+}
+
+/** Is some hand free (for drawing or taking something, before knowing what): the right, or the left beside a one-handed thing. */
+export const aHandFree = (right: HandsOf | null, left: HandsOf | null): boolean => !right || (!left && right.hands === 1);

@@ -2,6 +2,15 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-04 — B8a: shields, and a sword and shield together
+
+- **Five shields** as things, with models: **buckler** (small, iron), **small round shield**, **large round shield**, **knight's shield** (pointed, painted), **curved shield** (tall, square). Each reads its row in the shield table: its block bonus and properties. The table gives no weights, so I set them myself (1.5 to 7 kg).
+- **The left hand.** A shield goes on the **left forearm**, beside a one-handed weapon in the right hand. A two-handed weapon, or something you carry in both arms (a stool), leaves no hand for a shield, and the other way round: with a shield on, you can't pick up a greatsword until it's off. *Pick up*, *Take from the rack*, *Draw* and *Put away* all follow this. With both hands full, *Put down* and *Put away* take the weapon first, then the shield.
+- **The weapon rack has the shields too**, with your Shield skill and each one's block bonus. **Shields from the creator** are carried like your weapons, and you draw them the same way (*Draw a weapon or shield*).
+- **In a fight** your card says *"arming sword and buckler"*. When you defend, the best of **parry, block (Shield skill + the shield's bonus) or dodge** is used, as the rules already had. A blow to the left arm can make you drop the shield. You can pick a shield up or draw one as the side action, in or out of reach of your foe.
+- **The gladiator** now fights with a shield **three times in four** (a small round shield, a buckler or a large round one) and has some Shield skill. Strike the gong for a fresh one to get the other roll.
+- **Not checked by eye:** at the phone's zoom a buckler is a few pixels. The test checks that it's on the left forearm, not how it looks. Tell me if it sits wrong on the arm.
+
 ## 2026-11-04 — B8a: your own weapons from the creator
 
 - **Your hero carries the weapons they own**: every weapon chosen or bought in the creator (the default shepherd has the quarterstaff). They're at the belt or on the back, not in your hand.

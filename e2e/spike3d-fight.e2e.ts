@@ -1,4 +1,4 @@
-/* Browser test: a fight in the arena (B8a): draw and put away your own weapon; pick a sword up off the sand (held in the right hand, not slowing you), fight the gladiator round by round from the fight panel until one side wins (the upper hand: whoever is quicker sees the other's choice; a tap plans a move; the panel leaves the fight in view), and what it left (the dead, the injuries) is kept through a reload. */
+/* Browser test: a fight in the arena (B8a): draw and put away your own weapon; pick a sword (and a shield for the left arm) up off the sand (held in the right hand, not slowing you), fight the gladiator round by round from the fight panel until one side wins (the upper hand: whoever is quicker sees the other's choice; a tap plans a move; the panel leaves the fight in view), and what it left (the dead, the injuries) is kept through a reload. */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { OUT, openPage, startEnv, stopEnv, type Env } from './harness';
 
@@ -75,6 +75,22 @@ describe('spike3d fight', () => {
     await page.waitForTimeout(400);
     await page.screenshot({ path: `${OUT}/fight-sword.png` });
 
+    // A shield from the rack goes on the left forearm, beside the sword in the right hand.
+    await w(`(w.placeHeroAt(${rack!.x}, ${rack!.z - 1.4}), window.spike.sheet.open(${JSON.stringify(rack)}), 0)`);
+    await page.click('#act .offers button:has-text("Take something")');
+    await page.click('#act .offers button:has-text("Buckler")');
+    expect(await w('w.shieldOf("hero")?.kind')).toBe('buckler');
+    expect(await w('w.wieldedBy("hero")?.kind')).toBe('arming-sword');
+    // Drawn: the buckler on the left forearm, the sword in the right hand.
+    expect(await w('w.figureOf("hero").rig.left.children.length')).toBe(1);
+    expect(await w('w.figureOf("hero").rig.hand.children.length')).toBe(1);
+    await w(`(w.placeHeroAt(${sword!.x - 0.8}, ${sword!.z}), 0)`);
+    // (Zoomed in to see the buckler on the arm, then back.)
+    for (let i = 0; i < 4; i++) await page.click('#zoom button[data-zoom="1"]');
+    await page.waitForTimeout(600);
+    await page.screenshot({ path: `${OUT}/fight-shield.png` });
+    for (let i = 0; i < 4; i++) await page.click('#zoom button[data-zoom="-1"]');
+
     // A quick hero (Reaktion 8D6): quicker when it is rolled, so they see what the gladiator means to do.
     await w(`(window.spike.hero.dice['attr:Reaktion'] = { n: 8, mod: 0 }, 0)`);
     // Fight the gladiator: the panel opens, the world waits, they draw their own sword.
@@ -82,6 +98,8 @@ describe('spike3d fight', () => {
     expect(await page.isVisible('#fight')).toBe(true);
     expect(await w('w.inFight')).toBe(true);
     expect(await w('w.wieldedBy("gladiator")?.kind')).toMatch(/sword/);
+    // Your card says what you fight with: the sword and the buckler.
+    expect(await page.textContent('#fight .us')).toMatch(/arming sword and buckler/);
     const hour = await w('w.weather.hour');
 
     // Moving on purpose: a tap on the ground plans the round's move (a mark there), offered as a choice.
