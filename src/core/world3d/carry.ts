@@ -46,7 +46,25 @@ export interface Loose {
   home: LooseSpot & { room: number | null };
   /** Where it lies now; null while it is held. */
   at: LooseSpot | null;
+  /** Lent to the hero until this world hour (day × 24 + hour); not home by then, it counts as taken. */
+  loan?: number;
+  /** Given to the hero to keep (argued for, or threatened out of them): no longer a wrong to carry. */
+  mine?: boolean;
+  /** One of the map's people carrying it home (found lying about), by id. */
+  by?: string;
 }
+
+/**
+ * What giving a thing back does to its owner's view of you: a loan returned, a little goodwill; something taken and
+ * brought back, half of what they thought less of you for it, up to ten; nothing else (giving back can't be farmed).
+ */
+export function returnedRegard(regard: number, onLoan: boolean): number {
+  if (onLoan) return 3;
+  return regard < 0 ? Math.min(10, Math.round(-regard / 2)) : 0;
+}
+
+/** Is a thing out of place (not in its home room, nor held, nor yours)? What someone tidy brings home. */
+export const stray = (l: Loose, where: Whereabouts): boolean => !!l.at && !l.mine && !l.by && l.home.house !== null && stageOf(l.home, where) !== 'home';
 
 /** What the hero has taken and where things lie. */
 export interface CarryState {
@@ -73,6 +91,12 @@ export function stageOf(home: Loose['home'], now: Whereabouts): Stage {
   if (home.house === null) return 'home';
   if (now.house !== home.house) return 'out';
   return now.room === home.room ? 'home' : 'room';
+}
+
+/** The half sizes, along x and z, of a box `w` along its front and `d` deep turned by `rot`: what it covers on a floor grid. */
+export function turnedHalf(w: number, d: number, rot: number): { hw: number; hd: number } {
+  const c = Math.abs(Math.cos(rot)), s = Math.abs(Math.sin(rot));
+  return { hw: (c * w + s * d) / 2, hd: (s * w + c * d) / 2 };
 }
 
 /** The kind of act a stage is, done without leave. */

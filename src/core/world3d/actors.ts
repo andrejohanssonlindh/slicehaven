@@ -104,6 +104,11 @@ export class Walking {
     return list[level];
   }
 
+  /** Something moved on a house's upper storeys (furniture picked up or put down): their grids are worked out again. */
+  forgetHouse(id: string): void {
+    this.upper.delete(id);
+  }
+
   /** Bring the actor's house up to date with where they stand: through a door, they are on the ground floor of where they are. */
   settle(a: Actor): void {
     const id = this.houses.holding(a.x, a.z)?.place.id ?? null;

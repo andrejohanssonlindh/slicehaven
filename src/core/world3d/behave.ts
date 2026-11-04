@@ -53,6 +53,8 @@ export interface Mind {
    * ("grumble", "fetch"), and how many seconds more. The condition `answering` asks it; the world sets it.
    */
   answer?: { id: string; left: number };
+  /** A found thing they are bringing home (plan B3b, a loose thing's id): the condition `tidying` asks it; the world sets it. */
+  tidy?: { thing: string };
 }
 
 /** Let `dt` seconds pass on an answer: it ends when its time is up. */
@@ -77,6 +79,20 @@ export interface Acts {
   lit(t: ActTarget): boolean;
   /** Try an offer (`verb:light`) as this person. */
   act(mind: Mind, offer: string, t: ActTarget): ActResult;
+  /** Where a loose thing is now (lying, or in someone's arms), and where it belongs (plan B3b); null if there is no such thing. */
+  thingAt?(id: string): Whereabout | null;
+  thingHome?(id: string): Whereabout | null;
+  /** This person lifts it (false if it is gone, or in someone else's hands), and puts it down where it belongs. */
+  lift?(mind: Mind, id: string): boolean;
+  putHome?(mind: Mind, id: string): void;
+}
+
+/** A spot as a walker goes to it. */
+export interface Whereabout {
+  x: number;
+  z: number;
+  house: string | null;
+  level: number;
 }
 
 /** Where someone the mind knows of stands now (the hero, for `watch` to face), with their house and storey; null if they are not about. */

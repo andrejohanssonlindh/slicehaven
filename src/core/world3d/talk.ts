@@ -66,7 +66,35 @@ export interface TalkCase {
   leads?: { state: LeadsState; defs: Record<string, LeadDef>; hours: number };
   /** Has the hero leave in this house now (plan B3c)? Left out, leave isn't asked for. */
   hasLeave?: (house: string) => boolean;
+  /** What the hero holds, if it is someone's (plan B3b): borrowing it, giving it back, arguing or threatening for it. */
+  holding?: HeldThing;
+  /** Whether the person is afraid of the hero, or bold (B3c's `sizeUp`): a threat is easier or harder. */
+  nerve?: { afraid: boolean; bold: boolean };
 }
+
+/** A thing the hero holds that belongs to a household, as a talk sees it. */
+export interface HeldThing {
+  id: string;
+  /** What it is called ("stool"). */
+  name: string;
+  /** Its household's house. */
+  house: string;
+  /** Lent until this world hour, or null. */
+  loan: number | null;
+  /** How much it is worth to them (`worthOf`, 1 for an ordinary thing): arguing for something dear is harder. */
+  worth: number;
+}
+
+/** The ways to take that go through talk (plan B3b), on a thing the hero holds that is the person's household's. */
+export const BORROW = 'talk:borrow';
+export const GIVE_BACK = 'talk:giveback';
+export const CLAIM = 'talk:claim';
+export const DEMAND = 'talk:demand';
+/** How long a thing is lent for, world hours (a day). */
+export const LOAN_HOURS = 24;
+/** How hard arguing a thing is yours is (at an even mood, for an ordinary thing), and threatening for it. */
+const CLAIM_DIFFICULTY = 14;
+const DEMAND_DIFFICULTY = 12;
 
 /** An offer that asks about a lead: `lead:<id>`. No roll and no patience spent; anyone can be asked (most don't know). */
 export const LEAD_ASK = 'lead:';
@@ -133,7 +161,17 @@ export function talkOffers(p: TalkPerson, c: TalkCase): Offer[] {
   const leave: Offer[] = p.home && c.hasLeave && !c.hasLeave(p.home) && listens
     ? [{ id: ASK_LEAVE, label: (p.leaveAsk ?? 'Ask {name} if you may make yourself at home').replaceAll('{name}', p.name), skills: [...COAX_SKILLS], from: 'skill' }]
     : [];
-  return [...work, ...leads, ...press, ...leave, ...openChecks(o, s)
+  // Holding something of theirs: give it back (no roll, always), ask to borrow it, argue it's yours, or threaten for it.
+  const h = c.holding && p.home === c.holding.house ? c.holding : null;
+  const things: Offer[] = h
+    ? [
+      { id: GIVE_BACK, label: `Give the ${h.name} back to ${p.name}`, skills: [], from: 'verb' },
+      ...(listens && h.loan === null ? [{ id: BORROW, label: `Ask ${p.name} if you may borrow the ${h.name}`, skills: [...COAX_SKILLS], from: 'skill' as const }] : []),
+      ...(listens ? [{ id: CLAIM, label: `Argue the ${h.name} is yours to keep`, skills: skillsOf(c, 'persuade'), from: 'skill' as const }] : []),
+      { id: DEMAND, label: `Threaten ${p.name} into letting you keep the ${h.name}`, skills: skillsOf(c, 'threaten'), from: 'skill' },
+    ]
+    : [];
+  return [...work, ...things, ...leads, ...press, ...leave, ...openChecks(o, s)
     .filter((k) => opensNow(k, p, c) && (!k.talk || left === undefined || left > 0))
     .map((k) => ({ id: k.id, label: named(k.label, p), skills: [...k.skills], from: 'skill' as const }))];
 }
@@ -151,6 +189,73 @@ export interface TalkResult {
   lead?: string;
   /** Leave given to be in this house, for the rest of the day (plan B3c). */
   leave?: string;
+  /** A thing lent to the hero until `LOAN_HOURS` from now; given back to its household; given to the hero to keep (plan B3b). */
+  borrow?: string;
+  giveBack?: string;
+  given?: string;
+  /** They answer it as the culture says, from where their view of you now stands (a threat that failed). */
+  answer?: boolean;
+}
+
+/** The fitting skills for an effort: those of the library's general hook for it (`persuade`, `threaten`). */
+function skillsOf(c: TalkCase, effort: string): string[] {
+  return [...(c.library.hooks.find((h) => h.id === effort)?.skills ?? [])];
+}
+
+/** One social roll with the best of some skills (else Presence at −2D6), and the notes to show with it; null with no way to try. */
+function socialRoll(doer: Doer, skills: readonly string[], difficulty: number, rng: Rng, label: string): { roll: Roll; skill: string; notes: Line[] } | null {
+  const best = bestSkill(doer, skills);
+  const fallback = !best && doer.dice(PRESENCE).n > 0 ? { skill: PRESENCE, dice: modify(doer.dice(PRESENCE), -2) } : null;
+  const use = best ?? fallback;
+  if (!use) return null;
+  return { roll: rollTest(use.dice, Math.max(2, difficulty), rng, label), skill: use.skill, notes: fallback ? [{ text: 'No fitting skill: Presence instead, at −2D6.', tone: 'info' }] : [] };
+}
+
+/** Borrowing, giving back, arguing or threatening for a thing the hero holds (plan B3b); null for any other offer. */
+function aboutThing(offer: string, p: TalkPerson, doer: Doer, c: TalkCase, rng: Rng): TalkResult | null {
+  const h = c.holding && p.home === c.holding.house ? c.holding : null;
+  if (!h || ![GIVE_BACK, BORROW, CLAIM, DEMAND].includes(offer)) return null;
+  const mem = (c.memory.social[p.id] ??= { talks: 0, mood: 0 });
+  if (offer === GIVE_BACK) {
+    return {
+      done: true, hidden: false, success: true, giveBack: h.id,
+      lines: [{ text: `${p.name} takes the ${h.name} back.` }, { text: h.loan !== null ? '"Thank you for bringing it back."' : '"Where did you get that? Well. Thank you."', tone: 'good' }],
+    };
+  }
+  const left = talksLeftWith(objectOf(p, c), stateOf(c), c.library);
+  if (offer !== DEMAND && left !== undefined && left <= 0) return { done: false, reason: `${p.name} has had enough of you for now.`, hidden: false, success: false, lines: [] };
+  mem.talks += 1;
+  // (Something dear to them is harder to get: two a step of worth past an ordinary thing.)
+  const dear = Math.round(2 * Math.max(0, h.worth - 1));
+  const moodNote: Line[] = mem.mood ? [{ text: `(${mem.mood > 0 ? 'easier: they like you' : 'harder: they are wary of you'})`, tone: 'info' }] : [];
+  if (offer === BORROW) {
+    if (h.loan !== null) return { done: false, reason: 'It is already lent to you.', hidden: false, success: false, lines: [] };
+    if (mem.mood >= 1 && dear === 0) return { done: true, hidden: false, success: true, borrow: h.id, lines: [{ text: '"Of course. Bring it back by this time tomorrow."', tone: 'good' }] };
+    if (mem.mood <= -2) return { done: true, hidden: false, success: false, lines: [{ text: `"Lend you our ${h.name}? No."`, tone: 'bad' }] };
+    const r = socialRoll(doer, COAX_SKILLS, LEAVE_DIFFICULTY - 2 * mem.mood + dear, rng, `Borrow the ${h.name}`);
+    if (!r) return { done: true, hidden: false, success: false, lines: [{ text: 'You have no way to go about it.', tone: 'info' }] };
+    return r.roll.success
+      ? { done: true, roll: r.roll, skill: r.skill, hidden: false, success: true, borrow: h.id, lines: [...r.notes, ...moodNote, { text: '"All right. Back by this time tomorrow, mind."', tone: 'good' }] }
+      : { done: true, roll: r.roll, skill: r.skill, hidden: false, success: false, lines: [...r.notes, ...moodNote, { text: `"I'd rather keep our ${h.name} here."`, tone: 'bad' }] };
+  }
+  if (offer === CLAIM) {
+    const r = socialRoll(doer, skillsOf(c, 'persuade'), CLAIM_DIFFICULTY - 2 * mem.mood + dear, rng, `Argue for the ${h.name}`);
+    if (!r) return { done: true, hidden: false, success: false, lines: [{ text: 'You have no way to go about it.', tone: 'info' }] };
+    if (r.roll.success) return { done: true, roll: r.roll, skill: r.skill, hidden: false, success: true, given: h.id, lines: [...r.notes, ...moodNote, { text: `"...Fine. Keep the ${h.name}, then."`, tone: 'good' }] };
+    mem.mood = Math.max(-3, mem.mood - 1);
+    return { done: true, roll: r.roll, skill: r.skill, hidden: false, success: false, lines: [...r.notes, ...moodNote, { text: `"It's ours, and you know it."`, tone: 'bad' }] };
+  }
+  // Threatening: the bold are harder to frighten, the afraid easier. It never makes them like you.
+  const nerve = c.nerve ? (c.nerve.bold ? 4 : 0) - (c.nerve.afraid ? 4 : 0) : 0;
+  const r = socialRoll(doer, skillsOf(c, 'threaten'), DEMAND_DIFFICULTY + nerve + dear, rng, `Threaten for the ${h.name}`);
+  if (!r) return { done: true, hidden: false, success: false, lines: [{ text: 'You have no way to go about it.', tone: 'info' }] };
+  const notes: Line[] = [...r.notes, ...(nerve > 0 ? [{ text: '(harder: they are not easily frightened)', tone: 'info' as const }] : nerve < 0 ? [{ text: '(easier: they are afraid of you)', tone: 'info' as const }] : [])];
+  if (r.roll.success) {
+    mem.mood = Math.max(-3, mem.mood - 1);
+    return { done: true, roll: r.roll, skill: r.skill, hidden: false, success: true, given: h.id, lines: [...notes, { text: `${p.name} backs away. "Take it. Just go."`, tone: 'good' }] };
+  }
+  mem.mood = Math.max(-3, mem.mood - 2);
+  return { done: true, roll: r.roll, skill: r.skill, hidden: false, success: false, answer: true, lines: [...notes, { text: `${p.name} is not frightened of you.`, tone: 'bad' }] };
 }
 
 /** What a lead's answer looks like in the talk: the lines, and "Lead added" if it handed one over. */
@@ -190,6 +295,8 @@ export function talk(offer: string, p: TalkPerson, doer: Doer, c: TalkCase, rng:
       ? { done: true, roll, skill: use.skill, hidden: false, success: true, leave: p.home, lines: [...notes, { text: `"Go on, then. For today."`, tone: 'good' }] }
       : { done: true, roll, skill: use.skill, hidden: false, success: false, lines: [...notes, { text: `"I'd rather you didn't."`, tone: 'bad' }] };
   }
+  const thing = aboutThing(offer, p, doer, c, rng);
+  if (thing) return thing;
   if (offer.startsWith(LEAD_ASK) && c.leads) {
     const r = askAbout(c.leads.state, c.leads.defs, offer.slice(LEAD_ASK.length), p, c.flags, c.leads.hours);
     if (!r) return { done: false, reason: 'You know nothing of that to ask about.', hidden: false, success: false, lines: [] };

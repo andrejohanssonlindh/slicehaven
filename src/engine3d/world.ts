@@ -27,13 +27,13 @@ import type { Roll } from '../core/dice';
 import { type Cares, type LeadStatus, type LeadsState, giveLead, leadStatus, studied } from '../core/world3d/leads';
 import { LEADS } from '../content/leads';
 import { HEARD_FOR, type Noise, type Senses, type SightRoll, type Where, canSee, fadeSenses, hears, lastHeard, newSenses, noteHeard, rollSight, sightBoost, sightDue } from '../core/world3d/perceive';
-import { type TalkCase, type TalkMemory, type TalkPerson, type TalkResult, newTalkMemory, talk } from '../core/world3d/talk';
+import { LOAN_HOURS, type TalkCase, type TalkMemory, type TalkPerson, type TalkResult, newTalkMemory, talk } from '../core/world3d/talk';
 import { type Visitor, disposition } from '../core/skillweb';
 import {
   type ActKind, type AnswerStep, type CultureDef, type HeroLook, type Standing as HeroStanding, type Welcome, type WhoToThem, type Wrong, answerFor, answerLines,
   fadeStanding, giveLeave, hasLeave, mayDo, meet, moodsFromScale, newStanding, regardOf, shiftRegard, sizeUp, talkOntoScale, weightOf, withinHours,
 } from '../core/world3d/standing';
-import { type CarryState, type Loose, type LooseSpot, type Stage, actOfStage, newCarry, stageOf, wealthOf, worthOf } from '../core/world3d/carry';
+import { type CarryState, type Loose, type LooseSpot, type Stage, actOfStage, newCarry, returnedRegard, stageOf, stray, turnedHalf, wealthOf, worthOf } from '../core/world3d/carry';
 import { temperOf } from '../content/people/temper';
 import { cultureOf } from '../content/cultures';
 import { personName } from '../content/people/naming';
@@ -66,7 +66,8 @@ import { blobShadow } from './shadow';
 import { type BodyRig, makeBodyRig } from './body';
 import { geometryOf, thingGroup, thingMaterial } from './things';
 import { bodySpecOf } from '../content/people/bodies';
-import { IDLE, IDLE_SECONDS, SIT, WALK } from '../content/people/poses';
+import { IDLE, IDLE_SECONDS, SIT, WALK, carrying } from '../content/people/poses';
+import { orderly } from '../content/people/order';
 import { buildBody } from '../core/world3d/body';
 import { cyclePose } from '../core/world3d/pose';
 import { type Heat, makeFloorHeat, makeHeat } from './heat';
@@ -113,11 +114,14 @@ const HERO_SPEED = 1.6;
 const CARRY_PACE = 0.7;
 /** On easy, the eye or question mark floats over anyone within this of the hero who noticed them, seen or not (Q43), metres. */
 const MARK_REACH = 30;
-/** How far in front of the hero a thing is put down, metres. */
-const PUT_DOWN_AHEAD = 0.45;
-/** A held thing is shrunk to at most this long, metres, and held this high (its foot above the hero's). */
-const HELD_SIZE = 0.6;
-const HELD_Y = 0.72;
+/** How far in front of the hero a thing is put down, metres, past half its depth. */
+const PUT_DOWN_AHEAD = 0.3;
+/** A held thing is shrunk to at most this long, metres; its foot is held this high and this far ahead, as shares of the body's height. */
+const HELD_SIZE = 0.7;
+const HELD_Y = 0.4;
+const HELD_AHEAD = 0.1;
+/** How near a found thing must be for someone to notice it lying out of place and bring it home, metres. */
+const TIDY_REACH = 10;
 /** How far a carried thing has gone from home, in order. */
 const STAGE_RANK: Record<Stage, number> = { home: 0, room: 1, out: 2 };
 
@@ -583,8 +587,8 @@ export class SpikeWorld {
   carry: CarryState = newCarry();
   /** Loose things drawn now, by id: in a standing house's group (`inst`), or out of doors. */
   private readonly looseDrawn = new Map<string, { g: THREE.Object3D; inst: HouseInst | null }>();
-  /** The model of what the hero holds, in their arms. */
-  private heldG: THREE.Object3D | null = null;
+  /** The models of what is held, in the arms of whoever holds it (`hero`, or one of the map's people), by their id. */
+  private readonly heldGs = new Map<string, THREE.Object3D>();
   /** How far what the hero holds has gone from home, and who has already answered it (person ids). */
   private carryStage: Stage = 'home';
   private readonly sawCarry = new Set<string>();
@@ -593,6 +597,8 @@ export class SpikeWorld {
   heroWho: Visitor = {};
   /** Told when one of the map's people says something to the hero unasked (a guard come to see), for the page to show. */
   onSpeak: ((who: string, name: string, text: string) => void) | null = null;
+  /** Told something the hero should know that no one says (a loan fell due), for the page to show. */
+  onNote: ((text: string) => void) | null = null;
   /** When two people last talked of the hero (world hours), by the pair: word passes once an hour at most. */
   private readonly metAt = new Map<string, number>();
   private perceiveIn = 0;
@@ -701,16 +707,24 @@ export class SpikeWorld {
           sources.push({ x: w.x, z: w.z, kind: s.kind, weight: s.weight });
         }
       });
-      // The ground floor's walls, partitions and furniture block the ground's walking; the storeys above have grids of their own.
-      const ground = rooms.filter((r) => r.level === 0);
-      return { room: rooms, shapes: [...levelWalls(b, 0), ...furnitureObstacles(b, ground.flatMap((r) => footprints(r.plan)))], sources };
+      // The ground floor's walls and partitions block the ground's walking (its furniture is asked each time, as it can be
+      // moved: `furnitureRects`); the storeys above have grids of their own.
+      return { room: rooms, shapes: levelWalls(b, 0), sources };
     }, THINGS);
     const houseIndex = this.houseIndex;
     // Feet: the houses' walls and furniture block (held whole, in an index), and so do the trunks, posts and props the
-    // placed index knows by chunk, so the ground is asked only about what is near; so does the water.
+    // placed index knows by chunk, and loose things lying out of doors, so the ground is asked only about what is near;
+    // so does the water.
     this.placed = map.placed ?? new PlacedIndex(layout, THINGS);
     const placed = this.placed;
-    this.nav = new NavGrid(g.size, { near: (x0, z0, x1, z1) => [...houseIndex.shapesNear(x0, z0, x1, z1), ...placed.near(x0, z0, x1, z1)] }, { radius: 0.2, blocked: (x, z) => lakeDist(g, x, z) < 0.2 });
+    this.nav = new NavGrid(g.size, {
+      near: (x0, z0, x1, z1) => [
+        ...houseIndex.shapesNear(x0, z0, x1, z1),
+        ...houseIndex.near(x0, z0, x1, z1).flatMap((e) => furnitureObstacles(e.built, this.furnitureRects(e.built, 0))),
+        ...placed.near(x0, z0, x1, z1),
+        ...this.looseOutdoors(x0, z0, x1, z1),
+      ],
+    }, { radius: 0.2, blocked: (x, z) => lakeDist(g, x, z) < 0.2 });
     // Walking holds houses by id and asks the index (not what is standing), so a house streaming out changes nothing for the people in it.
     this.moves = new Walking(this.nav, g.size, {
       holding: (x, z) => houseIndex.houseContaining(x, z, -0.1)?.built ?? null,
@@ -718,7 +732,7 @@ export class SpikeWorld {
         const p = houseIndex.byId(id);
         return p ? houseIndex.lite(p).built : null;
       },
-      furniture: (b, level) => houseIndex.entry(b.place).room.filter((r) => r.level === level).flatMap((r) => footprints(r.plan)),
+      furniture: (b, level) => this.furnitureRects(b, level),
     });
 
     // The houses stand up as their chunk streams in (see `fillChunk`).
@@ -735,7 +749,8 @@ export class SpikeWorld {
     this.mapEvents = map.events;
     // Everyone answers what the hero does wrong as the place's culture says: its lines go at the top of every day (B3c).
     this.culture = cultureOf(map.culture);
-    const answering = answerLines(this.culture);
+    // (Answering a wrong comes first; then bringing a found thing home, B3b; then their own day.)
+    const answering = [...answerLines(this.culture), { when: { tidying: true }, do: 'tidy' }];
     for (const one of map.cast) {
       const who = { ...one, does: [...answering, ...one.does] };
       const fig = personFigure(who, this.yaw), blob = blobShadow(0.32);
@@ -2052,12 +2067,27 @@ export class SpikeWorld {
   talkTo(offer: string, id: string, doer: Doer, hero: Visitor): TalkResult {
     const p = this.talkPerson(id);
     if (!p) return { done: false, reason: 'No one is there.', hidden: false, success: false, lines: [] };
-    const c = this.talkCase(hero);
+    const c = this.talkCase(hero, id);
     const before = c.memory.social[id]?.mood ?? 0;
     const r = talk(offer, p, doer, c, this.actRng);
     // What it did to their mood goes onto their scale (scaled by the roll's advantages), and leave given is kept.
     talkOntoScale(this.standing, id, before, c.memory.social[id]?.mood ?? 0, r.roll?.advantages ?? 0);
     if (r.leave) giveLeave(this.standing, r.leave, this.worldHours);
+    // The ways to take through talk (B3b): lent until tomorrow, given back, given to keep; a failed threat answered.
+    const l = (r.borrow ?? r.giveBack ?? r.given) ? this.carry.loose[(r.borrow ?? r.giveBack ?? r.given)!] : null;
+    if (l && r.borrow) l.loan = this.worldHours + LOAN_HOURS;
+    if (l && r.given) {
+      l.mine = true;
+      delete l.loan;
+    }
+    if (l && r.giveBack) {
+      shiftRegard(this.standing, id, returnedRegard(regardOf(this.standing, id), l.loan !== undefined));
+      this.sendHome(r.giveBack);
+    }
+    const card = r.answer ? this.cast.find((x) => x.who.id === id) : null;
+    const step = card ? answerFor(regardOf(this.standing, id), this.culture, this.whoToThem(card)) : null;
+    const says = card && step ? this.startAnswer(card, step) : null;
+    if (says) r.lines.push({ text: `${p.name}: "${says}"`, tone: 'bad' });
     if (r.done) {
       this.recentActs.push({ who: doer.id, offer, target: id, skill: r.skill ?? null, success: r.success, hour: this.weather.hour ?? 0 });
       if (this.recentActs.length > 30) this.recentActs.shift();
@@ -2066,12 +2096,21 @@ export class SpikeWorld {
   }
 
   /** What a talk is about: the hero, the world's flags, the memory, the library, the hero's leads. */
-  talkCase(hero: Visitor): TalkCase {
+  talkCase(hero: Visitor, person?: string): TalkCase {
     // (The talk rules read each person's mood: a band of the view they hold, B3c.)
     moodsFromScale(this.talkMemory.social, this.standing);
+    // What the hero holds, if it is a household's and not given to them (B3b); and whether this person fears them.
+    const id = this.carry.held, l = id ? this.carry.loose[id] : null, kind = l ? THINGS.get(l.kind) : null;
+    const holding = id && l && kind && l.home.house && !l.mine
+      ? { id, name: thingName(kind), house: l.home.house, loan: l.loan ?? null, worth: worthOf('take', kind.value ?? 0, kind.importance ?? 0, this.houseWealth(l.home.house), this.culture) }
+      : undefined;
+    const card = person ? this.cast.find((c) => c.who.id === person) : null;
+    const who = card ? this.whoToThem(card) : null;
     return {
       hero, flags: this.flags, memory: this.talkMemory, library: LIBRARY, leads: { state: this.leads, defs: LEADS, hours: this.worldHours },
       hasLeave: (house) => hasLeave(this.standing, house, this.worldHours),
+      ...(holding ? { holding } : {}),
+      ...(who ? { nerve: { afraid: who.afraid, bold: who.bold } } : {}),
     };
   }
 
@@ -2503,6 +2542,25 @@ export class SpikeWorld {
     fireOf: (house) => this.fireOf(house),
     lit: (t) => this.fireLit(t),
     act: (mind, offer, t) => this.act(offer, t, this.doerOf(mind.id)),
+    // Bringing found things home (the behaviour `tidy`, plan B3b).
+    thingAt: (id) => this.whereLoose(id),
+    thingHome: (id) => {
+      const h = this.carry.loose[id]?.home;
+      return h ? { x: h.x, z: h.z, house: h.house, level: h.level } : null;
+    },
+    lift: (mind, id) => {
+      const l = this.carry.loose[id];
+      if (!l?.at || l.by || this.carry.held === id) return false;
+      this.feetChanged(l.at);
+      this.undraw(id);
+      l.at = null;
+      l.by = mind.id;
+      this.showHeld();
+      return true;
+    },
+    putHome: (mind, id) => {
+      if (this.carry.loose[id]?.by === mind.id) this.sendHome(id);
+    },
   };
 
   /** Someone in the map as a doer: they roll what their sheet says (nothing, for someone with no sheet). */
@@ -2580,7 +2638,8 @@ export class SpikeWorld {
   /** The hero picks a thing up: it leaves where it was and is held (in their arms, or out of sight). */
   private pickUp(t: ActTarget, hidden: boolean): boolean {
     const l = this.looseOf(t);
-    if (!l) return false;
+    if (!l || l.by) return false;
+    this.feetChanged(l.at ?? l.home);
     l.at = null;
     this.carry.loose[t.id] = l;
     this.carry.held = t.id;
@@ -2598,12 +2657,32 @@ export class SpikeWorld {
     const id = this.carry.held, l = id ? this.carry.loose[id] : null;
     if (!id || !l) return false;
     const yaw = this.heroFig.want, s = this.heroSpot();
-    l.at = { x: s.x + Math.sin(yaw) * PUT_DOWN_AHEAD, z: s.z + Math.cos(yaw) * PUT_DOWN_AHEAD, level: s.level, house: s.house, rot: yaw };
+    // (Far enough ahead that the hero isn't standing in it once it stops feet.)
+    const ahead = PUT_DOWN_AHEAD + (THINGS.get(l.kind).furniture?.model.d ?? 0) / 2;
+    l.at = { x: s.x + Math.sin(yaw) * ahead, z: s.z + Math.cos(yaw) * ahead, level: s.level, house: s.house, rot: yaw };
     this.carry.held = null;
     this.carry.hidden = false;
     this.showHeld();
     this.drawLoose(id, l);
+    this.feetChanged(l.at);
     return true;
+  }
+
+  /** A thing goes back where it belongs (given back, or brought home by someone): drawn there, in no one's hands. */
+  private sendHome(id: string): void {
+    const l = this.carry.loose[id];
+    if (!l) return;
+    if (this.carry.held === id) {
+      this.carry.held = null;
+      this.carry.hidden = false;
+    }
+    delete l.by;
+    delete l.loan;
+    this.feetChanged(l.at);
+    l.at = { x: l.home.x, z: l.home.z, level: l.home.level, house: l.home.house, rot: l.home.rot };
+    this.showHeld();
+    this.drawLoose(id, l);
+    this.feetChanged(l.at);
   }
 
   /** Draw a loose thing where it lies: in its house's group (if the house stands now), or on the ground. */
@@ -2662,25 +2741,82 @@ export class SpikeWorld {
     }
   }
 
-  /** What the hero holds, in their arms: in front of the chest, smaller than life so the body still shows. Nothing if hidden. */
-  private showHeld(): void {
-    if (this.heldG) this.dropPiece(this.heldG, null);
-    this.heldG = null;
+  /** The figure of the hero or one of the map's people. */
+  private figureOf(id: string): Figure | null {
+    return id === 'hero' ? this.heroFig : this.cast.find((c) => c.who.id === id)?.fig ?? null;
+  }
+
+  /** Who holds what, openly: the hero (unless out of sight), and the map's people carrying found things home. */
+  private holds(): Map<string, Loose> {
+    const out = new Map<string, Loose>();
     const id = this.carry.held, l = id ? this.carry.loose[id] : null;
-    const model = l ? THINGS.get(l.kind).furniture?.model : undefined;
-    if (!l || !model || this.carry.hidden) return;
-    const g = thingGroup(model.draw(l.seed, l.variant));
-    const s = Math.min(1, HELD_SIZE / Math.max(model.w, model.d));
-    g.scale.setScalar(s);
-    g.position.set(0, HELD_Y, 0.1 + (model.d * s) / 2);
-    this.heroFig.rig.group.add(g);
-    this.heldG = g;
+    if (l && !this.carry.hidden) out.set('hero', l);
+    for (const x of Object.values(this.carry.loose)) if (x.by) out.set(x.by, x);
+    return out;
+  }
+
+  /** What is held, in the holders' arms (the carrying pose: `stepFigures`): in front of the chest, smaller than life so the body still shows. */
+  private showHeld(): void {
+    for (const g of this.heldGs.values()) this.dropPiece(g, null);
+    this.heldGs.clear();
+    for (const [who, l] of this.holds()) {
+      const model = THINGS.get(l.kind).furniture?.model, fig = this.figureOf(who);
+      if (!model || !fig) continue;
+      const g = thingGroup(model.draw(l.seed, l.variant));
+      const s = Math.min(1, HELD_SIZE / Math.max(model.w, model.d)), H = fig.rig.model.height;
+      g.scale.setScalar(s);
+      g.position.set(0, HELD_Y * H, HELD_AHEAD * H + (model.d * s) / 2);
+      fig.rig.group.add(g);
+      this.heldGs.set(who, g);
+    }
+  }
+
+  /** The floor footprints of a house's furniture on a storey, house-local, for walking: the plan's pieces not moved, and loose things lying there. */
+  private furnitureRects(b: BuiltHouse, level: number): { x: number; z: number; hw: number; hd: number }[] {
+    const out: { x: number; z: number; hw: number; hd: number }[] = [];
+    this.houseIndex.entry(b.place).room.forEach((r, ri) => {
+      if (r.level !== level) return;
+      for (const f of footprints(r.plan)) if (!this.carry.loose[pieceId(b.place.id, ri, f.id)]) out.push(f);
+    });
+    for (const l of Object.values(this.carry.loose)) {
+      const model = THINGS.get(l.kind).furniture?.model;
+      if (!model || l.at?.house !== b.place.id || l.at.level !== level) continue;
+      const p = houseToLocal(b.place, l.at.x, l.at.z);
+      out.push({ x: p.x, z: p.z, ...turnedHalf(model.w, model.d, l.at.rot - b.place.rot) });
+    }
+    return out;
+  }
+
+  /** Loose things lying out of doors in a rectangle, as what stops feet. */
+  private looseOutdoors(x0: number, z0: number, x1: number, z1: number): Shape[] {
+    const out: Shape[] = [];
+    for (const l of Object.values(this.carry.loose)) {
+      const at = l.at, model = THINGS.get(l.kind).furniture?.model;
+      if (!at || at.house || !model || at.x < x0 - 2 || at.x > x1 + 2 || at.z < z0 - 2 || at.z > z1 + 2) continue;
+      out.push({ kind: 'box', x: at.x, z: at.z, hw: model.w / 2, hd: model.d / 2, rot: at.rot });
+    }
+    return out;
+  }
+
+  /** A thing left a spot or came to one: walking there is worked out again (the ground's grid there, a house's upper storeys). */
+  private feetChanged(at: { x: number; z: number; house: string | null; level: number } | null): void {
+    if (!at) return;
+    if (at.house && at.level > 0) this.moves.forgetHouse(at.house);
+    else this.nav.invalidate(at.x - 1.5, at.z - 1.5, at.x + 1.5, at.z + 1.5);
   }
 
   /** Everything loose drawn again from `carry` (a loaded game): the plan's pieces that moved go, the loose ones come. */
   private redrawLoose(): void {
     for (const id of [...this.looseDrawn.keys()]) this.undraw(id);
+    // (Walking is worked out again everywhere: what stops feet may lie elsewhere now.)
+    this.nav.forget(() => false);
     for (const [id, l] of Object.entries(this.carry.loose)) {
+      // Someone was carrying it home when the game was saved: it got there.
+      if (l.by) {
+        delete l.by;
+        l.at = { x: l.home.x, z: l.home.z, level: l.home.level, house: l.home.house, rot: l.home.rot };
+      }
+      for (const h of [l.home.house, l.at?.house]) if (h) this.moves.forgetHouse(h);
       this.removePiece(id);
       this.drawLoose(id, l);
     }
@@ -2697,12 +2833,14 @@ export class SpikeWorld {
    */
   private checkCarry(): void {
     const id = this.carry.held, l = id ? this.carry.loose[id] : null;
-    if (!id || !l || this.carry.hidden || !l.home.house) return;
+    if (!id || !l || this.carry.hidden || !l.home.house || l.mine) return;
     const house = l.home.house, kind = THINGS.get(l.kind);
     const stage = this.carryStageNow(l), was = this.carryStage;
     this.carryStage = stage;
+    // (Lent to you: no wrong until it is due.)
+    const lent = l.loan !== undefined && this.worldHours < l.loan;
     const wrongs = (act: ActKind): Wrong[] =>
-      mayDo({ owner: { house }, act, member: false, leave: hasLeave(this.standing, house, this.worldHours), welcome: null, hour: this.weather.hour ?? 12, culture: this.culture })
+      lent || mayDo({ owner: { house }, act, member: false, leave: hasLeave(this.standing, house, this.worldHours), welcome: null, hour: this.weather.hour ?? 12, culture: this.culture })
         ? []
         : [{ act, owner: { house }, worth: worthOf(act, kind.value ?? 0, kind.importance ?? 0, this.houseWealth(house), this.culture) }];
     const answer = (act: ActKind, only: (c: CastCard) => boolean, fallback: string | null): void => {
@@ -2717,6 +2855,60 @@ export class SpikeWorld {
     const act = actOfStage(stage);
     if (act && STAGE_RANK[stage] > STAGE_RANK[was]) answer(act, () => true, null);
     if (stage === 'out') answer('take', (c) => c.who.home === house, `That's our ${thingName(kind)}!`);
+  }
+
+  /** Where a loose thing is now: where it lies, or where whoever holds it stands. */
+  private whereLoose(id: string): { x: number; z: number; house: string | null; level: number } | null {
+    const l = this.carry.loose[id];
+    if (!l) return null;
+    if (l.at) return l.at;
+    if (this.carry.held === id) return this.heroSpot();
+    const m = l.by ? this.cast.find((c) => c.who.id === l.by)?.mind.actor : null;
+    return m ? { x: m.x, z: m.z, house: m.house, level: m.stair ? 0 : m.level } : null;
+  }
+
+  /**
+   * A loan falls due: if the thing isn't home by then, its household know it was kept, seen or not, and think of it
+   * as taken (B3b). Back home in time, the loan just ends. Lines said go to the page.
+   */
+  private checkLoans(): void {
+    for (const [id, l] of Object.entries(this.carry.loose)) {
+      if (l.loan === undefined || this.worldHours < l.loan || !l.home.house) continue;
+      delete l.loan;
+      const at = this.whereLoose(id);
+      const home = at && stageOf(l.home, { house: at.house, room: at.house ? this.roomAt(at)?.n ?? null : null }) === 'home';
+      if (home) continue;
+      const kind = THINGS.get(l.kind), house = l.home.house;
+      const w: Wrong = { act: 'take', owner: { house }, worth: worthOf('take', kind.value ?? 0, kind.importance ?? 0, this.houseWealth(house), this.culture) };
+      for (const c of this.cast.filter((x) => x.who.home === house)) shiftRegard(this.standing, c.who.id, -weightOf(w, this.culture, true));
+      this.onNote?.(`The ${thingName(kind)} you borrowed was due back. Its owners count it as taken.`);
+      // (It's theirs again in their minds now: carried openly, they know it.)
+      this.sawCarry.clear();
+      if (this.carry.held === id) this.carryStage = 'home';
+    }
+  }
+
+  /**
+   * Someone near a thing lying out of place brings it home: its own household always, anyone who likes order
+   * (`content/people/order.ts`) whatever its household. Run when people look; they set about it by the behaviour `tidy`.
+   */
+  private findStrays(): void {
+    const loose = Object.entries(this.carry.loose).filter(([, l]) => l.at && stray(l, { house: l.at.house, room: l.at.house ? this.roomAt(l.at)?.n ?? null : null }));
+    if (!loose.length) return;
+    const busy = new Set(this.cast.flatMap((c) => (c.mind.tidy ? [c.mind.tidy.thing] : [])));
+    for (const c of this.cast) {
+      const a = c.mind.actor;
+      if (c.mind.tidy || c.mind.answer || this.talkingWith === c.who.id) continue;
+      const tidy = orderly(PERSON_KINDS.resolve(c.who).chain);
+      for (const [id, l] of loose) {
+        const at = l.at!;
+        if (busy.has(id) || (!tidy && c.who.home !== l.home.house)) continue;
+        if (at.house !== a.house || (at.house !== null && at.level !== a.level) || Math.hypot(at.x - a.x, at.z - a.z) > TIDY_REACH) continue;
+        c.mind.tidy = { thing: id };
+        busy.add(id);
+        break;
+      }
+    }
   }
 
   /** Put the hero down at a spot (a loaded game): on storey `level` if the spot is in a house that has one. */
@@ -2926,7 +3118,9 @@ export class SpikeWorld {
       }
       f.yaw += wrapAngle(f.want - f.yaw) * (1 - Math.exp(-dt / 0.08));
       f.rig.group.rotation.y = f.yaw;
-      f.rig.pose(seat ? cyclePose(SIT, this.time / IDLE_SECONDS) : f.still < 0.15 ? cyclePose(WALK, f.phase) : cyclePose(IDLE, this.time / IDLE_SECONDS));
+      const pose = seat ? cyclePose(SIT, this.time / IDLE_SECONDS) : f.still < 0.15 ? cyclePose(WALK, f.phase) : cyclePose(IDLE, this.time / IDLE_SECONDS);
+      // Holding something: the arms carry it, whatever the legs do (B3b).
+      f.rig.pose(this.heldGs.has(p.id) ? carrying(pose) : pose);
       f.rig.setShells(Math.min(2, this.settings.shells));
     }
   }
@@ -3186,6 +3380,8 @@ export class SpikeWorld {
       this.gossip();
       this.checkTrespass();
       this.checkCarry();
+      this.checkLoans();
+      this.findStrays();
       // (Views fade back toward nothing, a little each world day: Q44.)
       fadeStanding(this.standing, this.weather.day, this.culture);
     }

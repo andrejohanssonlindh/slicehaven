@@ -50,5 +50,17 @@ const seated: Pose = {
 const seatedBreathe: Pose = { joints: { ...seated.joints, spine: [0.03, 0, 0], neck: [0.03, 0, 0] } };
 export const SIT: Cycle = { keys: [seated, seatedBreathe] };
 
+/**
+ * Carrying something in both hands (plan B3b): the arms forward and bent, hands together in front of the chest. Laid
+ * over whatever the legs are doing (walking, standing), so only the arms are said.
+ */
+export const CARRY_ARMS: Pose['joints'] = {
+  shoulderL: [-0.85, 0, -0.18], elbowL: [-0.75, 0, 0],
+  shoulderR: [-0.85, 0, 0.18], elbowR: [-0.75, 0, 0],
+};
+
+/** A pose with the arms carrying. */
+export const carrying = (p: Pose): Pose => ({ ...p, joints: { ...p.joints, ...CARRY_ARMS } });
+
 /** How many seconds one loop of standing takes. */
 export const IDLE_SECONDS = 3.2;

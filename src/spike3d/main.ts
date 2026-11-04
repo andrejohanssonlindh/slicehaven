@@ -635,6 +635,7 @@ setTimeout(() => {
   // Owners and the scale (B3c): who the hero is, as the people see them; and what they say unasked.
   world.heroWho = { kind: hero.kind, people: hero.people, tags: hero.tags };
   world.onSpeak = (_who, name, text) => notify(`${name}: "${text}"`);
+  world.onNote = (text) => notify(text);
   // How dangerous the hero looks: their physique and fearsome marks (scars…); weapons shown come with items.
   world.heroLook = { physique: units('attr:Kroppsbyggnad') || 10, marks: FEARSOME_MARKS.filter((m) => diceOf(hero, m).n > 0).length, weapons: 0, tags: hero.tags ?? [] };
   // Stepping into a house, or another room of it: whose it is (names on easy) and whether it is open to you.

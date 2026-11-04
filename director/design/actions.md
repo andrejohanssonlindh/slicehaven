@@ -38,7 +38,16 @@
 - **Steal unseen** (*Slip the {name} away unseen*): pocket or bag size; sleight of hand (Agility at −2D6 without), easy, +4 bag-sized, +4 with anyone watching. Done well: no one answers, never recognised. Fumbled: you have it, and whoever was looking saw a theft.
 - **Worth:** the act's weight × √(value ÷ what the owner's wealth calls a real loss) (country: poor 3, common 10, rich 60 coins), kept within 0.5–3, then +50 % a step of importance. Only for move, take, steal, harm. Wealth is read from the household's facets (`rich`, `poor`).
 - **Leave** ("make yourself at home") now covers entering, sitting, using, meddling and moving, not taking (the culture's `leaveCovers`).
-- **Not yet:** borrow and give back, argue, threaten, buy; people bringing found things home; weapons shown (no weapons yet); a carrying pose; a moved piece's old spot still blocks feet and its new one doesn't; outdoor things that can be taken.
+- **Not yet** (then): see the next section; outdoor things that can be taken (a hay bale in a yard) still wait.
+
+## Built (B3b, the rest, 2026-11-04)
+- **Through talk** (`core/world3d/talk.ts`, `aboutThing`): while the hero holds a thing of a household's, anyone of that household offers *Give the {thing} back* (no roll), *Ask if you may borrow it* (a friend says yes, someone cross no, else a coaxing roll against 10, two harder a step of their wariness and a step of the thing's worth), *Argue it is yours to keep* (persuading skills, against 14 the same way; fails, their mood drops a step) and *Threaten them into letting you keep it* (threatening skills against 12, +4 if they're bold, −4 if they're afraid of you; works, a step down; fails, two, and they answer as the culture says from where their view stands). Outcomes: `borrow` (a loan until 24 world hours on), `giveBack` (home, out of your hands), `given` (yours: no wrong to carry, never recognised).
+- **Loans fall due** (`SpikeWorld.checkLoans`): not home by then, its household think of it as taken, seen or not ("The stool you borrowed was due back").
+- **Giving back** (`returnedRegard`): a loan returned, +3; something taken and brought back, half of what they lost for it, up to 10; nothing more, so it can't be farmed.
+- **Found things go home** (`SpikeWorld.findStrays`, condition `tidying`, behaviour `tidy`): a thing lying out of its home room, within 10 m of someone of its household, or of anyone who likes order (`content/people/order.ts`: dwarves, guards, officials, the devout), is walked to, picked up (in their arms), carried back and put where it stood. Saved mid-way, it is home on load.
+- **Arms that carry** (`carrying` in `content/people/poses.ts`): anyone holding something has their arms forward over it, walking or standing; the thing is held at their chest, sized from their body.
+- **Feet:** furniture is asked each time the walking grid needs it (`SpikeWorld.furnitureRects`, `looseOutdoors`): a moved piece no longer blocks where it stood and blocks where it lies; the grids there are worked out again (`NavGrid.invalidate`, `Walking.forgetHouse`).
+- **Not yet:** buying (money, B6), weapons shown (B6/B8), outdoor things that can be taken, these as social conflicts over several rounds (B3d).
 
 ## Adding to it
 - **A verb**: a file in `content/actions/verbs/` (`VerbDef`): what it is `on` (a kind, a property the kind has, or `here`), its `gates`, an optional `roll` (skills, difficulty, `harder` where a fact holds), `takes` minutes, `success` and `failure` outcomes.
@@ -106,5 +115,5 @@ The value also makes the action itself harder.
 - **B3a The frame** ✅: tap, look, offer, state and place gates, no-roll and one-roll resolve, state/time/say outcomes; light, put out, sit, make a fire; an NPC lights the hearth at dawn.
 - **B3d Talking in 3D** (after B4): tap a person → their **portrait**, the conversation **log**, the choices **laid over it** (Q37). The social tries and conflicts we have, against their sheet. Leave ("you may use the forge, today") is an outcome.
 - **B3c Owners, the scale and consequences** (after B5): whose a thing is, the per-person scale (Q38), the weight of acts, consequences by culture and by who you are, recognising your things.
-- **B3b The ways to take** (after B3c): first slice ✅ (move, just take, steal unseen, carrying in the hands, worth); next the ways through talk: borrow and give back, argue, threaten; buy with money (B6). Pocketing joins with B6.
+- **B3b The ways to take** ✅ (move, just take, steal unseen, carrying in the hands, worth; borrow and give back, argue, threaten; found things brought home). Buying and pocketing join with B6.
 - **Later:** crafting (a challenge plus tools plus materials → an item), improvised weapons (B8).

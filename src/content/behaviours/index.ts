@@ -6,7 +6,8 @@ import type { Behaviour, BehaviourLibrary, Condition } from '../../core/world3d/
  * `core/world3d/behave.ts` and `director/design/behaviours.md`; a behaviour that does something to a thing goes
  * through the action frame (`ctx.acts`, like `tendfire`). (A vitest run that misses a brand-new file has a stale
  * glob: edit this file once.) Perception (B5) added `when/senses.ts`, `does/watch.ts`, `does/investigate.ts`. Answering the hero (B3c)
- * added `when/answering.ts`, `does/confront.ts`, `does/fetch.ts`.
+ * added `when/answering.ts`, `does/confront.ts`, `does/fetch.ts`. Bringing found things home (B3b) added
+ * `when/tidying.ts`, `does/tidy.ts`.
  */
 const doFiles = import.meta.glob<{ default: Behaviour | Behaviour[] }>('./does/*.ts', { eager: true });
 const whenFiles = import.meta.glob<{ default: Condition | Condition[] }>('./when/*.ts', { eager: true });

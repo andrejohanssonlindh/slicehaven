@@ -2,6 +2,21 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-04 — B3b done: borrow, give back, argue, threaten; found things go home; arms that carry
+
+- **Talk about what you hold.** Holding a stool from a house, tap one of the people who live there:
+  - **Give it back**: no roll. If it was taken, they think a little better of you again.
+  - **Ask to borrow it**: a friend says yes, someone cross says no, anyone else needs asking well. It's yours until this time tomorrow. Not home by then, they count it as taken, whether they see it or not.
+  - **Argue it's yours to keep**: a persuading roll, harder for something that matters to them. If it fails, they like you less.
+  - **Threaten them into letting you keep it**: harder against the bold (a guard, a tirak), easier if they're afraid of you. If it works they like you less; if it fails, they answer it (maybe a guard is fetched).
+- **Found things go home.** Leave something lying out of place and someone of its household who comes near carries it back where it stood. Anyone who likes order (dwarves, guards, officials, the devout) does it for anyone's things.
+- **Rough edges fixed:**
+  - **The arms hold it.** Anyone carrying has their arms forward over the thing, walking or standing, and it sits at their chest.
+  - **A moved thing stops your feet where it lies**, and its old spot is free to walk on.
+- **Moved on:** buying needs money, and showing a weapon needs weapons. Both come with items (B6).
+- **Next up: B6, items and inventory.** The grid and items can start, but I need the page of the carried-weight rule from you for how kilograms count.
+- **Try it:** Hamlet. Pick up a stool in a house, then tap one of the people who live there. Or put it down in the street near one of them and watch them bring it home.
+
 ## 2026-11-03 — B3b, first slice: picking things up, carrying, stealing unseen; Q43
 
 - **Pick things up.** Tap a stool, a broom, a keg, sacks, a basket, a footlocker… → *Pick up*. It's in the hero's arms (small for now, with no carrying pose yet). You walk slower and can't sit, light a fire or take something else until you **put it down** (tap the hero → *Put down the stool*). It stays where you put it, through a reload. Tables, benches, beds and the anvil are offered too, and are too heavy to carry alone. Hearths and shelves can't be taken.

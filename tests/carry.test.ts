@@ -5,7 +5,14 @@ import { LIBRARY } from '../src/content/skillweb';
 import { THINGS } from '../src/content/things';
 import { Rng } from '../src/core/rng';
 import { type ActTarget, type ActWorld, type Doer, offers, perform } from '../src/core/world3d/actions';
-import { actOfStage, carriable, hideable, stageOf, wealthOf, worthOf } from '../src/core/world3d/carry';
+import { actOfStage, carriable, hideable, returnedRegard, stageOf, stray, turnedHalf, wealthOf, worthOf } from '../src/core/world3d/carry';
+import { BORROW, CLAIM, DEMAND, GIVE_BACK, type TalkCase, type TalkPerson, newTalkMemory, talk, talkOffers } from '../src/core/world3d/talk';
+import { PERSON_KINDS } from '../src/content/people';
+import { BEHAVIOURS } from '../src/content/behaviours';
+import { orderly } from '../src/content/people/order';
+import { Walking } from '../src/core/world3d/actors';
+import { type Acts, type Whereabout, newMind, stepMind } from '../src/core/world3d/behave';
+import { NavGrid } from '../src/core/world3d/space';
 import { ThingStates, pieceId } from '../src/core/world3d/state';
 import { mayDo, weightOf } from '../src/core/world3d/standing';
 
@@ -113,8 +120,100 @@ describe('how far it went, and what it was worth (B3b)', () => {
     expect(wealthOf([])).toBe('common');
   });
 
+  it('giving back restores goodwill only where something was lost; a stray is out of place and in no one\'s hands', () => {
+    expect(returnedRegard(-30, false)).toBe(10);
+    expect(returnedRegard(-8, false)).toBe(4);
+    expect(returnedRegard(20, false)).toBe(0);
+    expect(returnedRegard(-30, true)).toBe(3);
+    const l = { kind: 'stool', seed: 1, home, at: { x: 5, z: 5, level: 0, house: null, rot: 0 } };
+    expect(stray(l, { house: null, room: null })).toBe(true);
+    expect(stray({ ...l, mine: true }, { house: null, room: null })).toBe(false);
+    expect(stray({ ...l, by: 'wenna' }, { house: null, room: null })).toBe(false);
+    expect(stray(l, { house: 'home', room: 0 })).toBe(false);
+    expect(turnedHalf(1, 0.4, 0)).toEqual({ hw: 0.5, hd: 0.2 });
+    const q = turnedHalf(1, 0.4, Math.PI / 2);
+    expect([q.hw, q.hd].map((v) => +v.toFixed(6))).toEqual([0.2, 0.5]);
+  });
+
   it('leave lets you make yourself at home, move things included, but not take them', () => {
     const c = (act: 'move' | 'take' | 'meddle') => mayDo({ owner: { house: 'h' }, act, member: false, leave: true, welcome: null, hour: 12, culture: country });
     expect([c('meddle'), c('move'), c('take')]).toEqual([true, true, false]);
+  });
+});
+
+describe('the ways to take through talk (B3b)', () => {
+  const wenna = (): TalkPerson => {
+    const r = PERSON_KINDS.resolve({ is: ['human', 'job-farmer'] });
+    return { id: 'wenna', name: 'Wenna', kind: r.facets.people ?? 'human', tags: r.chain, home: 'home' };
+  };
+  const held = { id: 'home/0/stool', name: 'stool', house: 'home', loan: null as number | null, worth: 1 };
+  const ctx = (mood: number, h: typeof held | null = held, nerve?: { afraid: boolean; bold: boolean }): TalkCase => {
+    const memory = newTalkMemory();
+    memory.social.wenna = { talks: 0, mood };
+    return { hero: {}, flags: {}, memory, library: LIBRARY, ...(h ? { holding: h } : {}), ...(nerve ? { nerve } : {}) };
+  };
+  const ids = (c: TalkCase, p = wenna()) => talkOffers(p, c).map((o) => o.id);
+  const roller = (n: number): Doer => ({ id: 'hero', dice: () => ({ n, mod: 0 }) });
+
+  it('holding something of their household\'s: give it back, borrow it, argue for it, threaten for it; not with anyone else', () => {
+    expect(ids(ctx(0))).toEqual(expect.arrayContaining([GIVE_BACK, BORROW, CLAIM, DEMAND]));
+    expect(ids(ctx(0, null))).not.toContain(GIVE_BACK);
+    expect(ids(ctx(0), { ...wenna(), home: 'mill' })).not.toContain(BORROW);
+    // (Already lent: no asking again.)
+    expect(ids(ctx(0, { ...held, loan: 30 }))).not.toContain(BORROW);
+  });
+
+  it('giving back needs no roll; borrowing is a yes from a friend, a no from someone cross, else a roll', () => {
+    expect(talk(GIVE_BACK, wenna(), roller(0), ctx(0), Rng.fromSeed(1))).toMatchObject({ success: true, giveBack: held.id });
+    expect(talk(BORROW, wenna(), roller(0), ctx(1), Rng.fromSeed(1))).toMatchObject({ success: true, borrow: held.id });
+    expect(talk(BORROW, wenna(), roller(9), ctx(-2), Rng.fromSeed(1)).borrow).toBeUndefined();
+    const r = talk(BORROW, wenna(), roller(3), ctx(0), Rng.fromSeed(1));
+    expect(r.roll).toBeDefined();
+    expect(!!r.borrow).toBe(r.success);
+  });
+
+  it('argued well, it is yours; argued badly, they think less of you', () => {
+    expect(talk(CLAIM, wenna(), roller(12), ctx(0), Rng.fromSeed(1))).toMatchObject({ success: true, given: held.id });
+    const c = ctx(0);
+    expect(talk(CLAIM, wenna(), roller(1), c, Rng.fromSeed(1)).given).toBeUndefined();
+    expect(c.memory.social.wenna.mood).toBe(-1);
+  });
+
+  it('a threat that works gets it and costs their liking; one that fails is answered; the bold are harder to frighten', () => {
+    const c = ctx(0);
+    expect(talk(DEMAND, wenna(), roller(12), c, Rng.fromSeed(1))).toMatchObject({ success: true, given: held.id });
+    expect(c.memory.social.wenna.mood).toBe(-1);
+    const d = ctx(0);
+    expect(talk(DEMAND, wenna(), roller(1), d, Rng.fromSeed(1))).toMatchObject({ success: false, answer: true });
+    expect(d.memory.social.wenna.mood).toBe(-2);
+    const bold = talk(DEMAND, wenna(), roller(3), ctx(0, held, { afraid: false, bold: true }), Rng.fromSeed(2));
+    expect(bold.lines.some((l) => l.text.includes('not easily frightened'))).toBe(true);
+  });
+});
+
+describe('bringing found things home (B3b)', () => {
+  it('who likes order: dwarves, guards; a farmer brings only their own household\'s things', () => {
+    expect(orderly(PERSON_KINDS.resolve({ is: ['dwarf'] }).chain)).toBe(true);
+    expect(orderly(PERSON_KINDS.resolve({ is: ['human', 'job-guard'] }).chain)).toBe(true);
+    expect(orderly(PERSON_KINDS.resolve({ is: ['human', 'job-farmer'] }).chain)).toBe(false);
+  });
+
+  it('tidy: walk to it, lift it, carry it home, put it down, and stop', () => {
+    const w = new Walking(new NavGrid(80, []), 80, { holding: () => null, byId: () => null, furniture: () => [] });
+    let at: Whereabout | null = { x: 6, z: 0, house: null, level: 0 }, by: string | null = null, home = false;
+    const acts: Acts = {
+      fireOf: () => null, lit: () => false, act: () => ({ done: false, events: [], transgressions: [] }),
+      thingAt: () => (by ? null : at), thingHome: () => ({ x: -6, z: 0, house: null, level: 0 }),
+      lift: (m) => ((by = m.id), (at = null), true),
+      putHome: () => void (home = true),
+    };
+    const m = newMind('tam', 0, 0, 1);
+    m.tidy = { thing: 'home/0/stool' };
+    const does = [{ when: { tidying: true }, do: 'tidy' }];
+    for (let t = 0; t < 30 && m.tidy; t += 0.1) stepMind(m, does, BEHAVIOURS, { walking: w, places: {}, clock: { hour: 12, events: new Set() }, acts }, 0.1);
+    expect(by).toBe('tam');
+    expect(home).toBe(true);
+    expect(m.tidy).toBeUndefined();
+    expect(Math.hypot(m.actor.x + 6, m.actor.z)).toBeLessThan(1.3);
   });
 });

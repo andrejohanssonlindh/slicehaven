@@ -45,6 +45,7 @@
 | `investigate` | walks to where the last noise came from (of a kind, if named), then looks about | `of`, `look` (s), `speed` |
 | `confront` | walks up to the hero (or `who`) and stands facing them, close, following as they move (scolding, a guard come to see; B3c) | `who`, `speed` |
 | `fetch` | walks to the nearest person of a calling (default the guard; else a neighbour), tells them, and they come for the hero (B3c) | `of`, `speed` |
+| `tidy` | walks to a found thing lying out of place, picks it up, carries it home and puts it where it belongs (B3b) | `speed` |
 
 | Condition | Holds | Value |
 |---|---|---|
@@ -54,8 +55,9 @@
 | `sees` / `notSees` | while they see (or don't) someone: in their cone and range, on their side of the walls, nothing in the way | `"hero"` or a person's id |
 | `heard` | for 30 s after hearing a noise of that kind | `"steps"`, `"shout"`, `"fire"`, `"any"`, or a list |
 | `answering` | while they answer something the hero did wrong (B3c): set by the world from the place's culture | an answer's name (`"grumble"`, `"scold"`, `"fetch"`…) or `"any"` |
+| `tidying` | while they bring a found thing home (B3b): set by the world when one lies near them out of place (their household's, or anyone's for someone who likes order) | `true` |
 
-**Answering a wrong (B3c)** needs nothing in the map: the culture's answers (`content/cultures/`) are put at the top of everyone's day as `{ "when": { "answering": "scold" }, "do": "confront" }` lines, so a schedule only says the ordinary day.
+**Answering a wrong (B3c)** needs nothing in the map: the culture's answers (`content/cultures/`) are put at the top of everyone's day as `{ "when": { "answering": "scold" }, "do": "confront" }` lines, so a schedule only says the ordinary day. **Bringing found things home (B3b)** is the same: `{ "when": { "tidying": true }, "do": "tidy" }` comes right after the answers. Who likes order is `content/people/order.ts`.
 
 **Perception (B5)** is in `core/world3d/perceive.ts`. Everyone near looks and listens four times a second. Their sight is rolled from their own sheet (Alertness against 8, every six world hours): a failure halves it, advantages stretch it. The night shortens it unless they have darkvision, and a flame the hero carries is seen from far. Noises: the hero's footsteps (5 m), a verb's `noise` (lighting a fire 8 m, call out 40 m); a wall muffles a sound to 40% of its reach. What they notice is on their mind (`mind.senses`).
 

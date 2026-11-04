@@ -65,7 +65,7 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
     if (!who) return;
     const w = world(), p = w.talkPerson(who);
     if (!p) return close();
-    const c = w.talkCase(visitor);
+    const c = w.talkCase(visitor, p.id);
     nameEl.textContent = p.name;
     const calling = [...p.tags].reverse().find((id) => FACETS[id]?.dim === 'station' && FACETS[id]?.parent !== 'station');
     const people = [...p.tags].reverse().find((id) => FACETS[id]?.dim === 'people');
