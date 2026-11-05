@@ -2,6 +2,14 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-05 — B8g stage F4: dice mode in the new layout
+
+- **Dice mode now goes one roll at a time** (panel → game row → *Fights: dice*). First **your attack**, with their defence written beside it. Then **the exchange plays out**: the swing, met by a parry, block or dodge, or a flinch. Then **where it lands** (the D10) on its own, and the mark lands on their body outline. Then **the damage** less armour, and it floats up over them. Then, if it was bad, **the serious wound** roll with the death roll and any broken bones.
+- Before, where and damage came together in one show; now each has its own.
+- **Fast mode is unchanged** and still the default; both modes run the same steps, fast just plays them at once and keeps the dice behind the log.
+- **Checked:** a new browser test runs a fight in dice mode and checks each show has one step (the D10 for where alone, the damage alone), that a blow floats and lands on an outline, and that no dice are hidden behind the log. The fast-mode test still passes.
+- **Next:** F5, the phone layout.
+
 ## 2026-11-05 — B8g stage F3: fast mode
 
 - **Fights now play out instead of rolling dice at you** (the new default). Pick a move and the exchange happens at once: the strike swings (a staff sweeps, a spear thrusts, an axe chops), and the other side **parries, blocks or dodges** right as the blow arrives, or **flinches**, **staggers** on a bad hit, or **falls** when they go down (before, they just snapped flat).

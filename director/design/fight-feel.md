@@ -104,6 +104,10 @@ export default {
 - **The dice behind the log:** every line whose rolls weren't shown has a 🎲; a tap throws them.
 - About 1.5 s an exchange, then your next pick.
 
+### Built (F4, 2026-11-05)
+- **Dice mode** (*Fights: dice* in the panel's game row): every blow one roll a step. **The attack** (their defence written beside it; only your own dice thrown), then **the exchange plays out** (the strike met by the parry, block or dodge, or the flinch); **where it lands** (the D10) on its own, and the blow lands on their outline; **the damage** (with any extra from advantages), less armour, and it floats up; **the serious wound** D10 with the death roll and any breaks. Each log line is written once its dice have landed.
+- Fast and dice mode share one sequence (`showAttack`): fast plays the exchange first and puts the same rolls behind the log.
+
 ## Stages
 | | Stage | Who | Needs |
 |---|---|---|---|
@@ -111,7 +115,7 @@ export default {
 | ✅ F1 | **The motion library** (first pass 2026-11-05, tune by eye): parry, block, dodge, flinch, stagger, fall, finish; strikes per way of moving (blade, two-hander, staff, spear, axe and mace, bare hands) | **Sonnet** (brief below) | F0 |
 | ✅ F2 | **The fight camera and the computer layout:** both columns with every move, roles greyed with the reason, the foe's choice lit when you have the upper hand, ⚔ Back to fight | Opus | — (can run beside F1) |
 | ✅ F3 | **Fast mode:** the exchange plays at once, floating damage, body outlines with wound icons, dice behind a tap on the log | Opus | F1, F2 |
-| F4 | **Dice mode in the new layout** (one roll per step) and the setting | Opus | F2 |
+| ✅ F4 | **Dice mode in the new layout** (one roll per step) and the setting | Opus | F2 |
 | F5 | **The phone:** the view on top, outlines in the corners, intent over the head, Attack/Defend/Move tabs, tap-twice | Opus | F2, F3 |
 | F6 | **The timer:** per difficulty, from content; hard 8 s; normal's "after a few fights" noted for later | Opus or Sonnet | F2 |
 

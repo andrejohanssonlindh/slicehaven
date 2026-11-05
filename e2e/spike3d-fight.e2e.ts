@@ -1,4 +1,4 @@
-/* Browser test: a fight in the arena (B8a, B8g F2): draw and put away your own weapon; pick a sword (and a shield for the left arm) up off the sand, fight the gladiator round by round in fast mode (each exchange played out, what it did floating up, body outlines, the dice behind a tap on the log; the view swings side-on; every move in your column, Offensive and Defensive, the one you lack greyed with why; the foe mirrored, their move shown when you are quicker; the Move row) until one side wins, and what it left (the dead, the injuries) is kept through a reload. */
+/* Browser test: a fight in the arena (B8a, B8g F2–F4; a second test runs a fight in dice mode, one roll a step): draw and put away your own weapon; pick a sword (and a shield for the left arm) up off the sand, fight the gladiator round by round in fast mode (each exchange played out, what it did floating up, body outlines, the dice behind a tap on the log; the view swings side-on; every move in your column, Offensive and Defensive, the one you lack greyed with why; the foe mirrored, their move shown when you are quicker; the Move row) until one side wins, and what it left (the dead, the injuries) is kept through a reload. */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { OUT, openPage, startEnv, stopEnv, type Env } from './harness';
 
@@ -221,4 +221,53 @@ describe('spike3d fight', () => {
     if (dead.includes('hero')) expect(await page.isVisible('#fight')).toBe(true);
     expect(errors).toEqual([]);
   }, 400_000);
+
+  it('dice mode (B8g F4): each blow shows one roll a step, the exchange plays out between them', async () => {
+    const dice = { 'slicehaven.settings': JSON.stringify({ v: 1, dice: 'result', diceSkin: 'bone', diceClose: 'auto', difficulty: 'easy', fight: 'dice' }) };
+    const { page, errors } = await openPage(env, '/spike3d/?map=arena&nogov', { storage: dice });
+    await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 90_000 });
+    const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; const fight = window.spike.fight; return ${fn}; })()`);
+    await page.waitForTimeout(1500);
+    // What each show of dice says, and what floats up.
+    await page.evaluate(() => {
+      const o = window as unknown as { shows: string[]; floats: string[] };
+      o.shows = [];
+      o.floats = [];
+      new MutationObserver((ms) => {
+        for (const m of ms) for (const n of m.addedNodes) {
+          const e = n as HTMLElement;
+          if (e.classList?.contains('dice-lines')) o.shows.push(e.textContent ?? '');
+          if (e.classList?.contains('fight-float')) o.floats.push(e.textContent ?? '');
+        }
+      }).observe(document.body, { childList: true, subtree: true });
+    });
+    await w(`(window.spike.hero.dice['attr:Reaktion'] = { n: 8, mod: 0 }, 0)`);
+    await w(`(fight.start('gladiator'), 0)`);
+    // Fight until someone is hit (or a few rounds): close in, strike, defend.
+    for (let rounds = 0; rounds < 30; rounds++) {
+      await page.waitForSelector('#fight .us .moves button:not([disabled]), #fight .choices button', { timeout: 90_000 });
+      const shows = (await page.evaluate(() => (window as unknown as { shows: string[] }).shows)) as string[];
+      if (shows.some((x) => /Where \(D10\)/.test(x))) break;
+      const labels = await page.$$eval('#fight .choices button', (bs) => bs.map((b) => b.textContent ?? ''));
+      if (labels.some((l) => /^OK$|New game/.test(l))) break;
+      const can = await page.$$eval('#fight .us .moves button:not([disabled])', (bs) => bs.map((b) => (b as HTMLElement).dataset.move ?? ''));
+      const pick = can.find((m) => m === 'atk:powerful') ?? can.find((m) => m === 'def:parry:standard');
+      await page.click(pick ? `#fight .us .moves button[data-move="${pick}"]` : '#fight .choices button');
+      await page.waitForTimeout(100);
+    }
+    const shows = (await page.evaluate(() => (window as unknown as { shows: string[] }).shows)) as string[];
+    // The attack, with the defence beside it; where it lands on its own; the damage on its own.
+    expect(shows.some((x) => /attack/.test(x))).toBe(true);
+    const where = shows.find((x) => /Where \(D10\)/.test(x));
+    expect(where).toBeTruthy();
+    expect(where).not.toMatch(/Damage/);
+    expect(shows.some((x) => /Damage/.test(x) && !/Where/.test(x))).toBe(true);
+    // A blow floated up and landed on an outline.
+    expect(((await page.evaluate(() => (window as unknown as { floats: string[] }).floats)) as string[]).length).toBeGreaterThan(0);
+    expect(await page.locator('#fight .card .outline svg path').count()).toBeGreaterThan(0);
+    // No dice hidden behind the log in this mode.
+    expect(await page.locator('#fight .log p.rolls').count()).toBe(0);
+    await page.screenshot({ path: `${OUT}/fight-dice.png` });
+    expect(errors).toEqual([]);
+  }, 300_000);
 });

@@ -709,11 +709,12 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
   }
 
   /**
-   * Fast mode: one exchange played out at once. The strike; the defender's parry, block or dodge timed so its contact
-   * meets the blow, or on a hit a flinch (a stagger when it hurt badly; going down is the fall, from their injuries);
-   * at the contact what it did floats up over them and lands on their outline. Then a moment to take it in.
+   * One exchange played out: the strike; the defender's parry, block or dodge timed so its contact meets the blow, or
+   * on a hit a flinch (a stagger when it hurt badly; going down is the fall, from their injuries). At the contact a
+   * miss floats up; with `landed` (fast mode) what the hit did floats up and lands on their outline too (in dice mode
+   * that waits for the where and damage rolls). Then a moment to take it in.
    */
-  async function exchange(l: Extract<LogLine, { k: 'attack' }>): Promise<void> {
+  async function exchange(l: Extract<LogLine, { k: 'attack' }>, landed: boolean): Promise<void> {
     const w = world();
     const hitAt = w.motionTiming(l.who, 'strike')?.contact ?? 0.35;
     w.play(l.who, 'strike');
@@ -723,17 +724,31 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       setTimeout(() => w.play(l.target, meet), lead * 1000);
     }
     await sleep(hitAt * 1000);
-    const lv = level();
     if (!l.hit) float(l.target, t(`fight.verdict.${l.how}`, VERDICT[l.how]), 'miss');
     else if (l.result) {
       const r = l.result;
       if (r.net > 0 && !r.after.out && !r.after.dead) w.play(l.target, r.serious || r.fatigue >= 3 ? 'stagger' : 'flinch');
-      const serious = r.serious ? t('fight.w.serious', 'serious wound') : '';
-      if (lv.foeExact) float(l.target, String(Math.max(0, r.net)), 'hit', serious);
-      else float(l.target, hitWord(r, l.type ?? 'cut'), 'hit');
-      cards();
+      if (landed) {
+        seeHit(l);
+        floatHit(l);
+      }
     }
-    await sleep(1100);
+    await sleep(landed || !l.hit ? 1100 : 500);
+  }
+
+  /** A blow that got through is seen: it goes on their outline. */
+  function seeHit(l: Extract<LogLine, { k: 'attack' }>): void {
+    if (!l.hit || !l.result || l.result.net <= 0) return;
+    (seen[l.target] ??= []).push({ part: l.result.part, type: l.type ?? 'cut', serious: !!l.result.serious });
+    cards();
+  }
+
+  /** What a hit did, floating up over them: the damage on easy (and a serious wound under it), else a word (Q50). */
+  function floatHit(l: Extract<LogLine, { k: 'attack' }>): void {
+    const r = l.result;
+    if (!r) return;
+    if (level().foeExact) float(l.target, String(Math.max(0, r.net)), 'hit', r.serious ? t('fight.w.serious', 'serious wound') : '');
+    else float(l.target, hitWord(r, l.type ?? 'cut'), 'hit');
   }
 
   /** Both cards drawn again (their outlines, bars and words). */
@@ -744,12 +759,14 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
   }
 
   /**
-   * A blow, step by step (the director: first who hits, then the damage, then the extra damage): attack against
-   * defence, with the pool's make-up in the log; then where it lands and the damage, less armour; then the
-   * serious wound's die and the death roll, if any.
+   * A blow. Fast mode: the exchange plays out at once and its rolls go behind the log. Dice mode (B8g F4), one roll a
+   * step: the attack (their defence written beside, only your own dice thrown), then the exchange plays out; where it
+   * lands (D10), and the blow lands on their outline; the damage, less armour, and it floats up; the serious wound's
+   * D10 with the death roll and breaks. The log line for each step is written once its dice have landed.
    */
-  async function showAttack(l: Extract<LogLine, { k: 'attack' }>, w: SpikeWorld): Promise<void> {
+  async function showAttack(l: Extract<LogLine, { k: 'attack' }>): Promise<void> {
     const lv = level();
+    const dice = !fast();
     const atkMine = l.who === 'hero', defMine = l.target === 'hero';
     const openPools = (id: string) => id === 'hero' || lv.foeExact;
     const tactic = l.tactic === 'standard' ? '' : ` (${t(`fight.tac.${l.tactic}`, l.tactic === 'quick' ? 'quick' : 'powerful')})`;
@@ -760,36 +777,38 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       ? l.defend && l.attack.total === l.defend.total ? t('fight.tie', 'a tie: the attacker wins it') : t('fight.hits', 'it hits')
       : t(`fight.verdict.${l.how}`, VERDICT[l.how]);
     const line = `${of(l.who, ['fight.strike.you', 'You strike{tactic}'], ['fight.strikes', '{who} strikes{tactic}'], { tactic })}: ${atkText} ${t('fight.against', 'against {whose}', { whose: whose(l.target) })} ${defText}: ${verdict}.`;
-    // A blow that landed is seen: it goes on their outline.
-    if (l.hit && l.result && l.result.net > 0) (seen[l.target] ??= []).push({ part: l.result.part, type: l.type ?? 'cut', serious: !!l.result.serious });
-    if (fast()) await exchange(l);
-    else w.play(l.who, 'strike');
 
-    // 1. Who hits.
+    // 1. Who hits: the attack, the defence written beside it.
     const rolls: Roll[] = [{ ...l.attack, label: t('fight.attackroll', '{who}: attack', { who: Name(l.who) }) }];
     const mine = [atkMine];
     if (l.defend) { rolls.push({ ...l.defend, label: t('fight.defroll', '{who}: {how}', { who: Name(l.target), how }) }); mine.push(defMine); }
     const adv = l.advantages ? [l.advantages === 1 ? t('fight.adv1', '1 advantage: more damage') : t('fight.advn', '{n} advantages: more damage', { n: l.advantages })] : [];
+    if (!dice) await exchange(l, true);
     await reveal(rolls, mine, [`${verdict.charAt(0).toUpperCase()}${verdict.slice(1)}.`, ...adv]);
     // (Written once the dice have landed, so the log doesn't give it away.)
     log(line, atkMine ? 'you' : 'they');
+    if (dice) await exchange(l, false);
     if (!l.hit || !l.result || !l.damage) return;
 
-    // 2. Where, and the damage (the extra from advantages on its own, then armour).
+    // 2. Where it lands.
     const res = l.result, dmg = l.damage;
     const part = partName(res.part);
+    await reveal([{ ...l.whereRoll!, label: t('fight.whereroll', 'Where (D10)') }], [atkMine], [t('fight.lands', 'In the {part}.', { part })]);
+    if (dice) seeHit(l);
+
+    // 3. The damage (the extra from advantages on its own), less armour.
     const weaponDice = diceText({ n: Math.max(0, dmg.weapon.n + dmg.tactic), mod: dmg.weapon.mod });
     const extraText = res.extra ? t('fight.extra', ' + {n} extra ({a})', { n: res.extra, a: l.advantages === 1 ? t('fight.adv1s', '1 advantage') : t('fight.advns', '{n} advantages', { n: l.advantages }) }) : '';
     const sum = t('fight.dmgsum', 'Damage {d}{extra} − armour {a} = {net} gets through', { d: res.damageRoll.total, extra: extraText, a: dmg.armour, net: Math.max(0, res.net) });
     const outcome = res.net <= 0 ? t('fight.glance', 'nothing: it glances off')
       : res.serious ? t('fight.serious', '{f} fatigue and a serious wound', { f: res.fatigue }) : t('fight.fatigueonly', '{f} fatigue', { f: res.fatigue });
-    const where: Roll = { ...l.whereRoll!, label: t('fight.whereroll', 'Where (D10)') };
-    const dmgRolls: Roll[] = [where, { ...res.damageRoll, label: t('fight.dmgroll', 'Damage {d}', { d: weaponDice }) }];
+    const dmgRolls: Roll[] = [{ ...res.damageRoll, label: t('fight.dmgroll', 'Damage {d}', { d: weaponDice }) }];
     if (res.extraRoll) dmgRolls.push({ ...res.extraRoll, label: t('fight.extraroll', 'Extra damage') });
-    await reveal(dmgRolls, dmgRolls.map(() => atkMine), [t('fight.lands', 'In the {part}.', { part }), `${sum}: ${outcome}.`]);
+    await reveal(dmgRolls, dmgRolls.map(() => atkMine), [`${sum}: ${outcome}.`]);
+    if (dice) floatHit(l);
     log(`${t('fight.inthe', 'In the {part}', { part })}: ${sum}: ${outcome}.`, atkMine ? 'good' : 'bad');
 
-    // 3. A serious wound: its die (the attacker's), the death roll (the one hit), breaks and cuts.
+    // 4. A serious wound: its die (the attacker's), the death roll (the one hit), breaks and cuts.
     if (res.serious) {
       const s = res.serious;
       const wRolls: Roll[] = [{ ...res.woundRoll, label: t('fight.woundroll', 'Serious wound (D10)') }];
@@ -845,7 +864,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
         }
         case 'attack':
           await settle(w);
-          await showAttack(l, w);
+          await showAttack(l);
           break;
         case 'drop':
           w.dropAt(l.who, l.item, l.at.x, l.at.z);
