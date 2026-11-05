@@ -88,12 +88,20 @@ export default {
 - **Viewer:** `/models/` → tap *People* until it says *Motions*; pick the body, what they hold and the motion; Play, 1× ½× ¼×, Loop, side or front. The time is shown, and a mark lights up as it passes. `/models/?show=motions` opens straight on it.
 - **The four moved out of code:** `guard`, `strike` (the old swing, same angles), `down`, `dead`. One small change: on guard the knees no longer bend (the guard now only drives the upper body, so a fighter's legs walk normally).
 
+### Built (F2, 2026-11-05)
+- **The view swings side-on** when a fight starts (`world.faceFight()`), you on the left; turning by hand stops the swing. **⚔ Back to fight** at the top of the view swings it back and follows the fight again.
+- **Your column:** your card, then **Offensive** (Standard, Quick, Powerful with their pools and what each costs; Retreat) and **Defensive** (a grid: parry, block if you wear a shield, dodge × standard, careful, counter, each with its pool; dodge has no counter). Nothing is picked for you: the rules now take **how** you defend (`Choice.defendWith`); anyone nobody steers still defends the best way.
+- **The group you don't have is greyed, with why:** *You're defending: they won the last exchange* / *they were quicker when blades crossed* / *they kept the attack*; *Not in reach: close in first.*
+- **The foe's column, mirrored:** their pools only on easy; their chosen move **lit** when you're quicker, with a line *Arruns means to …*; else *? Arruns was quicker: they'll see what you do.*
+- **The Move row:** walk or run where you tapped, close in, run in, pick up, draw, hold your ground, get away, ask to yield, accept their surrender, OK.
+- **Phone, until F5:** the same pieces stacked in the bottom sheet: the foe's column folds to its one line, and your group not in play to its *why*. **Sideways or on a computer:** the columns at both sides, the round, the Move row and the log along the bottom between them.
+
 ## Stages
 | | Stage | Who | Needs |
 |---|---|---|---|
 | ✅ F0 | **The motion foundation:** motions as data, the lookup, the player, the swing, guard, down and dead moved into it, the viewer on `/models/`. Nothing changes on screen | Opus | — |
 | ✅ F1 | **The motion library** (first pass 2026-11-05, tune by eye): parry, block, dodge, flinch, stagger, fall, finish; strikes per way of moving (blade, two-hander, staff, spear, axe and mace, bare hands) | **Sonnet** (brief below) | F0 |
-| F2 | **The fight camera and the computer layout:** both columns with every move, roles greyed with the reason, the foe's choice lit when you have the upper hand, ⚔ Back to fight | Opus | — (can run beside F1) |
+| ✅ F2 | **The fight camera and the computer layout:** both columns with every move, roles greyed with the reason, the foe's choice lit when you have the upper hand, ⚔ Back to fight | Opus | — (can run beside F1) |
 | F3 | **Fast mode:** the exchange plays at once, floating damage, body outlines with wound icons, dice behind a tap on the log | Opus | F1, F2 |
 | F4 | **Dice mode in the new layout** (one roll per step) and the setting | Opus | F2 |
 | F5 | **The phone:** the view on top, outlines in the corners, intent over the head, Attack/Defend/Move tabs, tap-twice | Opus | F2, F3 |

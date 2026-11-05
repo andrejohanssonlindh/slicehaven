@@ -5,8 +5,8 @@ import { THINGS } from '../content/things';
 import { WOUND_TABLES } from '../content/wounds';
 import { baseArmour, baseDamage, type Dice, diceText } from '../core/chargen/tables';
 import {
-  ADJACENT, RUN, WALK, type Choice, shieldFromRow, type Fight, type Fighter, type FightItem, type FightRules, type LogLine, PICKUP_REACH, UNTRAINED, attackTactics,
-  PLEA_SKILLS, acceptYield, between, canAct, loadDiceOf, pleaDifficulty, refuseYield, resolveRound, roleOf,
+  ADJACENT, RUN, WALK, type AttackTactic, type Choice, type DefenceTactic, shieldFromRow, type Fight, type Fighter, type FightItem, type FightRules, type LogLine, PICKUP_REACH, UNTRAINED, attackPool, attackTactics,
+  PLEA_SKILLS, acceptYield, between, canAct, defenceOptions, defencePool, loadDiceOf, pleaDifficulty, refuseYield, resolveRound, roleOf,
   seizeInitiative, startFight, weaponOf,
 } from '../core/combat';
 import { type Style, chooseFor, wantsToYield } from '../core/fightmind';
@@ -33,6 +33,11 @@ const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
  * how much, then the extra damage and any serious wound. The world plays it out: walking, swings, a sword falling on
  * the sand, someone going down. To the death (Q46). When one side is left, OK ends the fight; fatigue then comes back
  * with time (Q49), and the knocked out lie there until it has.
+ *
+ * The layout (B8g F2, design `director/design/fight-feel.md`): your column with every move in two groups, Offensive
+ * (a tactic, retreat) and Defensive (parry, block, dodge × standard, careful, counter; nothing picked for you), the
+ * group you don't have this round greyed with why; the foe's column mirrored, their move lit when you have the upper
+ * hand and a ? when you don't; the Move row (walk, run, pick up, draw, and the rest); the view side-on to the fight.
  */
 
 /** The pools a fight reads from a sheet: every combat skill, dodging, the shield, and the attributes it rolls. */
@@ -75,8 +80,11 @@ const slotFree = (f: Fighter, item: FightItem): boolean => (item.shield ? !f.shi
 
 export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: string) => void, save: () => void, newGame: () => void, condition: ConditionSheet): FightUI {
   const el = document.getElementById('fight')!;
-  const headEl = el.querySelector<HTMLElement>('.head')!, usEl = el.querySelector<HTMLElement>('.us')!, themEl = el.querySelector<HTMLElement>('.them')!;
+  const headEl = el.querySelector<HTMLElement>('.head')!, usEl = el.querySelector<HTMLElement>('.us .card')!, themEl = el.querySelector<HTMLElement>('.them .card')!;
+  const usMoves = el.querySelector<HTMLElement>('.us .moves')!, themMoves = el.querySelector<HTMLElement>('.them .moves')!;
   const logEl = el.querySelector<HTMLElement>('.log')!, choicesEl = el.querySelector<HTMLElement>('.choices')!;
+  const backEl = document.getElementById('fight-back') as HTMLButtonElement;
+  backEl.addEventListener('click', () => world().faceFight());
   let fight: Fight | null = null;
   let foeId = '';
   let busy = false;
@@ -84,6 +92,11 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
   let pending: Choice | null = null;
   /** Where the hero means to go this round (a tapped spot, or a weapon lying there), shown with a mark. */
   let plan: { x: number; z: number; item?: string } | null = null;
+  /**
+   * Why whoever attacks in the melee has the attack (B8g: the role swaps are shown): they were quicker when blades
+   * crossed, they won the last exchange, or they kept it.
+   */
+  let roleWhy: 'quicker' | 'won' | 'kept' = 'quicker';
 
   /**
    * Keep the fighters in the part of the screen the panel leaves free (the director: the panel covered them): on a
@@ -93,9 +106,12 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     const w = world();
     const canvas = document.getElementById('stage');
     if (!fight || el.hidden || !canvas) return void (w.viewAim = { x: 0, y: 0 });
-    const c = canvas.getBoundingClientRect(), p = el.getBoundingClientRect();
-    const side = p.left > c.left + c.width * 0.3; // docked at the right
-    const free = side ? { x: (c.left + p.left) / 2, y: c.top + c.height / 2 } : { x: c.left + c.width / 2, y: (c.top + p.top) / 2 };
+    const c = canvas.getBoundingClientRect();
+    const us = el.querySelector('.us')!.getBoundingClientRect(), them = el.querySelector('.them')!.getBoundingClientRect();
+    const mid = el.querySelector('.mid')!, m = getComputedStyle(mid).display === 'contents' ? el.getBoundingClientRect() : mid.getBoundingClientRect();
+    // Columns at both sides (a wide screen): the gap between them, above the bottom strip. Else above the sheet.
+    const wide = us.width > 0 && them.width > 0 && them.left > us.right;
+    const free = wide ? { x: (us.right + them.left) / 2, y: (c.top + m.top) / 2 } : { x: c.left + c.width / 2, y: (c.top + m.top) / 2 };
     w.viewAim = { x: ((free.x - c.left) / c.width) * 2 - 1, y: -(((free.y - c.top) / c.height) * 2 - 1) };
   }
   window.addEventListener('resize', aimView);
@@ -227,7 +243,6 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
 
   function refresh(): void {
     if (!fight) return;
-    aimView();
     const me = fight.fighters[0], foe = fight.fighters[1];
     const role = roleOf(fight, 'hero');
     const d = between(fight, 'hero', foeId);
@@ -237,21 +252,19 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     });
     card(usEl, me, t('fight.You', 'You'), true);
     card(themEl, foe, Name(foeId), false);
+    moves(usMoves, me, foe, true);
+    moves(themMoves, foe, me, false);
     choicesEl.replaceChildren();
-    const intent = pending && fight.winner === null ? intentOf(foeId, pending) : null;
-    if (intent) {
-      const p = document.createElement('p');
-      p.className = 'intent';
-      p.textContent = t('fight.intent', '{who} means to {what}.', { who: Name(foeId), what: intent });
-      choicesEl.appendChild(p);
-    }
-    if (fight.winner === null && !plan && roleOf(fight, 'hero') === 'free' && canAct(fight.fighters[0])) {
+    const h = document.createElement('h4');
+    h.textContent = t('fight.g.move', 'Move');
+    choicesEl.appendChild(h);
+    if (fight.winner === null && !plan && roleOf(fight, 'hero') === 'free' && canAct(fight.fighters[0]) && !busy) {
       const p = document.createElement('p');
       p.className = 'hint';
       p.textContent = t('fight.taphint', 'Tap the ground to go there, or a weapon to go to it.');
       choicesEl.appendChild(p);
     }
-    for (const c of choices()) {
+    for (const c of busy ? [] : choices()) {
       const b = document.createElement('button');
       b.type = 'button';
       b.textContent = c.label;
@@ -259,6 +272,162 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       choicesEl.appendChild(b);
     }
     logEl.scrollTop = logEl.scrollHeight;
+    aimView();
+  }
+
+  /** The tactics' names and what each does, for the buttons. */
+  const ATTACKS: Record<AttackTactic, [name: string, does: string]> = {
+    standard: [t('fight.tac.std', 'Standard'), ''],
+    quick: [t('fight.tac.quickN', 'Quick'), t('fight.tac.quickD', '+1D6, −1D6 dmg, +1 fatigue')],
+    powerful: [t('fight.tac.powerN', 'Powerful'), t('fight.tac.powerD', '−1D6, +2D6 dmg, +2 fatigue')],
+  };
+  const DEFENCES: Record<DefenceTactic, [name: string, does: string]> = {
+    standard: [t('fight.tac.std', 'Standard'), ''],
+    defensive: [t('fight.tac.careN', 'Careful'), t('fight.tac.careD', '+1D6, +1 fatigue')],
+    counter: [t('fight.tac.counterN', 'Counter'), t('fight.tac.counterD', '−1D6, attack next, +1 fatigue')],
+  };
+  const WAYS: Record<'parry' | 'block' | 'dodge', string> = { parry: t('fight.how.parry', 'parry'), block: t('fight.how.block', 'block'), dodge: t('fight.how.dodge', 'dodge') };
+
+  /**
+   * Why a group is greyed for someone this round, or null if it is theirs to use: over, can't act, out of reach, or
+   * the other role (and, for the hero, why they have it: quicker when blades crossed, won the last exchange, kept it).
+   */
+  function offWhy(f: Fighter, group: 'attack' | 'defend', mine: boolean): string | null {
+    if (!fight) return '';
+    if (fight.winner !== null) return t('fight.why.over', 'The fight is over.');
+    if (!canAct(f)) return mine ? t('fight.why.cant', 'You can’t fight now.') : t('fight.why.cantthey', 'They can’t fight now.');
+    const role = roleOf(fight, f.id);
+    if (role === 'free') return mine ? t('fight.why.free', 'Not in reach: close in first, or wait for them.') : t('fight.why.freethey', 'Not in reach.');
+    if ((group === 'attack') === (role === 'attacker')) return null;
+    if (!mine) return role === 'attacker' ? t('fight.why.theyattack', 'They’re attacking.') : t('fight.why.theydefend', 'They’re defending.');
+    const why = role === 'attacker'
+      ? { quicker: t('fight.why.quicker', 'you were quicker when blades crossed'), won: t('fight.why.won', 'you won the last exchange'), kept: t('fight.why.kept', 'you kept the attack') }[roleWhy]
+      : { quicker: t('fight.why.slower', 'they were quicker when blades crossed'), won: t('fight.why.lost', 'they won the last exchange'), kept: t('fight.why.theykept', 'they kept the attack') }[roleWhy];
+    return role === 'attacker' ? t('fight.why.attacking', 'You’re attacking: {why}.', { why }) : t('fight.why.defending', 'You’re defending: {why}.', { why });
+  }
+
+  /**
+   * One side's moves, always all shown: Offensive (each tactic with its pool, retreat) and Defensive (every way to
+   * defend × every tactic, with its pool; dodging can't counter). Yours act on a tap; the foe's are the same, mirrored,
+   * never tappable: their pools only on easy, their chosen move lit when you have the upper hand, else a ?.
+   */
+  function moves(box: HTMLElement, f: Fighter, other: Fighter, mine: boolean): void {
+    if (!fight) return;
+    box.replaceChildren();
+    const lv = level();
+    const open = mine || lv.foeExact;
+    const known = !mine && pending && fight.winner === null ? pending : null;
+    const lit = known ? litKey(f, other, known) : null;
+    if (!mine) {
+      const gist = document.createElement('p');
+      gist.className = 'gist';
+      const acts = fight.winner === null && canAct(f);
+      if (known) gist.textContent = t('fight.intent', '{who} means to {what}.', { who: Name(f.id), what: intentOf(f.id, known) });
+      else if (acts) {
+        gist.classList.add('unknown');
+        gist.textContent = fight.upper === 1
+          ? t('fight.unknown.slower', '? {who} was quicker: they’ll see what you do.', { who: Name(f.id) })
+          : t('fight.unknown', '? You don’t know what {who} will do.', { who: Name(f.id) });
+      } else gist.hidden = true;
+      box.appendChild(gist);
+    }
+    const cant = !mine || busy || !canAct(f) || fight.winner !== null;
+    const button = (label: string, small: string, key: string, go: (() => void) | null): HTMLButtonElement => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.append(label);
+      if (small) {
+        const s = document.createElement('small');
+        s.textContent = small;
+        b.appendChild(s);
+      }
+      b.dataset.move = key;
+      b.classList.toggle('lit', key === lit);
+      b.disabled = cant || !go;
+      if (go && !cant) b.addEventListener('click', go);
+      return b;
+    };
+    const group = (kind: 'attack' | 'defend', title: string): HTMLElement => {
+      const g = document.createElement('div');
+      g.className = `group ${kind}`;
+      const h = document.createElement('h4');
+      h.textContent = title;
+      g.appendChild(h);
+      const why = offWhy(f, kind, mine);
+      if (why) {
+        g.classList.add('off');
+        const p = document.createElement('p');
+        p.className = 'why';
+        p.textContent = why;
+        g.appendChild(p);
+      }
+      if (lit?.startsWith(kind === 'attack' ? 'atk' : 'def') || (kind === 'attack' && lit === 'retreat')) g.classList.add('lit-in');
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+      g.appendChild(grid);
+      box.appendChild(g);
+      return grid;
+    };
+
+    // Offensive.
+    const atkOn = !offWhy(f, 'attack', mine);
+    const ag = group('attack', t('fight.g.attack', 'Offensive'));
+    const can = attackTactics(f);
+    for (const tac of ['standard', 'quick', 'powerful'] as AttackTactic[]) {
+      const [name, does] = ATTACKS[tac];
+      const dice = open ? ` ${diceText(attackPool(f, tac))}` : '';
+      ag.appendChild(button(`${name}${dice}`, does, `atk:${tac}`, atkOn && can.includes(tac) ? () => void play({ attack: tac }) : null));
+    }
+    ag.appendChild(button(t('fight.retreatN', 'Retreat'), t('fight.retreatD', 'break off, 5 m back'), 'retreat', atkOn && fight.melee ? () => void play({ retreat: true }) : null));
+
+    // Defensive: a row for each way to defend, a column for each tactic.
+    const defOn = !offWhy(f, 'defend', mine);
+    const dg = group('defend', t('fight.g.defend', 'Defensive'));
+    dg.appendChild(document.createElement('span'));
+    const tactics: DefenceTactic[] = ['standard', 'defensive', 'counter'];
+    for (const tac of tactics) {
+      const lab = document.createElement('span');
+      lab.className = 'lab';
+      lab.textContent = DEFENCES[tac][0];
+      lab.title = DEFENCES[tac][1];
+      dg.appendChild(lab);
+    }
+    const against = weaponOf(other);
+    const pools = Object.fromEntries(tactics.map((tac) => [tac, defenceOptions(f, against, tac)]));
+    for (const how of pools.standard.map((o) => o.how)) {
+      const lab = document.createElement('span');
+      lab.className = 'lab row-lab';
+      lab.textContent = cap(WAYS[how]);
+      dg.appendChild(lab);
+      for (const tac of tactics) {
+        const o = pools[tac].find((x) => x.how === how);
+        if (!o) {
+          const none = document.createElement('span');
+          none.className = 'none';
+          none.textContent = '—';
+          dg.appendChild(none);
+          continue;
+        }
+        dg.appendChild(button(open ? diceText(o.dice) : cap(WAYS[how]), '', `def:${how}:${tac}`, defOn ? () => void play({ defend: tac, defendWith: how }) : null));
+      }
+    }
+    if (mine && defOn) {
+      const p = document.createElement('p');
+      p.className = 'why note';
+      p.textContent = t('fight.tactics', 'Careful: +1D6, +1 fatigue. Counter: −1D6, +1 fatigue; hold them off and you attack next.');
+      dg.parentElement!.appendChild(p);
+    }
+  }
+
+  /** Which of someone's buttons their declared choice is (`atk:quick`, `def:parry:counter`, `retreat`), or null. */
+  function litKey(f: Fighter, other: Fighter, c: Choice): string | null {
+    const role = roleOf(fight!, f.id);
+    if (role === 'attacker') return c.retreat ? 'retreat' : c.mercy || c.plead ? null : `atk:${c.attack ?? 'standard'}`;
+    if (role === 'defender') {
+      const tac = c.defend ?? 'standard';
+      return `def:${defencePool(f, weaponOf(other), tac, c.defendWith).how}:${tac}`;
+    }
+    return null;
   }
 
   /** How the foe fights: their own style (the map's `fights`), else their kind's. */
@@ -306,7 +475,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     refresh();
   }
 
-  /** What the hero can choose now, one button each: the round's whole choice in a tap. */
+  /** The Move row: what the hero can do besides strike or defend, one button each, the round's whole choice in a tap. */
   function choices(): { label: string; go: () => Promise<void> | void }[] {
     if (!fight) return [];
     const me = fight.fighters[0], foe = fight.fighters[1];
@@ -344,18 +513,10 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       out.push(...pick);
       out.push({ label: t('fight.hold', 'Hold your ground'), go: () => play({}) });
       if (d > 12) out.push({ label: t('fight.flee', 'Get away (end the fight)'), go: end });
-    } else if (role === 'attacker') {
-      const words = { standard: t('fight.strike', 'Strike'), quick: t('fight.quick', 'Quick strike (+1D6, −1D6 damage, +1 fatigue)'), powerful: t('fight.powerful', 'Powerful strike (−1D6, +2D6 damage, +2 fatigue)') };
-      for (const tac of attackTactics(me)) out.push({ label: words[tac], go: () => play({ attack: tac }) });
-      out.push(...pick);
-      if (fight.melee) out.push({ label: t('fight.retreat', 'Retreat (break off, 5 m back)'), go: () => play({ retreat: true }) });
-      out.push(plea(false));
     } else {
-      out.push({ label: t('fight.defend', 'Defend'), go: () => play({ defend: 'standard' }) });
-      out.push({ label: t('fight.defensive', 'Defend carefully (+1D6, +1 fatigue)'), go: () => play({ defend: 'defensive' }) });
-      out.push({ label: t('fight.counter', 'Counter (−1D6, attack next round, +1 fatigue)'), go: () => play({ defend: 'counter' }) });
+      // In a melee the blow or the defence is in the columns; here only the side actions and asking to yield.
       out.push(...pick);
-      out.push(plea(true));
+      out.push(plea(role === 'defender'));
     }
     return out;
   }
@@ -412,7 +573,8 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
   async function play(mine: Choice): Promise<void> {
     if (!fight || busy) return;
     busy = true;
-    choicesEl.replaceChildren();
+    roleWhy = 'kept';
+    refresh();
     const w = world();
     // Where they stand now (the world walked them), as the rules start the round from.
     for (const f of fight.fighters) {
@@ -572,6 +734,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
           await settle(w);
           const ids = fight!.fighters.map((f) => f.id);
           if (l.rolls.length) await reveal(l.rolls.map((r, i) => ({ ...r, label: `${Name(ids[i] ?? '')}: ${rollableName('attr:Reaktion')}` })), ids.map((id) => id === 'hero'));
+          roleWhy = 'quicker';
           log(of(l.attacker === 0 ? 'hero' : foeId, ['fight.opens.you', 'Blades cross. You have the upper hand.'], ['fight.opens', 'Blades cross. {who} has the upper hand.']), 'info');
           break;
         }
@@ -588,6 +751,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
           log(of(l.who, ['fight.retreats.you', 'You break off and step back.'], ['fight.retreats', '{who} breaks off and steps back.']), 'info');
           break;
         case 'roles':
+          roleWhy = 'won';
           log(of(l.attacker === 0 ? 'hero' : foeId, ['fight.turns.you', 'Now you press the attack.'], ['fight.turns', 'Now {who} presses the attack.']), 'info');
           break;
         case 'end': {
@@ -634,6 +798,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     plan = null;
     w.markSpot(null);
     el.hidden = true;
+    backEl.hidden = true;
     w.viewAim = { x: 0, y: 0 };
     save();
   }
@@ -655,6 +820,8 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     fight.ground = groundNear(w, (me.x + them.x) / 2, (me.z + them.z) / 2);
     logEl.replaceChildren();
     el.hidden = false;
+    backEl.hidden = false;
+    roleWhy = 'quicker';
     log(t('fight.begins', 'You face {name}. The fight is on.', { name: p.name }), 'info');
     if (!fight.fighters[0].weapon) {
       log(fight.fighters[0].belt?.length
@@ -683,6 +850,8 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
         headEl.textContent = t('fight.deadhead', 'The end');
         usEl.replaceChildren();
         themEl.replaceChildren();
+        usMoves.replaceChildren();
+        themMoves.replaceChildren();
         choicesEl.replaceChildren();
         const b = document.createElement('button');
         b.type = 'button';

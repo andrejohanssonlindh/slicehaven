@@ -650,6 +650,8 @@ export class SpikeWorld {
   yaw = VIEW_YAW;
   /** Held turn buttons or keys: -1 turns the world anticlockwise on screen, 1 clockwise. Set by the page. */
   turnInput = 0;
+  /** A turn the view is easing towards (the fight's side-on view, B8g), or null. Turning by hand drops it. */
+  private yawWant: number | null = null;
   private wet = 0;
   /** How full the hollows are with rain, 0..1 (`WORLD.uPool`). */
   private pool = 0;
@@ -2649,6 +2651,7 @@ export class SpikeWorld {
     this.follow = true;
     this.talkingWith = null;
     for (const id of ids) this.play(id, 'guard');
+    this.faceFight();
   }
 
   /** The fight is over: the world goes on. Those left lying stay down. */
@@ -2657,6 +2660,7 @@ export class SpikeWorld {
     const h = this.hurt.hero;
     if (h && !h.out && !h.dead && !h.dying) this.motions.delete('hero'); // up on a crutch
     this.fighting = null;
+    this.yawWant = null;
   }
 
   /**
@@ -3637,12 +3641,32 @@ export class SpikeWorld {
   /** Turn the view by `rad` (positive: the world turns clockwise on screen), round what it looks at. */
   turn(rad: number): void {
     this.yaw = wrapAngle(this.yaw + rad);
+    this.yawWant = null;
+  }
+
+  /**
+   * Frame the fight side-on (plan B8g): the view swings so the line from the hero to their foe runs left to right
+   * across the screen, the hero on the left, and follows the fight again. Screen right in the world is
+   * (cos yaw, −sin yaw). The ⚔ Back to fight button calls this too.
+   */
+  faceFight(): void {
+    if (!this.fighting) return;
+    this.follow = true;
+    const foe = [...this.fighting].map((id) => (id === 'hero' ? null : this.fighterAt(id))).find(Boolean);
+    if (!foe) return;
+    const dx = foe.x - this.hero.x, dz = foe.z - this.hero.z;
+    if (Math.hypot(dx, dz) > 0.05) this.yawWant = Math.atan2(-dz, dx);
   }
 
   update(dtMs: number): void {
     const dt = Math.min(0.1, dtMs / 1000);
     this.time += dt;
     if (this.turnInput) this.turn(this.turnInput * TURN_SPEED * dt);
+    if (this.yawWant !== null) {
+      const d = wrapAngle(this.yawWant - this.yaw);
+      this.yaw = Math.abs(d) < 0.002 ? this.yawWant : wrapAngle(this.yaw + d * (1 - Math.exp(-dt / 0.25)));
+      if (this.yaw === this.yawWant) this.yawWant = null;
+    }
     const w = this.weather;
     if (this.dayMinutes > 0 && !this.fighting) w.advance((dt * 24) / (this.dayMinutes * 60));
     if (!this.fighting) this.recover(dt);

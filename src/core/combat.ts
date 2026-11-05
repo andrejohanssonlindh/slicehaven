@@ -229,6 +229,11 @@ export interface Choice {
   retreat?: boolean;
   /** As the defender. */
   defend?: DefenceTactic;
+  /**
+   * How to defend (plan B8g): parry, block (with a shield) or dodge (never a counter). Left out, or not possible, the
+   * best of them is used (anyone nobody steers defends that way).
+   */
+  defendWith?: Exclude<Defence, 'none'>;
   /** Strike someone knocked out (no defence; armour doesn't help against cut and thrust). */
   mercy?: string;
   /**
@@ -354,22 +359,27 @@ export function attackWhy(f: Fighter, tactic: AttackTactic): PoolWhy {
 export const attackPool = (f: Fighter, tactic: AttackTactic): Dice => attackWhy(f, tactic).dice;
 
 /**
- * The best way to defend against this attacker, and its pool: parry with the weapon (fists at −2D6 against a
- * weapon; a Weak weapon −1D6), block with a shield (its melee bonus), or dodge (Undvika, less the load of what they
- * wear; never a counter). A Flexible weapon takes 1D6 off a parry or a block.
+ * Every way someone can defend against this attacker with this tactic, and its pool: parry with the weapon (fists at
+ * −2D6 against a weapon; a Weak weapon −1D6), block with a shield (its melee bonus), or dodge (Undvika, less the load
+ * of what they wear; never a counter). A Flexible weapon takes 1D6 off a parry or a block.
  */
-export function defencePool(f: Fighter, against: WeaponStats, tactic: DefenceTactic): { how: Defence; dice: Dice; why: PoolWhy } {
+export function defenceOptions(f: Fighter, against: WeaponStats, tactic: DefenceTactic): { how: Exclude<Defence, 'none'>; dice: Dice; why: PoolWhy }[] {
   const tac = { why: (tactic === 'counter' ? 'counter' : 'careful') as ModWhy, n: tactic === 'defensive' ? 1 : tactic === 'counter' ? -1 : 0 };
   const flexible = { why: 'flexible' as ModWhy, n: against.props.Böjlig ? -1 : 0 };
   const drew = { why: 'drew' as ModWhy, n: f.drew ? -1 : 0 };
   const w = weaponOf(f);
-  const options: { how: Defence; why: PoolWhy }[] = [];
+  const options: { how: Exclude<Defence, 'none'>; why: PoolWhy }[] = [];
   options.push({ how: 'parry', why: poolWhy(f, w.skill, [tac, { why: 'weak', n: -w.weak }, flexible, drew,
     { why: 'fists', n: w.unarmed && !against.unarmed ? -2 : 0 }, { why: 'weakWeapon', n: w.props.Svag && !against.unarmed ? -1 : 0 }], { kind: 'combat', arms: armsOf(w) }) });
   if (f.shield?.shield) options.push({ how: 'block', why: poolWhy(f, 'Sköld', [tac, flexible, drew], { kind: 'combat', arms: ['left'] }, f.shield.shield.melee) });
   if (tactic !== 'counter') options.push({ how: 'dodge', why: poolWhy(f, 'Undvika', [tac, { why: 'load', n: -f.loadDice }, drew], { kind: 'movement' }) });
-  const best = options.reduce((a, b) => (poolMean(b.why.dice) > poolMean(a.why.dice) ? b : a));
-  return { how: best.how, dice: best.why.dice, why: best.why };
+  return options.map((o) => ({ how: o.how, dice: o.why.dice, why: o.why }));
+}
+
+/** How someone defends against this attacker: the way they chose, if they can, else the best (by its average). */
+export function defencePool(f: Fighter, against: WeaponStats, tactic: DefenceTactic, chosen?: Defence): { how: Defence; dice: Dice; why: PoolWhy } {
+  const options = defenceOptions(f, against, tactic);
+  return options.find((o) => o.how === chosen) ?? options.reduce((a, b) => (poolMean(b.dice) > poolMean(a.dice) ? b : a));
 }
 
 /** Tactic fatigue (never a shock roll): quick +1 (none with a Quick weapon), powerful +2; defensive or counter +1. */
@@ -519,12 +529,12 @@ export function moreDamage(adv: number, dangerous: boolean): Dice {
 }
 
 /** One blow, attack against defence, and the damage if it lands. */
-function strike(fight: Fight, a: Fighter, d: Fighter, tactic: AttackTactic, defence: DefenceTactic, rules: FightRules, rng: Rng, log: LogLine[]): { hit: boolean; margin: number } {
+function strike(fight: Fight, a: Fighter, d: Fighter, tactic: AttackTactic, defence: DefenceTactic, rules: FightRules, rng: Rng, log: LogLine[], defendWith?: Defence): { hit: boolean; margin: number } {
   const w = weaponOf(a);
   const atkWhy = attackWhy(a, tactic);
   const atk = rollOpen(atkWhy.dice, rng, 'Attack');
   const whereRoll = rollTable(10, rng, 'Where');
-  const dp = defencePool(d, w, defence);
+  const dp = defencePool(d, w, defence, defendWith);
   const def = canAct(d) ? rollOpen(dp.dice, rng, 'Defence') : null;
   const defTotal = def?.total ?? 0;
   const hit = atk.total >= defTotal; // a tie goes to the attacker
@@ -683,7 +693,7 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
     const tactic = c.attack && attackTactics(a).includes(c.attack) ? c.attack : 'standard';
     const defence = (choices[d.id] ?? {}).defend ?? 'standard';
     const dTactic: DefenceTactic = canAct(d) ? defence : 'standard';
-    const { hit, margin } = strike(fight, a, d, tactic, dTactic, rules, rng, log);
+    const { hit, margin } = strike(fight, a, d, tactic, dTactic, rules, rng, log, (choices[d.id] ?? {}).defendWith);
     a.injuries = structuredClone(a.injuries);
     if (tactic !== 'standard') addFatigue(a.injuries, tacticFatigue(tactic, null, weaponOf(a)), tactic);
     if (canAct(d)) {

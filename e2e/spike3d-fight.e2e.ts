@@ -1,4 +1,4 @@
-/* Browser test: a fight in the arena (B8a): draw and put away your own weapon; pick a sword (and a shield for the left arm) up off the sand (held in the right hand, not slowing you), fight the gladiator round by round from the fight panel until one side wins (the upper hand: whoever is quicker sees the other's choice; a tap plans a move; the panel leaves the fight in view), and what it left (the dead, the injuries) is kept through a reload. */
+/* Browser test: a fight in the arena (B8a, B8g F2): draw and put away your own weapon; pick a sword (and a shield for the left arm) up off the sand, fight the gladiator round by round (the view swings side-on; every move in your column, Offensive and Defensive, the one you lack greyed with why; the foe mirrored, their move shown when you are quicker; the Move row) until one side wins, and what it left (the dead, the injuries) is kept through a reload. */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { OUT, openPage, startEnv, stopEnv, type Env } from './harness';
 
@@ -99,7 +99,14 @@ describe('spike3d fight', () => {
     expect(await w('w.inFight')).toBe(true);
     expect(await w('w.wieldedBy("gladiator")?.kind')).toMatch(/sword/);
     // Your card says what you fight with: the sword and the buckler.
-    expect(await page.textContent('#fight .us')).toMatch(/arming sword and buckler/);
+    expect(await page.textContent('#fight .us .card')).toMatch(/arming sword and buckler/);
+    // The view swings side-on to the fight (B8g): the line from you to them runs left to right on screen.
+    await page.waitForTimeout(1500);
+    expect(await w(`(() => { const h = w.fighterAt('hero'), g = w.fighterAt('gladiator'); const want = Math.atan2(-(g.z - h.z), g.x - h.x); return Math.abs(Math.atan2(Math.sin(w.yaw - want), Math.cos(w.yaw - want))); })()`)).toBeLessThan(0.05);
+    // Every defence is shown, with a block row for the buckler; a dodge can't counter.
+    expect(await page.$$eval('#fight .us .moves button[data-move^="def:"]', (bs) => bs.map((b) => (b as HTMLElement).dataset.move))).toEqual(
+      ['def:parry:standard', 'def:parry:defensive', 'def:parry:counter', 'def:block:standard', 'def:block:defensive', 'def:block:counter', 'def:dodge:standard', 'def:dodge:defensive'],
+    );
     const hour = await w('w.weather.hour');
 
     // Moving on purpose: a tap on the ground plans the round's move (a mark there), offered as a choice.
@@ -108,39 +115,50 @@ describe('spike3d fight', () => {
     expect(await page.$$eval('#fight .choices button', (bs) => bs.map((b) => b.textContent ?? ''))).toContainEqual(expect.stringMatching(/^Walk there \(3\.\d m\)/));
     await page.waitForTimeout(800);
     await page.screenshot({ path: `${OUT}/fight-plan.png` });
-    // The panel leaves the fighters in view: at the bottom on a phone (the view aims above it), at the side when wide.
+    // The panel leaves the fighters in view: at the bottom on a phone (the view aims above it); when wide, between
+    // the two columns and above the strip at the bottom.
     expect((await w('w.viewAim.y')) as number).toBeGreaterThan(0.3);
     await page.setViewportSize({ width: 1200, height: 760 });
     await page.waitForTimeout(1200);
-    expect((await w('w.viewAim.x')) as number).toBeLessThan(-0.2);
+    expect(Math.abs((await w('w.viewAim.x')) as number)).toBeLessThan(0.2);
+    expect((await w('w.viewAim.y')) as number).toBeGreaterThan(0.1);
+    expect(await page.isVisible('#fight .them .group.defend')).toBe(true);
     await page.screenshot({ path: `${OUT}/fight-wide.png` });
     await page.setViewportSize({ width: 400, height: 720 });
     await page.waitForTimeout(600);
 
-    // Take the first choice each round (close in, strike, defend…) until it is over.
-    let rounds = 0, sawIntent = false;
+    // Each round: counter when defending (to win the attack back, and with it the upper hand), a standard blow when
+    // attacking, else the first thing in the Move row (close in…), until it is over.
+    let rounds = 0, sawIntent = false, sawWhy = false;
     for (; rounds < 60; rounds++) {
-      await page.waitForSelector('#fight .choices button', { timeout: 60_000 });
+      await page.waitForSelector('#fight .us .moves button:not([disabled]), #fight .choices button', { timeout: 60_000 });
       const labels = await page.$$eval('#fight .choices button', (bs) => bs.map((b) => b.textContent ?? ''));
       if (labels.some((l) => /^OK$|New game/.test(l))) break;
-      // With the upper hand you see what they mean to do before you choose.
-      if (!sawIntent && (await page.isVisible('#fight .choices .intent'))) {
+      const can = await page.$$eval('#fight .us .moves button:not([disabled])', (bs) => bs.map((b) => (b as HTMLElement).dataset.move ?? ''));
+      // With the upper hand you see what they mean to do before you choose (their move lit on a wide screen).
+      if (!sawIntent && (await page.isVisible('#fight .them .gist:not(.unknown)'))) {
         sawIntent = true;
-        expect(await page.textContent('#fight .choices .intent')).toMatch(/means to/);
+        expect(await page.textContent('#fight .them .gist')).toMatch(/means to/);
         await page.screenshot({ path: `${OUT}/fight-intent.png` });
+      }
+      // In a melee the group you don't have says why.
+      if (!sawWhy && can.length && (await page.isVisible('#fight .us .group.off .why'))) {
+        sawWhy = true;
+        expect(await page.textContent('#fight .us .group.off .why')).toMatch(/You’re (attacking|defending): /);
       }
       if (rounds === 3) {
         await page.screenshot({ path: `${OUT}/fight-round.png` });
         // Your card opens the condition sheet: fatigue and where it came from, dice off rolls, wounds.
-        await page.click('#fight .us');
+        await page.click('#fight .us .card');
         expect(await page.isVisible('#condition')).toBe(true);
         await page.screenshot({ path: `${OUT}/fight-condition.png` });
         await page.click('#condition .close');
       }
-      // Counter when defending (to win the attack back, and with it the upper hand); else the first choice.
-      await page.click(labels.some((l) => l.startsWith('Counter')) ? '#fight .choices button:has-text("Counter")' : '#fight .choices button');
+      const pick = can.find((m) => m.endsWith(':counter')) ?? can.find((m) => m === 'atk:standard');
+      await page.click(pick ? `#fight .us .moves button[data-move="${pick}"]` : '#fight .choices button');
       await page.waitForTimeout(100);
     }
+    expect(sawWhy).toBe(true);
     expect(rounds).toBeLessThan(60);
     expect(await w('w.weather.hour')).toBe(hour); // the clock stood still
     await page.screenshot({ path: `${OUT}/fight-end.png` });

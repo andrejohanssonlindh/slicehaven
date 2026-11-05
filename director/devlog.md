@@ -2,6 +2,17 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-05 — B8g stage F2: the fight view and the new layout
+
+- **The view swings side-on** when a fight starts: you on the left, your foe on the right. You can still turn, zoom and pan; **⚔ Back to fight** (top of the view) swings it back.
+- **Every move is shown, in groups.** *Offensive*: Standard, Quick, Powerful (each with its dice and what it costs), Retreat. *Defensive*: a grid of **parry, block (with a shield) and dodge** × **standard, careful, counter**, each with its dice. **You now choose how to defend**: before, the game picked the best for you. (Dodge can't counter, so that square is empty.) *Move*: walking, running, picking up, drawing, holding your ground, asking to yield.
+- **Whichever group isn't yours this round is greyed, and says why**: *"You're defending: they won the last exchange"*, *"…they were quicker when blades crossed"*, *"Not in reach: close in first."* The role swaps that used to happen out of sight are now spelled out.
+- **The foe's column mirrors yours.** When you're quicker, their move **lights up** and a line says what they mean to do; when they're quicker, it shows **?** and says they'll see what you do. Their dice show only on easy.
+- **On the phone (portrait)** it's all in the bottom sheet for now: the foe's column is one line, and the group you can't use folds to its reason. The proper phone layout (view on top, tabs, tap twice) is F5. **Hold the phone sideways** to see the computer layout.
+- **Rules:** one addition, the choice of parry, block or dodge. Everyone else still defends the best way.
+- **Checked:** unit tests (a new one for the chosen defence), the fight browser test rewritten for the new layout (the side-on view, every defence offered, the reason shown, the foe's intent), pictures on a phone and a wide screen.
+- **Next:** F3, fast mode: the exchange plays at once with the new motions (parry, block, dodge, flinch…), damage floats up, body outlines with wound icons.
+
 ## 2026-11-05 — B8g stage F1: the motion library (first pass)
 
 - **Sixteen new motions**, three files in `content/motions/`. **Strikes** for each way of moving that needed one: two-hander (chopped down with both hands), staff (swept round, shoulders turning), spear (drawn back, driven straight), axe and mace (leaning back, then the whole weight dropped), bare hands (a punch). A blade keeps the plain strike. **Defences:** parry (the weapon arm sweeps across; their own for staff, spear and two-hander held in both hands, and for bare hands), block (the shield thrust up and forward), dodge (slips aside and back, leaning off the line). **Reactions:** flinch (a light hit), stagger (a hard one, rocked back), fall (knees go, tips onto its back and lands in `down`), and **finish**, the killing stroke (weapon high, a held breath, all the weight thrown down).

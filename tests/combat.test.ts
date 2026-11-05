@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  type Fight, type Fighter, acceptYield, attackPool, attackWhy, beaten, bestDamage, moreDamage, refuseYield, bonusDice, damageDice, defencePool, dropFrom, fists, parseProps, pleaDifficulty,
+  type Fight, type Fighter, acceptYield, attackPool, attackWhy, beaten, bestDamage, moreDamage, refuseYield, bonusDice, damageDice, defenceOptions, defencePool, dropFrom, fists, parseProps, pleaDifficulty,
   resolveRound, roleOf, seizeInitiative, startFight, tacticFatigue, weaponFromRow, weaponOf,
 } from '../src/core/combat';
 import { type Injuries, recoverFatigue, unhurt } from '../src/core/damage';
@@ -69,6 +69,14 @@ describe('weapons in hand', () => {
     const bare = fighter('c', 1, 1.5, { weapon: null, pools: { Slagsmål: { n: 2, mod: 0 }, Undvika: { n: 3, mod: 0 } } });
     expect(defencePool(bare, weaponOf(a), 'standard').how).toBe('dodge');
     expect(defencePool(bare, weaponOf(a), 'counter').how).toBe('parry'); // no dodging into a counter
+  });
+
+  it('defends the way chosen, if it can (B8g), else the best', () => {
+    const a = fighter('a', 0, 0);
+    const bare = fighter('c', 1, 1.5, { weapon: null, pools: { Slagsmål: { n: 2, mod: 0 }, Undvika: { n: 3, mod: 0 } } });
+    expect(defencePool(bare, weaponOf(a), 'standard', 'parry').how).toBe('parry');
+    expect(defencePool(bare, weaponOf(a), 'standard', 'block').how).toBe('dodge'); // no shield: the best instead
+    expect(defenceOptions(bare, weaponOf(a), 'counter').map((o) => o.how)).toEqual(['parry']);
   });
 
   it('tactics change the pools and cost fatigue', () => {

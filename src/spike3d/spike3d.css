@@ -186,33 +186,101 @@
 /* A fight (plan B8a): the round, how both sides are, what happened, and the hero's choices for the round. Kept low so
    the fighters show above it. */
 #talk .choices button.fight { color: #f0a080; }
+/*
+ * The fight (plan B8g F2). On a phone in portrait the pieces stack in a sheet at the bottom: the round, both cards,
+ * the foe's move in one line, your moves (the group you don't have this round folded to why), the Move row, the log.
+ * On a wide screen (or a phone held sideways) your column stands at the left, the foe's mirrored at the right, and
+ * the round, the Move row and the log along the bottom between them; the view frames the fight in the gap.
+ */
 #fight {
   position: absolute;
   left: 50%;
   bottom: 8px;
   transform: translateX(-50%);
   width: min(440px, calc(100% - 16px));
-  height: min(54%, 460px);
-  display: flex;
-  flex-direction: column;
+  max-height: min(62%, 560px);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-areas: "head head" "uscard themcard" "themmoves themmoves" "usmoves usmoves" "choices choices" "log log";
+  grid-template-rows: auto auto auto auto auto minmax(56px, 1fr);
   color: #e6dbb9;
   background: #140a0aee;
   border: 1px solid #b0503a;
   border-radius: 6px;
   z-index: 4;
-  overflow: hidden;
+  overflow-y: auto;
 }
 #fight[hidden] { display: none; }
-#fight .head { padding: 8px 10px 2px; font-size: 15px; font-weight: bold; }
-/* The two sides' cards, side by side: name and weapon, a fatigue bar (full: where most fail the shock roll), how they are. Tap for the details. */
-#fight .sides { display: flex; gap: 6px; padding: 4px 8px 2px; }
-#fight .us, #fight .them { flex: 1; min-width: 0; padding: 5px 7px; font-size: 12px; line-height: 1.3; border: 1px solid #b0503a55; border-radius: 4px; cursor: pointer; }
-#fight .us { border-color: #e0b05066; }
+#fight .col, #fight .mid { display: contents; }
+#fight .us .card { grid-area: uscard; margin: 4px 3px 2px 8px; }
+#fight .them .card { grid-area: themcard; margin: 4px 8px 2px 3px; }
+#fight .us .moves { grid-area: usmoves; }
+#fight .them .moves { grid-area: themmoves; }
+#fight .head { grid-area: head; padding: 8px 10px 2px; font-size: 15px; font-weight: bold; }
+#fight .choices { grid-area: choices; }
+#fight .log { grid-area: log; }
+/* A card: name and weapon, a fatigue bar (full: where most fail the shock roll), how they are. Tap for the details. */
+#fight .card { min-width: 0; padding: 5px 7px; font-size: 12px; line-height: 1.3; border: 1px solid #b0503a55; border-radius: 4px; cursor: pointer; }
+#fight .us .card { border-color: #e0b05066; }
 #fight .top { overflow-wrap: anywhere; }
 #fight .top .more { float: right; opacity: 0.6; font-size: 11px; }
 #fight .how { opacity: 0.85; margin-top: 3px; }
 #fight .bar, #condition .bar { height: 7px; margin-top: 4px; background: #ffffff1a; border-radius: 3px; overflow: hidden; }
 #fight .bar i, #condition .bar i { display: block; height: 100%; background: linear-gradient(90deg, #c8a040, #d0603a); }
+/* The moves: Offensive and Defensive, each a group; the one you don't have this round greyed, with why. */
+#fight .moves { padding: 2px 8px; display: flex; flex-direction: column; gap: 4px; }
+#fight .group { border-top: 1px solid #b0503a33; padding-top: 3px; }
+#fight .group h4 { margin: 0 0 3px; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.8; }
+#fight .group .why { margin: 0 0 3px; font-size: 12px; opacity: 0.7; font-style: italic; }
+#fight .group.off { opacity: 0.45; }
+#fight .group .grid { display: grid; gap: 4px; }
+#fight .group.attack .grid { grid-template-columns: 1fr 1fr; }
+#fight .group.defend .grid { grid-template-columns: auto 1fr 1fr 1fr; align-items: center; }
+#fight .grid .lab { font-size: 11px; opacity: 0.75; text-align: center; }
+#fight .grid .row-lab { text-align: left; font-size: 12px; opacity: 0.85; padding-right: 2px; }
+#fight .grid .none { text-align: center; opacity: 0.4; }
+#fight .moves button { padding: 3px 5px; font-size: 13px; line-height: 1.15; text-align: center; }
+#fight .moves button small { display: block; font-size: 10px; opacity: 0.75; }
+#fight .moves button:disabled { cursor: default; }
+/* The foe's move, when you have the upper hand: lit. Without it, a ? */
+#fight .moves button.lit { opacity: 1; background: #e0b050; color: #1a1010; box-shadow: 0 0 0 2px #f0d080; }
+#fight .them .group.lit-in { opacity: 1; }
+#fight .gist { margin: 2px 0; padding: 4px 6px; font-size: 13px; color: #f0c080; border-left: 2px solid #e0b050; }
+#fight .gist.unknown { color: #e6dbb9aa; border-left-color: #e6dbb955; }
+/* On a phone in portrait the foe's groups fold to their one line, and your group not in play to its why. */
+#fight .them .group { display: none; }
+#fight .us .group.off .grid { display: none; }
+#fight .group .note { display: none; }
+#fight .moves button { min-height: 34px; }
+#fight .group.defend .grid button { min-height: 32px; }
+#fight .log { min-height: 48px; overflow-y: auto; padding: 6px 10px 12px; font-size: 13px; line-height: 1.4; }
+#fight .log p { margin: 0 0 5px; }
+#fight .log p.you { color: #e0b050; }
+#fight .log p.info { opacity: 0.65; font-size: 12px; }
+#fight .log p.good { color: #b8d890; }
+#fight .log p.bad { color: #e09a80; }
+/* The Move row: walk, run, pick up, draw, and the rest (yield, accept, OK). */
+#fight .choices { padding: 6px 8px 6px; display: flex; flex-wrap: wrap; gap: 5px; border-top: 1px solid #b0503a55; }
+#fight .choices h4 { flex-basis: 100%; margin: 0; font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.8; }
+#fight .choices button { min-height: 40px; flex: 1 1 auto; text-align: left; font-size: 13px; }
+#fight .choices .hint { flex-basis: 100%; margin: 0 0 2px; font-size: 12px; opacity: 0.65; }
+/* Back to fight: swings the view side-on again after turning or panning away. */
+#fight-back { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 5; height: 40px; padding: 0 14px; font-size: 14px; }
+#fight-back[hidden] { display: none; }
+@media (min-width: 640px) and (min-aspect-ratio: 1/1) {
+  #fight { --col: clamp(200px, 24vw, 290px); inset: 0; transform: none; width: auto; max-height: none; display: block; background: none; border: 0; border-radius: 0; overflow: visible; pointer-events: none; }
+  #fight .col, #fight .mid { display: flex; flex-direction: column; position: absolute; pointer-events: auto; background: #140a0aee; border: 1px solid #b0503a; border-radius: 6px; overflow-y: auto; }
+  #fight .col { top: 56px; width: var(--col); max-height: calc(100% - 64px); padding-bottom: 6px; }
+  #fight .us { left: 8px; }
+  #fight .them { right: 64px; } /* clear of the zoom and turn buttons */
+  #fight .mid { left: calc(var(--col) + 16px); right: calc(var(--col) + 72px); bottom: 8px; height: min(40%, 320px); }
+  #fight .us .card, #fight .them .card { margin: 6px 8px 2px; }
+  #fight .them .group { display: block; }
+  #fight .us .group.off .grid { display: grid; }
+  #fight .group .note { display: block; }
+  #fight .moves button, #fight .group.defend .grid button { min-height: 40px; }
+  #fight .log { flex: 1; }
+}
 /* The condition sheet (the "You" button, or a tap on a card): fatigue and where it came from, dice off rolls, wounds. */
 #condition-open { position: absolute; left: 6px; bottom: 52px; height: 40px; padding: 0 12px; font-size: 14px; z-index: 3; opacity: 0.8; }
 #condition {
@@ -239,19 +307,3 @@
 #condition p { margin: 0 0 3px; font-size: 13px; line-height: 1.35; }
 #condition p.note { font-size: 12px; opacity: 0.7; }
 #condition p.bad { color: #e09a80; }
-#fight .log { flex: 1; min-height: 48px; overflow-y: auto; padding: 6px 10px 12px; font-size: 13px; line-height: 1.4; }
-#fight .log p { margin: 0 0 5px; }
-#fight .log p.you { color: #e0b050; }
-#fight .log p.info { opacity: 0.65; font-size: 12px; }
-#fight .log p.good { color: #b8d890; }
-#fight .log p.bad { color: #e09a80; }
-#fight .choices { flex-shrink: 0; max-height: 45%; overflow-y: auto; padding: 6px 8px 8px; display: flex; flex-direction: column; gap: 5px; border-top: 1px solid #b0503a55; }
-#fight .choices button { min-height: 42px; text-align: left; font-size: 14px; }
-/* What the foe means to do, when you have the upper hand and so know it before choosing. */
-#fight .choices .hint { margin: 0 0 2px; font-size: 12px; opacity: 0.65; }
-/* On a wide screen the fight panel docks at the right, and the view keeps the fighters in the rest. */
-@media (min-width: 760px) and (min-aspect-ratio: 1/1) {
-  #fight { left: auto; right: 64px; top: 56px; bottom: 8px; height: auto; transform: none; width: 400px; } /* clear of the zoom and turn buttons */
-  #fight .choices { max-height: 55%; }
-}
-#fight .choices .intent { margin: 0 0 2px; padding: 4px 6px; font-size: 13px; color: #f0c080; border-left: 2px solid #e0b050; }
