@@ -2,6 +2,14 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-05 — B8g stage F1: the motion library (first pass)
+
+- **Sixteen new motions**, three files in `content/motions/`. **Strikes** for each way of moving that needed one: two-hander (chopped down with both hands), staff (swept round, shoulders turning), spear (drawn back, driven straight), axe and mace (leaning back, then the whole weight dropped), bare hands (a punch). A blade keeps the plain strike. **Defences:** parry (the weapon arm sweeps across; their own for staff, spear and two-hander held in both hands, and for bare hands), block (the shield thrust up and forward), dodge (slips aside and back, leaning off the line). **Reactions:** flinch (a light hit), stagger (a hard one, rocked back), fall (knees go, tips onto its back and lands in `down`), and **finish**, the killing stroke (weapon high, a held breath, all the weight thrown down).
+- Each has a contact mark where the blow lands or is met. The page doesn't ask for most of them yet: that is F3. In the fight today only strike (and finish, which is the strike until now) plays.
+- **First passes, built from the angles, not drawn by eye.** Judge them on `/models/` → Motions (side and front, slow). Send what reads wrong and it gets tuned.
+- **Trap found:** vitest caches the motions folder's index, so a *new* file wasn't seen until `node_modules/.vite/vitest` and `.vitest-cache` were deleted. If the library count looks stale, clear them.
+- **Checked:** unit tests (no library problems), the models browser test for every motion at its contact, looked at the pictures.
+
 ## 2026-11-04 — B8g stage F0: motions as data
 
 - **Fight animations are data now**, not code. Each one is a small file in `content/motions/`: how long it takes, a few key poses, which part of the body it moves, what follows it, and marks such as **contact** (the moment the blade meets, for timing the parry and the floating damage later). The swing, the guard and lying down were moved out of the code into four files, with the same angles.
