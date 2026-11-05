@@ -2,6 +2,17 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-05 — B8g stages F5 and F6: the phone layout and the pick timer (B8g built, ready for your review)
+
+- **On the phone (portrait), the fight now leaves the top ~55% to the view.** The two fighters' small cards sit in its top corners: the body figure, the fatigue bar, the name, how they are. Tap one for the details, as before.
+- **The foe's move is a bubble over their head**: *⚔ Quick*, *🛡 Parry · Careful*, *Runs*, or **?** when they were quicker. Tap it to unfold their whole column; tap the column to fold it.
+- **Below the view: tabs Attack | Defend | Move.** Each round opens on the tab for your role, and the others are greyed (you can still look at them, and they say why).
+- **Tap twice on a phone:** the first tap rings a move, the second takes it, so a mis-tap no longer costs a round. On a computer one tap still acts.
+- **The timer, on hard: 8 seconds a pick.** A bar runs down under the round, red at the end. A move is ringed from the start: last round's if you can take it again, else a plain one (a standard blow, your best standard defence, holding your ground). When time runs out, that's what you do. It waits while dice roll. Easy and normal have none; normal is meant to get one after a few fights (later). The seconds are one value per difficulty in `content/combat/timer.ts`.
+- **Sideways or on a computer:** the column layout, unchanged.
+- **Checked:** three fight browser tests: fast mode on a phone (tabs opening on your role, the bubble unfolding the foe's column), dice mode with two taps, and the timer running out on hard. Pictures looked over; fixed overlapping corner cards on a narrow phone.
+- **That's all of B8g built.** Ready for your review whenever you are.
+
 ## 2026-11-05 — B8g stage F4: dice mode in the new layout
 
 - **Dice mode now goes one roll at a time** (panel → game row → *Fights: dice*). First **your attack**, with their defence written beside it. Then **the exchange plays out**: the swing, met by a parry, block or dodge, or a flinch. Then **where it lands** (the D10) on its own, and the mark lands on their body outline. Then **the damage** less armour, and it floats up over them. Then, if it was bad, **the serious wound** roll with the death roll and any broken bones.

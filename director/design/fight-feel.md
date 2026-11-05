@@ -1,6 +1,6 @@
 # How a fight looks and feels
 
-*2026-11-04. The director: "Rules are not changed per se… make it a bit more engaging. Current approach feels… wrong." Talked through and agreed the same day (decisions below). **Started: F0 (motions as data) built 2026-11-04.** It's built in the stages at the bottom, one at a time, each tried on the phone before the next.*
+*2026-11-04. The director: "Rules are not changed per se… make it a bit more engaging. Current approach feels… wrong." Talked through and agreed the same day (decisions below). **Built, all stages F0–F6 (2026-11-04/05); waiting for the director's review.** It's built in the stages at the bottom, one at a time, each tried on the phone before the next.*
 
 **Not changed:** the rules. `core/combat.ts` still takes one `Choice` per side per round and `resolveRound` decides what happens. Everything here is the page, the camera and the animations.
 
@@ -108,6 +108,12 @@ export default {
 - **Dice mode** (*Fights: dice* in the panel's game row): every blow one roll a step. **The attack** (their defence written beside it; only your own dice thrown), then **the exchange plays out** (the strike met by the parry, block or dodge, or the flinch); **where it lands** (the D10) on its own, and the blow lands on their outline; **the damage** (with any extra from advantages), less armour, and it floats up; **the serious wound** D10 with the death roll and any breaks. Each log line is written once its dice have landed.
 - Fast and dice mode share one sequence (`showAttack`): fast plays the exchange first and puts the same rolls behind the log.
 
+### Built (F5, F6, 2026-11-05)
+- **The phone in portrait:** the view keeps the top ~55%. **Small cards in its top corners** (the body outline, the fatigue bar, the name, how they are; tap for the details). **The foe's move is a bubble over their head** (*⚔ Quick*, *🛡 Parry · Careful*, *Runs*, or **?**); a tap on it unfolds their whole column under their card, a tap on the column folds it. **The sheet below:** the round, the timer bar, **tabs Attack | Defend | Move** (a new round opens on your role's tab; the other greyed but can be looked at), the tab's moves, the log. ⚔ Back to fight sits just over the sheet.
+- **Tap twice on a touch screen:** the first tap rings a move, the second takes it; one tap on a computer (`?taps=2` / `?taps=1` force it). A ringed move that is tapped again goes at once.
+- **Sideways or on a computer:** the column layout of F2.
+- **The timer** (`content/combat/timer.ts`: easy none, normal none for now, hard 8 s): a bar under the round, red in the last 3 s. A move is ringed from the start (last round's if you can take it again, else a standard blow, the best standard defence, or holding your ground); out of time, it is taken (*Out of time.* in the log). It only runs while it's your pick, so it waits while anything plays or dice roll.
+
 ## Stages
 | | Stage | Who | Needs |
 |---|---|---|---|
@@ -116,8 +122,8 @@ export default {
 | ✅ F2 | **The fight camera and the computer layout:** both columns with every move, roles greyed with the reason, the foe's choice lit when you have the upper hand, ⚔ Back to fight | Opus | — (can run beside F1) |
 | ✅ F3 | **Fast mode:** the exchange plays at once, floating damage, body outlines with wound icons, dice behind a tap on the log | Opus | F1, F2 |
 | ✅ F4 | **Dice mode in the new layout** (one roll per step) and the setting | Opus | F2 |
-| F5 | **The phone:** the view on top, outlines in the corners, intent over the head, Attack/Defend/Move tabs, tap-twice | Opus | F2, F3 |
-| F6 | **The timer:** per difficulty, from content; hard 8 s; normal's "after a few fights" noted for later | Opus or Sonnet | F2 |
+| ✅ F5 | **The phone:** the view on top, outlines in the corners, intent over the head, Attack/Defend/Move tabs, tap-twice | Opus | F2, F3 |
+| ✅ F6 | **The timer:** per difficulty, from content; hard 8 s; normal's "after a few fights" noted for later | Opus or Sonnet | F2 |
 
 ### Brief for the Sonnet session (F1, once F0 is done)
 > Read `CLAUDE.md`, then this page's *Animation first* section, then `director/design/models.md`. Motions are files in `content/motions/` (see the existing ones and *Built (F0): the format* above). Make: parry, block (shield), dodge (a step back and aside), flinch (a light hit), stagger (a hard hit), fall (to lying), finish (the killing stroke), and a strike for each weapon way of moving that has none yet. Check each one in the motion viewer on `/models/` with the matching body and weapon, from the side and from the front, at full and slow speed. Each needs a `contact` mark where the blow lands or is met. Don't touch `core/combat.ts` or the fight panel. Run `npm test` and `npm run build`, the `models` browser test, then commit and push one motion family at a time with a short devlog entry.

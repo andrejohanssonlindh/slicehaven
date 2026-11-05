@@ -1,5 +1,6 @@
 import { ARMOUR, SHIELDS, WEAPONS } from '../content/chargen/equipment';
 import { FIGHT_MINDS, styleFor } from '../content/combat';
+import { PICK_SECONDS } from '../content/combat/timer';
 import { rollableName } from '../content/rollables';
 import { THINGS } from '../content/things';
 import { WOUND_TABLES } from '../content/wounds';
@@ -89,6 +90,37 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
   const el = document.getElementById('fight')!;
   const headEl = el.querySelector<HTMLElement>('.head')!, usEl = el.querySelector<HTMLElement>('.us .card')!, themEl = el.querySelector<HTMLElement>('.them .card')!;
   const usMoves = el.querySelector<HTMLElement>('.us .moves')!, themMoves = el.querySelector<HTMLElement>('.them .moves')!;
+  usMoves.classList.add('mine');
+  const usCol = el.querySelector<HTMLElement>('.us')!, tabsEl = el.querySelector<HTMLElement>('.tabs')!, paneEl = el.querySelector<HTMLElement>('.pane')!;
+  const intentEl = el.querySelector<HTMLButtonElement>('.intent-icon')!;
+  // A tap on the foe's bubble unfolds their whole column under their card (a phone); again folds it.
+  intentEl.addEventListener('click', () => el.classList.toggle('show-foe'));
+  themMoves.addEventListener('click', () => el.classList.remove('show-foe'));
+  /** The computer layout (columns at both sides): a wide screen, or a phone held sideways. */
+  const WIDE = matchMedia('(min-width: 640px) and (min-aspect-ratio: 1/1)');
+  /**
+   * Tap to pick, tap again to act (B8g F5): on a touch screen a mis-tap would cost a round. `?taps=2` or `?taps=1`
+   * forces it (for testing on a computer).
+   */
+  const taps = new URLSearchParams(location.search).get('taps');
+  const twoTaps = (): boolean => (taps ? taps === '2' : matchMedia('(pointer: coarse)').matches);
+  /** The move picked and waiting for its second tap (and what the timer would take): its key, and what it does. */
+  let armed: { key: string; go: () => unknown } | null = null;
+  /** The phone's tab, and the round and role it was opened for (a new round opens on the role's tab). */
+  let tab: 'attack' | 'defend' | 'move' = 'move';
+  let tabFor = '';
+  /** The moves you can take now (filled as they are drawn), by key: what the timer can take. */
+  let avail = new Map<string, () => unknown>();
+  /** The move you took last round (its key): the timer starts ringing that one. */
+  let lastMove: string | null = null;
+  /** The pick timer (F6; seconds by difficulty in `content/combat/timer.ts`): for which pick, and when it runs out. */
+  let timer: { key: string; until: number; total: number } | null = null;
+  const timerEl = document.createElement('div');
+  timerEl.className = 'timer';
+  timerEl.hidden = true;
+  const timerBar = document.createElement('i');
+  timerEl.appendChild(timerBar);
+  el.querySelector('.head')!.after(timerEl);
   const logEl = el.querySelector<HTMLElement>('.log')!, choicesEl = el.querySelector<HTMLElement>('.choices')!;
   const backEl = document.getElementById('fight-back') as HTMLButtonElement;
   backEl.addEventListener('click', () => world().faceFight());
@@ -120,14 +152,86 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     const canvas = document.getElementById('stage');
     if (!fight || el.hidden || !canvas) return void (w.viewAim = { x: 0, y: 0 });
     const c = canvas.getBoundingClientRect();
-    const us = el.querySelector('.us')!.getBoundingClientRect(), them = el.querySelector('.them')!.getBoundingClientRect();
-    const mid = el.querySelector('.mid')!, m = getComputedStyle(mid).display === 'contents' ? el.getBoundingClientRect() : mid.getBoundingClientRect();
-    // Columns at both sides (a wide screen): the gap between them, above the bottom strip. Else above the sheet.
-    const wide = us.width > 0 && them.width > 0 && them.left > us.right;
-    const free = wide ? { x: (us.right + them.left) / 2, y: (c.top + m.top) / 2 } : { x: c.left + c.width / 2, y: (c.top + m.top) / 2 };
+    const us = usCol.getBoundingClientRect(), them = el.querySelector('.them')!.getBoundingClientRect(), m = el.querySelector('.mid')!.getBoundingClientRect();
+    // Columns at both sides (a wide screen): the gap between them, above the bottom strip. A phone: between the
+    // cards in the corners and the sheet.
+    const free = WIDE.matches ? { x: (us.right + them.left) / 2, y: (c.top + m.top) / 2 } : { x: c.left + c.width / 2, y: (Math.max(us.bottom, c.top) + m.top) / 2 };
     w.viewAim = { x: ((free.x - c.left) / c.width) * 2 - 1, y: -(((free.y - c.top) / c.height) * 2 - 1) };
   }
-  window.addEventListener('resize', aimView);
+  window.addEventListener('resize', () => { layout(); aimView(); });
+
+  /** Your moves go in your column on a wide screen, in the sheet under the tabs on a phone. */
+  function layout(): void {
+    if (WIDE.matches) { if (usMoves.parentElement !== usCol) usCol.appendChild(usMoves); }
+    else if (usMoves.parentElement !== paneEl) paneEl.appendChild(usMoves);
+  }
+
+  /** Pick a move: on a touch screen the first tap rings it and the second acts; elsewhere one tap acts. */
+  function press(key: string, go: () => unknown): void {
+    if (busy) return;
+    if (!twoTaps() || armed?.key === key) {
+      armed = null;
+      timer = null;
+      lastMove = key;
+      void go();
+      return;
+    }
+    armed = { key, go };
+    refresh();
+  }
+
+  /** The tabs (a phone): Attack, Defend, Move; a new round opens on the tab for your role; the others greyed. */
+  function tabs(): void {
+    if (!fight) return;
+    const role = roleOf(fight, 'hero');
+    const now = `${fight.round}:${role}:${fight.winner}`;
+    if (now !== tabFor) {
+      tabFor = now;
+      tab = fight.winner === null && canAct(fight.fighters[0]) ? (role === 'attacker' ? 'attack' : role === 'defender' ? 'defend' : 'move') : 'move';
+    }
+    tabsEl.replaceChildren();
+    const names = { attack: t('fight.tab.attack', 'Attack'), defend: t('fight.tab.defend', 'Defend'), move: t('fight.tab.move', 'Move') };
+    for (const k of ['attack', 'defend', 'move'] as const) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = names[k];
+      b.dataset.tab = k;
+      b.classList.toggle('on', k === tab);
+      b.classList.toggle('off', k !== 'move' && !!offWhy(fight.fighters[0], k, true));
+      b.addEventListener('click', () => { tab = k; tabs(); });
+      tabsEl.appendChild(b);
+    }
+    el.classList.remove('tab-attack', 'tab-defend', 'tab-move');
+    el.classList.add(`tab-${tab}`);
+  }
+
+  /** The foe's move as a word in the bubble over their head (a phone): what they mean to do, or ? */
+  function intentBubble(): void {
+    if (!fight || !fight.fighters[1] || fight.winner !== null || !canAct(fight.fighters[1])) return void (intentEl.hidden = true);
+    const foe = fight.fighters[1], me = fight.fighters[0];
+    intentEl.hidden = false;
+    intentEl.classList.toggle('unknown', !pending);
+    if (!pending) return void (intentEl.textContent = '?');
+    const key = litKey(foe, me, pending);
+    const [k, a, b] = key?.split(':') ?? [];
+    intentEl.textContent = k === 'atk' ? `⚔ ${ATTACKS[a as AttackTactic][0]}`
+      : k === 'def' ? `🛡 ${cap(WAYS[a as 'parry'])} · ${DEFENCES[b as DefenceTactic][0]}`
+        : key === 'retreat' ? t('fight.bubble.retreat', '↩ Retreat')
+          : pending.plead ? t('fight.bubble.plead', 'Yield?')
+            : pending.move ? (pending.move.run ? t('fight.bubble.run', 'Runs') : t('fight.bubble.close', 'Closes in'))
+              : pending.pickUp || pending.draw ? t('fight.bubble.arm', 'Arms') : t('fight.bubble.hold', 'Holds');
+  }
+
+  /** Keep the bubble over the foe's head while the fight lasts (they move, the view turns). */
+  function trackBubble(): void {
+    if (!fight || el.hidden) return;
+    const at = fight.fighters[1] ? world().screenOf(fight.fighters[1].id) : null;
+    if (at && !intentEl.hidden) {
+      intentEl.style.left = `${at.x * 100}%`;
+      intentEl.style.top = `${at.y * 100}%`;
+    }
+    requestAnimationFrame(trackBubble);
+  }
 
   /** A tap on the world: plan to go there (free), or to the weapon tapped; in reach of a foe, only breaking off moves you. */
   function tap(thing: string | null, ground: { x: number; z: number } | null): void {
@@ -245,7 +349,10 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     const skill = weaponOf(f).skill, pool = f.pools[skill];
     const dice = pool && (pool.n > 0 || pool.mod > 0) ? diceText(pool) : `${diceText(UNTRAINED)} ${t('fight.untrainedtag', 'untrained')}`;
     const weapon = (f.weapon ? kindName(f.weapon.id) : t('fight.bare', 'bare hands')) + (f.shield ? t('fight.andshield', ' and {shield}', { shield: kindName(f.shield.id) }) : '');
-    top.append(b, document.createTextNode(` · ${exactHarm ? `${weapon} (${rollableName(skill)} ${dice})` : weapon}`));
+    const wpn = document.createElement('span');
+    wpn.className = 'wpn';
+    wpn.textContent = ` · ${exactHarm ? `${weapon} (${rollableName(skill)} ${dice})` : weapon}`;
+    top.append(b, wpn);
     if (own || lv.foeExact) {
       const more = document.createElement('span');
       more.className = 'more';
@@ -270,6 +377,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
 
   function refresh(): void {
     if (!fight) return;
+    avail = new Map();
     const me = fight.fighters[0], foe = fight.fighters[1];
     const role = roleOf(fight, 'hero');
     const d = between(fight, 'hero', foeId);
@@ -277,10 +385,13 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       r: fight.round, d: d.toFixed(1),
       role: fight.winner !== null ? t('fight.over', 'over') : role === 'attacker' ? t('fight.attacking', 'you attack') : role === 'defender' ? t('fight.defending', 'you defend') : t('fight.free', 'not in reach'),
     });
+    layout();
     card(usEl, me, t('fight.You', 'You'), true);
     card(themEl, foe, Name(foeId), false);
     moves(usMoves, me, foe, true);
     moves(themMoves, foe, me, false);
+    tabs();
+    intentBubble();
     choicesEl.replaceChildren();
     const h = document.createElement('h4');
     h.textContent = t('fight.g.move', 'Move');
@@ -295,11 +406,67 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       const b = document.createElement('button');
       b.type = 'button';
       b.textContent = c.label;
-      b.addEventListener('click', () => void c.go());
+      b.dataset.move = c.label;
+      b.classList.toggle('armed', armed?.key === c.label);
+      b.addEventListener('click', () => press(c.label, c.go));
+      avail.set(c.label, c.go);
       choicesEl.appendChild(b);
     }
     logEl.scrollTop = logEl.scrollHeight;
+    pickTimer();
     aimView();
+  }
+
+  /** Can the hero pick a move now (their turn, nothing playing)? */
+  const canPick = (): boolean => !!fight && !busy && fight.winner === null && canAct(fight.fighters[0]);
+
+  /**
+   * The pick timer (F6): on a difficulty with seconds for it, each pick runs against the clock (a bar under the
+   * round). The move ringed is what it takes when it runs out: last round's if you can take it again, else a plain
+   * one for your role (a standard blow, the best standard defence, holding your ground). It stops while anything
+   * plays or dice roll, and a new pick starts it afresh.
+   */
+  function pickTimer(): void {
+    const secs = PICK_SECONDS[loadSettings().difficulty];
+    if (!fight || !secs || !canPick()) {
+      timer = null;
+      timerEl.hidden = true;
+      return;
+    }
+    const me = fight.fighters[0], foe = fight.fighters[1];
+    const key = `${fight.round}:${fight.midRound ?? ''}:${roleOf(fight, 'hero')}`;
+    if (timer?.key !== key) {
+      timer = { key, until: performance.now() + secs * 1000, total: secs * 1000 };
+      requestAnimationFrame(tick);
+    }
+    if (!armed || !avail.has(armed.key)) {
+      const role = roleOf(fight, 'hero');
+      const plain = role === 'attacker' ? 'atk:standard'
+        : role === 'defender' && foe ? `def:${defencePool(me, weaponOf(foe), 'standard').how}:standard`
+          : t('fight.hold', 'Hold your ground');
+      const k = [lastMove, plain].find((x) => x && avail.has(x)) ?? avail.keys().next().value;
+      armed = k ? { key: k, go: avail.get(k)! } : null;
+    } else armed.go = avail.get(armed.key)!;
+    for (const b of el.querySelectorAll<HTMLElement>('[data-move]')) b.classList.toggle('armed', !!armed && b.dataset.move === armed.key && !b.closest('.them'));
+    timerEl.hidden = false;
+  }
+
+  /** The timer running down; out of time, the ringed move is taken. */
+  function tick(): void {
+    if (!timer) return void (timerEl.hidden = true);
+    if (!canPick()) return void (timer = null);
+    const left = timer.until - performance.now();
+    timerBar.style.width = `${Math.max(0, (left / timer.total) * 100)}%`;
+    timerEl.classList.toggle('late', left < 3000);
+    if (left > 0) return void requestAnimationFrame(tick);
+    const a = armed;
+    timer = null;
+    armed = null;
+    if (a) {
+      lastMove = a.key;
+      log(t('fight.timeup', 'Out of time.'), 'info');
+      void a.go();
+    }
   }
 
   /** The tactics' names and what each does, for the buttons. */
@@ -370,8 +537,12 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       }
       b.dataset.move = key;
       b.classList.toggle('lit', key === lit);
+      b.classList.toggle('armed', mine && armed?.key === key);
       b.disabled = cant || !go;
-      if (go && !cant) b.addEventListener('click', go);
+      if (go && !cant) {
+        b.addEventListener('click', () => press(key, go));
+        avail.set(key, go);
+      }
       return b;
     };
     const group = (kind: 'attack' | 'defend', title: string): HTMLElement => {
@@ -601,6 +772,8 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     if (!fight || busy) return;
     busy = true;
     roleWhy = 'kept';
+    armed = null;
+    el.classList.remove('show-foe');
     refresh();
     const w = world();
     // Where they stand now (the world walked them), as the rules start the round from.
@@ -950,6 +1123,11 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     seen = {};
     stash = [];
     lastLine = null;
+    armed = null;
+    tabFor = '';
+    lastMove = null;
+    timer = null;
+    requestAnimationFrame(trackBubble);
     log(t('fight.begins', 'You face {name}. The fight is on.', { name: p.name }), 'info');
     if (!fight.fighters[0].weapon) {
       log(fight.fighters[0].belt?.length
