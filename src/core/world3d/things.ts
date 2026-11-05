@@ -3,6 +3,7 @@ import type { Size } from './carry';
 import type { FSource, SourceKind } from './filaments3d';
 import type { BuildingPlan } from './house';
 import type { MeshData } from './mesh';
+import type { WayOfMoving } from './motion';
 import type { RoomLine, RoomRecipe } from './roomplan';
 import type { Lumps, PlacedProp } from './props';
 import { type Shape, circle } from './space';
@@ -154,6 +155,11 @@ export interface ThingDef {
    * greatsword). Left out, it is carried in both arms (a stool) and nothing else can be held with it.
    */
   hands?: 1 | 2;
+  /**
+   * How it moves in the hand (plan B8g): which motions a fighter holding it plays (`core/world3d/motion.ts`), a sword's
+   * strikes and parries or a staff's. Inherited, so a new weapon finds its motions from its kind.
+   */
+  moves?: WayOfMoving;
   /**
    * A rack or chest that hands out things of a family (a weapon rack: `weapon`): *take from it* lists every kind under
    * it to pick from, and the one picked is put in your hand. Never runs out (a test ground's, for now).

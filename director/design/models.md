@@ -6,6 +6,7 @@
 - ✅ **People: one builder, five bodies.** Every people family has its own proportions, and every people its own size from the creator's typical height and weight for women and men. Dressed from the looks the kinds of person already have (no person is made by hand).
 - ✅ **Movement as data:** a walk and a standing breath, as poses in a loop.
 - ✅ **The gallery** `/models/`: the eight bodies on turning stands, and every piece of furniture; toggles for turning, walking, shells and the outline.
+- ✅ **Motions** (B8g F0, 2026-11-04): strikes, falls and the rest are data in `content/motions/` (format in [fight feel](fight-feel.md#built-f0-2026-11-04-the-format)), played over the legs or the whole body; the gallery's third view, *Motions*, plays one on a body with a weapon, slowed down, from the side or front.
 - ✅ **In the world:** every person on the map is a body (one skinned mesh on a skeleton, three draw calls a person). The flat people cards are gone (the director, 2026-11-02): a person on screen is a `Figure` in `engine3d/world.ts`, an anchor the rules place and show, carrying the body.
 - ⬜ Later, as the game needs them: held things, faces, more poses (sit, work, fight, fall).
 - ✅ **Furniture, the pattern and four examples:** `table`, `keg`, `bed`, `shelf` are models; they turn to face out from their wall; [the how-to](models-authoring.md) lists the rest in six batches.
@@ -28,7 +29,7 @@ Each person varies ±4% in height by their seed, and their weight makes them bro
 - **Rules:** `core/world3d/body.ts` (`buildBody(spec)`: about 25 tapered boxes on 11 joints, ~400 triangles) and `core/world3d/pose.ts` (poses, loops, mirroring). Pure and tested (`tests/body.test.ts`).
 - **Data:** `content/people/bodies.ts` (the families' proportions; `bodySpecOf` turns a person into a spec), `content/people/poses.ts` (the walk and the standing breath).
 - **Engine:** `engine3d/body.ts` (`makeBodyRig`: one skinned mesh per body on a skeleton of its joints, colours in the vertices, one material for every body, two shells over cloth and hair on the same skeleton).
-- **A new people with a body of its own:** a new entry in `BODY_PLANS` under its family kind. A new movement: a new loop in `poses.ts`.
+- **A new people with a body of its own:** a new entry in `BODY_PLANS` under its family kind. A new looping movement: a new loop in `poses.ts`. A movement that plays once (a strike, a fall): a motion file in `content/motions/`. Held things go in the hand with `holdOnRig` (`engine3d/body.ts`), and a motion's root is placed with `placeRoot`.
 
 ## Furniture
 **One file per kind** in `content/things/models/` (found by itself), its default export a `FurnitureModel` (`core/world3d/things.ts`: a footprint `w` × `d` and a `draw(seed, variant)`), built with the kit in `core/world3d/modelkit.ts`. Every piece of furniture must have one (the kind file throws without it), and its footprint is the piece's size. The room solver turns a model to face out from its wall (`turnFor` in `roomplan.ts`). The materials of things are shared by the world and the gallery (`engine3d/things.ts`; `iron` is new). Guarded by `tests/furniture-models.test.ts` (on the floor, inside its footprint, under 450 triangles, the same for a seed) and `e2e/models.e2e.ts` (two pictures of each). **How to make one: [models-authoring.md](models-authoring.md).**

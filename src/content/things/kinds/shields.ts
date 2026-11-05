@@ -8,7 +8,7 @@ import { MODELS } from '../models';
  * (`shield`): its block bonus and properties in a fight. The table gives no weights; these are ours (reading). A new
  * shield: a line here and a model file of the same name.
  */
-const family: ThingDef = { id: 'shield', is: 'weapon', abstract: true, size: 'strapped', importance: 1 };
+const family: ThingDef = { id: 'shield', is: 'weapon', abstract: true, size: 'strapped', importance: 1, moves: 'shield' };
 
 const ROWS: Record<string, { row: string; kg: number; look: string }> = {
   buckler: { row: 'Bucklare', kg: 1.5, look: 'A buckler: a small round shield of iron, held in the fist.' },

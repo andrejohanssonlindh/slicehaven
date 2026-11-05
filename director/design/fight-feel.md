@@ -1,6 +1,6 @@
 # How a fight looks and feels
 
-*2026-11-04. The director: "Rules are not changed per se… make it a bit more engaging. Current approach feels… wrong." Talked through and agreed the same day (decisions below). **Planned, not started.** It's built in the stages at the bottom, one at a time, each tried on the phone before the next.*
+*2026-11-04. The director: "Rules are not changed per se… make it a bit more engaging. Current approach feels… wrong." Talked through and agreed the same day (decisions below). **Started: F0 (motions as data) built 2026-11-04.** It's built in the stages at the bottom, one at a time, each tried on the phone before the next.*
 
 **Not changed:** the rules. `core/combat.ts` still takes one `Choice` per side per round and `resolveRound` decides what happens. Everything here is the page, the camera and the animations.
 
@@ -61,10 +61,37 @@ There will be many more motions: per weapon, per fighting style, parry, block, d
 - **Checked when read** (the compile-and-report pattern): an unknown joint, keys out of order or a missing mark is a listed problem.
 - **A motion viewer on `/models/`**: pick a body, a weapon and a motion; play, slow it down, loop it. That's how motions are made and checked, by whoever makes them and by the director.
 
+### Built (F0, 2026-11-04): the format
+A motion is a file in `content/motions/` (a family can share one file as an array: `lying.ts` has `down` and `dead`):
+
+```ts
+export default {
+  id: 'strike', act: 'strike',      // the act it shows (MOTION_ACTS in core/world3d/motion.ts)
+  way: 'staff', style: 'gladiator', // optional: only for weapons that move this way / this fighting style
+  seconds: 0.7,
+  part: 'upper',                    // 'arms' | 'upper' (over the legs) | 'whole' (every joint, and the root)
+  keys: [                           // `at` 0..1, rising; a joint a key leaves out is at rest there
+    { at: 0, joints: GUARD_ARMS },
+    { at: 0.35, joints: { shoulderR: [-2.7, 0, -0.2], elbowR: [-0.7, 0, 0], spine: [0, -0.25, 0] } },
+    { at: 1, joints: GUARD_ARMS },
+  ],
+  then: 'guard',                    // the act after it, or 'hold'
+  marks: { contact: 0.6 },          // strike, parry, block, dodge, finish need `contact`
+} satisfies Motion;
+```
+
+- **Whole-body motions move the root** per key: `root: { tilt, up, back, side }` (radians and metres; lying is `tilt: −π/2`). That replaced the renderer's `if` for lying.
+- **Ways of moving** (`moves` on the weapon kind): `blade`, `two-hander`, `staff`, `spear`, `axe-mace`, `shield`, and `hands` for nothing held.
+- **Lookup:** style + way beats style beats way beats any. With nothing for the act, it falls back (`FALLS_BACK`: finish → strike, stagger → flinch, fall → down), so the page can already ask for `finish` and the library fills it in later.
+- **The world:** `world.play(id, act)` (optionally `{ after: true }` to queue it); `world.actOf(id)`. The fight page asks for `strike` and `finish`; F3 will ask for the rest.
+- **Checked when read** (`motionLibraryProblems`, zero in `tests/motion.test.ts`): unknown act, joint or way; keys out of order; a joint outside the part; a missing mark; an act some `then` names with no motion for any weapon.
+- **Viewer:** `/models/` → tap *People* until it says *Motions*; pick the body, what they hold and the motion; Play, 1× ½× ¼×, Loop, side or front. The time is shown, and a mark lights up as it passes. `/models/?show=motions` opens straight on it.
+- **The four moved out of code:** `guard`, `strike` (the old swing, same angles), `down`, `dead`. One small change: on guard the knees no longer bend (the guard now only drives the upper body, so a fighter's legs walk normally).
+
 ## Stages
 | | Stage | Who | Needs |
 |---|---|---|---|
-| F0 | **The motion foundation:** motions as data, the lookup, the player, the swing, guard, down and dead moved into it, the viewer on `/models/`. Nothing changes on screen | Opus | — |
+| ✅ F0 | **The motion foundation:** motions as data, the lookup, the player, the swing, guard, down and dead moved into it, the viewer on `/models/`. Nothing changes on screen | Opus | — |
 | F1 | **The motion library:** parry, block, dodge, flinch, stagger, fall, finish; strikes per way of moving (blade, two-hander, staff, spear, axe and mace, bare hands) | **Sonnet** (brief below) | F0 |
 | F2 | **The fight camera and the computer layout:** both columns with every move, roles greyed with the reason, the foe's choice lit when you have the upper hand, ⚔ Back to fight | Opus | — (can run beside F1) |
 | F3 | **Fast mode:** the exchange plays at once, floating damage, body outlines with wound icons, dice behind a tap on the log | Opus | F1, F2 |
@@ -73,7 +100,7 @@ There will be many more motions: per weapon, per fighting style, parry, block, d
 | F6 | **The timer:** per difficulty, from content; hard 8 s; normal's "after a few fights" noted for later | Opus or Sonnet | F2 |
 
 ### Brief for the Sonnet session (F1, once F0 is done)
-> Read `CLAUDE.md`, then this page's *Animation first* section, then `director/design/models.md`. Motions are files in `content/motions/` (see the existing ones and the F0 devlog entry for the format). Make: parry, block (shield), dodge (a step back and aside), flinch (a light hit), stagger (a hard hit), fall (to lying), finish (the killing stroke), and a strike for each weapon way of moving that has none yet. Check each one in the motion viewer on `/models/` with the matching body and weapon, from the side and from the front, at full and slow speed. Each needs a `contact` mark where the blow lands or is met. Don't touch `core/combat.ts` or the fight panel. Run `npm test` and `npm run build`, the `models` browser test, then commit and push one motion family at a time with a short devlog entry.
+> Read `CLAUDE.md`, then this page's *Animation first* section, then `director/design/models.md`. Motions are files in `content/motions/` (see the existing ones and *Built (F0): the format* above). Make: parry, block (shield), dodge (a step back and aside), flinch (a light hit), stagger (a hard hit), fall (to lying), finish (the killing stroke), and a strike for each weapon way of moving that has none yet. Check each one in the motion viewer on `/models/` with the matching body and weapon, from the side and from the front, at full and slow speed. Each needs a `contact` mark where the blow lands or is met. Don't touch `core/combat.ts` or the fight panel. Run `npm test` and `npm run build`, the `models` browser test, then commit and push one motion family at a time with a short devlog entry.
 
 ## Agreed (2026-11-04)
 - One tap acts on a computer; tap twice on a phone.

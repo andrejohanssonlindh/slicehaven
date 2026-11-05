@@ -10,3 +10,6 @@ body { display: flex; flex-direction: column; height: 100dvh; margin: 0; }
 #panel button.on { background: var(--accent, #c8a444); color: #1a1420; }
 #cast { margin: 0; padding-left: 22px; font-size: 13px; color: var(--muted, #b8ab90); columns: 2; }
 @media (max-width: 480px) { #cast { columns: 1; } }
+#panel .pick { font-size: 13px; color: var(--muted, #b8ab90); display: flex; align-items: center; gap: 4px; }
+#panel select { font-size: 14px; padding: 6px; max-width: 46vw; }
+#cast li.mark { color: var(--accent, #c8a444); font-weight: bold; }

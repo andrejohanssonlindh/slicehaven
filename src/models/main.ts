@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 import { PERSON_KINDS } from '../content/people';
 import { bodySpecOf } from '../content/people/bodies';
-import { IDLE, IDLE_SECONDS, WALK } from '../content/people/poses';
+import { IDLE, IDLE_SECONDS, WALK, wielding } from '../content/people/poses';
+import { MOTIONS } from '../content/motions';
+import { overPose, sampleMotion } from '../core/world3d/motion';
 import type { PersonSpec } from '../core/persons';
 import { buildBody } from '../core/world3d/body';
 import { cyclePose } from '../core/world3d/pose';
-import { BODY_SHELLS, type BodyRig, makeBodyRig } from '../engine3d/body';
+import { BODY_SHELLS, type BodyRig, holdOnRig, makeBodyRig, placeRoot } from '../engine3d/body';
 import { WORLD, lit } from '../engine3d/materials';
 import { Pipeline } from '../engine3d/pipeline';
 import { thingGroup } from '../engine3d/things';
@@ -16,7 +18,8 @@ import { t } from '../i18n';
 
 /**
  * The model gallery (plan item A2): every kind of body and every piece of furniture on a slowly turning stand, in
- * the real pixel pipeline. Judge models here on the phone; whoever builds one checks it here.
+ * the real pixel pipeline. Judge models here on the phone; whoever builds one checks it here. **Motions** (plan B8g):
+ * one body with a weapon playing one motion from `content/motions/`, at full or slow speed, from the side or the front.
  */
 
 const PITCH = 0.68;
@@ -84,7 +87,9 @@ function build(): void {
 const params = new URLSearchParams(location.search);
 /** `?only=table` shows just that model (for checking one piece); `?show=furniture` opens on the furniture. */
 const only = params.get('only');
-let show: 'people' | 'furniture' = only || params.get('show') === 'furniture' ? 'furniture' : 'people';
+type Show = 'people' | 'furniture' | 'motions';
+const SHOWS: Show[] = ['people', 'furniture', 'motions'];
+let show: Show = only || params.get('show') === 'furniture' ? 'furniture' : params.get('show') === 'motions' ? 'motions' : 'people';
 const furn = new THREE.Group();
 scene.add(furn);
 const furnItems: { model: THREE.Group }[] = [];
@@ -141,12 +146,13 @@ const furnList: string[] = [];
 /** The middle of the furniture rows, front to back (the view centres on it). */
 let furnMidZ = 0;
 /** Look at the middle of what is shown. */
-const centre = (): void => { target.set(0, 0.8, show === 'furniture' ? furnMidZ : 0); };
+const centre = (): void => { target.set(0, show === 'motions' ? 0.9 : 0.8, show === 'furniture' ? furnMidZ : 0); };
 
 /** The list under the stage: who or what stands there. */
 function fillList(): void {
   list.replaceChildren();
-  const lines = show === 'people' ? peopleList : furnList;
+  motionRows.forEach((r) => { r.hidden = show !== 'motions'; });
+  const lines = show === 'people' ? peopleList : show === 'furniture' ? furnList : motionLines();
   for (const l of lines) {
     const li = document.createElement('li');
     li.textContent = l;
@@ -199,8 +205,14 @@ function toggle(label: () => string, on: () => boolean, click: () => void): void
   refresh();
   row.appendChild(b);
 }
-toggle(() => (show === 'people' ? t('models.people', 'People') : t('models.furniture', 'Furniture')), () => true, () => {
-  show = show === 'people' ? 'furniture' : 'people';
+const SHOW_NAMES: Record<Show, () => string> = {
+  people: () => t('models.people', 'People'),
+  furniture: () => t('models.furniture', 'Furniture'),
+  motions: () => t('models.motions', 'Motions'),
+};
+toggle(() => SHOW_NAMES[show](), () => true, () => {
+  show = SHOWS[(SHOWS.indexOf(show) + 1) % SHOWS.length];
+  if (show === 'motions') { state.turning = false; state.angle = view.side ? Math.PI / 2 : 0; state.zoom = ZOOMS.length - 1; fit(); }
   centre();
   placeCamera();
   fillList();
@@ -219,6 +231,111 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('#zoom button')) {
   });
 }
 
+// --- motions (plan B8g): one body, a weapon in hand, one motion ---
+/** What the motion viewer shows: whose body, what they hold, which motion, how fast, looping, from which side. */
+const view = { who: 0, held: 'arming-sword', motion: 'strike', speed: 1, loop: true, side: true, t: 0, rest: 0 };
+let actor: BodyRig | null = null;
+const HELD = THINGS.placeable.filter((id) => THINGS.get(id).weapon || THINGS.get(id).shield).sort();
+
+function buildActor(): void {
+  actor?.dispose();
+  const c = CAST[view.who];
+  actor = makeBodyRig(buildBody(bodySpecOf(PERSON_KINDS.resolve(c.who), c.who.seed ?? 1)));
+  actor.setShells(state.shells);
+  if (view.held) {
+    const kind = THINGS.get(view.held), model = modelOf(kind)!;
+    holdOnRig(actor, thingGroup(model.draw(1)), { grip: model.grip, shield: !!kind.shield });
+  }
+  scene.add(actor.group);
+  view.t = 0;
+}
+
+/** The lines under the stage for a motion: what it is, and where it is now (its marks light up as they pass). */
+const nowLine = document.createElement('li');
+function motionLines(): string[] {
+  const m = MOTIONS[view.motion];
+  if (!m) return [];
+  const fits = [m.way ? t('models.mway', 'for {way}', { way: m.way }) : t('models.many', 'for any weapon'), m.style ? t('models.mstyle', 'style {style}', { style: m.style }) : ''].filter(Boolean).join(', ');
+  const marks = Object.entries(m.marks ?? {}).map(([k, at]) => `${k} ${(at * m.seconds).toFixed(2)} s`).join(', ');
+  return [
+    t('models.mline', '{id}: {act}, {fits}; {s} s, {part}; then {then}', { id: m.id, act: m.act, fits, s: m.seconds, part: m.part, then: m.then }),
+    ...(marks ? [t('models.marks', 'Marks: {marks}', { marks })] : []),
+  ];
+}
+
+const motionRows: HTMLElement[] = [];
+function select(label: string, options: [value: string, text: string][], get: () => string, set: (v: string) => void): HTMLElement {
+  const l = document.createElement('label');
+  l.className = 'pick';
+  l.append(label + ' ');
+  const s = document.createElement('select');
+  for (const [v, text] of options) s.add(new Option(text, v));
+  s.value = get();
+  s.addEventListener('change', () => { set(s.value); fillList(); });
+  l.append(s);
+  return l;
+}
+{
+  const panel = document.getElementById('panel')!;
+  const picks = document.createElement('div');
+  picks.className = 'row';
+  picks.id = 'row-motion';
+  picks.append(
+    select(t('models.body', 'Body'), CAST.map((c, i) => [String(i), c.label]), () => String(view.who), (v) => { view.who = Number(v); buildActor(); }),
+    select(t('models.held', 'Holds'), [['', t('models.nothing', 'nothing')], ...HELD.map((id): [string, string] => [id, THINGS.get(id).name ?? id])], () => view.held, (v) => { view.held = v; buildActor(); }),
+    select(t('models.motion', 'Motion'), Object.keys(MOTIONS).sort().map((id): [string, string] => [id, id]), () => view.motion, (v) => { view.motion = v; view.t = 0; view.rest = 0; }),
+  );
+  const play = document.createElement('div');
+  play.className = 'row';
+  const refreshers: (() => void)[] = [];
+  const btn = (label: () => string, on: () => boolean, click: () => void): void => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    const refresh = (): void => { b.textContent = label(); b.classList.toggle('on', on()); };
+    b.addEventListener('click', () => { click(); refreshers.forEach((r) => r()); });
+    refreshers.push(refresh);
+    refresh();
+    play.appendChild(b);
+  };
+  btn(() => t('models.replay', 'Play'), () => false, () => { view.t = 0; view.rest = 0; });
+  for (const sp of [1, 0.5, 0.25]) btn(() => (sp === 1 ? '1×' : sp === 0.5 ? '½×' : '¼×'), () => view.speed === sp, () => { view.speed = sp; });
+  btn(() => t('models.loop', 'Loop'), () => view.loop, () => { view.loop = !view.loop; });
+  btn(() => (view.side ? t('models.side', 'From the side') : t('models.front', 'From the front')), () => true, () => {
+    view.side = !view.side;
+    state.turning = false;
+    state.angle = view.side ? Math.PI / 2 : 0;
+  });
+  panel.insertBefore(play, list);
+  panel.insertBefore(picks, play);
+  motionRows.push(picks, play);
+}
+
+/** Move the motion on and pose the body: base standing (holding the weapon up), the motion over it, the root placed. */
+function stepMotion(dt: number): void {
+  if (!actor) return;
+  actor.group.visible = show === 'motions';
+  if (show !== 'motions') return;
+  const m = MOTIONS[view.motion];
+  actor.group.rotation.y = state.angle;
+  const base = cyclePose(IDLE, time / IDLE_SECONDS);
+  const legs = view.held && !THINGS.get(view.held).shield ? wielding(base) : base;
+  if (!m) return actor.pose(legs);
+  view.t += dt * view.speed;
+  // After its end it holds a moment, then starts again (looping).
+  if (view.t >= m.seconds) {
+    view.rest += dt;
+    if (view.loop && view.rest > 0.8) { view.t = 0; view.rest = 0; }
+  }
+  const f = sampleMotion(m, Math.min(view.t, m.seconds));
+  actor.pose(overPose(legs, f, m.part));
+  placeRoot(actor, f.root, state.angle);
+  const k = m.seconds > 0 ? Math.min(1, view.t / m.seconds) : 1;
+  const hit = Object.entries(m.marks ?? {}).filter(([, at]) => Math.abs(at - k) < 0.06).map(([n]) => n);
+  nowLine.textContent = `${(Math.min(view.t, m.seconds)).toFixed(2)} s${hit.length ? ` · ${hit.join(', ').toUpperCase()}` : ''}`;
+  nowLine.classList.toggle('mark', hit.length > 0);
+  if (nowLine.parentElement !== list) list.prepend(nowLine);
+}
+
 // --- the loop ---
 let last = performance.now(), time = 0;
 function loop(now: number): void {
@@ -232,6 +349,7 @@ function loop(now: number): void {
   for (const f of furnItems) {
     f.model.rotation.y = state.angle;
   }
+  stepMotion(dt);
   for (const r of rigs) {
     r.rig.group.visible = show === 'people';
     r.rig.group.rotation.y = state.angle;
@@ -245,9 +363,11 @@ function loop(now: number): void {
 
 build();
 buildFurniture();
+buildActor();
+if (show === 'motions') Object.assign(state, { turning: false, angle: Math.PI / 2, zoom: ZOOMS.length - 1 });
 fillList();
 centre();
 fit();
 new ResizeObserver(fit).observe(stage);
-(window as unknown as { models: unknown }).models = { rigs, furnItems, state, build, BODY_SHELLS, pipeline, target, placeCamera, get show() { return show; } };
+(window as unknown as { models: unknown }).models = { rigs, furnItems, state, view, build, BODY_SHELLS, pipeline, target, placeCamera, get show() { return show; }, get actor() { return actor; } };
 requestAnimationFrame((n) => { last = n; loop(n); });

@@ -66,10 +66,13 @@ import { Leaves } from './leaves';
 import { Rain } from './rain';
 import { type Chimney, Smoke } from './smoke';
 import { blobShadow } from './shadow';
-import { type BodyRig, makeBodyRig } from './body';
+import { type BodyRig, holdOnRig, makeBodyRig, placeRoot } from './body';
 import { geometryOf, thingGroup, thingMaterial } from './things';
 import { bodySpecOf } from '../content/people/bodies';
-import { type FightPose, IDLE, IDLE_SECONDS, SIT, WALK, carrying, fightPose, wielding } from '../content/people/poses';
+import { IDLE, IDLE_SECONDS, SIT, WALK, carrying, wielding } from '../content/people/poses';
+import { MOTIONS } from '../content/motions';
+import { styleFor } from '../content/combat';
+import { LYING_ACTS, type Motion, type MotionAct, type Playing, type WayOfMoving, advance, findMotion, overPose, sampleMotion } from '../core/world3d/motion';
 import { orderly } from '../content/people/order';
 import { buildBody } from '../core/world3d/body';
 import { cyclePose } from '../core/world3d/pose';
@@ -598,8 +601,8 @@ export class SpikeWorld {
   private readonly inHand = new Set<string>();
   /** A fight going on (plan B8a): who is in it. While it lasts the world waits: the clock, and everyone else stands. */
   private fighting: Set<string> | null = null;
-  /** How each fighter stands, and since when (`time`): on guard, swinging, down, dead (`content/people/poses.ts`). */
-  private readonly fightPoses = new Map<string, { pose: FightPose; t: number }>();
+  /** The motion each fighter plays, and since when (`time`): on guard, a strike, lying down (`content/motions/`, B8g). */
+  private readonly motions = new Map<string, Playing>();
   /** What fights left on people (the hero too), by id: their injuries (`core/damage.ts`). Saved. */
   private hurt: Record<string, Injuries> = {};
   /** World minutes for one point of fatigue back (the difficulty's; the page sets it). */
@@ -2645,14 +2648,14 @@ export class SpikeWorld {
     this.fighting = new Set(ids);
     this.follow = true;
     this.talkingWith = null;
-    for (const id of ids) if (this.canStand(id)) this.fightPoses.set(id, { pose: 'guard', t: this.time });
+    for (const id of ids) this.play(id, 'guard');
   }
 
   /** The fight is over: the world goes on. Those left lying stay down. */
   endFight(): void {
-    for (const id of this.fighting ?? []) if (this.fightPoses.get(id)?.pose === 'guard' || this.fightPoses.get(id)?.pose === 'swing') this.fightPoses.delete(id);
+    for (const id of this.fighting ?? []) if (!this.lying(id)) this.motions.delete(id);
     const h = this.hurt.hero;
-    if (h && !h.out && !h.dead && !h.dying) this.fightPoses.delete('hero'); // up on a crutch
+    if (h && !h.out && !h.dead && !h.dying) this.motions.delete('hero'); // up on a crutch
     this.fighting = null;
   }
 
@@ -2707,8 +2710,8 @@ export class SpikeWorld {
     // (A broken leg puts them on the ground for good: they lie there, awake. The hero, outside a fight, limps on as if
     // on a crutch, so they're never stuck before healing exists.)
     const lying = i.dead ? 'dead' : i.out || i.dying || (grounded(i) && (id !== 'hero' || this.fighting)) ? 'down' : null;
-    if (lying) this.fightPoses.set(id, { pose: lying, t: this.time });
-    else if (this.fightPoses.get(id)?.pose === 'down') this.fightPoses.set(id, { pose: 'guard', t: this.time });
+    if (lying) this.play(id, lying);
+    else if (this.lying(id)) this.play(id, 'guard');
     if (lying) {
       const c = this.cast.find((x) => x.who.id === id);
       if (c) c.mind.actor.legs = [];
@@ -2733,13 +2736,63 @@ export class SpikeWorld {
       const next = recoverFatigue(i, minutes, per);
       if (next === i) continue;
       this.hurt[id] = next;
-      if (i.out && !next.out && !grounded(next)) this.fightPoses.delete(id); // up again (not on a broken leg)
+      if (i.out && !next.out && !grounded(next)) this.motions.delete(id); // up again (not on a broken leg)
     }
   }
 
-  /** A fighter swings (the rules said they strike): the pose plays once and settles back on guard. */
-  swing(id: string): void {
-    if (this.canStand(id)) this.fightPoses.set(id, { pose: 'swing', t: this.time });
+  /**
+   * Someone acts (the rules said what happened: they strike, parry, fall): the motion for the act is looked up for the
+   * weapon they hold and how they fight, and plays from now, or after what is playing (`after`). Standing acts are
+   * skipped for someone lying (knocked out, dying, dead). Then it goes on to what the motion says follows (back on guard).
+   */
+  play(id: string, act: MotionAct, opts: { after?: boolean } = {}): void {
+    if (!LYING_ACTS.has(act) && !this.canStand(id)) return;
+    const m = this.motionFor(id, act);
+    if (!m) return;
+    const cur = this.motions.get(id);
+    if (opts.after && cur && !this.settled(cur)) cur.queue.push(act);
+    else this.motions.set(id, { act, motion: m.id, since: this.time, queue: [] });
+  }
+
+  /** What someone's motion is showing now (`guard`, `strike`, `down` …), or null outside any. */
+  actOf(id: string): MotionAct | null {
+    return this.motions.get(id)?.act ?? null;
+  }
+
+  /** Lying where they are (knocked out, dying, dead: a lying motion). */
+  private lying(id: string): boolean {
+    const a = this.motions.get(id)?.act;
+    return !!a && LYING_ACTS.has(a);
+  }
+
+  /** A motion that has played out and only holds (nothing queued, nothing follows). */
+  private settled(p: Playing): boolean {
+    const m = MOTIONS[p.motion];
+    return !m || (!p.queue.length && m.then === 'hold' && this.time - p.since >= m.seconds);
+  }
+
+  /** How what someone holds in the right hand moves (their weapon kind's `moves`), else bare hands. */
+  private wayOf(id: string): WayOfMoving {
+    let way: WayOfMoving | undefined;
+    for (const [who, l] of this.holds()) {
+      if (who !== id) continue;
+      const k = THINGS.get(l.kind);
+      if (k.shield) way ??= k.moves;
+      else if (k.moves) way = k.moves;
+    }
+    return way ?? 'hands';
+  }
+
+  /** The fighting style someone fights by (their own, their kind's, the default); the hero has none yet. */
+  private styleOf(id: string): string | undefined {
+    if (id === 'hero') return undefined;
+    const c = this.cast.find((x) => x.who.id === id);
+    return c ? styleFor(PERSON_KINDS.resolve(c.who).chain, c.who.fights).id : undefined;
+  }
+
+  /** The motion someone plays for an act (`findMotion`: the most specific for their weapon and style). */
+  private motionFor(id: string, act: MotionAct): Motion | null {
+    return findMotion(MOTIONS, act, this.wayOf(id), this.styleOf(id));
   }
 
   /** Where a fighter stands now (the hero or one of the map's people). */
@@ -2921,7 +2974,7 @@ export class SpikeWorld {
     this.called = (this.called ?? 0) + 1;
     c.who.sheet = PERSON_KINDS.rolled({ ...c.who, level, seed: (c.who.seed ?? 0) + this.called * 101 }, c.who.id);
     delete this.hurt[c.who.id];
-    this.fightPoses.delete(c.who.id);
+    this.motions.delete(c.who.id);
     for (const [id, l] of Object.entries(this.carry.loose)) if (l.wield === c.who.id) delete this.carry.loose[id];
     const a = c.mind.actor;
     a.x = c.who.start[0];
@@ -3198,19 +3251,9 @@ export class SpikeWorld {
       const model = modelOf(THINGS.get(l.kind)), fig = this.figureOf(who);
       if (!model || !fig) continue;
       const g = thingGroup(model.draw(l.seed, l.variant));
-      if (THINGS.get(l.kind).shield) {
-        // A shield on the left forearm: its face (y) out to the left (x), its length (x) along the forearm (y).
-        const m = new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, -1));
-        g.quaternion.setFromRotationMatrix(m);
-        g.position.set(0.035, 0, 0.02);
-        fig.rig.left.add(g);
-      } else if (model.grip !== undefined) {
-        // The model's length (x) out along the forearm's front (z), its up (y) to the side (x).
-        const m = new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0));
-        g.quaternion.setFromRotationMatrix(m);
-        g.position.copy(new THREE.Vector3(model.grip, 0.02, 0).applyMatrix4(m).negate());
-        fig.rig.hand.add(g);
-        this.inHand.add(who);
+      const shield = !!THINGS.get(l.kind).shield;
+      if (holdOnRig(fig.rig, g, { grip: model.grip, shield })) {
+        if (!shield) this.inHand.add(who);
       } else {
         const s = Math.min(1, HELD_SIZE / Math.max(model.w, model.d)), H = fig.rig.model.height;
         g.scale.setScalar(s);
@@ -3391,8 +3434,8 @@ export class SpikeWorld {
     this.flags = { ...s.flags };
     // What fights left: those knocked out or killed lie where they fell (B8a).
     this.hurt = s.hurt ? structuredClone(s.hurt) : {};
-    this.fightPoses.clear();
-    for (const [id, i] of Object.entries(this.hurt)) if (i.dead || i.out || i.dying || (grounded(i) && id !== 'hero')) this.fightPoses.set(id, { pose: i.dead ? 'dead' : 'down', t: 0 });
+    this.motions.clear();
+    for (const [id, i] of Object.entries(this.hurt)) if (i.dead || i.out || i.dying || (grounded(i) && id !== 'hero')) this.play(id, i.dead ? 'dead' : 'down');
     this.carry = s.carry ? structuredClone(s.carry) : newCarry();
     this.standing = s.standing ? structuredClone(s.standing) : newStanding();
     this.talkMemory = s.talk ? structuredClone(s.talk) : newTalkMemory();
@@ -3576,13 +3619,17 @@ export class SpikeWorld {
       const legs = seat ? cyclePose(SIT, this.time / IDLE_SECONDS) : f.still < 0.15 ? cyclePose(WALK, f.phase) : cyclePose(IDLE, this.time / IDLE_SECONDS);
       // Holding something: the arms carry it, or the right hand holds it up (a sword), whatever the legs do (B3b, B8a).
       const pose = this.inHand.has(p.id) ? wielding(legs) : this.inArms.has(p.id) ? carrying(legs) : legs;
-      // In a fight, or left lying after one: on guard, a swing, or laid on their back (B8a).
-      const fp = this.fightPoses.get(p.id);
-      const lying = fp?.pose === 'down' || fp?.pose === 'dead';
-      f.rig.group.rotation.order = 'YXZ';
-      f.rig.group.rotation.x = lying ? -Math.PI / 2 : 0;
-      f.rig.group.position.y = lying ? 0.12 : 0;
-      f.rig.pose(fp ? fightPose(pose, fp.pose, this.time - fp.t) : pose);
+      // A motion playing (in a fight, or left lying after one: `content/motions/`): over what the legs do, or the whole
+      // body with its root moved (tipped onto its back, a step back).
+      let pl = this.motions.get(p.id);
+      if (pl) {
+        const next = advance(pl, this.time, MOTIONS, (a) => this.motionFor(p.id, a));
+        if (next !== pl) this.motions.set(p.id, (pl = next));
+      }
+      const m = pl ? MOTIONS[pl.motion] : undefined;
+      const fr = m && pl ? sampleMotion(m, this.time - pl.since) : null;
+      placeRoot(f.rig, fr?.root ?? null, f.yaw);
+      f.rig.pose(fr && m ? overPose(pose, fr, m.part) : pose);
       f.rig.setShells(Math.min(2, this.settings.shells));
     }
   }

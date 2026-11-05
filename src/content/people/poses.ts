@@ -72,31 +72,4 @@ export const IDLE_SECONDS = 3.2;
 export const WIELD_ARM: Pose['joints'] = { shoulderR: [-0.45, 0, -0.12], elbowR: [-1.15, 0, 0] };
 export const wielding = (p: Pose): Pose => ({ ...p, joints: { ...p.joints, ...WIELD_ARM } });
 
-/** How someone stands in a fight, laid over what the legs do: on guard, striking, down (knocked out), dead. */
-export type FightPose = 'guard' | 'swing' | 'down' | 'dead';
-
-/** How long a swing takes, seconds: up over the shoulder, then down through the blow. */
-export const SWING_SECONDS = 0.7;
-const raised: Pose['joints'] = { shoulderR: [-2.7, 0, -0.2], elbowR: [-0.7, 0, 0], spine: [0, -0.25, 0] };
-const struck: Pose['joints'] = { shoulderR: [-0.9, 0, 0.15], elbowR: [-0.15, 0, 0], spine: [0.12, 0.3, 0] };
-const guard: Pose['joints'] = { ...WIELD_ARM, shoulderL: [-0.3, 0, 0.25], elbowL: [-0.9, 0, 0], kneeL: [0.15, 0, 0], kneeR: [0.15, 0, 0] };
-
-/**
- * A fight pose `t` seconds after it began, over a body's pose. A swing rises for the first third and falls through the
- * blow, then settles back on guard. Down and dead lie still (the renderer lays the body on its back).
- */
-export function fightPose(p: Pose, kind: FightPose, t: number): Pose {
-  if (kind === 'down' || kind === 'dead') return { joints: { shoulderL: [0, 0, 0.5], shoulderR: [0, 0, -0.5], elbowL: [-0.3, 0, 0], kneeR: [0.4, 0, 0], hipR: [-0.3, 0, 0] } };
-  if (kind === 'guard') return { ...p, joints: { ...p.joints, ...guard } };
-  const k = Math.min(1, t / SWING_SECONDS);
-  const ease = (a: Pose['joints'], b: Pose['joints'], x: number): Pose['joints'] => {
-    const out: Pose['joints'] = {};
-    for (const j of new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof Pose['joints']>) {
-      const u = a[j] ?? [0, 0, 0], v = b[j] ?? [0, 0, 0];
-      out[j] = [u[0] + (v[0] - u[0]) * x, u[1] + (v[1] - u[1]) * x, u[2] + (v[2] - u[2]) * x];
-    }
-    return out;
-  };
-  const arms = k < 0.35 ? ease(guard, raised, k / 0.35) : k < 0.6 ? ease(raised, struck, (k - 0.35) / 0.25) : ease(struck, guard, (k - 0.6) / 0.4);
-  return { ...p, joints: { ...p.joints, ...arms } };
-}
+// Fight motions (guard, strike, lying down) are data in `content/motions/`, played by `core/world3d/motion.ts` (B8g F0).

@@ -2,6 +2,16 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-04 — B8g stage F0: motions as data
+
+- **Fight animations are data now**, not code. Each one is a small file in `content/motions/`: how long it takes, a few key poses, which part of the body it moves, what follows it, and marks such as **contact** (the moment the blade meets, for timing the parry and the floating damage later). The swing, the guard and lying down were moved out of the code into four files, with the same angles.
+- **Which one plays is looked up**, never written as an `if`: by what happens (strike, parry, fall…), by how the weapon moves (every weapon now says: blade, two-hander, staff, spear, axe and mace, shield; bare hands when nothing is held) and, if wanted, by fighting style. The most specific wins; a gladiator can get flashier strikes later with one file and no code. A killing stroke plays the strike until it has its own.
+- **Lying down is a motion too**: the body is tipped over by the motion's data, so the renderer's own special case for lying is gone. A dodge can step back the same way.
+- **New on `/models/`: Motions.** Tap the first button (*People*) until it says *Motions*. Pick a body, what they hold and a motion; play it at full, half or quarter speed, loop it, look from the side or the front. The time shows, and *CONTACT* lights up as it passes. This is where the motion library (F1, for Sonnet) gets made and where you can judge it.
+- **Looks the same in a fight**, apart from one small thing: on guard, the knees no longer bend (the guard only moves the upper body now, so the legs walk normally under it).
+- **Checked:** unit tests for the rules and the library (it must have no problems), the fight browser test, and a new browser test that pictures every motion at its contact from the side and the front.
+- **Next:** F1, the motion library (Sonnet, brief in the [design](design/fight-feel.md)), and F2, the fight camera and layout, which can be built beside it.
+
 ## 2026-11-04 — Planned: how a fight looks and feels (B8g)
 
 - **Talked through your redesign** and wrote it up: [how a fight looks and feels](design/fight-feel.md). The rules don't change; the page, the camera and the animations do. It's on the plan as **B8g, next up, not started**, before B8b edges (the edges will land in the new Offensive group).

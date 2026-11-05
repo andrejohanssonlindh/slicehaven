@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { BodyModel, BodyPart } from '../core/world3d/body';
+import type { MotionRoot } from '../core/world3d/motion';
 import { JOINTS, type Joint, type Pose } from '../core/world3d/pose';
 import { lit, shellOf } from './materials';
 
@@ -138,4 +139,38 @@ export function makeBodyRig(model: BodyModel): BodyRig {
       group.removeFromParent();
     },
   };
+}
+
+/**
+ * Put a thing in a body's hands (plan B8a): a shield on the left forearm, its face out to the left and its length
+ * along the forearm; something with a grip (a sword) in the right hand at its grip, its length out along the
+ * forearm's front. Returns false for anything else (the caller carries it in both arms).
+ */
+export function holdOnRig(rig: BodyRig, g: THREE.Object3D, held: { grip?: number; shield?: boolean }): boolean {
+  if (held.shield) {
+    const m = new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 1, 0), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, -1));
+    g.quaternion.setFromRotationMatrix(m);
+    g.position.set(0.035, 0, 0.02);
+    rig.left.add(g);
+    return true;
+  }
+  if (held.grip === undefined) return false;
+  const m = new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0));
+  g.quaternion.setFromRotationMatrix(m);
+  g.position.copy(new THREE.Vector3(held.grip, 0.02, 0).applyMatrix4(m).negate());
+  rig.hand.add(g);
+  return true;
+}
+
+/**
+ * Where a motion puts the whole body (`MotionRoot`, plan B8g): tipped about its own x, raised, stepped back or to its
+ * right, for a body facing `yaw`. Null puts it back on its feet. The body's `group` is turned to `yaw` already.
+ */
+export function placeRoot(rig: BodyRig, root: Required<MotionRoot> | null, yaw: number): void {
+  const g = rig.group, r = root ?? { tilt: 0, up: 0, back: 0, side: 0 };
+  const fx = Math.sin(yaw), fz = Math.cos(yaw);
+  g.rotation.order = 'YXZ';
+  g.rotation.x = r.tilt;
+  // Back is away from where it faces; its right is (−cos, sin) of the way it faces.
+  g.position.set(-fx * r.back - fz * r.side, r.up, -fz * r.back + fx * r.side);
 }

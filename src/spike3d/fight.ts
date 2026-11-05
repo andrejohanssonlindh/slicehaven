@@ -496,7 +496,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       ? l.defend && l.attack.total === l.defend.total ? t('fight.tie', 'a tie: the attacker wins it') : t('fight.hits', 'it hits')
       : t(`fight.verdict.${l.how}`, VERDICT[l.how]);
     const line = `${of(l.who, ['fight.strike.you', 'You strike{tactic}'], ['fight.strikes', '{who} strikes{tactic}'], { tactic })}: ${atkText} ${t('fight.against', 'against {whose}', { whose: whose(l.target) })} ${defText}: ${verdict}.`;
-    w.swing(l.who);
+    w.play(l.who, 'strike');
 
     // 1. Who hits.
     const rolls: Roll[] = [{ ...l.attack, label: t('fight.attackroll', '{who}: attack', { who: Name(l.who) }) }];
@@ -608,7 +608,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
         }
         case 'mercy':
           await settle(w);
-          w.swing(l.who);
+          w.play(l.who, 'finish');
           log(of(l.who, ['fight.mercy.you', 'You give {target} the killing stroke.'], ['fight.mercy', '{who} gives {target} the killing stroke.'], { target: nameOf(l.target) }), l.who === 'hero' ? 'good' : 'bad');
           break;
         case 'over':
