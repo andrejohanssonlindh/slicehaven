@@ -7,7 +7,7 @@ import { rollPool, rollTable, rollTest } from '../core/dice';
 import { Rng } from '../core/rng';
 import { DICE_SKINS } from '../content/dice/skins';
 import { showRolls } from '../ui/dice';
-import { DICE_CLOSES, DICE_LEVELS, loadSettings, saveSettings } from '../ui/settings';
+import { DICE_CLOSES, DICE_LEVELS, FIGHT_MODES, loadSettings, saveSettings } from '../ui/settings';
 import { DIFFICULTIES, DIFFICULTY_RULES } from '../core/difficulty';
 import { diceOf } from '../core/hero';
 import { sightWord } from '../core/world3d/perceive';
@@ -190,6 +190,9 @@ function buildControls(): void {
   button('row-game', () => t('spike.dice.skin', 'Skin: {name}', { name: t(`dice.skin.${loadSettings().diceSkin}`, DICE_SKINS[loadSettings().diceSkin]?.name ?? '?') }), () => false, () => {
     saveSettings({ diceSkin: cycle(skins, loadSettings().diceSkin) });
   });
+  // How a fight is shown (B8g): fast (each exchange played out, its dice behind the log) or every roll step by step.
+  const fightName = { fast: t('spike.fight.fast', 'Fights: fast'), dice: t('spike.fight.dice', 'Fights: dice') };
+  button('row-game', () => fightName[loadSettings().fight], () => false, () => { saveSettings({ fight: cycle(FIGHT_MODES, loadSettings().fight) }); });
   // How hard the game is: on easy, sight rolls are shown and who sees or heard you is marked over their head (B5).
   const diffName = { easy: t('spike.diff.easy', 'Game: easy'), normal: t('spike.diff.normal', 'Game: normal'), hard: t('spike.diff.hard', 'Game: hard') };
   button('row-game', () => diffName[loadSettings().difficulty], () => loadSettings().difficulty === 'easy', () => {

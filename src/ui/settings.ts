@@ -13,6 +13,10 @@ export const DICE_LEVELS: readonly DiceLevel[] = ['glass', 'icons', 'result'];
 export type DiceClose = 'ok' | 'auto';
 export const DICE_CLOSES: readonly DiceClose[] = ['ok', 'auto'];
 
+/** How a fight is shown (plan B8g): fast, each exchange played out at once with its dice behind the log, or every roll shown step by step. */
+export type FightMode = 'fast' | 'dice';
+export const FIGHT_MODES: readonly FightMode[] = ['fast', 'dice'];
+
 export interface Settings {
   v: number;
   dice: DiceLevel;
@@ -20,11 +24,12 @@ export interface Settings {
   diceClose: DiceClose;
   /** How hard the game is (`core/difficulty.ts`): on easy, more is shown (sight rolls, who sees you). */
   difficulty: GameDifficulty;
+  fight: FightMode;
 }
 
 const VERSION = 1;
 const KEY = 'slicehaven.settings';
-const DEFAULTS: Settings = { v: VERSION, dice: 'glass', diceSkin: 'bone', diceClose: 'ok', difficulty: DEFAULT_DIFFICULTY };
+const DEFAULTS: Settings = { v: VERSION, dice: 'glass', diceSkin: 'bone', diceClose: 'ok', difficulty: DEFAULT_DIFFICULTY, fight: 'fast' };
 
 /** What this page has set, if storage would not keep it. */
 let memo: Settings | null = null;

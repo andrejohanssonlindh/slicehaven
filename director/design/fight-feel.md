@@ -96,13 +96,21 @@ export default {
 - **The Move row:** walk or run where you tapped, close in, run in, pick up, draw, hold your ground, get away, ask to yield, accept their surrender, OK.
 - **Phone, until F5:** the same pieces stacked in the bottom sheet: the foe's column folds to its one line, and your group not in play to its *why*. **Sideways or on a computer:** the columns at both sides, the round, the Move row and the log along the bottom between them.
 
+### Built (F3, 2026-11-05)
+- **Fast mode is the default**; *Fights: fast / dice* in the game row of the panel switches it (setting `fight`). Dice mode is still today's step-by-step flow until F4.
+- **An exchange plays out at once:** the strike (by the weapon's way of moving), and the defender's parry, block or dodge started so its *contact* meets the blow's (`world.motionTiming`). On a hit they flinch, or stagger if it was serious or 3+ fatigue; going down plays the **fall** into lying (it was an instant switch).
+- **At the contact, it floats up** over whoever was hit (`world.screenOf`), red, rising for about 2 s: the damage that got through on easy (and *serious wound* under it); on normal and hard a word by how bad it was and the kind of damage (*graze, cut, deep cut; nick, stab, deep stab; bruise, heavy blow, crushing blow* …; *glancing* when armour took it all). A miss floats *parried / blocked / dodged*.
+- **Body outlines** in both cards (`src/spike3d/outline.ts`): the six parts tinted by wounds (yours exactly; the foe's on easy, else only by the blows you saw), icons where blows landed (cut, stab, crush), broken bones, bleeding, parts lost; the fatigue bar beside it (it replaced the bar under the name).
+- **The dice behind the log:** every line whose rolls weren't shown has a 🎲; a tap throws them.
+- About 1.5 s an exchange, then your next pick.
+
 ## Stages
 | | Stage | Who | Needs |
 |---|---|---|---|
 | ✅ F0 | **The motion foundation:** motions as data, the lookup, the player, the swing, guard, down and dead moved into it, the viewer on `/models/`. Nothing changes on screen | Opus | — |
 | ✅ F1 | **The motion library** (first pass 2026-11-05, tune by eye): parry, block, dodge, flinch, stagger, fall, finish; strikes per way of moving (blade, two-hander, staff, spear, axe and mace, bare hands) | **Sonnet** (brief below) | F0 |
 | ✅ F2 | **The fight camera and the computer layout:** both columns with every move, roles greyed with the reason, the foe's choice lit when you have the upper hand, ⚔ Back to fight | Opus | — (can run beside F1) |
-| F3 | **Fast mode:** the exchange plays at once, floating damage, body outlines with wound icons, dice behind a tap on the log | Opus | F1, F2 |
+| ✅ F3 | **Fast mode:** the exchange plays at once, floating damage, body outlines with wound icons, dice behind a tap on the log | Opus | F1, F2 |
 | F4 | **Dice mode in the new layout** (one roll per step) and the setting | Opus | F2 |
 | F5 | **The phone:** the view on top, outlines in the corners, intent over the head, Attack/Defend/Move tabs, tap-twice | Opus | F2, F3 |
 | F6 | **The timer:** per difficulty, from content; hard 8 s; normal's "after a few fights" noted for later | Opus or Sonnet | F2 |

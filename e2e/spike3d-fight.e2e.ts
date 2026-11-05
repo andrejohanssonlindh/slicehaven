@@ -1,4 +1,4 @@
-/* Browser test: a fight in the arena (B8a, B8g F2): draw and put away your own weapon; pick a sword (and a shield for the left arm) up off the sand, fight the gladiator round by round (the view swings side-on; every move in your column, Offensive and Defensive, the one you lack greyed with why; the foe mirrored, their move shown when you are quicker; the Move row) until one side wins, and what it left (the dead, the injuries) is kept through a reload. */
+/* Browser test: a fight in the arena (B8a, B8g F2): draw and put away your own weapon; pick a sword (and a shield for the left arm) up off the sand, fight the gladiator round by round in fast mode (each exchange played out, what it did floating up, body outlines, the dice behind a tap on the log; the view swings side-on; every move in your column, Offensive and Defensive, the one you lack greyed with why; the foe mirrored, their move shown when you are quicker; the Move row) until one side wins, and what it left (the dead, the injuries) is kept through a reload. */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { OUT, openPage, startEnv, stopEnv, type Env } from './harness';
 
@@ -98,6 +98,15 @@ describe('spike3d fight', () => {
     expect(await page.isVisible('#fight')).toBe(true);
     expect(await w('w.inFight')).toBe(true);
     expect(await w('w.wieldedBy("gladiator")?.kind')).toMatch(/sword/);
+    // Fast mode (the default, B8g F3): count what floats up over the fighters, and the body outlines in both cards.
+    await page.evaluate(() => {
+      const o = window as unknown as { floats: string[] };
+      o.floats = [];
+      new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if ((n as HTMLElement).classList?.contains('fight-float')) o.floats.push((n as HTMLElement).className + ':' + n.textContent); })
+        .observe(document.getElementById('stage')!, { childList: true });
+    });
+    expect(await page.locator('#fight .us .card .outline svg rect').count()).toBe(6);
+    expect(await page.locator('#fight .them .card .outline svg rect').count()).toBe(6);
     // Your card says what you fight with: the sword and the buckler.
     expect(await page.textContent('#fight .us .card')).toMatch(/arming sword and buckler/);
     // The view swings side-on to the fight (B8g): the line from you to them runs left to right on screen.
@@ -129,7 +138,7 @@ describe('spike3d fight', () => {
 
     // Each round: counter when defending (to win the attack back, and with it the upper hand), a standard blow when
     // attacking, else the first thing in the Move row (close in…), until it is over.
-    let rounds = 0, sawIntent = false, sawWhy = false;
+    let rounds = 0, sawIntent = false, sawWhy = false, shotFloat = false;
     for (; rounds < 60; rounds++) {
       await page.waitForSelector('#fight .us .moves button:not([disabled]), #fight .choices button', { timeout: 60_000 });
       const labels = await page.$$eval('#fight .choices button', (bs) => bs.map((b) => b.textContent ?? ''));
@@ -156,9 +165,24 @@ describe('spike3d fight', () => {
       }
       const pick = can.find((m) => m.endsWith(':counter')) ?? can.find((m) => m === 'atk:standard');
       await page.click(pick ? `#fight .us .moves button[data-move="${pick}"]` : '#fight .choices button');
+      // One picture of an exchange as it plays: the motions and what floats up.
+      if (pick && !shotFloat && (await page.waitForSelector('.fight-float', { timeout: 4000 }).catch(() => null))) {
+        shotFloat = true;
+        await page.waitForTimeout(250);
+        await page.screenshot({ path: `${OUT}/fight-float.png` });
+      }
       await page.waitForTimeout(100);
     }
     expect(sawWhy).toBe(true);
+    // Every exchange floated what it did over the one hit (a number on easy) or how it was met.
+    const floats = (await page.evaluate(() => (window as unknown as { floats: string[] }).floats)) as string[];
+    expect(floats.length).toBeGreaterThan(0);
+    expect(floats.some((f) => /hit:\d|miss:(parried|blocked|dodged|missed)/.test(f))).toBe(true);
+    // The dice were rolled, not shown: a line with a die opens them.
+    expect(await page.locator('#fight .log p.rolls').count()).toBeGreaterThan(0);
+    await page.locator('#fight .log p.rolls').first().click();
+    await page.waitForSelector('.dice-lines', { timeout: 15_000 });
+    await page.waitForSelector('.dice-show', { state: 'detached', timeout: 15_000 });
     expect(rounds).toBeLessThan(60);
     expect(await w('w.weather.hour')).toBe(hour); // the clock stood still
     await page.screenshot({ path: `${OUT}/fight-end.png` });

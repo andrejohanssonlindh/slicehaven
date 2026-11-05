@@ -10,7 +10,8 @@ import {
   seizeInitiative, startFight, weaponOf,
 } from '../core/combat';
 import { type Style, chooseFor, wantsToYield } from '../core/fightmind';
-import { type Injuries, totalFatigue, unhurt } from '../core/damage';
+import { type DamageType, type HitResult, type Injuries, totalFatigue, unhurt } from '../core/damage';
+import type { MotionAct } from '../core/world3d/motion';
 import { DIFFICULTY_RULES } from '../core/difficulty';
 import type { Roll } from '../core/dice';
 import type { Hero } from '../core/hero';
@@ -22,6 +23,7 @@ import { t } from '../i18n';
 import { showRolls } from '../ui/dice';
 import { loadSettings } from '../ui/settings';
 import { type ConditionSheet, effectText, fatigueShare, fatigueWord, harmBits, partName, poolText } from './condition';
+import { type SeenHit, bodyOutline } from './outline';
 
 const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -38,6 +40,11 @@ const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
  * (a tactic, retreat) and Defensive (parry, block, dodge × standard, careful, counter; nothing picked for you), the
  * group you don't have this round greyed with why; the foe's column mirrored, their move lit when you have the upper
  * hand and a ? when you don't; the Move row (walk, run, pick up, draw, and the rest); the view side-on to the fight.
+ *
+ * Fast mode (F3, the default; the setting `fight`): each exchange plays out at once, the strike met by a parry, block
+ * or dodge timed to its contact, or a flinch, a stagger, a fall; what it did floats up over whoever was hit (a number
+ * on easy, a word otherwise, Q50) and lands on their body outline. The dice are rolled but not shown: a log line with
+ * a die opens them. Dice mode shows every roll step by step.
  */
 
 /** The pools a fight reads from a sheet: every combat skill, dodging, the shield, and the attributes it rolls. */
@@ -97,6 +104,12 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
    * crossed, they won the last exchange, or they kept it.
    */
   let roleWhy: 'quicker' | 'won' | 'kept' = 'quicker';
+  /** The blows each fighter was seen to take this fight (where and of what kind), for the body outlines. */
+  let seen: Record<string, SeenHit[]> = {};
+  /** Rolls made but not shown (fast mode), waiting to go behind the next log line. */
+  let stash: Roll[] = [];
+  let lastLine: HTMLElement | null = null;
+  const fast = (): boolean => loadSettings().fight === 'fast';
 
   /**
    * Keep the fighters in the part of the screen the panel leaves free (the director: the panel covered them): on a
@@ -154,7 +167,23 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     p.className = kind;
     p.textContent = text;
     logEl.appendChild(p);
+    lastLine = p;
+    flushRolls();
     logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  /** Put the rolls made but not shown behind the last log line: a die on it, a tap shows them. */
+  function flushRolls(): void {
+    if (!stash.length || !lastLine) return;
+    const rolls = stash;
+    stash = [];
+    const p = lastLine;
+    if (!p.classList.contains('rolls')) {
+      p.classList.add('rolls');
+      p.dataset.rolls = '[]';
+      p.addEventListener('click', () => void showRolls(JSON.parse(p.dataset.rolls!) as Roll[]));
+    }
+    p.dataset.rolls = JSON.stringify([...(JSON.parse(p.dataset.rolls!) as Roll[]), ...rolls]);
   }
 
   /** The hero as a fighter: their sheet, what they hold, no armour yet (the hero has none in the world). */
@@ -223,11 +252,6 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       more.textContent = t('fight.details', 'details ›');
       top.appendChild(more);
     }
-    const bar = document.createElement('div');
-    bar.className = 'bar';
-    const fill = document.createElement('i');
-    fill.style.width = `${Math.round(fatigueShare(i, vitalityOf(f)) * 100)}%`;
-    bar.appendChild(fill);
     const how = document.createElement('div');
     how.className = 'how';
     const bits: string[] = [];
@@ -238,7 +262,10 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       bits.push(...harmBits(i, exactHarm));
     }
     how.textContent = bits.join(' · ');
-    box.append(top, bar, how);
+    // The body outline: your own wounds exactly; the foe's on easy, else only the blows you saw land. Fatigue is the
+    // bar beside it (full: where most fail the shock roll).
+    const outline = bodyOutline(i, seen[f.id] ?? [], exactHarm, fatigueShare(i, vitalityOf(f)));
+    box.append(outline, top, how);
   }
 
   function refresh(): void {
@@ -638,8 +665,83 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
   /** Whose: "your", "Arruns's". */
   const whose = (id: string): string => (id === 'hero' ? t('fight.your', 'your') : t('fight.whose', '{who}’s', { who: Name(id) }));
   /** Show rolls, throwing only the hero's (`mine[i]`); the others are written beside them. */
-  const reveal = (rolls: Roll[], mine: boolean[], notes: string[] = []) =>
-    showRolls(rolls, { unthrown: mine.flatMap((m, i) => (m ? [] : [i])), notes });
+  const reveal = (rolls: Roll[], mine: boolean[], notes: string[] = []): Promise<void> => {
+    if (fast()) {
+      stash.push(...rolls);
+      return Promise.resolve();
+    }
+    return showRolls(rolls, { unthrown: mine.flatMap((m, i) => (m ? [] : [i])), notes });
+  };
+  const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+  /** What a blow did, in a word or two (normal and hard; Q50): by how bad it was and its kind of damage. */
+  function hitWord(r: HitResult, type: DamageType): string {
+    if (r.net <= 0) return t('fight.w.glance', 'glancing');
+    const bad = r.serious ? 2 : r.fatigue >= 2 ? 1 : 0;
+    const W: Record<DamageType, [string, string, string]> = {
+      cut: [t('fight.w.graze', 'graze'), t('fight.w.cut', 'cut'), t('fight.w.deepcut', 'deep cut')],
+      thrust: [t('fight.w.nick', 'nick'), t('fight.w.stab', 'stab'), t('fight.w.deepstab', 'deep stab')],
+      crush: [t('fight.w.bruise', 'bruise'), t('fight.w.heavy', 'heavy blow'), t('fight.w.crushing', 'crushing blow')],
+      brawl: [t('fight.w.bruise', 'bruise'), t('fight.w.blow', 'hard blow'), t('fight.w.crushing', 'crushing blow')],
+      fall: [t('fight.w.bruise', 'bruise'), t('fight.w.fall', 'bad fall'), t('fight.w.fallserious', 'terrible fall')],
+      burn: [t('fight.w.singe', 'singe'), t('fight.w.burn', 'burn'), t('fight.w.deepburn', 'bad burn')],
+    };
+    return W[type][bad];
+  }
+
+  /** Words or a number rising slowly over someone and fading (the old-game way): red for a hit, pale for a miss. */
+  function float(id: string, text: string, kind: 'hit' | 'miss', sub = ''): void {
+    const stage = document.getElementById('stage');
+    const at = world().screenOf(id);
+    if (!stage || !at) return;
+    const f = document.createElement('div');
+    f.className = `fight-float ${kind}`;
+    f.textContent = text;
+    if (sub) {
+      const s = document.createElement('small');
+      s.textContent = sub;
+      f.appendChild(s);
+    }
+    f.style.left = `${at.x * 100}%`;
+    f.style.top = `${at.y * 100}%`;
+    stage.appendChild(f);
+    setTimeout(() => f.remove(), 1900);
+  }
+
+  /**
+   * Fast mode: one exchange played out at once. The strike; the defender's parry, block or dodge timed so its contact
+   * meets the blow, or on a hit a flinch (a stagger when it hurt badly; going down is the fall, from their injuries);
+   * at the contact what it did floats up over them and lands on their outline. Then a moment to take it in.
+   */
+  async function exchange(l: Extract<LogLine, { k: 'attack' }>): Promise<void> {
+    const w = world();
+    const hitAt = w.motionTiming(l.who, 'strike')?.contact ?? 0.35;
+    w.play(l.who, 'strike');
+    const meet: MotionAct | null = !l.hit && l.how !== 'none' ? l.how : null;
+    if (meet) {
+      const lead = Math.max(0, hitAt - (w.motionTiming(l.target, meet)?.contact ?? 0));
+      setTimeout(() => w.play(l.target, meet), lead * 1000);
+    }
+    await sleep(hitAt * 1000);
+    const lv = level();
+    if (!l.hit) float(l.target, t(`fight.verdict.${l.how}`, VERDICT[l.how]), 'miss');
+    else if (l.result) {
+      const r = l.result;
+      if (r.net > 0 && !r.after.out && !r.after.dead) w.play(l.target, r.serious || r.fatigue >= 3 ? 'stagger' : 'flinch');
+      const serious = r.serious ? t('fight.w.serious', 'serious wound') : '';
+      if (lv.foeExact) float(l.target, String(Math.max(0, r.net)), 'hit', serious);
+      else float(l.target, hitWord(r, l.type ?? 'cut'), 'hit');
+      cards();
+    }
+    await sleep(1100);
+  }
+
+  /** Both cards drawn again (their outlines, bars and words). */
+  function cards(): void {
+    if (!fight) return;
+    card(usEl, fight.fighters[0], t('fight.You', 'You'), true);
+    if (fight.fighters[1]) card(themEl, fight.fighters[1], Name(foeId), false);
+  }
 
   /**
    * A blow, step by step (the director: first who hits, then the damage, then the extra damage): attack against
@@ -658,7 +760,10 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       ? l.defend && l.attack.total === l.defend.total ? t('fight.tie', 'a tie: the attacker wins it') : t('fight.hits', 'it hits')
       : t(`fight.verdict.${l.how}`, VERDICT[l.how]);
     const line = `${of(l.who, ['fight.strike.you', 'You strike{tactic}'], ['fight.strikes', '{who} strikes{tactic}'], { tactic })}: ${atkText} ${t('fight.against', 'against {whose}', { whose: whose(l.target) })} ${defText}: ${verdict}.`;
-    w.play(l.who, 'strike');
+    // A blow that landed is seen: it goes on their outline.
+    if (l.hit && l.result && l.result.net > 0) (seen[l.target] ??= []).push({ part: l.result.part, type: l.type ?? 'cut', serious: !!l.result.serious });
+    if (fast()) await exchange(l);
+    else w.play(l.who, 'strike');
 
     // 1. Who hits.
     const rolls: Roll[] = [{ ...l.attack, label: t('fight.attackroll', '{who}: attack', { who: Name(l.who) }) }];
@@ -773,6 +878,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
         case 'mercy':
           await settle(w);
           w.play(l.who, 'finish');
+          if (fast()) await sleep(1300);
           log(of(l.who, ['fight.mercy.you', 'You give {target} the killing stroke.'], ['fight.mercy', '{who} gives {target} the killing stroke.'], { target: nameOf(l.target) }), l.who === 'hero' ? 'good' : 'bad');
           break;
         case 'over':
@@ -782,9 +888,9 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       // Injuries show on the bodies and the cards as they happen (lying down when out).
       if (l.k === 'attack' || l.k === 'end' || l.k === 'mercy') {
         for (const f of fight!.fighters) w.setInjuries(f.id, f.injuries);
-        card(usEl, fight!.fighters[0], t('fight.You', 'You'), true);
-        card(themEl, fight!.fighters[1], Name(foeId), false);
+        cards();
       }
+      flushRolls();
     }
     await settle(w);
   }
@@ -822,6 +928,9 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     el.hidden = false;
     backEl.hidden = false;
     roleWhy = 'quicker';
+    seen = {};
+    stash = [];
+    lastLine = null;
     log(t('fight.begins', 'You face {name}. The fight is on.', { name: p.name }), 'info');
     if (!fight.fighters[0].weapon) {
       log(fight.fighters[0].belt?.length

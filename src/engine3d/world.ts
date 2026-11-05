@@ -2714,8 +2714,14 @@ export class SpikeWorld {
     // (A broken leg puts them on the ground for good: they lie there, awake. The hero, outside a fight, limps on as if
     // on a crutch, so they're never stuck before healing exists.)
     const lying = i.dead ? 'dead' : i.out || i.dying || (grounded(i) && (id !== 'hero' || this.fighting)) ? 'down' : null;
-    if (lying) this.play(id, lying);
-    else if (this.lying(id)) this.play(id, 'guard');
+    // Going down: they fall (in a fight), then lie still; already lying, they stay.
+    const cur = this.motions.get(id);
+    if (lying && !this.lying(id)) {
+      if (this.fighting) this.play(id, 'fall');
+      this.play(id, lying, { after: true });
+    } else if (lying && cur?.act === 'fall') cur.queue = [lying]; // still falling: lie as they are now at the end
+    else if (lying && cur?.act !== lying) this.play(id, lying);
+    else if (!lying && this.lying(id)) this.play(id, 'guard');
     if (lying) {
       const c = this.cast.find((x) => x.who.id === id);
       if (c) c.mind.actor.legs = [];
@@ -2756,6 +2762,30 @@ export class SpikeWorld {
     const cur = this.motions.get(id);
     if (opts.after && cur && !this.settled(cur)) cur.queue.push(act);
     else this.motions.set(id, { act, motion: m.id, since: this.time, queue: [] });
+  }
+
+  /**
+   * How long the motion someone would play for an act takes, and when its `contact` comes (seconds from its start;
+   * null if it has none), so the page can time one fighter's motion against the other's and the floating damage.
+   */
+  motionTiming(id: string, act: MotionAct): { seconds: number; contact: number | null } | null {
+    const m = this.motionFor(id, act);
+    if (!m) return null;
+    const c = m.marks?.contact;
+    return { seconds: m.seconds, contact: c === undefined ? null : c * m.seconds };
+  }
+
+  /**
+   * Where someone is on the screen, `up` metres over their feet (their head by default): a share of the view across
+   * (0 left, 1 right) and down (0 top, 1 bottom). Null if they aren't shown.
+   */
+  screenOf(id: string, up?: number): { x: number; y: number } | null {
+    const f = this.figureOf(id);
+    if (!f || !f.place.visible) return null;
+    const v = f.place.getWorldPosition(new THREE.Vector3());
+    v.y += up ?? (this.lying(id) ? 0.4 : f.rig.model.height);
+    v.project(this.camera);
+    return { x: (v.x + 1) / 2, y: (1 - v.y) / 2 };
   }
 
   /** What someone's motion is showing now (`guard`, `strike`, `down` …), or null outside any. */

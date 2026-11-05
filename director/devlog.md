@@ -2,6 +2,16 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-05 — B8g stage F3: fast mode
+
+- **Fights now play out instead of rolling dice at you** (the new default). Pick a move and the exchange happens at once: the strike swings (a staff sweeps, a spear thrusts, an axe chops), and the other side **parries, blocks or dodges** right as the blow arrives, or **flinches**, **staggers** on a bad hit, or **falls** when they go down (before, they just snapped flat).
+- **What it did floats up** over whoever was hit, in red, rising slowly: the damage on easy (with *serious wound* under it), a word on normal and hard (*graze, cut, deep cut, stab, crushing blow, glancing* …). A miss floats *parried*, *blocked* or *dodged*.
+- **Body outlines** in both cards: a small figure with the six hit locations. Wounds tint the part, and an icon lands where each blow hit (a slash for a cut, a dot for a stab, a star for a crushing blow), plus broken bones and bleeding. Fatigue is the bar beside it. On normal and hard, the foe's figure only shows what you saw land.
+- **The dice are still rolled, just not shown.** A log line with 🎲 has dice behind it: tap it to see them thrown.
+- **Prefer the dice?** Panel → game row → *Fights: fast* switches to *Fights: dice*, the old step-by-step way. F4 redoes that mode for the new layout.
+- **Checked:** unit tests, the fight browser test (outlines in both cards, floats during the fight, a log line opening its dice), pictures of an exchange mid-swing and the end of a fight.
+- **Next:** F4, dice mode in the new layout (one roll per step).
+
 ## 2026-11-05 — B8g stage F2: the fight view and the new layout
 
 - **The view swings side-on** when a fight starts: you on the left, your foe on the right. You can still turn, zoom and pan; **⚔ Back to fight** (top of the view) swings it back.
