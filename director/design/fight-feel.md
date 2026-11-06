@@ -114,6 +114,15 @@ export default {
 - **Sideways or on a computer:** the column layout of F2.
 - **The timer** (`content/combat/timer.ts`: easy none, normal none for now, hard 8 s): a bar under the round, red in the last 3 s. A move is ringed from the start (last round's if you can take it again, else a standard blow, the best standard defence, or holding your ground); out of time, it is taken (*Out of time.* in the log). It only runs while it's your pick, so it waits while anything plays or dice roll.
 
+### Built: the director's review, computer first (2026-11-06)
+- **The page in parts** (`src/spike3d/fight/`): `index.ts` runs the rounds; `columns.ts` the cards and moves; `others.ts` the side action and Other; `picking.ts` the layout, the bubble, the timer; `show.ts` a round played out and the log; `fighters.ts`, `words.ts`; `ctx.ts` what they share.
+- **Your column, top to bottom:** your card; **Side action** (Move ▸, Draw ▸, Pick up ▸, Look around; a ▸ unfolds its list, ‹ folds it; tapping the ground opens Move, tapping a weapon in reach opens Pick up); Offensive; Defensive; **Other** (Ask to yield, Accept their surrender, Hold your ground, Get away; Finish them and OK once it is over). **The middle is only the round, the timer and the log.**
+- **Side action and main action:** free, the side action is the round (one tap on a computer). In a melee it is picked first (ticked, green) and goes with the blow or defence you take after it; those buttons then show the dice you would roll (a sword drawn: its skill, −1D6). Blades just crossed, the side actions are done: only the blow or defence. Picking a side action or opening a list is one tap even on a phone.
+- **Who goes first:** no Reaktion roll on the way in; both choose blind and **move together**, a step at a time, stopping at arm's reach (both running in meet in the middle). Reaktion is rolled as blades cross (who attacks), and if both go for the same weapon (who gets it).
+- **Dice in the log:** where the difficulty shows them (yours unless hard, the foe's on easy), a line carries its sums: *"Arruns: knocked out (Shock roll 3D6+1 = 4 < 6)."*, runs, Reaktion, pleas, death rolls, looking round.
+- **Weapons noticed:** at the start an Alertness roll against each weapon's `spot` (on its kind: dagger 12, short sword, axe, cudgel 10, sword 8, staff, spear, two-handers, shields 6, buckler 8), 1 harder every 4 m beyond 4. Noticed ones get a **red ring** and are offered to go to or pick up; *Look around* rolls again with 1D6 more. Tapped or seen falling, it counts as noticed.
+- **Closer in:** a fight starts at 63 px a metre, a step walking about doesn't reach; the old zoom comes back after.
+
 ## Stages
 | | Stage | Who | Needs |
 |---|---|---|---|

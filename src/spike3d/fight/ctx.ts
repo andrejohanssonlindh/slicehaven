@@ -37,6 +37,16 @@ export interface FightState {
   lastMove: string | null;
   /** The pick timer (F6): for which pick, and when it runs out. */
   timer: { key: string; until: number; total: number } | null;
+  /**
+   * The side action picked for this round (the director: a round is a side action and a main action, as the rules
+   * have it): in a melee it is picked first and goes with the blow or defence taken after; free, it is the round.
+   * `look`: looking round for what lies about (the page's own, an Alertness roll), not a choice for the rules.
+   */
+  side: { key: string; label: string; choice: Choice; look?: boolean } | null;
+  /** Which side-action list is unfolded (the director: Draw ▸ your sword, your cudgel). */
+  open: 'move' | 'draw' | 'pickUp' | null;
+  /** The things lying about the hero has noticed (an Alertness roll; seen falling; tapped): only these are offered and ringed. */
+  spotted: Set<string>;
 }
 
 /** The panel's elements (`#fight` in `spike3d/index.html`). */

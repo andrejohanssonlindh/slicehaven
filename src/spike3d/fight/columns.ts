@@ -8,6 +8,7 @@ import { t } from '../../i18n';
 import { fatigueShare, fatigueWord, harmBits } from '../condition';
 import { bodyOutline } from '../outline';
 import { type FightCtx, type Go, cap, press } from './ctx';
+import { afterSide, otherMoves, sideEntries, sideWhy, withSide } from './others';
 import { ATTACKS, DEFENCES, WAYS, intentOf } from './words';
 
 /**
@@ -99,7 +100,7 @@ export function litKey(ctx: FightCtx, f: Fighter, other: Fighter, c: Choice): st
 }
 
 /** A move button: its label, a small line under it, its key; acts on a tap (or rings it first on a phone) if it can. */
-export function moveButton(ctx: FightCtx, label: string, small: string, key: string, go: Go | null, opts: { cant?: boolean; lit?: string | null; mine?: boolean } = {}): HTMLButtonElement {
+export function moveButton(ctx: FightCtx, label: string, small: string, key: string, go: Go | null, opts: { cant?: boolean; lit?: string | null; mine?: boolean; instant?: boolean } = {}): HTMLButtonElement {
   const b = document.createElement('button');
   b.type = 'button';
   b.append(label);
@@ -112,22 +113,90 @@ export function moveButton(ctx: FightCtx, label: string, small: string, key: str
   const mine = opts.mine ?? true;
   b.classList.toggle('lit', key === opts.lit);
   b.classList.toggle('armed', mine && ctx.s.armed?.key === key);
-  b.disabled = !!opts.cant || !go;
-  if (go && !opts.cant) {
+  const cant = !!opts.cant || ctx.s.busy;
+  b.disabled = cant || !go;
+  if (go && !cant && opts.instant) b.addEventListener('click', () => void go());
+  else if (go && !cant) {
     b.addEventListener('click', () => press(ctx, key, go));
     ctx.s.avail.set(key, go);
   }
   return b;
 }
 
+/** A group in a column: its heading, a line saying why it is greyed (if it is), and the grid its buttons go in. */
+function groupBox(box: HTMLElement, kind: string, title: string, why: string | null): HTMLElement {
+  const g = document.createElement('div');
+  g.className = `group ${kind}`;
+  const h = document.createElement('h4');
+  h.textContent = title;
+  g.appendChild(h);
+  if (why) {
+    g.classList.add('off');
+    const p = document.createElement('p');
+    p.className = 'why';
+    p.textContent = why;
+    g.appendChild(p);
+  }
+  const grid = document.createElement('div');
+  grid.className = 'grid';
+  g.appendChild(grid);
+  box.appendChild(g);
+  return grid;
+}
+
+/**
+ * The side action (the hero's column, first): its lists folded (Move ▸, Draw ▸, Pick up ▸) and Look around; a tap
+ * unfolds a list, ‹ folds it. In a melee the one picked is ticked and goes with the blow or defence after it.
+ */
+function sideGroup(ctx: FightCtx, box: HTMLElement): void {
+  const s = ctx.s;
+  const why = sideWhy(ctx);
+  const free = !!s.fight && roleOf(s.fight, 'hero') === 'free';
+  const title = free ? t('fight.g.side', 'Side action') : t('fight.g.sidefirst', 'Side action, then a blow or defence');
+  const grid = groupBox(box, 'side', title, why);
+  if (why) return;
+  const entries = sideEntries(ctx);
+  const open = entries.find((e) => e.id === s.open && e.items.length);
+  if (open) {
+    const back = moveButton(ctx, `‹ ${open.label}`, '', `side:${open.id}`, () => { s.open = null; ctx.refresh(); }, { instant: true });
+    back.classList.add('back');
+    grid.appendChild(back);
+    for (const m of open.items) {
+      const b = moveButton(ctx, m.label, m.small ?? '', m.key, m.go, { instant: m.instant });
+      b.classList.toggle('picked', s.side?.key === m.key);
+      grid.appendChild(b);
+    }
+    return;
+  }
+  for (const e of entries) {
+    const picked = e.go ? s.side?.key === 'look' : e.items.find((m) => m.key === s.side?.key);
+    const small = picked && picked !== true ? `✓ ${picked.label}` : picked ? `✓ ${t('fight.side.picked', 'picked')}` : e.small;
+    const go = e.go ?? (e.items.length ? () => { s.open = e.id as 'move' | 'draw' | 'pickUp'; ctx.refresh(); } : null);
+    // (Unfolding a list, or picking a side action to go with a blow, plays nothing: one tap, even on a phone.)
+    const b = moveButton(ctx, e.go ? e.label : `${e.label} ▸`, small, e.go ? 'look' : `side:${e.id}`, go, { instant: !e.go || e.instant });
+    b.classList.toggle('picked', !!picked);
+    grid.appendChild(b);
+  }
+}
+
+/** The Other group (the hero's column, last): instead of a blow or a defence, and the end of the fight. */
+function otherGroup(ctx: FightCtx, box: HTMLElement, done: Parameters<typeof otherMoves>[1]): void {
+  const grid = groupBox(box, 'other', t('fight.g.other', 'Other'), null);
+  for (const m of otherMoves(ctx, done)) grid.appendChild(moveButton(ctx, m.label, m.small ?? '', m.key, m.go));
+}
+
 /**
  * One side's moves, always all shown: Offensive (each tactic with its pool, retreat) and Defensive (every way to
- * defend × every tactic, with its pool; dodging can't counter).
+ * defend × every tactic, with its pool; dodging can't counter). The hero's column has the side action above them
+ * and Other below (`done`: what ends a fight).
  */
-export function moves(ctx: FightCtx, box: HTMLElement, f: Fighter, other: Fighter, mine: boolean): void {
+export function moves(ctx: FightCtx, box: HTMLElement, f0: Fighter, other: Fighter, mine: boolean, done?: Parameters<typeof otherMoves>[1]): void {
   const { fight, pending, busy } = ctx.s;
   if (!fight) return;
   box.replaceChildren();
+  if (mine) sideGroup(ctx, box);
+  // (Your blows and defences show the dice they'd have after the side action picked: a sword drawn, −1D6 for it.)
+  const f = mine ? afterSide(ctx, f0) : f0;
   const lv = ctx.level();
   const open = mine || lv.foeExact;
   const known = !mine && pending && fight.winner === null ? pending : null;
@@ -148,24 +217,8 @@ export function moves(ctx: FightCtx, box: HTMLElement, f: Fighter, other: Fighte
   const cant = !mine || busy || !canAct(f) || fight.winner !== null;
   const button = (label: string, small: string, key: string, go: Go | null) => moveButton(ctx, label, small, key, go, { cant, lit, mine });
   const group = (kind: 'attack' | 'defend', title: string): HTMLElement => {
-    const g = document.createElement('div');
-    g.className = `group ${kind}`;
-    const h = document.createElement('h4');
-    h.textContent = title;
-    g.appendChild(h);
-    const why = offWhy(ctx, f, kind, mine);
-    if (why) {
-      g.classList.add('off');
-      const p = document.createElement('p');
-      p.className = 'why';
-      p.textContent = why;
-      g.appendChild(p);
-    }
-    if (lit?.startsWith(kind === 'attack' ? 'atk' : 'def') || (kind === 'attack' && lit === 'retreat')) g.classList.add('lit-in');
-    const grid = document.createElement('div');
-    grid.className = 'grid';
-    g.appendChild(grid);
-    box.appendChild(g);
+    const grid = groupBox(box, kind, title, offWhy(ctx, f, kind, mine));
+    if (lit?.startsWith(kind === 'attack' ? 'atk' : 'def') || (kind === 'attack' && lit === 'retreat')) grid.parentElement!.classList.add('lit-in');
     return grid;
   };
 
@@ -176,9 +229,9 @@ export function moves(ctx: FightCtx, box: HTMLElement, f: Fighter, other: Fighte
   for (const tac of ['standard', 'quick', 'powerful'] as AttackTactic[]) {
     const [name, does] = ATTACKS[tac];
     const dice = open ? ` ${diceText(attackPool(f, tac))}` : '';
-    ag.appendChild(button(`${name}${dice}`, does, `atk:${tac}`, atkOn && can.includes(tac) ? () => ctx.play({ attack: tac }) : null));
+    ag.appendChild(button(`${name}${dice}`, does, `atk:${tac}`, atkOn && can.includes(tac) ? () => ctx.play(withSide(ctx, { attack: tac })) : null));
   }
-  ag.appendChild(button(t('fight.retreatN', 'Retreat'), t('fight.retreatD', 'break off, 5 m back'), 'retreat', atkOn && fight.melee ? () => ctx.play({ retreat: true }) : null));
+  ag.appendChild(button(t('fight.retreatN', 'Retreat'), t('fight.retreatD', 'break off, 5 m back'), 'retreat', atkOn && fight.melee ? () => ctx.play(withSide(ctx, { retreat: true })) : null));
 
   // Defensive: a row for each way to defend, a column for each tactic.
   const defOn = !offWhy(ctx, f, 'defend', mine);
@@ -208,7 +261,7 @@ export function moves(ctx: FightCtx, box: HTMLElement, f: Fighter, other: Fighte
         dg.appendChild(none);
         continue;
       }
-      dg.appendChild(button(open ? diceText(o.dice) : cap(WAYS[how]), '', `def:${how}:${tac}`, defOn ? () => ctx.play({ defend: tac, defendWith: how }) : null));
+      dg.appendChild(button(open ? diceText(o.dice) : cap(WAYS[how]), '', `def:${how}:${tac}`, defOn ? () => ctx.play(withSide(ctx, { defend: tac, defendWith: how })) : null));
     }
   }
   if (mine && defOn) {
@@ -217,4 +270,5 @@ export function moves(ctx: FightCtx, box: HTMLElement, f: Fighter, other: Fighte
     p.textContent = t('fight.tactics', 'Careful: +1D6, +1 fatigue. Counter: −1D6, +1 fatigue; hold them off and you attack next.');
     dg.parentElement!.appendChild(p);
   }
+  if (mine && done) otherGroup(ctx, box, done);
 }

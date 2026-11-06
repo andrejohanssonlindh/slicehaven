@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  type Fight, type Fighter, acceptYield, attackPool, attackWhy, beaten, bestDamage, moreDamage, refuseYield, bonusDice, damageDice, defenceOptions, defencePool, dropFrom, fists, parseProps, pleaDifficulty,
+  type Fight, type Fighter, type LogLine, acceptYield, attackPool, attackWhy, beaten, bestDamage, moreDamage, refuseYield, bonusDice, damageDice, defenceOptions, defencePool, dropFrom, fists, parseProps, pleaDifficulty,
   resolveRound, roleOf, seizeInitiative, startFight, tacticFatigue, weaponFromRow, weaponOf,
 } from '../src/core/combat';
 import { type Injuries, recoverFatigue, unhurt } from '../src/core/damage';
@@ -223,17 +223,36 @@ describe('drawing your own weapon', () => {
 describe('the upper hand (declared in reverse order)', () => {
   it('belongs to the attacker in a melee, with no roll', () => {
     const f = { ...startFight([fighter('a', 0, 0), fighter('b', 1, 1.5)]), melee: { attacker: 1, opened: 1 } };
-    const r = seizeInitiative(f, Rng.fromSeed(1));
+    const r = seizeInitiative(f);
     expect(r.fight.upper).toBe(1);
     expect(r.log).toEqual([]);
   });
 
-  it('is rolled on Reaktion when free and near, and nobody has it far apart', () => {
-    const near = seizeInitiative(startFight([fighter('a', 0, 0), fighter('b', 1, 8)]), Rng.fromSeed(3));
-    expect([0, 1]).toContain(near.fight.upper);
-    expect(near.log[0]).toMatchObject({ k: 'initiative', ids: ['a', 'b'] });
-    const far = seizeInitiative(startFight([fighter('a', 0, 0), fighter('b', 1, 30)]), Rng.fromSeed(3));
-    expect(far.fight.upper).toBeUndefined();
+  it('nobody has it while free, however near (the roll belongs to the meeting): Reaktion is rolled as blades cross', () => {
+    const near = seizeInitiative(startFight([fighter('a', 0, 0), fighter('b', 1, 6)]));
+    expect(near.fight.upper).toBeUndefined();
+    expect(near.log).toEqual([]);
+    const r = resolveRound(near.fight, { a: { move: { x: 4.5, z: 0 } } }, RULES, Rng.fromSeed(5), { pauseOnOpen: true });
+    expect(r.log.find((l) => l.k === 'open')).toMatchObject({ rolls: [expect.anything(), expect.anything()] });
+  });
+
+  it('both closing in meet in the middle (they move at the same time), never passing through each other', () => {
+    const f = startFight([fighter('a', 0, 0), fighter('b', 1, 8)]);
+    const r = resolveRound(f, { a: { move: { x: 6.5, z: 0 } }, b: { move: { x: 1.5, z: 0 } } }, RULES, Rng.fromSeed(5), { pauseOnOpen: true });
+    const [a, b] = r.fight.fighters;
+    expect(a.x).toBeGreaterThan(2.5);
+    expect(b.x).toBeLessThan(5.5);
+    expect(b.x - a.x).toBeGreaterThan(1.4);
+    expect(b.x - a.x).toBeLessThanOrEqual(2);
+    expect(r.log.filter((l) => l.k === 'move').map((l) => (l as { metres: number }).metres > 2)).toEqual([true, true]);
+  });
+
+  it('two free fighters reaching for the one sword roll Reaktion for it; the winner has it', () => {
+    const f: Fight = { ...startFight([fighter('a', 0, 0, { weapon: null }), fighter('b', 1, 2.5, { weapon: null })]), ground: [{ id: 'sw', weapon: row('Stridssvärd'), x: 1.2, z: 0 }] };
+    const r = resolveRound(f, { a: { pickUp: 'sw' }, b: { pickUp: 'sw' } }, RULES, Rng.fromSeed(2));
+    const race = r.log.find((l) => l.k === 'race') as Extract<LogLine, { k: 'race' }>;
+    expect(race).toMatchObject({ item: 'sw' });
+    expect(r.fight.fighters.find((x) => x.id === race.ids[0])!.weapon?.id).toBe('sw');
   });
 
   it('decides the roles when blades cross that round, goes first for a weapon, and lasts one round', () => {

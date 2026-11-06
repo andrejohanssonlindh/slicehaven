@@ -252,12 +252,13 @@ export interface FightRules {
 
 /** One line of what happened, with its rolls. Plain words for the page to put in its own (`t()`). */
 export type LogLine =
-  | { k: 'move'; who: string; to: { x: number; z: number }; ran?: boolean; roll?: Roll }
+  /** A walk or run, and how far it got (0: they were already in reach, or blocked). */
+  | { k: 'move'; who: string; to: { x: number; z: number }; metres: number; ran?: boolean; roll?: Roll }
   | { k: 'pickUp'; who: string; item: string }
   | { k: 'draw'; who: string; item: string }
   | { k: 'open'; attacker: number; rolls: Roll[] }
-  /** Who has the upper hand this round, and the Reaktion rolls that decided it (none in a melee: the attacker has it). */
-  | { k: 'initiative'; upper: number; rolls: Roll[]; ids: string[] }
+  /** Two reached for the same thing: Reaktion said who gets there first (`ids[0]` won). */
+  | { k: 'race'; item: string; ids: string[]; rolls: Roll[] }
   | {
     k: 'attack'; who: string; target: string; tactic: AttackTactic; defence: DefenceTactic; how: Defence;
     attack: Roll; attackWhy: PoolWhy; defend: Roll | null; defendWhy?: PoolWhy; hit: boolean; advantages: number;
@@ -442,43 +443,65 @@ export function dropFrom(fight: Fight, f: Fighter, parts: (BodyPart | undefined)
 /** How close a move brings you to a foe at most (inside reach, not on top of them). */
 const STOP = ADJACENT * 0.75;
 
-/** Walk (or run) towards a spot, as far as the side action goes; a failed run is a walk. */
-function moveTowards(fight: Fight, f: Fighter, to: { x: number; z: number }, run: boolean, rules: FightRules, rng: Rng, log: LogLine[]): void {
-  if (f.injuries.short.includes('fall') || grounded(f.injuries)) return; // down: can't move until up; a broken leg: not at all
-  let roll: Roll | undefined;
-  let reach = WALK;
-  if (run) {
-    const d = withPenalty(plus(pool(f, 'attr:Förflyttning'), -f.loadDice), f.injuries, { kind: 'attr', attr: 'Förflyttning' });
-    roll = rollTest(d, rules.ground, rng, 'Run');
-    if (roll.success) reach = RUN;
-  }
-  const d = dist(f, to);
-  const k = d <= reach ? 1 : reach / d;
-  // Nobody walks through a foe (the director: both closing in, they passed each other): the move stops where it
-  // first comes within arm's reach of anyone on the other side who can still fight.
-  const dx = (to.x - f.x) * k, dz = (to.z - f.z) * k;
+/** How far along a step (0..1) someone gets before coming within arm's reach of a foe who can fight (1: the whole step). */
+function stepClear(fight: Fight, f: Fighter, dx: number, dz: number): number {
   let s = 1;
   const len2 = dx * dx + dz * dz;
-  if (len2 > 1e-9) {
-    for (const o of fight.fighters) {
-      if (o.side === f.side || !canAct(o)) continue;
-      const ox = f.x - o.x, oz = f.z - o.z;
-      // Already within reach: no step nearer them (stepping away is fine).
-      if (dist(f, o) <= STOP) {
-        if (ox * dx + oz * dz < 0) s = 0;
-        continue;
-      }
-      // |f + s·(dx,dz) − o|² = STOP²: the first s it is met.
-      const b = 2 * (ox * dx + oz * dz), c = ox * ox + oz * oz - STOP * STOP;
-      const disc = b * b - 4 * len2 * c;
-      if (disc < 0) continue;
-      const hit = (-b - Math.sqrt(disc)) / (2 * len2);
-      if (hit >= 0 && hit < s) s = hit;
+  if (len2 <= 1e-9) return 1;
+  for (const o of fight.fighters) {
+    if (o.side === f.side || !canAct(o)) continue;
+    const ox = f.x - o.x, oz = f.z - o.z;
+    // Already within reach: no step nearer them (stepping away is fine).
+    if (dist(f, o) <= STOP) {
+      if (ox * dx + oz * dz < 0) s = 0;
+      continue;
+    }
+    // |f + s·(dx,dz) − o|² = STOP²: the first s it is met.
+    const b = 2 * (ox * dx + oz * dz), c = ox * ox + oz * oz - STOP * STOP;
+    const disc = b * b - 4 * len2 * c;
+    if (disc < 0) continue;
+    const hit = (-b - Math.sqrt(disc)) / (2 * len2);
+    if (hit >= 0 && hit < s) s = hit;
+  }
+  return s;
+}
+
+/** Steps a round's moves are played in, everyone a step at a time. */
+const MOVE_STEPS = 24;
+
+/**
+ * Everyone's walk or run this round, at the same time (the director: both ran in, but only one did; they should meet
+ * in the middle). A run is a Förflyttning roll (a failed one is a walk). Then everyone moves a step at a time
+ * together, and nobody walks through a foe: a move stops where it first comes within arm's reach of anyone on the
+ * other side who can still fight.
+ */
+function moveAll(fight: Fight, wants: { f: Fighter; to: { x: number; z: number }; run: boolean }[], rules: FightRules, rng: Rng, log: LogLine[]): void {
+  const movers = wants.flatMap(({ f, to, run }) => {
+    if (f.injuries.short.includes('fall') || grounded(f.injuries)) return []; // down: can't move until up; a broken leg: not at all
+    let roll: Roll | undefined;
+    let reach = WALK;
+    if (run) {
+      const d = withPenalty(plus(pool(f, 'attr:Förflyttning'), -f.loadDice), f.injuries, { kind: 'attr', attr: 'Förflyttning' });
+      roll = rollTest(d, rules.ground, rng, 'Run');
+      if (roll.success) reach = RUN;
+    }
+    const d = dist(f, to);
+    const k = d <= reach ? 1 : reach / d;
+    return [{ f, run, roll, from: { x: f.x, z: f.z }, dx: ((to.x - f.x) * k) / MOVE_STEPS, dz: ((to.z - f.z) * k) / MOVE_STEPS, done: false }];
+  });
+  for (let step = 0; step < MOVE_STEPS; step++) {
+    for (const m of movers) {
+      if (m.done) continue;
+      const s = stepClear(fight, m.f, m.dx, m.dz);
+      m.f.x += m.dx * s;
+      m.f.z += m.dz * s;
+      if (s < 1) m.done = true;
     }
   }
-  f.x += dx * s;
-  f.z += dz * s;
-  log.push({ k: 'move', who: f.id, to: { x: f.x, z: f.z }, ...(run ? { ran: !!roll?.success } : {}), ...(roll ? { roll } : {}) });
+  for (const m of movers) {
+    const metres = dist(m.f, m.from);
+    log.push({ k: 'move', who: m.f.id, to: { x: m.f.x, z: m.f.z }, metres, ...(m.run ? { ran: !!m.roll?.success } : {}), ...(m.roll ? { roll: m.roll } : {}) });
+  }
 }
 
 /** A Reaktion roll to open a melee (Reach X: +X D6). */
@@ -494,32 +517,31 @@ function higher(a: Fighter, b: Fighter, ra: Roll, rb: Roll, rng: Rng): number {
   return d !== 0 ? Math.sign(d) : rollDie(2, rng) === 1 ? 1 : -1;
 }
 
-/** How near a foe must be, free, for who goes first to matter (a run and a reach): further off, both choose blind. */
-export const INITIATIVE_RANGE = RUN + ADJACENT;
-
 /**
  * Who has the upper hand this round, before anyone chooses (the director: choices are declared in reverse order, so
- * whoever is ahead knows what those behind mean to do). In a melee the attacking side has it (they have the fight in
- * hand); free, the nearest two foes roll Reaktion if they are near enough for it to matter, and that roll also
- * decides the roles if blades cross this round. Sets `Fight.upper`.
+ * whoever is ahead knows what those behind mean to do). Only in a melee: the attacking side has it (they have the
+ * fight in hand). Free, nobody does: both choose blind, and Reaktion is rolled when it matters, as blades cross (who
+ * attacks) or two reach for the same thing (the director, 2026-11-06: the roll belongs to the meeting, not to the
+ * run towards it). Sets `Fight.upper`.
  */
-export function seizeInitiative(before: Fight, rng: Rng): RoundResult {
+export function seizeInitiative(before: Fight): RoundResult {
   const fight: Fight = structuredClone(before);
-  const log: LogLine[] = [];
-  if (fight.winner !== null || fight.upper !== undefined) return { fight, log };
-  if (fight.melee) {
-    fight.upper = fight.melee.attacker;
-    return { fight, log };
-  }
-  const able = fight.fighters.filter(canAct);
-  const pair = able
-    .flatMap((a) => able.filter((b) => b.side > a.side && dist(a, b) <= INITIATIVE_RANGE).map((b) => [a, b] as const))
-    .sort((p, q) => dist(...p) - dist(...q))[0];
-  if (!pair) return { fight, log };
-  const rolls = pair.map((f) => reactionRoll(f, rng));
-  fight.upper = (higher(pair[0], pair[1], rolls[0], rolls[1], rng) > 0 ? pair[0] : pair[1]).side;
-  log.push({ k: 'initiative', upper: fight.upper, rolls, ids: pair.map((f) => f.id) });
-  return { fight, log };
+  if (fight.winner === null && fight.upper === undefined && fight.melee) fight.upper = fight.melee.attacker;
+  return { fight, log: [] };
+}
+
+/** Could they take this item into its hand now (the hand free; no shield beside a two-handed weapon)? */
+export function canHold(f: Fighter, item: FightItem): boolean {
+  const slot = item.shield ? 'shield' : 'weapon';
+  if (f[slot]) return false;
+  if (slot === 'shield') return weaponOf(f).hands !== 2;
+  return !(f.shield && item.weapon && twoHanded(f, item.weapon));
+}
+
+/** The fighter with this item in its hand, having just taken it (−1D6 on the next roll unless quick to draw). */
+export function holding(f: Fighter, item: FightItem): Fighter {
+  const slot = item.shield ? 'shield' : 'weapon';
+  return { ...f, [slot]: { id: item.id, ...(item.weapon ? { weapon: item.weapon } : {}), ...(item.shield ? { shield: item.shield } : {}) }, drew: true };
 }
 
 /** More damage for advantages: +2 each (each +4 a die), or +1D6 each with a Dangerous weapon. */
@@ -602,34 +624,43 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
   delete fight.midRound;
   if (!resumed) for (const f of fight.fighters) f.drew = false;
 
-  // Side actions: pick up (also in a melee), move (only when free). The side with the upper hand goes first (the
-  // book's order by Reaktion: they reach the sword on the sand first).
-  const order = fight.upper === undefined ? fight.fighters : [...fight.fighters].sort((a, b) => Number(b.side === fight.upper) - Number(a.side === fight.upper));
+  // Side actions (one each): pick up (also in a melee), draw, move (only when free). The side with the upper hand goes
+  // first; free, two reaching for the same thing roll Reaktion for it (the book's order, rolled only when it matters).
+  const order = fight.upper === undefined ? [...fight.fighters] : [...fight.fighters].sort((a, b) => Number(b.side === fight.upper) - Number(a.side === fight.upper));
+  if (!resumed && fight.upper === undefined) {
+    const reach = order.filter((f) => canAct(f) && choices[f.id]?.pickUp);
+    for (const a of reach) for (const b of reach) {
+      if (a.side >= b.side || choices[a.id].pickUp !== choices[b.id].pickUp) continue;
+      const rolls = [reactionRoll(a, rng), reactionRoll(b, rng)];
+      const [first, second] = higher(a, b, rolls[0], rolls[1], rng) > 0 ? [a, b] : [b, a];
+      log.push({ k: 'race', item: choices[a.id].pickUp!, ids: [first.id, second.id], rolls: first === a ? rolls : [rolls[1], rolls[0]] });
+      order.splice(order.indexOf(first), 1);
+      order.splice(order.indexOf(second), 0, first);
+    }
+  }
+  const moving: { f: Fighter; to: { x: number; z: number }; run: boolean }[] = [];
   for (const f of resumed ? [] : order) {
     if (!canAct(f)) continue;
     const c = choices[f.id] ?? {};
     if (c.pickUp) {
       const i = fight.ground.findIndex((g) => g.id === c.pickUp && dist(g, f) <= PICKUP_REACH);
       const item = fight.ground[i];
-      const slot = item?.shield ? 'shield' : 'weapon';
-      if (item && !f[slot] && !(slot === 'shield' && weaponOf(f).hands === 2) && !(slot === 'weapon' && f.shield && item.weapon && twoHanded(f, item.weapon))) {
+      if (item && canHold(f, item)) {
         fight.ground.splice(i, 1);
-        f[slot] = { id: item.id, ...(item.weapon ? { weapon: item.weapon } : {}), ...(item.shield ? { shield: item.shield } : {}) };
-        f.drew = true;
+        Object.assign(f, holding(f, item));
         log.push({ k: 'pickUp', who: f.id, item: item.id });
       }
     } else if (c.draw) {
       const i = (f.belt ?? []).findIndex((b) => b.id === c.draw);
       const item = f.belt?.[i];
-      const slot = item?.shield ? 'shield' : 'weapon';
-      if (item && !f[slot] && !(slot === 'shield' && weaponOf(f).hands === 2) && !(slot === 'weapon' && f.shield && item.weapon && twoHanded(f, item.weapon))) {
+      if (item && canHold(f, item)) {
         f.belt!.splice(i, 1);
-        f[slot] = item;
-        f.drew = true;
+        Object.assign(f, holding(f, item));
         log.push({ k: 'draw', who: f.id, item: item.id });
       }
-    } else if (c.move && !inMelee(f)) moveTowards(fight, f, c.move, !!c.move.run, rules, rng, log);
+    } else if (c.move && !inMelee(f)) moving.push({ f, to: c.move, run: !!c.move.run });
   }
+  if (moving.length) moveAll(fight, moving, rules, rng, log);
 
   // A melee opens when two foes who can act stand within reach.
   if (!fight.melee) {

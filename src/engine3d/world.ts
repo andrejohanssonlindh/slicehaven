@@ -2693,6 +2693,29 @@ export class SpikeWorld {
     this.marker.visible = true;
   }
 
+  /** Red rings round things noticed lying about in a fight (weapons on the sand), one each. */
+  private spotRings: THREE.Mesh[] = [];
+
+  /**
+   * Ring what the hero has noticed lying about (plan B8, the director: weapons on the ground are hard to see): a red
+   * ring on the ground round each spot; an empty list takes them all away.
+   */
+  markSpotted(spots: { x: number; z: number }[]): void {
+    while (this.spotRings.length < spots.length) {
+      const ring = new THREE.RingGeometry(0.42, 0.55, 20);
+      ring.rotateX(-Math.PI / 2);
+      const m = new THREE.Mesh(ring, new THREE.MeshBasicMaterial({ color: 0xe0402a, transparent: true, opacity: 0.85, depthWrite: false }));
+      m.renderOrder = 3;
+      this.scene.add(m);
+      this.spotRings.push(m);
+    }
+    this.spotRings.forEach((m, i) => {
+      const at = spots[i];
+      m.visible = !!at;
+      if (at) m.position.set(at.x, this.store.heightAt(at.x, at.z) + 0.03, at.z);
+    });
+  }
+
   get inFight(): boolean {
     return this.fighting !== null;
   }

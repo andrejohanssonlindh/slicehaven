@@ -1,4 +1,4 @@
-/* Browser test: a fight in the arena (B8a, B8g F2–F4; a second test runs a fight in dice mode, one roll a step, with two taps to act as on a phone; a third lets the pick timer run out on hard, with two taps to act as on a phone): draw and put away your own weapon; pick a sword (and a shield for the left arm) up off the sand, fight the gladiator round by round in fast mode (each exchange played out, what it did floating up, body outlines, the dice behind a tap on the log; the view swings side-on; every move in your column, Offensive and Defensive, the one you lack greyed with why; the foe mirrored, their move shown when you are quicker (on a phone a bubble over their head, its column on a tap; tabs opening on your role); the Move row) until one side wins, and what it left (the dead, the injuries) is kept through a reload. */
+/* Browser test: a fight in the arena (B8a, B8g F2–F4; a second test runs a fight in dice mode, one roll a step, with two taps to act as on a phone; a third lets the pick timer run out on hard, with two taps to act as on a phone): draw and put away your own weapon; pick a sword (and a shield for the left arm) up off the sand, fight the gladiator round by round in fast mode (each exchange played out, what it did floating up, body outlines, the dice behind a tap on the log; the view swings side-on; every move in your column, Offensive and Defensive, the one you lack greyed with why; the foe mirrored, their move shown when you are quicker (on a phone a bubble over their head, its column on a tap; tabs opening on your role); the side action's folded lists and Other on your side, the middle only the log; weapons noticed on a first look round; the view closer in for the fight; Reaktion rolled as blades cross, moves made together) until one side wins, and what it left (the dead, the injuries) is kept through a reload. */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { OUT, openPage, startEnv, stopEnv, type Env } from './harness';
 
@@ -118,10 +118,16 @@ describe('spike3d fight', () => {
     );
     const hour = await w('w.weather.hour');
 
-    // Moving on purpose: a tap on the ground plans the round's move (a mark there), offered as a choice.
-    await page.waitForSelector('#fight .choices button', { timeout: 60_000 });
+    // Moving on purpose: a tap on the ground plans the round's move (a mark there); the side action's Move list
+    // opens with it (the director: the many options folded into lists, on your side; the middle is the log).
+    await page.waitForSelector('#fight .mine .group.side button:not([disabled])', { timeout: 60_000 });
+    expect(await page.locator('#fight .choices').count()).toBe(0);
     await w(`(() => { const h = w.fighterAt('hero'); fight.tap(null, { x: h.x + 3, z: h.z + 1 }); return 0; })()`);
-    expect(await page.$$eval('#fight .choices button', (bs) => bs.map((b) => b.textContent ?? ''))).toContainEqual(expect.stringMatching(/^Walk there \(3\.\d m\)/));
+    expect(await page.textContent('#fight .mine button[data-move="walk:there"]')).toMatch(/^Walk there \(3\.\d m\)/);
+    // Weapons noticed lying about are ringed, and the first look round is in the log with its dice.
+    expect(await page.$$eval('#fight .log p', (ps) => ps.map((p) => p.textContent ?? ''))).toContainEqual(expect.stringMatching(/(notice|catches your eye).*Alertness \d+D6/));
+    // The fight starts closer in than walking about.
+    expect(await w('w.ppm')).toBe(63);
     await page.waitForTimeout(800);
     await page.screenshot({ path: `${OUT}/fight-plan.png` });
     // The panel leaves the fighters in view: at the bottom on a phone (the view aims above it); when wide, between
@@ -137,11 +143,11 @@ describe('spike3d fight', () => {
     await page.waitForTimeout(600);
 
     // Each round: counter when defending (to win the attack back, and with it the upper hand), a standard blow when
-    // attacking, else the first thing in the Move row (close in…), until it is over.
+    // attacking, else close in (the side action's Move list), else the first thing in Other, until it is over.
     let rounds = 0, sawIntent = false, sawWhy = false, shotFloat = false;
     for (; rounds < 60; rounds++) {
-      await page.waitForSelector('#fight .mine button:not([disabled]), #fight .choices button', { timeout: 60_000 });
-      const labels = await page.$$eval('#fight .choices button', (bs) => bs.map((b) => b.textContent ?? ''));
+      await page.waitForSelector('#fight .mine button:not([disabled])', { timeout: 60_000 });
+      const labels = await page.$$eval('#fight .mine .group.other button', (bs) => bs.map((b) => b.textContent ?? ''));
       if (labels.some((l) => /^OK$|New game/.test(l))) break;
       const can = await page.$$eval('#fight .mine button:not([disabled])', (bs) => bs.map((b) => (b as HTMLElement).dataset.move ?? ''));
       // With the upper hand you see what they mean to do before you choose: on a phone a bubble over their head,
@@ -155,9 +161,9 @@ describe('spike3d fight', () => {
         await page.click('#fight .them .gist'); // a tap on their column folds it
       }
       // In a melee the phone opens on the tab for your role, and the group you don't have says why.
-      if (!sawWhy && can.length && (await page.locator('#fight .mine .group.off .why').count())) {
+      if (!sawWhy && can.some((m) => /^(atk|def):/.test(m)) && (await page.locator('#fight .mine :is(.attack, .defend).off .why').count())) {
         sawWhy = true;
-        expect(await page.textContent('#fight .mine .group.off .why')).toMatch(/You’re (attacking|defending): /);
+        expect(await page.textContent('#fight .mine :is(.attack, .defend).off .why')).toMatch(/You’re (attacking|defending): /);
         const role = (await page.textContent('#fight .head')) ?? '';
         const want = /you attack/.test(role) ? 'attack' : /you defend/.test(role) ? 'defend' : 'move';
         expect(await page.getAttribute('#fight .tabs button.on', 'data-tab')).toBe(want);
@@ -171,7 +177,11 @@ describe('spike3d fight', () => {
         await page.click('#condition .close');
       }
       const pick = can.find((m) => m.endsWith(':counter')) ?? can.find((m) => m === 'atk:standard');
-      await page.click(pick ? `#fight .mine button[data-move="${pick}"]` : '#fight .choices button');
+      if (pick) await page.click(`#fight .mine button[data-move="${pick}"]`);
+      else if (can.includes('side:move') || can.includes('closein')) {
+        if (!can.includes('closein')) await page.click('#fight .mine button[data-move="side:move"]');
+        await page.click('#fight .mine button[data-move="closein"]');
+      } else await page.click('#fight .mine .group.other button');
       // One picture of an exchange as it plays: the motions and what floats up.
       if (pick && !shotFloat && (await page.waitForSelector('.fight-float', { timeout: 4000 }).catch(() => null))) {
         shotFloat = true;
@@ -195,22 +205,25 @@ describe('spike3d fight', () => {
     await page.screenshot({ path: `${OUT}/fight-end.png` });
     const log = await page.$$eval('#fight .log p', (ps) => ps.map((p) => p.textContent ?? ''));
     expect(log.some((l) => /strike.*against/i.test(l))).toBe(true);
-    // Near enough, someone was quicker (Reaktion) and so saw the other's choice first.
-    expect(log.some((l) => /is quicker|are quicker/.test(l))).toBe(true);
-    expect(log.some((l) => /You are quicker/.test(l))).toBe(true);
+    // Reaktion is rolled as blades cross (not on the way in): the quicker attacks, and so sees the other's choice.
+    expect(log.some((l) => /Blades cross\. (You are|\w+ is) quicker/.test(l))).toBe(true);
+    expect(log.some((l) => /Blades cross\. You are quicker/.test(l))).toBe(true);
+    // Moves are made together: both walked or ran.
+    expect(log.some((l) => /^You (walk|run)/.test(l)) && log.some((l) => /^\w+ (walks|runs) /.test(l))).toBe(true);
     expect(sawIntent).toBe(true);
     const heroDead = (await w('!!w.injuriesOf("hero")?.dead')) as boolean;
-    const labels = await page.$$eval('#fight .choices button', (bs) => bs.map((b) => b.textContent ?? ''));
+    const labels = await page.$$eval('#fight .mine .group.other button', (bs) => bs.map((b) => b.textContent ?? ''));
     if (heroDead) expect(labels).toContain('New game');
     else {
       // Won (or spared): finish them if offered, then OK; the world goes on.
       if (labels.includes('Finish them')) {
-        await page.click('#fight .choices button:has-text("Finish them")');
-        await page.waitForSelector('#fight .choices button:text-is("OK")', { timeout: 60_000 });
+        await page.click('#fight .mine button[data-move="finish"]');
+        await page.waitForSelector('#fight .mine button[data-move="ok"]', { timeout: 60_000 });
         expect(await w('!!w.injuriesOf("gladiator")?.dead')).toBe(true);
       }
-      await page.click('#fight .choices button:text-is("OK")');
+      await page.click('#fight .mine button[data-move="ok"]');
       expect(await w('w.inFight')).toBe(false);
+      expect(await w('w.ppm')).toBeLessThan(63); // the zoom from before the fight
       // Fatigue comes back with time (Q49).
       const before = (await w('w.injuriesOf("hero")?.fatigue ?? 0')) as number;
       if (before > 0) {
@@ -254,21 +267,23 @@ describe('spike3d fight', () => {
     // Fight until someone is hit (or a few rounds): close in, strike, defend.
     let rang = false;
     for (let rounds = 0; rounds < 30; rounds++) {
-      await page.waitForSelector('#fight .mine button:not([disabled]), #fight .choices button', { timeout: 90_000 });
+      await page.waitForSelector('#fight .mine button:not([disabled])', { timeout: 90_000 });
       const shows = (await page.evaluate(() => (window as unknown as { shows: string[] }).shows)) as string[];
       if (shows.some((x) => /Where \(D10\)/.test(x))) break;
-      const labels = await page.$$eval('#fight .choices button', (bs) => bs.map((b) => b.textContent ?? ''));
+      const labels = await page.$$eval('#fight .mine .group.other button', (bs) => bs.map((b) => b.textContent ?? ''));
       if (labels.some((l) => /^OK$|New game/.test(l))) break;
       const can = await page.$$eval('#fight .mine button:not([disabled])', (bs) => bs.map((b) => (b as HTMLElement).dataset.move ?? ''));
       const pick = can.find((m) => m === 'atk:powerful') ?? can.find((m) => m === 'def:parry:standard');
-      const sel = pick ? `#fight .mine button[data-move="${pick}"]` : '#fight .choices button';
+      // (Free: open the Move list, one tap even here, then close in, which takes two.)
+      if (!pick && !can.includes('closein') && can.includes('side:move')) await page.click('#fight .mine button[data-move="side:move"]');
+      const sel = `#fight .mine button[data-move="${pick ?? 'closein'}"]`;
       await page.click(sel);
       if (!rang) {
         rang = true;
         expect(await page.locator('#fight button.armed').count()).toBe(1); // rung, nothing played yet
         await page.screenshot({ path: `${OUT}/fight-armed.png` });
       }
-      await page.click(pick ? sel : '#fight .choices button.armed');
+      await page.click(sel);
       await page.waitForTimeout(100);
     }
     const shows = (await page.evaluate(() => (window as unknown as { shows: string[] }).shows)) as string[];

@@ -18,6 +18,8 @@ export interface Tier {
   zooms: number[];
   /** Default zoom index into `zooms`. */
   zoom: number;
+  /** The zoom index a fight starts at (the director: closer than the closest you walk about at); outside a fight the zoom stops one short of it. */
+  fightZoom: number;
   grass: number;
   bloom: boolean;
 }
@@ -26,10 +28,10 @@ export interface Tier {
 export const TEXELS_PER_M = 21;
 
 export const TIERS: Record<TierName, Tier> = {
-  low: { name: 'low', pixelCss: 1, shadowMap: 1024, lights: 4, shells: 1, zooms: [14, 21, 42], zoom: 1, grass: 600, bloom: false },
-  medium: { name: 'medium', pixelCss: 1, shadowMap: 2048, lights: 8, shells: 2, zooms: [10.5, 14, 21, 42], zoom: 2, grass: 1500, bloom: true },
+  low: { name: 'low', pixelCss: 1, shadowMap: 1024, lights: 4, shells: 1, zooms: [14, 21, 42, 63], zoom: 1, fightZoom: 3, grass: 600, bloom: false },
+  medium: { name: 'medium', pixelCss: 1, shadowMap: 2048, lights: 8, shells: 2, zooms: [10.5, 14, 21, 42, 63], zoom: 2, fightZoom: 4, grass: 1500, bloom: true },
   // (No zoom further out than 10.5 px/m: at 7 the view held so much that it stuttered on desktop too.)
-  high: { name: 'high', pixelCss: 1, shadowMap: 4096, lights: 16, shells: 2, zooms: [10.5, 14, 21, 42], zoom: 2, grass: 3000, bloom: true },
+  high: { name: 'high', pixelCss: 1, shadowMap: 4096, lights: 16, shells: 2, zooms: [10.5, 14, 21, 42, 63], zoom: 2, fightZoom: 4, grass: 3000, bloom: true },
 };
 
 export interface DeviceInfo {

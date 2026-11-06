@@ -9,7 +9,7 @@ import { showRolls } from '../../ui/dice';
 import { effectText, partName, poolText } from '../condition';
 import { cards } from './columns';
 import { type FightCtx, cap } from './ctx';
-import { HOW, VERDICT, hitWord } from './words';
+import { HOW, VERDICT, hitWord, rollText } from './words';
 
 /**
  * Showing a round (B8g F3, F4): the world plays it out (walks, strikes met by parries, flinches, falls), what a blow
@@ -26,6 +26,10 @@ export interface Playback {
   show(lines: LogLine[], w: SpikeWorld): Promise<void>;
   /** A new fight: an empty log, nothing waiting. */
   reset(): void;
+  /** Show rolls (only the hero's thrown; in fast mode they go behind the next log line). */
+  rolls(rolls: Roll[], mine: boolean[], notes?: string[]): Promise<void>;
+  /** A roll's numbers for a log line, where the difficulty shows them (else ''). */
+  said(r: Roll, who: string, label?: string): string;
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
@@ -65,6 +69,23 @@ export function makePlayback(ctx: FightCtx): Playback {
     who === 'hero' ? t(you[0], you[1], vars) : t(they[0], they[1], { who: ctx.Name(who), ...vars });
   /** Whose: "your", "Arruns's". */
   const whose = (id: string): string => (id === 'hero' ? t('fight.your', 'your') : t('fight.whose', '{who}’s', { who: ctx.Name(id) }));
+  /**
+   * A roll's numbers for a log line, " (Shock roll 3D6+1 = 4 < 6)", where the difficulty shows them: your own unless
+   * on hard, the foe's on easy (the director: in fast mode, see what the dice did). Else nothing.
+   */
+  const said = (r: Roll, who: string, label = r.label ?? ''): string => {
+    const lv = ctx.level();
+    if (!(who === 'hero' ? lv.ownExact : lv.foeExact)) return '';
+    return ` (${label ? `${t(`fight.roll.${label.replace(/ /g, '')}`, label)} ` : ''}${rollText(r)})`;
+  };
+
+  /** Several people's rolls of one thing in one bracket, " (Reaktion: you 2D6+3 = 9, Arruns 3D6 = 14)", each where the difficulty shows it. */
+  const saidAll = (rolls: Roll[], ids: string[], label: string): string => {
+    const lv = ctx.level();
+    const each = rolls.flatMap((r, i) => ((ids[i] === 'hero' ? lv.ownExact : lv.foeExact) ? [`${ctx.nameOf(ids[i])} ${rollText(r)}`] : []));
+    return each.length ? ` (${label}: ${each.join(', ')})` : '';
+  };
+
   /** Show rolls, throwing only the hero's (`mine[i]`); the others are written beside them. */
   const reveal = (rolls: Roll[], mine: boolean[], notes: string[] = []): Promise<void> => {
     if (ctx.fast()) {
@@ -204,8 +225,9 @@ export function makePlayback(ctx: FightCtx): Playback {
       if (fx) notes.push(cap(fx));
       if (s.died) notes.push(of(l.target, ['fight.killed.you', 'You fall.'], ['fight.killed', '{who} falls dead.']));
       await reveal(wRolls, wMine, notes);
-      if (fx) log(t('fight.woundfx', 'Serious wound: {fx}.', { fx }), atkMine ? 'good' : 'bad');
-      if (s.died) log(of(l.target, ['fight.killed.you', 'You fall.'], ['fight.killed', '{who} falls dead.']), atkMine ? 'good' : 'bad');
+      const death = s.deathRoll ? said(s.deathRoll, l.target, 'Death roll') : '';
+      if (fx) log(`${t('fight.woundfx', 'Serious wound: {fx}.', { fx })}${death ? ` ${t('fight.survived', 'Survived{roll}.', { roll: death })}` : ''}`, atkMine ? 'good' : 'bad');
+      if (s.died) log(`${of(l.target, ['fight.killed.you', 'You fall.'], ['fight.killed', '{who} falls dead.'])}${death}`, atkMine ? 'good' : 'bad');
       for (const rk of res.risks) if (rk.happened) log(rk.effect.k === 'break' ? t('fight.breaks', 'Bone breaks.') : t('fight.severed', 'Something is cut off.'), 'bad');
     }
   }
@@ -219,7 +241,22 @@ export function makePlayback(ctx: FightCtx): Playback {
         case 'move': {
           w.moveFighter(l.who, l.to.x, l.to.z);
           if (l.roll) await reveal([{ ...l.roll, label: `${ctx.Name(l.who)}: ${rollableName('attr:Förflyttning')}` }], [l.who === 'hero']);
-          log(l.ran ? of(l.who, ['fight.ran.you', 'You run in.'], ['fight.ran', '{who} runs in.']) : of(l.who, ['fight.walked.you', 'You close in.'], ['fight.walked', '{who} closes in.']), l.who === 'hero' ? 'you' : 'they');
+          const m = { m: l.metres.toFixed(1) };
+          const roll = l.roll ? said(l.roll, l.who, 'Run') : '';
+          // (Moves are made together: someone already in reach, or met on the way, gets no nearer.)
+          const line = l.metres < 0.1 ? of(l.who, ['fight.still.you', 'You get no nearer.'], ['fight.still', '{who} gets no nearer.'])
+            : l.ran ? of(l.who, ['fight.ran.you', 'You run {m} m.'], ['fight.ran', '{who} runs {m} m.'], m)
+              : l.ran === false ? of(l.who, ['fight.ranfail.you', 'You stumble and only walk {m} m.'], ['fight.ranfail', '{who} stumbles and only walks {m} m.'], m)
+                : of(l.who, ['fight.walked.you', 'You walk {m} m.'], ['fight.walked', '{who} walks {m} m.'], m);
+          log(`${line.replace(/\.$/, '')}${roll}.`, l.who === 'hero' ? 'you' : 'they');
+          break;
+        }
+        case 'race': {
+          await settle(w);
+          const mine = l.ids.map((id) => id === 'hero');
+          await reveal(l.rolls.map((r, i) => ({ ...r, label: `${ctx.Name(l.ids[i])}: ${rollableName('attr:Reaktion')}` })), mine);
+          const nums = saidAll(l.rolls, l.ids, rollableName('attr:Reaktion'));
+          log(`${of(l.ids[0], ['fight.race.you', 'You both go for the {thing}: you are quicker'], ['fight.race', 'You both go for the {thing}: {who} is quicker'], { thing: ctx.kindName(l.item) })}${nums}.`, 'info');
           break;
         }
         case 'draw':
@@ -231,20 +268,13 @@ export function makePlayback(ctx: FightCtx): Playback {
           w.takeUp(l.who, l.item);
           log(of(l.who, ['fight.pickedup.you', 'You pick up the {thing}.'], ['fight.pickedup', '{who} picks up the {thing}.'], { thing: ctx.kindName(l.item) }), l.who === 'hero' ? 'you' : 'they');
           break;
-        case 'initiative': {
-          await settle(w);
-          await reveal(l.rolls.map((r, i) => ({ ...r, label: `${ctx.Name(l.ids[i] ?? '')}: ${rollableName('attr:Reaktion')}` })), l.ids.map((id) => id === 'hero'));
-          log(l.upper === 0
-            ? t('fight.upper.you', 'You are quicker: you see what {who} means to do.', { who: ctx.nameOf(foeId) })
-            : t('fight.upper.they', '{who} is quicker: they will see what you do.', { who: ctx.Name(foeId) }), 'info');
-          break;
-        }
         case 'open': {
           await settle(w);
           const ids = fight().fighters.map((f) => f.id);
           if (l.rolls.length) await reveal(l.rolls.map((r, i) => ({ ...r, label: `${ctx.Name(ids[i] ?? '')}: ${rollableName('attr:Reaktion')}` })), ids.map((id) => id === 'hero'));
           ctx.s.roleWhy = 'quicker';
-          log(of(l.attacker === 0 ? 'hero' : foeId, ['fight.opens.you', 'Blades cross. You have the upper hand.'], ['fight.opens', 'Blades cross. {who} has the upper hand.']), 'info');
+          const nums = saidAll(l.rolls, ids, rollableName('attr:Reaktion'));
+          log(`${of(l.attacker === 0 ? 'hero' : foeId, ['fight.opens.you', 'Blades cross. You are quicker and attack'], ['fight.opens', 'Blades cross. {who} is quicker and attacks'])}${nums}.`, 'info');
           break;
         }
         case 'attack':
@@ -253,6 +283,7 @@ export function makePlayback(ctx: FightCtx): Playback {
           break;
         case 'drop':
           w.dropAt(l.who, l.item, l.at.x, l.at.z);
+          ctx.s.spotted.add(l.item); // (seen falling)
           log(of(l.who, ['fight.dropped.you', 'You drop the {thing}.'], ['fight.dropped', '{who} drops the {thing}.'], { thing: ctx.kindName(l.item) }), l.who === 'hero' ? 'bad' : 'good');
           break;
         case 'retreat':
@@ -265,17 +296,25 @@ export function makePlayback(ctx: FightCtx): Playback {
           break;
         case 'end': {
           if (l.end.rolls.length) await reveal(l.end.rolls.map((r) => ({ ...r, label: `${ctx.Name(l.who)}: ${r.label ?? ''}` })), l.end.rolls.map(() => l.who === 'hero'));
-          for (const n of l.end.notes) if (n !== 'stayed up') log(`${ctx.Name(l.who)}: ${t(`fight.note.${n.replace(/ /g, '')}`, n)}.`, l.who === 'hero' ? 'bad' : 'good');
+          // Each note with the roll that made it, if one did ("knocked out (Shock roll 3D6+1 = 4 < 6)"): the shock
+          // roll for staying up or going out, the death roll for bleeding or burning out.
+          const rollFor = (n: string) => l.end.rolls.find((r) => (r.label === 'Shock roll') === (n === 'stayed up' || n === 'knocked out'));
+          for (const n of l.end.notes) {
+            const r = ['stayed up', 'knocked out', 'bleeding stopped', 'bled out', 'burned to death', 'fire out'].includes(n) ? rollFor(n) : undefined;
+            const nums = r ? said(r, l.who) : '';
+            if (n === 'stayed up' && !nums) continue;
+            log(`${ctx.Name(l.who)}: ${t(`fight.note.${n.replace(/ /g, '')}`, n)}${nums}.`, n === 'stayed up' ? 'info' : l.who === 'hero' ? 'bad' : 'good');
+          }
           break;
         }
         case 'plead': {
           const mine = l.who === 'hero';
-          const said = l.granted
+          const answer = l.granted
             ? of(l.who, ['fight.spared.you', '{foe} lowers their weapon and lets you yield.'], ['fight.spared.they', 'You let {who} yield.'], { foe: ctx.Name(foeId) })
             : of(l.who, ['fight.refused.you', '{foe} won’t hear of it.'], ['fight.refused.they', '{who} begs; you fight on.'], { foe: ctx.Name(foeId) });
           log(of(l.who, ['fight.pleads.you', 'You ask to yield.'], ['fight.pleads', '{who} asks to yield.']), mine ? 'you' : 'they');
-          await reveal([{ ...l.roll, label: t('fight.plearoll', '{who}: plea', { who: ctx.Name(l.who) }) }], [mine], [said]);
-          log(said, l.granted ? 'info' : 'bad');
+          await reveal([{ ...l.roll, label: t('fight.plearoll', '{who}: plea', { who: ctx.Name(l.who) }) }], [mine], [answer]);
+          log(`${answer.replace(/\.$/, '')}${said(l.roll, l.who, 'Plea')}.`, l.granted ? 'info' : 'bad');
           if (l.granted && mine) w.noteYield(foeId);
           break;
         }
@@ -302,6 +341,8 @@ export function makePlayback(ctx: FightCtx): Playback {
   return {
     log,
     show,
+    rolls: reveal,
+    said,
     reset() {
       logEl.replaceChildren();
       stash = [];

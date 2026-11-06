@@ -2,6 +2,20 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-06 — Your B8g review, the computer side
+
+- **The fight page is split into parts** first (`src/spike3d/fight/`, eight files instead of one of 1,170 lines), so the rest could be changed safely.
+- **No more being the "attacker" while running at each other.** Free, nobody has the upper hand: both choose blind, and Reaktion is rolled when you meet (who attacks), or when you both go for the same weapon (who gets it).
+- **Moves happen at the same time.** Both running in now run, and meet in the middle; before, one ran the whole way and the other was logged as running but stood still. The log says how far: *"Arruns runs 9.4 m."*
+- **Your decisions are on your side, the middle is the log.** Your column: **Side action** (Move ▸, Draw ▸, Pick up ▸, Look around: tap a ▸ to see its list, ‹ to fold it), Offensive, Defensive, **Other** (Ask to yield, Hold your ground, Get away, Accept their surrender, OK).
+- **Side action plus main action.** In a melee you pick the side action first (it goes green), then the blow or defence. The blow shows the dice it will roll with it: draw your staff and *Standard* reads 2D6+2 (the staff, −1D6 for drawing). Free, the side action is the round.
+- **Dice sums in the log** where the difficulty allows: *"Arruns: knocked out (Shock roll 3D6+1 = 4 < 6)."* Also runs, Reaktion, pleas, death rolls.
+- **Weapons on the ground get a red ring once noticed.** At the start you roll Alertness against each weapon (a dagger is hard to see, a spear easy; further off is harder). *Look around* is a side action that rolls again with 1D6 more. A weapon you tap or see fall counts as noticed.
+- **The view starts closer in a fight**, one step past the closest you can zoom while walking, and goes back after.
+- **The coward no longer runs at you:** they arm themselves if they can, then wait for you.
+- **Noted for later:** knocked out while bleeding, you bleed out unless someone gives aid (B8f).
+- **Checked:** unit tests (new ones for meeting in the middle, Reaktion on meeting, the race for a sword), the three fight browser tests, pictures at computer size. **The phone is untouched** (the F5 layout with the new groups in its tabs); it's next after your try on the computer.
+
 ## 2026-11-05 — B8g stages F5 and F6: the phone layout and the pick timer (B8g built, ready for your review)
 
 - **On the phone (portrait), the fight now leaves the top ~55% to the view.** The two fighters' small cards sit in its top corners: the body figure, the fatigue bar, the name, how they are. Tap one for the details, as before.

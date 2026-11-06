@@ -90,6 +90,11 @@ export interface ThingDef {
    * alone). No size: it is part of where it stands (a hearth, a shelf) and can't be taken.
    */
   size?: Size;
+  /**
+   * How hard it is to notice lying about (plan B8, the director: weapons on the sand are hard to see): an Alertness
+   * roll against this, harder further off (`spotDifficulty` in `perceive.ts`). Inherited; left out, it is never missed.
+   */
+  spot?: number;
   /** What it weighs, kilograms (plan B6): what can be carried is set against the carrier's capacity (`carryCapacity`). */
   weight?: number;
   /** What it is worth, in coins (a first guess until prices come with B6): taking it weighs more against a poor owner. */

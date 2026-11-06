@@ -42,6 +42,19 @@ export function rollSight(dice: Dice, rng: Rng, label = 'Sight'): { roll: Roll; 
   return { roll, sight: { success: !!roll.success, advantages: roll.advantages ?? 0 } };
 }
 
+/** Within this many metres a thing lying about is as easy to notice as its kind says; beyond, 1 harder each so many more. */
+export const SPOT_NEAR = 4;
+
+/**
+ * How hard it is to notice a thing lying about (plan B8, the director: "attention makes it easier to spot them"): its
+ * kind's `spot`, 1 harder for every 4 m beyond 4. An Alertness roll at the start of a fight against this; looking
+ * round on purpose (a side action) rolls again with 1D6 more (`LOOK_BONUS`).
+ */
+export const spotDifficulty = (spot: number, metres: number): number => spot + Math.max(0, Math.floor((metres - SPOT_NEAR) / SPOT_NEAR));
+
+/** The dice looking round on purpose adds to the Alertness roll. */
+export const LOOK_BONUS = 1;
+
 /** How a sight roll stretches sight: multipliers on its range and its width. A failure halves both. */
 export function sightBoost(s: SightRoll): { range: number; fov: number } {
   if (!s.success) return { range: 0.5, fov: 0.5 };

@@ -1,5 +1,7 @@
+import { diceText } from '../../core/chargen/tables';
 import { type AttackTactic, type Choice, type DefenceTactic, roleOf } from '../../core/combat';
 import type { DamageType, HitResult } from '../../core/damage';
+import type { Roll } from '../../core/dice';
 import { t } from '../../i18n';
 import type { FightCtx } from './ctx';
 
@@ -19,6 +21,16 @@ export const DEFENCES: Record<DefenceTactic, [name: string, does: string]> = {
 export const WAYS: Record<'parry' | 'block' | 'dodge', string> = { parry: t('fight.how.parry', 'parry'), block: t('fight.how.block', 'block'), dodge: t('fight.how.dodge', 'dodge') };
 export const HOW: Record<string, string> = { parry: 'parry', block: 'block', dodge: 'dodge', none: 'no defence' };
 export const VERDICT: Record<string, string> = { parry: 'parried', block: 'blocked', dodge: 'dodged', none: 'missed' };
+
+/**
+ * A roll in numbers for the log (the director: in fast mode, see what the dice did where the difficulty allows it):
+ * "3D6+1 = 4 < 6", or "3D6 = 12" with nothing to reach.
+ */
+export function rollText(r: Roll): string {
+  const pool = r.sides === 6 ? diceText(r.dice) : `D${r.sides}`;
+  const vs = r.target === undefined ? '' : ` ${r.success ? '≥' : '<'} ${r.target}`;
+  return `${pool} = ${r.total}${vs}`;
+}
 
 /** What a blow did, in a word or two (normal and hard; Q50): by how bad it was and its kind of damage. */
 export function hitWord(r: HitResult, type: DamageType): string {

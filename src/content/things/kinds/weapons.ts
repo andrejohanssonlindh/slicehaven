@@ -10,24 +10,27 @@ import { MODELS } from '../models';
  * `things/models/`. A new weapon: a line here and a model file.
  */
 
-/** The family: a weapon is a tool (to the skill hooks), held in a hand, worn on a belt or back when not. */
-const family: ThingDef = { id: 'weapon', is: 'tool', abstract: true, size: 'strapped', importance: 1 };
+/**
+ * The family: a weapon is a tool (to the skill hooks), held in a hand, worn on a belt or back when not. Lying about,
+ * one is noticed on an Alertness roll against 8 (`spot`); the small harder, the long easier (per row).
+ */
+const family: ThingDef = { id: 'weapon', is: 'tool', abstract: true, size: 'strapped', importance: 1, spot: 8 };
 
-/** Every weapon, by the id of its kind: how it moves in the hand (its motions), its row in the table and a line for looking at it. */
-const ROWS: Record<string, { moves: WayOfMoving; row: string; look: string }> = {
+/** Every weapon, by the id of its kind: how it moves in the hand (its motions), its row in the table, a line for looking at it, and how hard it is to notice if not 8. */
+const ROWS: Record<string, { moves: WayOfMoving; row: string; look: string; spot?: number }> = {
   'arming-sword': { moves: 'blade', row: 'Stridssvärd', look: 'An arming sword, plain and well kept.' },
-  'short-sword': { moves: 'blade', row: 'Kortsvärd', look: 'A short sword, broad at the base.' },
-  'hand-axe': { moves: 'axe-mace', row: 'Handyxa', look: 'A hand axe with a worn haft.' },
-  cudgel: { moves: 'axe-mace', row: 'Påk', look: 'A cudgel of hard wood.' },
-  quarterstaff: { moves: 'staff', row: 'Stridsstav', look: 'A quarterstaff, shod with iron at both ends.' },
-  dagger: { moves: 'blade', row: 'Dolk', look: 'A dagger with a double edge.' },
+  'short-sword': { moves: 'blade', row: 'Kortsvärd', look: 'A short sword, broad at the base.', spot: 10 },
+  'hand-axe': { moves: 'axe-mace', row: 'Handyxa', look: 'A hand axe with a worn haft.', spot: 10 },
+  cudgel: { moves: 'axe-mace', row: 'Påk', look: 'A cudgel of hard wood.', spot: 10 },
+  quarterstaff: { moves: 'staff', row: 'Stridsstav', look: 'A quarterstaff, shod with iron at both ends.', spot: 6 },
+  dagger: { moves: 'blade', row: 'Dolk', look: 'A dagger with a double edge.', spot: 12 },
   sabre: { moves: 'blade', row: 'Kroksabel', look: 'A sabre, its blade gently curved.' },
   rapier: { moves: 'blade', row: 'Värja', look: 'A rapier, long and thin, with a swept guard.' },
   'bastard-sword': { moves: 'blade', row: 'Slagsvärd', look: 'A bastard sword, its grip long enough for two hands.' },
-  greatsword: { moves: 'two-hander', row: 'Storsvärd', look: 'A greatsword, nearly as tall as a man.' },
+  greatsword: { moves: 'two-hander', row: 'Storsvärd', look: 'A greatsword, nearly as tall as a man.', spot: 6 },
   'battle-axe': { moves: 'axe-mace', row: 'Stridsyxa', look: 'A battle axe with a deep, bearded head.' },
-  'great-axe': { moves: 'two-hander', row: 'Storyxa', look: 'A great axe, double-bitted, on a long haft.' },
-  'hunting-spear': { moves: 'spear', row: 'Jaktspjut', look: 'A hunting spear with a broad leaf head.' },
+  'great-axe': { moves: 'two-hander', row: 'Storyxa', look: 'A great axe, double-bitted, on a long haft.', spot: 6 },
+  'hunting-spear': { moves: 'spear', row: 'Jaktspjut', look: 'A hunting spear with a broad leaf head.', spot: 6 },
   'war-hammer': { moves: 'axe-mace', row: 'Stridshammare', look: 'A war hammer: a square face, a spike behind.' },
   'morning-star': { moves: 'axe-mace', row: 'Morgonstjärna', look: 'A morning star, its head set with studs.' },
   'steel-mace': { moves: 'axe-mace', row: 'Stålklubba', look: 'A short mace of steel.' },
@@ -43,6 +46,6 @@ export default [
     if (!row) throw new Error(`weapon ${id}: no row ${w.row} in the weapon table`);
     const model = MODELS[id];
     if (!model) throw new Error(`weapon ${id} has no model in content/things/models/${id}.ts`);
-    return { id, is: 'weapon', look: w.look, name: row.en.toLowerCase(), weapon: row.sv, hands: row.h1 === '–' ? 2 : 1, moves: w.moves, model, weight: kg(row.weight), value: row.price, draw: (p) => model.draw(p.seed) };
+    return { id, is: 'weapon', look: w.look, name: row.en.toLowerCase(), weapon: row.sv, hands: row.h1 === '–' ? 2 : 1, moves: w.moves, model, weight: kg(row.weight), value: row.price, ...(w.spot ? { spot: w.spot } : {}), draw: (p) => model.draw(p.seed) };
   }),
 ] satisfies ThingDef[];

@@ -427,11 +427,22 @@ const sheet = makeSheet(() => world, notify, save, doer, journal.added);
 /** A fight with someone tapped (plan B8a): it takes over from the talk, and the world waits while it lasts. */
 /** The hero's condition: fatigue and where it came from, dice off rolls, wounds (the "You" button). */
 const condition = makeCondition(() => world, hero);
+/** The zoom before a fight, given back when it ends (a fight starts closer in: the tier's `fightZoom`). */
+let zoomBeforeFight: number | null = null;
 const fight = makeFight(() => world, hero, notify, save, () => {
   saveOff = true;
   clearWorld(mapName, localStorage);
   location.reload();
-}, condition);
+}, condition, (on) => {
+  if (on && zoomBeforeFight === null) {
+    zoomBeforeFight = zoomIndex;
+    zoomIndex = Math.max(zoomIndex, tier.fightZoom);
+  } else if (!on && zoomBeforeFight !== null) {
+    zoomIndex = zoomBeforeFight;
+    zoomBeforeFight = null;
+  }
+  fit();
+});
 const talk = makeTalk(() => world, () => pipeline.renderer, hero, doer, notify, save, journal.added, (id) => fight.start(id));
 
 function bindInput(): void {
@@ -536,7 +547,9 @@ function bindInput(): void {
     down = null;
   });
   const zoom = (d: number): void => {
-    zoomIndex = Math.max(0, Math.min(tier.zooms.length - 1, zoomIndex + d));
+    // (The closest step is a fight's own: walking about stops one short of it.)
+    const max = fight.on ? tier.zooms.length - 1 : Math.min(tier.zooms.length - 1, tier.fightZoom - 1);
+    zoomIndex = Math.max(0, Math.min(max, zoomIndex + d));
     fit();
   };
   for (const b of document.querySelectorAll<HTMLButtonElement>('#zoom button')) {
