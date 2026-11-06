@@ -26,9 +26,15 @@ const SHAPES: Record<BodyPart, { d: [x: number, y: number, w: number, h: number,
   leftLeg: { d: [20.5, 44, 7, 33, 3], at: [24, 60] },
 };
 const TINT = ['#e6dbb918', '#d8a04099', '#d06030c0', '#b02020e0'];
-const BROKEN_PART: Record<BreakArea, BodyPart> = { neck: 'head', skull: 'head', ribs: 'torso', spine: 'torso', hip: 'torso', leftArm: 'leftArm', rightArm: 'rightArm', leftLeg: 'leftLeg', rightLeg: 'rightLeg' };
+/** Which of the six parts a broken bone is in. */
+export const BROKEN_PART: Record<BreakArea, BodyPart> = { neck: 'head', skull: 'head', ribs: 'torso', spine: 'torso', hip: 'torso', leftArm: 'leftArm', rightArm: 'rightArm', leftLeg: 'leftLeg', rightLeg: 'rightLeg' };
 const ARM: CutArea[] = ['hand', 'forearm', 'elbow', 'upperarm', 'shoulder'];
 const LEG: CutArea[] = ['foot', 'calf', 'knee', 'thigh', 'hip'];
+/** Which of the six parts something cut off was on (null: none of them, an ear or a nose). */
+export function lostPart(l: { area: CutArea; side?: string | null }): BodyPart | null {
+  const side = l.side === 'left' ? 'left' : 'right';
+  return ARM.includes(l.area) ? `${side}Arm` : LEG.includes(l.area) ? `${side}Leg` : null;
+}
 
 const el = <K extends keyof SVGElementTagNameMap>(name: K, attrs: Record<string, string | number>): SVGElementTagNameMap[K] => {
   const e = document.createElementNS(NS, name);
@@ -59,9 +65,8 @@ export function bodyOutline(i: Injuries, seen: SeenHit[], exact: boolean, fatigu
   const svg = el('svg', { viewBox: '0 0 40 80', width: 30, height: 60, role: 'img' });
   const lost = new Set<BodyPart>();
   for (const l of i.lost) {
-    const side = l.side === 'left' ? 'left' : 'right';
-    if (ARM.includes(l.area)) lost.add(`${side}Arm`);
-    else if (LEG.includes(l.area)) lost.add(`${side}Leg`);
+    const p = lostPart(l);
+    if (p) lost.add(p);
   }
   const said: string[] = [];
   for (const [part, s] of Object.entries(SHAPES) as [BodyPart, (typeof SHAPES)[BodyPart]][]) {

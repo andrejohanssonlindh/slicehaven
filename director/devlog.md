@@ -2,6 +2,12 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-06 — Third notes: rings out of a fight, the body in the details
+
+- **Noticed weapons are ringed out of a fight too** (within 20 m of you), and the rings breathe a little so they catch the eye.
+- **The details sheet has the body outline** (yours, or the foe's on easy), with the marks of the blows you saw. Point at a part, or tap it, and the lines about it light up (wounds, armour torn, broken, hit with no lasting wound, the dice it costs you); point at a line and its part lights up.
+- **Defences keep the −1D6 from dazed and the rest**, as you play it too (recorded).
+
 ## 2026-11-06 — Your second round of notes
 
 - **Weapons are noticed as they come into view, not when a fight starts.** Walking about, each weapon or shield you see clearly gets an Alertness roll (a line says what you noticed; with the roll on easy). Missed, it is tried again once you are near enough for it to be easier. What you noticed is saved. In a fight the log says it, and *Look around* still rolls with 1D6 more.

@@ -86,6 +86,8 @@ import { type Water, makeWater } from './water';
 
 /** How fast the view turns while a turn button or key is held, radians a second (about 80°). */
 const TURN_SPEED = 1.4;
+/** Out of a fight, noticed things lying within this many metres of the hero are ringed. */
+const RING_REACH = 20;
 /** About 39°: ground is squashed to ~0.63, as in the old hex art (20 px rows on 32 px tiles). */
 export const PITCH = 0.68;
 const CAM_DIST = 60;
@@ -2767,6 +2769,15 @@ export class SpikeWorld {
     });
   }
 
+  /** The rings breathe a little, so they catch the eye on busy ground. */
+  private pulseRings(): void {
+    const k = 0.5 + 0.5 * Math.sin(this.time * 3);
+    for (const m of this.spotRings) if (m.visible) {
+      (m.material as THREE.MeshBasicMaterial).opacity = 0.6 + 0.35 * k;
+      m.scale.setScalar(1 + 0.12 * k);
+    }
+  }
+
   get inFight(): boolean {
     return this.fighting !== null;
   }
@@ -3835,9 +3846,13 @@ export class SpikeWorld {
       WORLD.uSight.value.set(this.facing, sp.fov / 2, sp.edge, sp.near);
       WORLD.uSightBack.value = sp.back;
       this.stepExplored();
+      this.pulseRings();
       if (this.time - this.noticeAt >= 0.5) {
         this.noticeAt = this.time;
         this.noticeLying();
+        // Out of a fight the world rings what you noticed near you (the director: make them clearer); in one, the
+        // fight page does, from what lies about the fight.
+        if (!this.fighting) this.markSpotted(this.weaponsLying(this.hero.x, this.hero.z, RING_REACH).filter((g) => this.noticed.has(g.id)));
       }
     } else {
       WORLD.uVision.value.set(0, 0, 0, 0);

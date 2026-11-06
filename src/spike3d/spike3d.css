@@ -332,3 +332,10 @@
 #condition p { margin: 0 0 3px; font-size: 13px; line-height: 1.35; }
 #condition p.note { font-size: 12px; opacity: 0.7; }
 #condition p.bad { color: #e09a80; }
+/* The body outline beside the text: point at (or tap) a part to light the lines about it, and the other way round. */
+#condition .cond-fig { float: right; margin: 4px 0 8px 12px; }
+#condition .cond-fig svg { width: 64px; height: 128px; display: block; }
+#condition .cond-fig rect { cursor: pointer; transition: stroke 0.1s; }
+#condition .cond-fig rect.hl { stroke: #f0d080; stroke-width: 1.8; }
+#condition p[data-parts] { border-radius: 3px; padding: 0 3px; margin-left: -3px; }
+#condition p.hl { background: #e0b05033; color: #f0d080; }

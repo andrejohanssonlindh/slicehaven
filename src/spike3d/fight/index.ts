@@ -106,9 +106,9 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
   const rules: FightRules = { tables: WOUND_TABLES, ground: GROUND };
 
   window.addEventListener('resize', () => { layout(ctx); aimView(ctx); });
-  el.usCard.addEventListener('click', () => { if (s.fight) condition.open(s.fight.fighters[0].injuries, ctx.vitalityOf(s.fight.fighters[0])); });
+  el.usCard.addEventListener('click', () => { if (s.fight) condition.open(s.fight.fighters[0].injuries, ctx.vitalityOf(s.fight.fighters[0]), undefined, s.seen.hero); });
   el.themCard.addEventListener('click', () => {
-    if (s.fight && s.fight.fighters[1] && ctx.level().foeExact) condition.open(s.fight.fighters[1].injuries, ctx.vitalityOf(s.fight.fighters[1]), nameOf(s.foeId));
+    if (s.fight && s.fight.fighters[1] && ctx.level().foeExact) condition.open(s.fight.fighters[1].injuries, ctx.vitalityOf(s.fight.fighters[1]), nameOf(s.foeId), s.seen[s.foeId]);
   });
 
   /** A tap on the world: plan to go there (free), or to the weapon tapped; in reach of a foe, only breaking off moves you. */

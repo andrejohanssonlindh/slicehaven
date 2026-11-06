@@ -2,8 +2,11 @@ import { rollableName } from '../content/rollables';
 import { type Dice, diceText } from '../core/chargen/tables';
 import { type ModWhy, type PoolWhy, poolMean } from '../core/combat';
 import {
-  type Effect, type FatigueWhy, FATIGUE_WHYS, type Injuries, type PenaltyWhy, type RollUse, penaltyParts, totalFatigue, unhurt,
+  BODY_PARTS, type Effect, type FatigueWhy, FATIGUE_WHYS, type Injuries, type PenaltyWhy, type RollUse, penaltyParts, totalFatigue, unhurt,
 } from '../core/damage';
+import { BROKEN_PART, type SeenHit, bodyOutline, lostPart } from './outline';
+
+const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 import { DIFFICULTY_RULES, REST_SPEED } from '../core/difficulty';
 import type { Hero } from '../core/hero';
 import type { SpikeWorld } from '../engine3d/world';
@@ -111,9 +114,28 @@ const USES: { label: [string, string]; use: RollUse }[] = [
   { label: ['cond.use.death', 'Death rolls'], use: { kind: 'death' } },
 ];
 
-/** Fill a box with everything about someone's condition. `exact`: numbers for fatigue (else words). */
-export function renderCondition(box: HTMLElement, i: Injuries, vitality: Dice, exact: boolean, restMinutes: number): void {
+/**
+ * Fill a box with everything about someone's condition. `exact`: numbers for fatigue (else words). Beside it their
+ * body outline (the director: the outline in the details too), with the blows `seen` on it; pointing at a part (or
+ * tapping it) lights the lines about it, and pointing at such a line lights its part.
+ */
+export function renderCondition(box: HTMLElement, i: Injuries, vitality: Dice, exact: boolean, restMinutes: number, seen: SeenHit[] = []): void {
   box.replaceChildren();
+  const fig = bodyOutline(i, seen, true, null);
+  fig.classList.add('cond-fig');
+  box.appendChild(fig);
+  /** Light a part and the lines about it (null: none). */
+  const light = (part: string | null): void => {
+    for (const r of fig.querySelectorAll<SVGElement>('[data-part]')) r.classList.toggle('hl', r.dataset.part === part);
+    for (const p of box.querySelectorAll<HTMLElement>('p[data-parts]')) p.classList.toggle('hl', !!part && p.dataset.parts!.split(' ').includes(part));
+  };
+  let pinned: string | null = null;
+  for (const r of fig.querySelectorAll<SVGElement>('[data-part]')) {
+    const part = r.dataset.part!;
+    r.addEventListener('pointerenter', () => light(part));
+    r.addEventListener('pointerleave', () => light(pinned));
+    r.addEventListener('click', () => light((pinned = pinned === part ? null : part)));
+  }
   const sec = (title: string): HTMLElement => {
     const s = document.createElement('section');
     const h = document.createElement('h3');
@@ -122,10 +144,15 @@ export function renderCondition(box: HTMLElement, i: Injuries, vitality: Dice, e
     box.appendChild(s);
     return s;
   };
-  const line = (s: HTMLElement, text: string, cls = ''): void => {
+  const line = (s: HTMLElement, text: string, cls = '', parts: string[] = []): void => {
     const p = document.createElement('p');
     if (cls) p.className = cls;
     p.textContent = text;
+    if (parts.length) {
+      p.dataset.parts = parts.join(' ');
+      p.addEventListener('pointerenter', () => light(parts[0]));
+      p.addEventListener('pointerleave', () => light(pinned));
+    }
     s.appendChild(p);
   };
   if (i.dead) return line(sec(t('cond.state', 'State')), t('fight.dead', 'dead'));
@@ -159,29 +186,37 @@ export function renderCondition(box: HTMLElement, i: Injuries, vitality: Dice, e
     if (!ps.length) continue;
     any = true;
     const n = ps.reduce((s, p) => s + p.n, 0);
-    line(d, `${t(u.label[0], u.label[1])}: −${n}D6 (${ps.map((p) => `${whyName(p.why)} −${p.n}D6`).join(', ')})`);
+    const parts = ps.flatMap((p) => ((BODY_PARTS as string[]).includes(p.why) ? [p.why] : p.why === 'ribs' ? ['torso'] : []));
+    line(d, `${t(u.label[0], u.label[1])}: −${n}D6 (${ps.map((p) => `${whyName(p.why)} −${p.n}D6`).join(', ')})`, '', parts);
   }
   if (!any) line(d, t('cond.nodice', 'Nothing holds you back.'));
 
   // What lasts: wounds, pain, bleeding, breaks.
   const w = sec(t('cond.harm', 'Wounds and the rest'));
-  const lasting: string[] = [];
-  for (const [p, n] of Object.entries(i.wounds)) if (n) lasting.push(t('cond.wound', '{part}: {n} of 3 wounds', { part: partName(p), n }));
-  if (i.pain) lasting.push(t('cond.pain', 'Pain {n}: −{n}D6 on fighting, moving and the attributes that need the body.', { n: i.pain }));
-  if (i.bleed) lasting.push(t('cond.bleed', 'Bleeding: {r} fatigue a round, until stopped (difficulty {d}).', { r: i.bleed.rate, d: i.bleed.diff }));
-  if (i.infection) lasting.push(t('cond.infection', 'Infection, level {n}.', { n: i.infection.level }));
-  if (i.internal) lasting.push(t('cond.internal', 'Internal injuries: {n}.', { n: i.internal }));
-  for (const b of i.broken) lasting.push(t('cond.broken', 'Broken: {b}.', { b }));
-  for (const l of i.lost) lasting.push(t('cond.lost', 'Lost: {a}.', { a: `${l.side ? `${l.side} ` : ''}${l.area}` }));
-  for (const a of i.armourOff) lasting.push(t('cond.armouroff', 'Armour torn off the {part}.', { part: partName(a) }));
-  if (i.short.length) lasting.push(t('cond.short', 'Until your next turn: {s}.', { s: i.short.map((s) => t(`fight.short.${s}`, SHORT[s])).join(', ') }));
-  for (const l of lasting) line(w, l);
+  // Each with the part(s) of the body it is on, for the outline.
+  const lasting: [string, string[]][] = [];
+  for (const [p, n] of Object.entries(i.wounds)) if (n) lasting.push([t('cond.wound', '{part}: {n} of 3 wounds', { part: partName(p), n }), [p]]);
+  if (i.pain) lasting.push([t('cond.pain', 'Pain {n}: −{n}D6 on fighting, moving and the attributes that need the body.', { n: i.pain }), []]);
+  const bledAt = [...seen].reverse().find((h) => h.serious)?.part;
+  if (i.bleed) lasting.push([t('cond.bleed', 'Bleeding: {r} fatigue a round, until stopped (difficulty {d}).', { r: i.bleed.rate, d: i.bleed.diff }), bledAt ? [bledAt] : []]);
+  if (i.infection) lasting.push([t('cond.infection', 'Infection, level {n}.', { n: i.infection.level }), []]);
+  if (i.internal) lasting.push([t('cond.internal', 'Internal injuries: {n}.', { n: i.internal }), ['torso']]);
+  for (const b of i.broken) lasting.push([t('cond.broken', 'Broken: {b}.', { b }), [BROKEN_PART[b]]]);
+  for (const l of i.lost) { const p = lostPart(l); lasting.push([t('cond.lost', 'Lost: {a}.', { a: `${l.side ? `${l.side} ` : ''}${l.area}` }), p ? [p] : []]); }
+  for (const a of i.armourOff) lasting.push([t('cond.armouroff', 'Armour torn off the {part}.', { part: partName(a) }), [a]]);
+  if (i.short.length) lasting.push([t('cond.short', 'Until your next turn: {s}.', { s: i.short.map((s) => t(`fight.short.${s}`, SHORT[s])).join(', ') }), []]);
+  // Blows seen that left no lasting wound still show where they landed.
+  for (const part of BODY_PARTS) {
+    const n = seen.filter((h) => h.part === part).length;
+    if (n && !i.wounds[part]) lasting.push([t('cond.blows', '{part}: hit {n}×, no lasting wound.', { part: cap(partName(part)), n }), [part]]);
+  }
+  for (const [text, parts] of lasting) line(w, text, '', parts);
   if (!lasting.length) line(w, t('cond.unhurt', 'Unhurt.'));
 }
 
 export interface ConditionSheet {
   /** Open the sheet on the hero (or someone in a fight, with their injuries). */
-  open(i?: Injuries, vitality?: Dice, title?: string): void;
+  open(i?: Injuries, vitality?: Dice, title?: string, seen?: SeenHit[]): void;
 }
 
 /** The hero's condition sheet: the "You" button at the bottom left, or a tap on your card in a fight. */
@@ -190,12 +225,12 @@ export function makeCondition(world: () => SpikeWorld, hero: Hero): ConditionShe
   el.querySelector('.close')!.addEventListener('click', () => (el.hidden = true));
   const openBtn = document.getElementById('condition-open')!;
   const vit = (): Dice => hero.dice['attr:Livskraft'] ?? { n: 2, mod: 0 };
-  function open(i?: Injuries, vitality?: Dice, title?: string): void {
+  function open(i?: Injuries, vitality?: Dice, title?: string, seen: SeenHit[] = []): void {
     const rules = DIFFICULTY_RULES[loadSettings().difficulty];
     const own = !title;
     titleEl.textContent = title ?? t('cond.title', 'Your condition');
     const inj = i ?? world().injuriesOf('hero');
-    renderCondition(body, inj ?? unhurt(), vitality ?? vit(), own ? rules.ownExact : rules.foeExact, rules.restMinutes);
+    renderCondition(body, inj ?? unhurt(), vitality ?? vit(), own ? rules.ownExact : rules.foeExact, rules.restMinutes, seen);
     el.hidden = false;
   }
   openBtn.addEventListener('click', () => (el.hidden ? open() : (el.hidden = true)));
