@@ -9,6 +9,8 @@
 
 **Noted for later (from the review):** knocked out while bleeding, you don't die at once but bleed out unless someone gives aid (the rules have it: *dying*, one Healing try in the scene); comes with healing and helping the hurt (B8f).
 
+**Refactor before the next big world feature (proposed 2026-11-06, not needed for rules work):** `engine3d/world.ts` is 4,100 lines and holds fights, carrying, noticing, perception, talk and the drawing. Split it by area, as the fight page was, before B6 inventory or the first village adds more to it.
+
 **B6, items and inventory** (pockets and the bag, shapes, money and prices, so buying and pocketing can come). **First slice done (2026-11-04): weight and carrying capacity** (5 kg a Physique die, 1 a pip; toil and haul adds half that for its dice; dwarves 8 kg more; nothing over it until fatigue). Next in B6: items as kinds with shapes, the pockets and bag grid, pocketing. **B3b is done (2026-11-04):** picking up, carrying (with arms that hold it), putting down anywhere, stealing small things unseen, borrowing and giving back, arguing and threatening for a thing, neighbours bringing found things home, moved things stopping feet where they lie. Buying moved to B6 (money), weapons you show to B6/B8 (there are no weapons yet).
 
 ---
