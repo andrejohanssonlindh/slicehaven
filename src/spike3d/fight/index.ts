@@ -5,9 +5,8 @@ import type { Dice } from '../../core/chargen/tables';
 import {
   type Choice, type Fighter, type FightRules, PICKUP_REACH, acceptYield, between, canAct, refuseYield, resolveRound, roleOf, seizeInitiative, startFight,
 } from '../../core/combat';
-import { rollOpen } from '../../core/dice';
-import { unitsDice } from '../../core/npcsheet';
-import { LOOK_BONUS, spotDifficulty } from '../../core/world3d/perceive';
+import type { Roll } from '../../core/dice';
+import { LOOK_BONUS } from '../../core/world3d/perceive';
 import type { Injuries } from '../../core/damage';
 import { DIFFICULTY_RULES } from '../../core/difficulty';
 import { chooseFor, wantsToYield, type Style } from '../../core/fightmind';
@@ -48,13 +47,23 @@ export interface FightUI {
   check(): void;
   /** A tap on the world during the fight: a thing (its id) and/or the ground there. Plans the round's move. */
   tap(thing: string | null, ground: { x: number; z: number } | null): void;
+  /** The hero noticed something lying about during the fight (`SpikeWorld.onNotice`): the log says it. */
+  noticed(id: string, roll: Roll | null): void;
 }
 
-/**
- * `onView(true)` as a fight starts and `onView(false)` as it ends: the page brings the view in closer for it (the
- * director: a fight starts closer than the closest zoom while walking) and gives the old zoom back after.
- */
-export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: string) => void, save: () => void, newGame: () => void, condition: ConditionSheet, onView: (on: boolean) => void = () => {}): FightUI {
+/** How the page frames a fight (`main.ts`): its zoom. */
+export interface FightView {
+  /** A fight starts (true) or ends (false): the old zoom is kept, and given back after. */
+  on(on: boolean): void;
+  /**
+   * Zoom to keep both fighters in the part of the screen the panel leaves free (the director: close in, but always
+   * both in view): `span` metres side to side must fit `width` × `height` CSS pixels.
+   */
+  fit(span: number, width: number, height: number): void;
+}
+
+export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: string) => void, save: () => void, newGame: () => void, condition: ConditionSheet, view: FightView = { on: () => {}, fit: () => {} }): FightUI {
+  const onView = view.on;
   const root = document.getElementById('fight')!;
   const q = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel)!;
   const el: FightEls = {
@@ -68,7 +77,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
   el.themMoves.addEventListener('click', () => root.classList.remove('show-foe'));
   el.back.addEventListener('click', () => world().faceFight());
 
-  const s: FightState = { fight: null, foeId: '', busy: false, pending: null, plan: null, roleWhy: 'quicker', seen: {}, armed: null, avail: new Map(), lastMove: null, timer: null, side: null, open: null, spotted: new Set() };
+  const s: FightState = { fight: null, foeId: '', busy: false, pending: null, plan: null, roleWhy: 'quicker', seen: {}, armed: null, avail: new Map(), lastMove: null, timer: null, side: null, open: null };
   const names = new Map<string, string>();
   const nameOf = (id: string) => names.get(id) ?? id;
   /** `?taps=2` or `?taps=1` forces two taps to act, or one (for testing on a computer). */
@@ -89,6 +98,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     log: (text, kind) => playback.log(text, kind),
     refresh: () => refresh(),
     play: (mine) => play(mine),
+    fitView: (span, w, h) => view.fit(span, w, h),
   };
   const playback = makePlayback(ctx);
   const tabs = makeTabs(ctx);
@@ -112,7 +122,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       return;
     }
     // (A weapon tapped is one you have found yourself: noticed from now on. In reach, its list opens; else the moves.)
-    if (item) s.spotted.add(item.id);
+    if (item) world().notice(item.id);
     const inReach = !!item && within(ctx, item, PICKUP_REACH);
     s.plan = inReach ? null : item ? { x: item.x, z: item.z, item: item.id } : ground ? { ...ground } : null;
     s.open = inReach ? 'pickUp' : s.plan ? 'move' : s.open;
@@ -139,7 +149,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     tabs.draw();
     intentBubble(ctx);
     // What you have noticed lying about, ringed in red (the director: weapons on the ground are hard to see).
-    world().markSpotted(fight.ground.filter((g) => s.spotted.has(g.id)));
+    world().markSpotted(fight.ground.filter((g) => world().hasNoticed(g.id)));
     el.log.scrollTop = el.log.scrollHeight;
     timer.draw();
     aimView(ctx);
@@ -232,27 +242,33 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     refresh();
   }
 
+  /** While looking round on purpose: what is noticed is said once, by `lookAbout`, not line by line. */
+  let looking = false;
+
   /**
-   * Notice what lies about (plan B8, the director: weapons on the sand are hard to see): one Alertness roll (with
-   * `bonus` dice more when looking on purpose) against each thing's `spot`, harder further off. Noticed, it is ringed
-   * in red and offered to go to or pick up.
+   * Look round on purpose (the side action, plan B8): an Alertness roll with `bonus` dice more against everything in
+   * view not noticed yet (`SpikeWorld.noticeLying`; noticing itself happens as things come into view, fight or not).
    */
   async function lookAbout(bonus: number): Promise<void> {
-    const fight = s.fight;
-    if (!fight) return;
-    const me = fight.fighters[0];
-    const base = hero.dice['attr:Vaksamhet'] ?? unitsDice(world().alertness);
-    const roll = rollOpen({ n: base.n + bonus, mod: base.mod }, ctx.rng, 'Alertness');
-    const spotOf = (id: string): number => { const k = world().thingKind(id); return (k && THINGS.has(k) ? THINGS.get(k).spot : undefined) ?? 0; };
-    const fresh = fight.ground.filter((g) => !s.spotted.has(g.id) && roll.total >= spotDifficulty(spotOf(g.id), Math.hypot(g.x - me.x, g.z - me.z)));
-    for (const g of fresh) s.spotted.add(g.id);
-    await playback.rolls([{ ...roll, label: t('fight.lookroll', 'You: Alertness') }], [true]);
-    const what = fresh.map((g) => t('fight.thething', 'the {name}', { name: ctx.kindName(g.id) })).join(', ');
-    const nums = playback.said(roll, 'hero', 'Alertness');
-    ctx.log(fresh.length
+    if (!s.fight) return;
+    looking = true;
+    const { found, roll } = world().noticeLying(bonus);
+    looking = false;
+    if (roll) await playback.rolls([{ ...roll, label: t('fight.lookroll', 'You: Alertness') }], [true]);
+    const what = found.map((id) => t('fight.thething', 'the {name}', { name: ctx.kindName(id) })).join(', ');
+    const nums = roll ? playback.said(roll, 'hero', 'Alertness') : '';
+    ctx.log(found.length
       ? t('fight.noticed', 'You notice {what} on the ground{roll}.', { what, roll: nums })
-      : bonus ? t('fight.noticednone', 'You look about: nothing more catches your eye{roll}.', { roll: nums }) : t('fight.noticedno', 'Nothing on the ground catches your eye{roll}.', { roll: nums }), fresh.length ? 'good' : 'info');
+      : t('fight.noticednone', 'You look about: nothing more catches your eye{roll}.', { roll: nums }), found.length ? 'good' : 'info');
     refresh();
+  }
+
+  /** Noticed something lying about during the fight (it came into view): say so, ring it. */
+  function noticed(id: string, roll: Roll | null): void {
+    if (!s.fight || looking) return;
+    const nums = roll ? playback.said(roll, 'hero', 'Alertness') : '';
+    ctx.log(t('fight.noticed', 'You notice {what} on the ground{roll}.', { what: t('fight.thething', 'the {name}', { name: ctx.kindName(id) }), roll: nums }), 'good');
+    if (!s.busy) refresh();
   }
 
   /** The fight is over (OK, or got away): the world goes on. Fatigue comes back with time; the knocked out lie there till then. */
@@ -289,7 +305,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     playback.reset();
     root.hidden = false;
     el.back.hidden = false;
-    Object.assign(s, { roleWhy: 'quicker', seen: {}, armed: null, lastMove: null, timer: null, side: null, open: null, spotted: new Set<string>() });
+    Object.assign(s, { roleWhy: 'quicker', seen: {}, armed: null, lastMove: null, timer: null, side: null, open: null });
     onView(true);
     tabs.reset();
     requestAnimationFrame(() => trackBubble(ctx));
@@ -302,14 +318,13 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     // Beaten in an earlier fight, they may ask to yield at once.
     offerYield(styleFor(p.tags, p.fights));
     s.pending = null;
-    // A first look round: what lies about that catches your eye (the rest you may find by looking, or by tapping it).
-    s.busy = true;
-    void lookAbout(0).then(() => { s.busy = false; return beginRound(); });
+    void beginRound();
   }
 
   return {
     start,
     tap,
+    noticed,
     get on() {
       return s.fight !== null;
     },

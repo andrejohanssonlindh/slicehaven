@@ -485,7 +485,10 @@ export const grounded = (i: Injuries): boolean => i.broken.some((b) => b === 'le
 export function penaltyParts(i: Injuries, use: RollUse): { why: PenaltyWhy; n: number }[] {
   const out: { why: PenaltyWhy; n: number }[] = [];
   const add = (why: PenaltyWhy, n: number) => { if (n > 0) { const o = out.find((x) => x.why === why); if (o) o.n += n; else out.push({ why, n }); } };
-  for (const s of i.short) add(s, 1); // each short effect −1D6 on everything; they stack (Q47)
+  // Each short effect (dazed, knocked back, drops, falls, armour damage) is −1D6 on every *action*; they stack (Q47).
+  // A shock or death roll is no action (nor is a defence in the book's sense, but there we take it off: reading), so
+  // they roll without (the book's own example: dazed, then a shock roll at full dice).
+  if (use.kind !== 'shock' && use.kind !== 'death') for (const s of i.short) add(s, 1);
   const movementish = use.kind === 'movement' || (use.kind === 'attr' && use.attr === 'Förflyttning');
   if (use.kind === 'combat' || use.kind === 'movement' || use.kind === 'mystic' || (use.kind === 'attr' && PAINED_ATTRS.has(use.attr ?? ''))) add('pain', i.pain);
   if (use.kind === 'shock') add('head', i.wounds.head ?? 0);

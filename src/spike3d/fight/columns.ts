@@ -152,7 +152,8 @@ function sideGroup(ctx: FightCtx, box: HTMLElement): void {
   const s = ctx.s;
   const why = sideWhy(ctx);
   const free = !!s.fight && roleOf(s.fight, 'hero') === 'free';
-  const title = free ? t('fight.g.side', 'Side action') : t('fight.g.sidefirst', 'Side action, then a blow or defence');
+  // (Optional, and said so: the director read "then a blow or defence" as something you must do first.)
+  const title = free ? t('fight.g.side', 'Side action (optional)') : t('fight.g.sidefirst', 'Side action (optional, with your blow or defence)');
   const grid = groupBox(box, 'side', title, why);
   if (why) return;
   const entries = sideEntries(ctx);

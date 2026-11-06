@@ -36,7 +36,17 @@ export function aimView(ctx: FightCtx): void {
   // cards in the corners and the sheet.
   const free = WIDE.matches ? { x: (us.right + them.left) / 2, y: (c.top + m.top) / 2 } : { x: c.left + c.width / 2, y: (Math.max(us.bottom, c.top) + m.top) / 2 };
   w.viewAim = { x: ((free.x - c.left) / c.width) * 2 - 1, y: -(((free.y - c.top) / c.height) * 2 - 1) };
+  // Close in, but with both fighters inside the free part (the director: the foe stood behind their card): the gap
+  // between the columns on a wide screen, the strip over the sheet on a phone; their distance and a body's room.
+  const width = WIDE.matches ? them.left - us.right : c.width;
+  const height = WIDE.matches ? m.top - c.top : m.top - Math.max(us.bottom, c.top);
+  const fight = ctx.s.fight;
+  const a = fight.fighters[0], b = fight.fighters[1];
+  if (a && b) ctx.fitView(Math.hypot(a.x - b.x, a.z - b.z) + FIT_ROOM, width, height);
 }
+
+/** Room round the two fighters when the view is fitted to them, metres (a body each side and a little air). */
+const FIT_ROOM = 3;
 
 /** The phone's tabs (Attack, Defend, Other): a new round opens on the tab for your role; the others greyed. */
 export function makeTabs(ctx: FightCtx): { draw(): void; reset(): void } {

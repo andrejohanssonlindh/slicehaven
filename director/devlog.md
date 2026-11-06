@@ -2,6 +2,14 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-06 — Your second round of notes
+
+- **Weapons are noticed as they come into view, not when a fight starts.** Walking about, each weapon or shield you see clearly gets an Alertness roll (a line says what you noticed; with the roll on easy). Missed, it is tried again once you are near enough for it to be easier. What you noticed is saved. In a fight the log says it, and *Look around* still rolls with 1D6 more.
+- **The fight view keeps both fighters in view.** It centres between the two of you, in the gap between the columns, and zooms in as close as that allows: far apart it pulls back, in reach it is the close fight zoom.
+- **"Side action (optional)"**, and in a melee "Side action (optional, with your blow or defence)".
+- **Your rules question, checked in the book:** dazed and pain should **not** weigh on shock rolls. Dazed and the other short effects are −1D6 on *actions*, and a shock roll is no action (the book's own example rolls one at full dice right after a daze). Pain names what it hits, and Vitality isn't on the list. Changed: shock and death rolls now only feel head wounds (shock) and torso wounds (death). The "3D6+1 = 4 < 6" knock-out you saw was partly this.
+- **Checked:** unit tests, the fight, save and senses browser tests, pictures at computer size (pulled back at 20 m, close in when in reach). The save version went up (old saves are dropped).
+
 ## 2026-11-06 — Your B8g review, the computer side
 
 - **The fight page is split into parts** first (`src/spike3d/fight/`, eight files instead of one of 1,170 lines), so the rest could be changed safely.

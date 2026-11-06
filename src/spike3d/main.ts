@@ -20,6 +20,9 @@ import { FEARSOME_MARKS } from '../content/people/temper';
 import { makeTalk } from './talksheet';
 import { makeCondition } from './condition';
 import { makeFight } from './fight';
+import { rollText } from './fight/words';
+import { THINGS } from '../content/things';
+import { thingName } from '../core/world3d/actions';
 import { makeJournal } from './journal';
 
 /**
@@ -433,16 +436,31 @@ const fight = makeFight(() => world, hero, notify, save, () => {
   saveOff = true;
   clearWorld(mapName, localStorage);
   location.reload();
-}, condition, (on) => {
-  if (on && zoomBeforeFight === null) {
-    zoomBeforeFight = zoomIndex;
-    zoomIndex = Math.max(zoomIndex, tier.fightZoom);
-  } else if (!on && zoomBeforeFight !== null) {
-    zoomIndex = zoomBeforeFight;
-    zoomBeforeFight = null;
-  }
-  fit();
+}, condition, {
+  on: (on) => {
+    if (on && zoomBeforeFight === null) {
+      zoomBeforeFight = zoomIndex;
+      zoomIndex = tier.fightZoom;
+    } else if (!on && zoomBeforeFight !== null) {
+      zoomIndex = zoomBeforeFight;
+      zoomBeforeFight = null;
+    }
+    fit();
+  },
+  // The closest zoom (the fight's own at most) at which both fighters fit the free part of the screen: `span` metres
+  // across, and a body's height (FIT_TALL) up. A metre is ppm rendered pixels, a rendered pixel factor/dpr CSS pixels.
+  fit: (span, width, height) => {
+    const css = pipeline.factor / (window.devicePixelRatio || 1);
+    let i = tier.fightZoom;
+    while (i > 0 && (tier.zooms[i] * css * span > width || tier.zooms[i] * css * FIT_TALL > height)) i--;
+    if (i !== zoomIndex) {
+      zoomIndex = i;
+      fit();
+    }
+  },
 });
+/** How tall the fitted fight view must be, metres: a body and what floats over it. */
+const FIT_TALL = 3.2;
 const talk = makeTalk(() => world, () => pipeline.renderer, hero, doer, notify, save, journal.added, (id) => fight.start(id));
 
 function bindInput(): void {
@@ -688,6 +706,13 @@ setTimeout(() => {
   world.onEnterPlace = (at) => {
     const line = whoseText(world.whoseAt(at), loadSettings().difficulty === 'easy');
     if (line && at.house) notify(line);
+  };
+  // Noticing something lying about as it comes into view (plan B8): in a fight its log says it, else a line (with
+  // the roll on easy).
+  world.onNotice = (id, kind, roll) => {
+    if (fight.on) return fight.noticed(id, roll);
+    const nums = roll && loadSettings().difficulty === 'easy' ? ` (${t('fight.roll.Alertness', 'Alertness')} ${rollText(roll)})` : '';
+    notify(t('spike.noticed', 'You notice {what} on the ground{roll}.', { what: thingName(THINGS.get(kind)), roll: nums }));
   };
   world.onSightRoll = (who, roll, sight) => {
     if (who !== 'hero' || loadSettings().difficulty !== 'easy') return;

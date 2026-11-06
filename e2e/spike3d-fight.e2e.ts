@@ -124,10 +124,12 @@ describe('spike3d fight', () => {
     expect(await page.locator('#fight .choices').count()).toBe(0);
     await w(`(() => { const h = w.fighterAt('hero'); fight.tap(null, { x: h.x + 3, z: h.z + 1 }); return 0; })()`);
     expect(await page.textContent('#fight .mine button[data-move="walk:there"]')).toMatch(/^Walk there \(3\.\d m\)/);
-    // Weapons noticed lying about are ringed, and the first look round is in the log with its dice.
-    expect(await page.$$eval('#fight .log p', (ps) => ps.map((p) => p.textContent ?? ''))).toContainEqual(expect.stringMatching(/(notice|catches your eye).*Alertness \d+D6/));
-    // The fight starts closer in than walking about.
-    expect(await w('w.ppm')).toBe(63);
+    // Weapons lying about are noticed as they come into view (an Alertness roll; here a long look, 10D6 more, so it
+    // can't miss), kept in the save, and ringed in the fight.
+    await w('w.noticeLying(10)');
+    expect(((await w('w.saveState().noticed.seen')) as string[]).length).toBeGreaterThan(0);
+    // The view is fitted so both fighters are on screen (closer in than walking about, once they are near).
+    expect(await w(`['hero', 'gladiator'].every((id) => { const s = w.screenOf(id); return s && s.x > 0 && s.x < 1; })`)).toBe(true);
     await page.waitForTimeout(800);
     await page.screenshot({ path: `${OUT}/fight-plan.png` });
     // The panel leaves the fighters in view: at the bottom on a phone (the view aims above it); when wide, between

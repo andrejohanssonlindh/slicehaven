@@ -135,8 +135,9 @@ describe('after-effects on a person', () => {
     expect(penaltyDice(i, { kind: 'combat', arms: ['right'] })).toBe(3); // dazed, pain, the sword arm
     expect(penaltyDice(i, { kind: 'combat', arms: ['left'] })).toBe(2);
     expect(penaltyDice(i, { kind: 'movement' })).toBe(4); // dazed, pain, the worse leg
-    expect(penaltyDice(i, { kind: 'shock' })).toBe(2); // dazed, head wound
-    expect(penaltyDice(i, { kind: 'death' })).toBe(3); // dazed, torso wounds
+    // A shock or death roll is no action: dazed and pain don't weigh on it, only the head and torso wounds do.
+    expect(penaltyDice(i, { kind: 'shock' })).toBe(1); // head wound
+    expect(penaltyDice(i, { kind: 'death' })).toBe(2); // torso wounds
     expect(penaltyDice(i, { kind: 'attr', attr: 'Reaktion' })).toBe(2);
     expect(penaltyDice(i, { kind: 'attr', attr: 'Intryck' })).toBe(1);
   });

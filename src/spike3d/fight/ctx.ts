@@ -45,8 +45,6 @@ export interface FightState {
   side: { key: string; label: string; choice: Choice; look?: boolean } | null;
   /** Which side-action list is unfolded (the director: Draw ▸ your sword, your cudgel). */
   open: 'move' | 'draw' | 'pickUp' | null;
-  /** The things lying about the hero has noticed (an Alertness roll; seen falling; tapped): only these are offered and ringed. */
-  spotted: Set<string>;
 }
 
 /** The panel's elements (`#fight` in `spike3d/index.html`). */
@@ -91,6 +89,8 @@ export interface FightCtx {
   refresh(): void;
   /** Play the round with the hero's choice. */
   play(mine: Choice): Promise<void>;
+  /** Zoom so `span` metres side to side fit `width` × `height` CSS pixels (both fighters in the free part of the screen). */
+  fitView(span: number, width: number, height: number): void;
 }
 
 /** Pick a move: on a touch screen the first tap rings it and the second acts; elsewhere one tap acts. */

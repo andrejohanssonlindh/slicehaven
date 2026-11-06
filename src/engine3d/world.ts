@@ -23,10 +23,10 @@ import { type StatesJSON, ThingStates, pieceId, placedId } from '../core/world3d
 import { type ActResult, type ActTarget, type ActWorld, type Doer, type Offer, type Spot, offers, perform, thingName } from '../core/world3d/actions';
 import { ACTIONS } from '../content/actions';
 import { type PersonLevel, type RolledSheet, sheetDice, unitsDice } from '../core/npcsheet';
-import type { Roll } from '../core/dice';
+import { type Roll, rollOpen } from '../core/dice';
 import { type Cares, type LeadStatus, type LeadsState, giveLead, leadStatus, studied } from '../core/world3d/leads';
 import { LEADS } from '../content/leads';
-import { HEARD_FOR, type Noise, type Senses, type SightRoll, type Where, canSee, fadeSenses, hears, lastHeard, newSenses, noteHeard, rollSight, sightBoost, sightDue } from '../core/world3d/perceive';
+import { HEARD_FOR, type Noise, type Senses, type SightRoll, type Where, canSee, fadeSenses, hears, lastHeard, newSenses, noteHeard, rollSight, sightBoost, sightDue, spotDifficulty } from '../core/world3d/perceive';
 import { LOAN_HOURS, type TalkCase, type TalkMemory, type TalkPerson, type TalkResult, newTalkMemory, talk } from '../core/world3d/talk';
 import { type Visitor, disposition } from '../core/skillweb';
 import {
@@ -2664,8 +2664,8 @@ export class SpikeWorld {
   }
 
   /**
-   * Where the view looks in a fight, or null outside one: the middle between the hero and the others, but never more
-   * than 5 m from the hero (far apart, the hero stays in view and the view leans towards the foe).
+   * Where the view looks in a fight, or null outside one: the middle between the hero and the others (the page zooms
+   * out until both fit: the director, the view leaned to the hero and left the foe behind their card).
    */
   private fightCentre(): { x: number; z: number } | null {
     if (!this.fighting) return null;
@@ -2676,9 +2676,7 @@ export class SpikeWorld {
     }
     const h = this.hero;
     if (!n) return { x: h.x, z: h.z };
-    const dx = x / n - h.x, dz = z / n - h.z, d = Math.hypot(dx, dz);
-    const k = d > 0 ? Math.min(d / 2, 5) / d : 0;
-    return { x: h.x + dx * k, z: h.z + dz * k };
+    return { x: (h.x + x / n) / 2, z: (h.z + z / n) / 2 };
   }
 
   /** Bring the view back onto the fight (or the hero) after the player panned away. */
@@ -2691,6 +2689,59 @@ export class SpikeWorld {
     if (!at) return void (this.marker.visible = false);
     this.marker.position.set(at.x, this.store.heightAt(at.x, at.z) + 0.04, at.z);
     this.marker.visible = true;
+  }
+
+  /** Things lying about the hero has noticed (saved), and for the rest the difficulty they were last tried at. */
+  private noticed = new Set<string>();
+  private noticeTried: Record<string, number> = {};
+  private noticeAt = 0;
+  /** The hero noticed something lying about (the page says so): its id, kind and the roll (null: it needs none). */
+  onNotice: ((id: string, kind: string, roll: Roll | null) => void) | null = null;
+
+  /** Has the hero noticed this thing lying about? */
+  hasNoticed(id: string): boolean {
+    return this.noticed.has(id);
+  }
+
+  /** The hero has noticed it now, without a roll (seen falling, tapped, found by looking round). */
+  notice(id: string): void {
+    this.noticed.add(id);
+  }
+
+  /**
+   * Noticing what lies about as it comes into view (plan B8, the director: as weapons come into vision, not when a
+   * fight starts). Twice a second: each weapon or shield lying within sight range that the hero sees clearly and
+   * hasn't noticed gets an Alertness roll against its kind's `spot`, harder further off (`spotDifficulty`). A failed
+   * one is tried again only when it has got easier (nearer). `bonus` dice: looking round on purpose, now, everything
+   * in view (the side action Look around). Returns what was noticed.
+   */
+  noticeLying(bonus = 0): { found: string[]; roll: Roll | null } {
+    const h = this.hero, range = this.vision.outer > 0 ? this.spec.range : 30;
+    const dice = unitsDice(this.alertness);
+    let roll: Roll | null = null;
+    const found: string[] = [];
+    for (const g of this.weaponsLying(h.x, h.z, range)) {
+      if (this.noticed.has(g.id) || this.seen(g.x, g.z) < 0.5) continue;
+      const spot = THINGS.get(g.kind).spot;
+      const diff = spotDifficulty(spot ?? 0, Math.hypot(g.x - h.x, g.z - h.z));
+      if (spot === undefined) {
+        this.noticed.add(g.id);
+        found.push(g.id);
+        this.onNotice?.(g.id, g.kind, null);
+        continue;
+      }
+      if (!bonus && this.noticeTried[g.id] !== undefined && diff >= this.noticeTried[g.id]) continue;
+      // (One roll for everything noticed at one look; a fresh one when the look is fresh.)
+      roll ??= rollOpen({ n: dice.n + bonus, mod: dice.mod }, this.actRng, 'Alertness');
+      this.noticeTried[g.id] = diff;
+      if (roll.total >= diff) {
+        this.noticed.add(g.id);
+        delete this.noticeTried[g.id];
+        found.push(g.id);
+        this.onNotice?.(g.id, g.kind, { ...roll, target: diff, success: true });
+      }
+    }
+    return { found, roll };
   }
 
   /** Red rings round things noticed lying about in a fight (weapons on the sand), one each. */
@@ -3481,14 +3532,19 @@ export class SpikeWorld {
   }
 
   /** What the save keeps of the world (the page adds the map and writes it: `core/world3d/save.ts`). */
-  saveState(): { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags: Record<string, boolean>; talk: TalkMemory; leads: LeadsState; standing: HeroStanding; carry: CarryState; hurt: Record<string, Injuries> } {
+  saveState(): { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags: Record<string, boolean>; talk: TalkMemory; leads: LeadsState; standing: HeroStanding; carry: CarryState; hurt: Record<string, Injuries>; noticed: { seen: string[]; tried: Record<string, number> } } {
     const h = this.hero;
-    return { hour: this.weather.hour ?? 12, hero: { x: h.x, z: h.z, level: h.stair ? 0 : h.level }, explored: this.explored.toJSON(), things: this.states.toJSON(), flags: { ...this.flags }, talk: structuredClone(this.talkMemory), leads: structuredClone(this.leads), standing: structuredClone(this.standing), carry: structuredClone(this.carry), hurt: structuredClone(this.hurt) };
+    return {
+      hour: this.weather.hour ?? 12, hero: { x: h.x, z: h.z, level: h.stair ? 0 : h.level }, explored: this.explored.toJSON(), things: this.states.toJSON(), flags: { ...this.flags }, talk: structuredClone(this.talkMemory), leads: structuredClone(this.leads), standing: structuredClone(this.standing), carry: structuredClone(this.carry), hurt: structuredClone(this.hurt),
+      noticed: { seen: [...this.noticed], tried: { ...this.noticeTried } },
+    };
   }
 
   /** Take a save back: the clock, the hero, what was seen, the things' states, what they know, what was moved. */
-  loadState(s: { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags?: Record<string, boolean>; talk?: TalkMemory; leads?: LeadsState; standing?: HeroStanding; carry?: CarryState; hurt?: Record<string, Injuries> }): void {
+  loadState(s: { hour: number; hero: { x: number; z: number; level: number }; explored: Record<string, string>; things: StatesJSON; flags?: Record<string, boolean>; talk?: TalkMemory; leads?: LeadsState; standing?: HeroStanding; carry?: CarryState; hurt?: Record<string, Injuries>; noticed?: { seen: string[]; tried: Record<string, number> } }): void {
     this.flags = { ...s.flags };
+    this.noticed = new Set(s.noticed?.seen ?? []);
+    this.noticeTried = { ...s.noticed?.tried };
     // What fights left: those knocked out or killed lie where they fell (B8a).
     this.hurt = s.hurt ? structuredClone(s.hurt) : {};
     this.motions.clear();
@@ -3779,6 +3835,10 @@ export class SpikeWorld {
       WORLD.uSight.value.set(this.facing, sp.fov / 2, sp.edge, sp.near);
       WORLD.uSightBack.value = sp.back;
       this.stepExplored();
+      if (this.time - this.noticeAt >= 0.5) {
+        this.noticeAt = this.time;
+        this.noticeLying();
+      }
     } else {
       WORLD.uVision.value.set(0, 0, 0, 0);
     }

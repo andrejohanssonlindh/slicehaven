@@ -86,7 +86,8 @@ function sideMove(ctx: FightCtx, key: string, label: string, choice: Choice, sma
 
 /** The side action's lists, in order: Move (free only), Draw, Pick up, and Look around. */
 export function sideEntries(ctx: FightCtx): SideEntry[] {
-  const { fight, foeId, plan, spotted } = ctx.s;
+  const { fight, foeId, plan } = ctx.s;
+  const spotted = { has: (id: string) => ctx.world().hasNoticed(id) };
   if (!fight) return [];
   const me = fight.fighters[0], foe = fight.fighters[1];
   const free = roleOf(fight, 'hero') === 'free';

@@ -153,6 +153,8 @@ Always at least 1 advantage, even if a weapon lowers the cost to 0.
 ## 7. After-effects (pp. 111–117)
 "Until the end of their next active phase" is shortened to **(next phase)**.
 
+**"−1D6 on everything" below means on every *action*** (the book says "all actions", and words "all rolls" differently where it means that). A shock or death roll is no action, so the short effects don't weigh on it; the book's own worked example rolls a shock roll right after *dazed* at full dice. A defence isn't an action either in the book's sense (you can always defend), but we still take the dice off it (reading). Pain names what it hits, and Vitality isn't there: no pain on shock or death rolls (checked 2026-11-06, the director asked).
+
 | After-effect | What it does | Goes away |
 |---|---|---|
 | **Dazed** (`Omtöcknad`) | −1D6 on everything | next phase |

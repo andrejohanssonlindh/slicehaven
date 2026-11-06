@@ -283,7 +283,7 @@ export function makePlayback(ctx: FightCtx): Playback {
           break;
         case 'drop':
           w.dropAt(l.who, l.item, l.at.x, l.at.z);
-          ctx.s.spotted.add(l.item); // (seen falling)
+          w.notice(l.item); // (seen falling)
           log(of(l.who, ['fight.dropped.you', 'You drop the {thing}.'], ['fight.dropped', '{who} drops the {thing}.'], { thing: ctx.kindName(l.item) }), l.who === 'hero' ? 'bad' : 'good');
           break;
         case 'retreat':
