@@ -150,6 +150,8 @@ function groupBox(box: HTMLElement, kind: string, title: string, why: string | n
  */
 function sideGroup(ctx: FightCtx, box: HTMLElement): void {
   const s = ctx.s;
+  // Over, or you can't act: no side action to speak of (it said "Nothing to do now" and took room).
+  if (!s.fight || s.fight.winner !== null || !canAct(s.fight.fighters[0])) return;
   const why = sideWhy(ctx);
   const free = !!s.fight && roleOf(s.fight, 'hero') === 'free';
   // (Optional, and said so: the director read "then a blow or defence" as something you must do first.)

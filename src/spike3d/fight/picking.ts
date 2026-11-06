@@ -3,6 +3,7 @@ import { type AttackTactic, type DefenceTactic, canAct, defencePool, roleOf, wea
 import { t } from '../../i18n';
 import { loadSettings } from '../../ui/settings';
 import { offWhy, litKey } from './columns';
+import { sideWhy } from './others';
 import { type FightCtx, cap } from './ctx';
 import { ATTACKS, DEFENCES, WAYS } from './words';
 
@@ -15,11 +16,19 @@ import { ATTACKS, DEFENCES, WAYS } from './words';
 /** The computer layout (columns at both sides): a wide screen, or a phone held sideways. */
 export const WIDE = matchMedia('(min-width: 640px) and (min-aspect-ratio: 1/1)');
 
-/** Your moves go in your column on a wide screen, in the sheet under the tabs on a phone. */
+/**
+ * Your moves go in your column on a wide screen, in the sheet under the tabs on a phone. ⚔ Back to fight sits over
+ * the view on a wide screen, in the sheet's round line on a phone (it covered the fight there).
+ */
 export function layout(ctx: FightCtx): void {
-  const { usMoves, usCol, pane } = ctx.el;
-  if (WIDE.matches) { if (usMoves.parentElement !== usCol) usCol.appendChild(usMoves); }
-  else if (usMoves.parentElement !== pane) pane.appendChild(usMoves);
+  const { usMoves, usCol, pane, back, head, root } = ctx.el;
+  if (WIDE.matches) {
+    if (usMoves.parentElement !== usCol) usCol.appendChild(usMoves);
+    if (back.parentElement !== root.parentElement) root.after(back);
+  } else {
+    if (usMoves.parentElement !== pane) pane.appendChild(usMoves);
+    if (back.parentElement !== head) head.appendChild(back);
+  }
 }
 
 /**
@@ -48,36 +57,54 @@ export function aimView(ctx: FightCtx): void {
 /** Room round the two fighters when the view is fitted to them, metres (a body each side and a little air). */
 const FIT_ROOM = 3;
 
-/** The phone's tabs (Attack, Defend, Other): a new round opens on the tab for your role; the others greyed. */
-export function makeTabs(ctx: FightCtx): { draw(): void; reset(): void } {
-  let tab: 'attack' | 'defend' | 'move' = 'move';
+type Tab = 'attack' | 'defend' | 'side' | 'other';
+
+/**
+ * The phone's tabs, one per group of your column: Attack, Defend, Side (the side action, ticked when one is picked)
+ * and Other. A new round opens on the tab for your role (free: Side; over: Other); the ones not for now greyed.
+ */
+export function makeTabs(ctx: FightCtx): { draw(): void; reset(): void; show(tab: Tab): void } {
+  let tab: Tab = 'side';
   let tabFor = '';
+  let lastSide: string | null = null;
   function draw(): void {
     const fight = ctx.s.fight;
     if (!fight) return;
     const role = roleOf(fight, 'hero');
-    const now = `${fight.round}:${role}:${fight.winner}`;
-    if (now !== tabFor) {
+    const acts = fight.winner === null && canAct(fight.fighters[0]);
+    const now = `${fight.round}:${fight.midRound ?? ''}:${role}:${fight.winner}`;
+    // A new round opens on your role's tab; a side action just picked in a melee takes you back there for the blow.
+    const sideKey = ctx.s.side?.key ?? null;
+    const picked = sideKey !== lastSide && sideKey !== null;
+    lastSide = sideKey;
+    if (now !== tabFor || (picked && role !== 'free')) {
       tabFor = now;
-      tab = fight.winner === null && canAct(fight.fighters[0]) ? (role === 'attacker' ? 'attack' : role === 'defender' ? 'defend' : 'move') : 'move';
+      tab = !acts ? 'other' : role === 'attacker' ? 'attack' : role === 'defender' ? 'defend' : 'side';
     }
     const el = ctx.el.tabs;
     el.replaceChildren();
-    const names = { attack: t('fight.tab.attack', 'Attack'), defend: t('fight.tab.defend', 'Defend'), move: t('fight.tab.move', 'Move') };
-    for (const k of ['attack', 'defend', 'move'] as const) {
+    el.hidden = !acts;
+    const names: Record<Tab, string> = {
+      attack: t('fight.tab.attack', 'Attack'), defend: t('fight.tab.defend', 'Defend'),
+      side: ctx.s.side ? t('fight.tab.sidepicked', 'Side ✓') : t('fight.tab.side', 'Side'), other: t('fight.tab.other', 'Other'),
+    };
+    const off: Record<Tab, boolean> = {
+      attack: !!offWhy(ctx, fight.fighters[0], 'attack', true), defend: !!offWhy(ctx, fight.fighters[0], 'defend', true), side: !!sideWhy(ctx), other: false,
+    };
+    for (const k of ['attack', 'defend', 'side', 'other'] as const) {
       const b = document.createElement('button');
       b.type = 'button';
       b.textContent = names[k];
       b.dataset.tab = k;
       b.classList.toggle('on', k === tab);
-      b.classList.toggle('off', k !== 'move' && !!offWhy(ctx, fight.fighters[0], k, true));
+      b.classList.toggle('off', off[k]);
       b.addEventListener('click', () => { tab = k; draw(); });
       el.appendChild(b);
     }
-    ctx.el.root.classList.remove('tab-attack', 'tab-defend', 'tab-move');
-    ctx.el.root.classList.add(`tab-${tab}`);
+    ctx.el.root.classList.remove('tab-attack', 'tab-defend', 'tab-side', 'tab-other');
+    ctx.el.root.classList.add(`tab-${acts ? tab : 'other'}`);
   }
-  return { draw, reset: () => void (tabFor = '') };
+  return { draw, reset: () => void (tabFor = ''), show: (k) => { tab = k; draw(); } };
 }
 
 /** The foe's move as a word in the bubble over their head (a phone): what they mean to do, or ? */

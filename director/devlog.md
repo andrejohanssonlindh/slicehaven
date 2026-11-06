@@ -2,7 +2,13 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
-## 2026-11-06 — Third notes: rings out of a fight, the body in the details
+## 2026-11-06 — The phone in a fight
+
+- **The log is about four times as tall.** The sheet now takes the bottom 58% (it was 45%). Your moves take what they need, up to half of it, and the log gets the rest (at least five lines, usually ten or more).
+- **Room taken from the top:** in a fight the page's top bar and the numbers overlay are hidden, and ⚔ Back to fight sits in the round line instead of floating over the fighters.
+- **Four tabs, one per group: Attack, Defend, Side, Other.** "Move" used to hold both the side action and Other, and clashed with the Move ▸ list. Each tab now shows only its own group, so the headings went too. A new round opens on your role's tab (free: Side). A side action picked in a melee takes you back to Attack or Defend for the blow, and the tab reads "Side ✓". Tapping the ground opens Side. Once the fight is over the tabs go and only Other is left (OK, Finish them, New game).
+- **Small inconsistencies fixed:** "Nothing to do now" no longer shows once the fight is over; the end-of-round lines read as sentences ("You are knocked out (Shock roll 2D6+3 = 8 < 11)", not "You: knocked out"); "You notice a quarterstaff", not "notice quarterstaff"; in a fight, a line like that shows over the view, not over the log.
+- **Checked:** a whole fight played at iPhone size in pictures, and the three fight browser tests (they open the right tab before tapping now).
 
 - **Noticed weapons are ringed out of a fight too** (within 20 m of you), and the rings breathe a little so they catch the eye.
 - **The details sheet has the body outline** (yours, or the foe's on easy), with the marks of the blows you saw. Point at a part, or tap it, and the lines about it light up (wounds, armour torn, broken, hit with no lasting wound, the dice it costs you); point at a line and its part lights up.

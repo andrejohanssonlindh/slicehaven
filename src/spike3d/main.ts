@@ -712,7 +712,8 @@ setTimeout(() => {
   world.onNotice = (id, kind, roll) => {
     if (fight.on) return fight.noticed(id, roll);
     const nums = roll && loadSettings().difficulty === 'easy' ? ` (${t('fight.roll.Alertness', 'Alertness')} ${rollText(roll)})` : '';
-    notify(t('spike.noticed', 'You notice {what} on the ground{roll}.', { what: thingName(THINGS.get(kind)), roll: nums }));
+    const name = thingName(THINGS.get(kind));
+    notify(t('spike.noticed', 'You notice {what} on the ground{roll}.', { what: `${/^[aeiou]/i.test(name) ? 'an' : 'a'} ${name}`, roll: nums }));
   };
   world.onSightRoll = (who, roll, sight) => {
     if (who !== 'hero' || loadSettings().difficulty !== 'easy') return;

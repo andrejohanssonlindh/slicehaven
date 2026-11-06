@@ -77,6 +77,10 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
   el.themMoves.addEventListener('click', () => root.classList.remove('show-foe'));
   el.back.addEventListener('click', () => world().faceFight());
 
+  /** The round line's words (⚔ Back to fight sits beside them on a phone). */
+  const headText = document.createElement('span');
+  headText.className = 'txt';
+  el.head.appendChild(headText);
   const s: FightState = { fight: null, foeId: '', busy: false, pending: null, plan: null, roleWhy: 'quicker', seen: {}, armed: null, avail: new Map(), lastMove: null, timer: null, side: null, open: null };
   const names = new Map<string, string>();
   const nameOf = (id: string) => names.get(id) ?? id;
@@ -126,6 +130,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     const inReach = !!item && within(ctx, item, PICKUP_REACH);
     s.plan = inReach ? null : item ? { x: item.x, z: item.z, item: item.id } : ground ? { ...ground } : null;
     s.open = inReach ? 'pickUp' : s.plan ? 'move' : s.open;
+    if (s.open) tabs.show('side');
     world().markSpot(s.plan);
     refresh();
   }
@@ -137,7 +142,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     const me = fight.fighters[0], foe = fight.fighters[1];
     const role = roleOf(fight, 'hero');
     const d = between(fight, 'hero', s.foeId);
-    el.head.textContent = t('fight.head', 'Round {r} · {d} m · {role}', {
+    headText.textContent = t('fight.head', 'Round {r} · {d} m · {role}', {
       r: fight.round, d: d.toFixed(1),
       role: fight.winner !== null ? t('fight.over', 'over') : role === 'attacker' ? t('fight.attacking', 'you attack') : role === 'defender' ? t('fight.defending', 'you defend') : t('fight.free', 'not in reach'),
     });
@@ -284,6 +289,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     w.viewAim = { x: 0, y: 0 };
     w.markSpotted([]);
     onView(false);
+    document.body.classList.remove('fighting');
     save();
   }
 
@@ -307,6 +313,8 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     el.back.hidden = false;
     Object.assign(s, { roleWhy: 'quicker', seen: {}, armed: null, lastMove: null, timer: null, side: null, open: null });
     onView(true);
+    // (The page's top bar and the numbers overlay give way on a phone: `body.fighting` in the styles.)
+    document.body.classList.add('fighting');
     tabs.reset();
     requestAnimationFrame(() => trackBubble(ctx));
     ctx.log(t('fight.begins', 'You face {name}. The fight is on.', { name: p.name }), 'info');
@@ -335,7 +343,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       playback.reset();
       root.hidden = false;
       ctx.log(t('fight.youdie', 'You are dead.'), 'bad');
-      el.head.textContent = t('fight.deadhead', 'The end');
+      headText.textContent = t('fight.deadhead', 'The end');
       for (const e of [el.usCard, el.themCard, el.usMoves, el.themMoves]) e.replaceChildren();
       const b = document.createElement('button');
       b.type = 'button';

@@ -10,6 +10,15 @@ afterAll(async () => {
   await stopEnv(env);
 });
 
+/** Tap one of your moves; on a phone it may sit behind a tab (Attack, Defend, Side, Other): open that first. */
+async function tapMove(page: import('playwright').Page, sel: string): Promise<void> {
+  if (!(await page.isVisible(sel))) {
+    const tab = await page.$eval(sel, (b) => ['attack', 'defend', 'side', 'other'].find((k) => b.closest('.group')?.classList.contains(k)) ?? null).catch(() => null);
+    if (tab) await page.click(`#fight .tabs button[data-tab="${tab}"]`);
+  }
+  await page.click(sel);
+}
+
 const quick = { 'slicehaven.settings': JSON.stringify({ v: 1, dice: 'result', diceSkin: 'bone', diceClose: 'auto', difficulty: 'easy' }) };
 
 describe('spike3d fight', () => {
@@ -148,7 +157,7 @@ describe('spike3d fight', () => {
     // attacking, else close in (the side action's Move list), else the first thing in Other, until it is over.
     let rounds = 0, sawIntent = false, sawWhy = false, shotFloat = false;
     for (; rounds < 60; rounds++) {
-      await page.waitForSelector('#fight .mine button:not([disabled])', { timeout: 60_000 });
+      await page.waitForSelector('#fight .mine button:not([disabled])', { state: 'attached', timeout: 60_000 });
       const labels = await page.$$eval('#fight .mine .group.other button', (bs) => bs.map((b) => b.textContent ?? ''));
       if (labels.some((l) => /^OK$|New game/.test(l))) break;
       const can = await page.$$eval('#fight .mine button:not([disabled])', (bs) => bs.map((b) => (b as HTMLElement).dataset.move ?? ''));
@@ -167,7 +176,7 @@ describe('spike3d fight', () => {
         sawWhy = true;
         expect(await page.textContent('#fight .mine :is(.attack, .defend).off .why')).toMatch(/You’re (attacking|defending): /);
         const role = (await page.textContent('#fight .head')) ?? '';
-        const want = /you attack/.test(role) ? 'attack' : /you defend/.test(role) ? 'defend' : 'move';
+        const want = /you attack/.test(role) ? 'attack' : /you defend/.test(role) ? 'defend' : 'side';
         expect(await page.getAttribute('#fight .tabs button.on', 'data-tab')).toBe(want);
       }
       if (rounds === 3) {
@@ -179,11 +188,11 @@ describe('spike3d fight', () => {
         await page.click('#condition .close');
       }
       const pick = can.find((m) => m.endsWith(':counter')) ?? can.find((m) => m === 'atk:standard');
-      if (pick) await page.click(`#fight .mine button[data-move="${pick}"]`);
+      if (pick) await tapMove(page, `#fight .mine button[data-move="${pick}"]`);
       else if (can.includes('side:move') || can.includes('closein')) {
-        if (!can.includes('closein')) await page.click('#fight .mine button[data-move="side:move"]');
-        await page.click('#fight .mine button[data-move="closein"]');
-      } else await page.click('#fight .mine .group.other button');
+        if (!can.includes('closein')) await tapMove(page, '#fight .mine button[data-move="side:move"]');
+        await tapMove(page, '#fight .mine button[data-move="closein"]');
+      } else await tapMove(page, '#fight .mine .group.other button');
       // One picture of an exchange as it plays: the motions and what floats up.
       if (pick && !shotFloat && (await page.waitForSelector('.fight-float', { timeout: 4000 }).catch(() => null))) {
         shotFloat = true;
@@ -219,11 +228,11 @@ describe('spike3d fight', () => {
     else {
       // Won (or spared): finish them if offered, then OK; the world goes on.
       if (labels.includes('Finish them')) {
-        await page.click('#fight .mine button[data-move="finish"]');
+        await tapMove(page, '#fight .mine button[data-move="finish"]');
         await page.waitForSelector('#fight .mine button[data-move="ok"]', { timeout: 60_000 });
         expect(await w('!!w.injuriesOf("gladiator")?.dead')).toBe(true);
       }
-      await page.click('#fight .mine button[data-move="ok"]');
+      await tapMove(page, '#fight .mine button[data-move="ok"]');
       expect(await w('w.inFight')).toBe(false);
       expect(await w('w.ppm')).toBeLessThan(63); // the zoom from before the fight
       // Fatigue comes back with time (Q49).
@@ -269,7 +278,7 @@ describe('spike3d fight', () => {
     // Fight until someone is hit (or a few rounds): close in, strike, defend.
     let rang = false;
     for (let rounds = 0; rounds < 30; rounds++) {
-      await page.waitForSelector('#fight .mine button:not([disabled])', { timeout: 90_000 });
+      await page.waitForSelector('#fight .mine button:not([disabled])', { state: 'attached', timeout: 90_000 });
       const shows = (await page.evaluate(() => (window as unknown as { shows: string[] }).shows)) as string[];
       if (shows.some((x) => /Where \(D10\)/.test(x))) break;
       const labels = await page.$$eval('#fight .mine .group.other button', (bs) => bs.map((b) => b.textContent ?? ''));
@@ -277,9 +286,9 @@ describe('spike3d fight', () => {
       const can = await page.$$eval('#fight .mine button:not([disabled])', (bs) => bs.map((b) => (b as HTMLElement).dataset.move ?? ''));
       const pick = can.find((m) => m === 'atk:powerful') ?? can.find((m) => m === 'def:parry:standard');
       // (Free: open the Move list, one tap even here, then close in, which takes two.)
-      if (!pick && !can.includes('closein') && can.includes('side:move')) await page.click('#fight .mine button[data-move="side:move"]');
+      if (!pick && !can.includes('closein') && can.includes('side:move')) await tapMove(page, '#fight .mine button[data-move="side:move"]');
       const sel = `#fight .mine button[data-move="${pick ?? 'closein'}"]`;
-      await page.click(sel);
+      await tapMove(page, sel);
       if (!rang) {
         rang = true;
         expect(await page.locator('#fight button.armed').count()).toBe(1); // rung, nothing played yet

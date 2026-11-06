@@ -36,6 +36,8 @@
   pointer-events: none;
 }
 #notice[hidden] { display: none; }
+/* In a fight a line goes over the view, not over the log at the bottom. */
+body.fighting #notice { bottom: auto; top: 30%; }
 
 /* What a tapped thing is and what can be tried on it (plan B3a): a sheet at the bottom, big buttons for a thumb. */
 #act {
@@ -202,8 +204,12 @@
 #fight.show-foe .them { z-index: 6; } /* over Back to fight while unfolded; a tap on it folds it */
 #fight .us { left: 6px; }
 #fight .them { right: 54px; } /* clear of the zoom and turn buttons */
-#fight .mid { left: 0; right: 0; bottom: 0; height: 45%; border-radius: 6px 6px 0 0; border-bottom: 0; overflow: hidden; background: #140a0a; }
-#fight .head { padding: 6px 10px 2px; font-size: 14px; font-weight: bold; flex-shrink: 0; }
+/* The sheet (a phone): the bottom 58%, the view above it (the page's top bar gives way in a fight, below). */
+#fight .mid { left: 0; right: 0; bottom: 0; height: 58%; border-radius: 6px 6px 0 0; border-bottom: 0; overflow: hidden; background: #140a0a; }
+#fight .head { display: flex; align-items: center; gap: 8px; padding: 4px 6px 2px 10px; font-size: 14px; font-weight: bold; flex-shrink: 0; }
+#fight .head .txt { flex: 1; min-width: 0; }
+#fight .head #fight-back { position: static; transform: none; height: 30px; padding: 0 8px; font-size: 12px; flex-shrink: 0; }
+body.fighting #stats { display: none; }
 /* The pick timer (hard): a bar under the round running down, red at the end. */
 #fight .timer { height: 5px; margin: 0 10px 3px; background: #ffffff1a; border-radius: 3px; overflow: hidden; flex-shrink: 0; }
 #fight .timer[hidden] { display: none; }
@@ -211,13 +217,17 @@
 #fight .timer.late i { background: #e04a3a; }
 /* The tabs (phone): one per group; the one not yours this round greyed. */
 #fight .tabs { display: flex; gap: 4px; padding: 2px 8px 4px; flex-shrink: 0; }
+#fight .tabs[hidden] { display: none; }
 #fight .tabs button { flex: 1; min-height: 36px; font-size: 14px; padding: 0; }
 #fight .tabs button.on { background: var(--accent, #c8a444); color: #1a1420; }
 #fight .tabs button.off:not(.on) { opacity: 0.45; }
-#fight .pane { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
-/* The side action and Other show on every tab; Attack and Defend each only their own group. */
-#fight.tab-attack .pane .group.defend, #fight.tab-defend .pane .group.attack,
-#fight.tab-move .pane .group.attack, #fight.tab-move .pane .group.defend { display: none; }
+/* The tab's moves take what they need (up to about half the sheet, then they scroll); the log has the rest. */
+#fight .pane { flex: 0 1 auto; max-height: 52%; min-height: 0; overflow-y: auto; }
+/* Each tab shows its own group of your column. */
+#fight.tab-attack .pane .group:not(.attack), #fight.tab-defend .pane .group:not(.defend),
+#fight.tab-side .pane .group:not(.side), #fight.tab-other .pane .group:not(.other) { display: none; }
+#fight .pane .group { border-top: 0; }
+#fight .pane .group h4 { display: none; }
 /* A card: the body outline, name and weapon, how they are. Tap for the details. Small in the corners on a phone. */
 #fight .card { min-width: 0; padding: 4px 6px; font-size: 11px; line-height: 1.25; cursor: pointer; }
 #fight .us .card .top b { color: #e0b050; }
@@ -261,7 +271,7 @@
 #fight .them .group.lit-in { opacity: 1; }
 #fight .gist { margin: 2px 0; padding: 4px 6px; font-size: 13px; color: #f0c080; border-left: 2px solid #e0b050; }
 #fight .gist.unknown { color: #e6dbb9aa; border-left-color: #e6dbb955; }
-#fight .log { flex: 0 0 auto; height: 58px; overflow-y: auto; padding: 4px 10px 8px; font-size: 12px; line-height: 1.35; border-top: 1px solid #b0503a55; }
+#fight .log { flex: 1 1 0; min-height: 96px; overflow-y: auto; padding: 4px 10px 8px; font-size: 12px; line-height: 1.35; border-top: 1px solid #b0503a55; }
 #fight .log p { margin: 0 0 4px; }
 #fight .log p.you { color: #e0b050; }
 #fight .log p.info { opacity: 0.65; font-size: 12px; }
@@ -284,9 +294,10 @@
 /* Back to fight: swings the view side-on again after turning or panning away. */
 #fight-back { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 5; height: 40px; padding: 0 14px; font-size: 14px; }
 #fight-back[hidden] { display: none; }
-/* A phone in portrait: Back to fight sits just over the sheet, clear of the cards in the corners. */
+/* A phone in portrait: Back to fight is in the sheet's round line (`layout` in fight/picking.ts), and in a fight the
+   page's top bar gives way so the view and the sheet have the room. */
 @media not all and (min-width: 640px) and (min-aspect-ratio: 1/1) {
-  #fight-back { top: auto; bottom: calc(45% + 8px); }
+  body.fighting #topbar { display: none; }
 }
 @media (min-width: 640px) and (min-aspect-ratio: 1/1) {
   #fight { --col: clamp(200px, 24vw, 290px); }

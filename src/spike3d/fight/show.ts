@@ -19,6 +19,18 @@ import { HOW, VERDICT, hitWord, rollText } from './words';
 
 type Attack = Extract<LogLine, { k: 'attack' }>;
 
+/** What the end of a round did to someone, said of you and of anyone else ("You are knocked out", "Arruns bleeds"). */
+const END_NOTE: Record<string, [you: string, they: string]> = {
+  burned: ['You burn', '{who} burns'],
+  bled: ['You bleed', '{who} bleeds'],
+  'knocked out': ['You are knocked out', '{who} is knocked out'],
+  'stayed up': ['You stay on your feet', '{who} stays on their feet'],
+  'bled out': ['You bleed out: you are dying', '{who} bleeds out: they are dying'],
+  'bleeding stopped': ['Your bleeding stops', '{who}’s bleeding stops'],
+  'fire out': ['The fire on you goes out', 'The fire on {who} goes out'],
+  'burned to death': ['You burn to death', '{who} burns to death'],
+};
+
 export interface Playback {
   /** Write a line in the log (the rolls made but not shown go behind it). */
   log(text: string, kind?: 'you' | 'they' | 'info' | 'good' | 'bad'): void;
@@ -303,7 +315,8 @@ export function makePlayback(ctx: FightCtx): Playback {
             const r = ['stayed up', 'knocked out', 'bleeding stopped', 'bled out', 'burned to death', 'fire out'].includes(n) ? rollFor(n) : undefined;
             const nums = r ? said(r, l.who) : '';
             if (n === 'stayed up' && !nums) continue;
-            log(`${ctx.Name(l.who)}: ${t(`fight.note.${n.replace(/ /g, '')}`, n)}${nums}.`, n === 'stayed up' ? 'info' : l.who === 'hero' ? 'bad' : 'good');
+            const [you, they] = END_NOTE[n] ?? [n, `{who}: ${n}`];
+            log(`${of(l.who, [`fight.note.you.${n.replace(/ /g, '')}`, you], [`fight.note.${n.replace(/ /g, '')}`, they])}${nums}.`, n === 'stayed up' ? 'info' : l.who === 'hero' ? 'bad' : 'good');
           }
           break;
         }
