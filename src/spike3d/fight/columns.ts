@@ -232,7 +232,11 @@ export function moves(ctx: FightCtx, box: HTMLElement, f0: Fighter, other: Fight
   for (const tac of ['standard', 'quick', 'powerful'] as AttackTactic[]) {
     const [name, does] = ATTACKS[tac];
     const dice = open ? ` ${diceText(attackPool(f, tac))}` : '';
-    ag.appendChild(button(`${name}${dice}`, does, `atk:${tac}`, atkOn && can.includes(tac) ? () => ctx.play(withSide(ctx, { attack: tac })) : null));
+    // (A tactic the weapon doesn't allow is greyed and says why: an unwieldy weapon can't strike quickly, p. 89.)
+    const allowed = can.includes(tac);
+    const b = button(`${name}${dice}`, allowed ? does : t('fight.tac.unwieldy', 'not with an unwieldy weapon'), `atk:${tac}`, atkOn && allowed ? () => ctx.play(withSide(ctx, { attack: tac })) : null);
+    b.classList.toggle('nope', !allowed);
+    ag.appendChild(b);
   }
   ag.appendChild(button(t('fight.retreatN', 'Retreat'), t('fight.retreatD', 'break off, 5 m back'), 'retreat', atkOn && fight.melee ? () => ctx.play(withSide(ctx, { retreat: true })) : null));
 

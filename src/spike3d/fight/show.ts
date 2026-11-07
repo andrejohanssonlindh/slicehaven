@@ -6,7 +6,7 @@ import type { MotionAct } from '../../core/world3d/motion';
 import type { SpikeWorld } from '../../engine3d/world';
 import { t } from '../../i18n';
 import { showRolls } from '../../ui/dice';
-import { effectText, partName, poolText } from '../condition';
+import { effectText, partName, poolText, riskText } from '../condition';
 import { cards } from './columns';
 import { type FightCtx, cap } from './ctx';
 import { HOW, VERDICT, hitWord, rollText } from './words';
@@ -238,14 +238,18 @@ export function makePlayback(ctx: FightCtx): Playback {
       for (const rk of res.risks) { wRolls.push({ ...rk.roll, label: rk.effect.k === 'break' ? t('fight.breakroll', 'Bone holds?') : t('fight.cutroll', 'Limb holds?') }); wMine.push(defMine); }
       const notes = [t('fight.woundsum', 'Wound table: {d} + {b} = {r}', { d: res.woundD10, b: s.result - res.woundD10, r: s.result })];
       // What the wound does, in words ("a wound to the right arm, bleeding 2 a round, dazed").
-      const fx = s.died ? '' : s.effects.map(effectText).join(', ');
+      // (A break or cut risk is said as it came out: "breaks the left leg", "the left leg nearly breaks".)
+      const fx = s.died ? '' : s.effects.map((e) => {
+        if (e.k !== 'break' && e.k !== 'cut') return effectText(e);
+        const rk = res.risks.find((r) => r.effect.k === e.k && r.effect.area === e.area);
+        return rk ? riskText(rk.effect, rk.happened) : effectText(e);
+      }).join(', ');
       if (fx) notes.push(cap(fx));
       if (s.died) notes.push(of(l.target, ['fight.killed.you', 'You fall.'], ['fight.killed', '{who} falls dead.']));
       await reveal(wRolls, wMine, notes);
       const death = s.deathRoll ? said(s.deathRoll, l.target, 'Death roll') : '';
       if (fx) log(`${t('fight.woundfx', 'Serious wound: {fx}.', { fx })}${death ? ` ${t('fight.survived', 'Survived{roll}.', { roll: death })}` : ''}`, atkMine ? 'good' : 'bad');
       if (s.died) log(`${of(l.target, ['fight.killed.you', 'You fall.'], ['fight.killed', '{who} falls dead.'])}${death}`, atkMine ? 'good' : 'bad');
-      for (const rk of res.risks) if (rk.happened) log(rk.effect.k === 'break' ? t('fight.breaks', 'Bone breaks.') : t('fight.severed', 'Something is cut off.'), 'bad');
     }
   }
 
@@ -335,16 +339,22 @@ export function makePlayback(ctx: FightCtx): Playback {
           break;
         }
         case 'end': {
-          if (l.end.rolls.length) await reveal(l.end.rolls.map((r) => ({ ...r, label: `${ctx.Name(l.who)}: ${r.label ?? ''}` })), l.end.rolls.map(() => l.who === 'hero'));
+          // Bleeding or burning is no line of its own each round (the director: the repeated "You bleed"); the card
+          // says it ("bleeding 2 a round"), and the shock roll it brings says why it was rolled.
+          const cause = l.end.notes.includes('bled') ? t('fight.cause.bleed', 'bleeding') : l.end.notes.includes('burned') ? t('fight.cause.fire', 'burning') : '';
+          const why = cause ? ` (${cause})` : '';
+          if (l.end.rolls.length) await reveal(l.end.rolls.map((r) => ({ ...r, label: `${ctx.Name(l.who)}: ${r.label ?? ''}${r.label === 'Shock roll' ? why : ''}` })), l.end.rolls.map(() => l.who === 'hero'));
           // Each note with the roll that made it, if one did ("knocked out (Shock roll 3D6+1 = 4 < 6)"): the shock
           // roll for staying up or going out, the death roll for bleeding or burning out.
           const rollFor = (n: string) => l.end.rolls.find((r) => (r.label === 'Shock roll') === (n === 'stayed up' || n === 'knocked out'));
           for (const n of l.end.notes) {
             const r = ['stayed up', 'knocked out', 'bleeding stopped', 'bled out', 'burned to death', 'fire out'].includes(n) ? rollFor(n) : undefined;
             const nums = r ? said(r, l.who) : '';
+            if (n === 'bled' || n === 'burned') continue;
             if (n === 'stayed up' && !nums) continue;
             const [you, they] = END_NOTE[n] ?? [n, `{who}: ${n}`];
-            log(`${of(l.who, [`fight.note.you.${n.replace(/ /g, '')}`, you], [`fight.note.${n.replace(/ /g, '')}`, they])}${nums}.`, n === 'stayed up' ? 'info' : l.who === 'hero' ? 'bad' : 'good');
+            const through = cause && (n === 'stayed up' || n === 'knocked out') ? t('fight.through', ', weakened by {c}', { c: cause }) : '';
+            log(`${of(l.who, [`fight.note.you.${n.replace(/ /g, '')}`, you], [`fight.note.${n.replace(/ /g, '')}`, they])}${through}${nums}.`, n === 'stayed up' ? 'info' : l.who === 'hero' ? 'bad' : 'good');
           }
           break;
         }

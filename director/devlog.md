@@ -2,7 +2,12 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
-## 2026-11-07 — Your fight notes, the wall of them
+## 2026-11-07 — Unwieldy weapons, bleeding, broken bones
+
+- **A quick strike with an unwieldy weapon** (the Binderakk hammer, the great axe…) was already refused by the rules, but the button looked like the others. It is now crossed out and greyed, and says "not with an unwieldy weapon".
+- **No more "You bleed" every round.** The card says it instead: "bleeding 2 a round" (and "infection 2" once there is one).
+- **The dice you saw while bleeding were a shock roll**, not healing: each round the bleeding adds fatigue, and that brings a shock roll to stay on your feet. Success meant you stayed up. It now says so: the dice are labelled "Shock roll (bleeding)", and the log reads "You stay on your feet, weakened by bleeding (Shock roll …)". Bleeding only stops when someone stops it with Healing (comes with B8f), or, knocked out, on a passed death roll. The details sheet says this.
+- **A break is said on the wound's own line:** "Serious wound: breaks the left leg" or "the left leg nearly breaks", not "may break" and then "Bone breaks." on the next line.
 
 - **The second gladiator now fights.** After the first one died, their sword lay on the sand; the new one answering the gong came without a weapon, and a check on their shield then crashed, so Attack zoomed in and nothing happened. Each called fighter now brings their own weapon and shield; what the last one dropped stays where it lies.
 - **Finish them off later:** tap someone lying senseless (fight over or not): you walk up, and the fight panel offers *Finish them* or *OK* to leave them.

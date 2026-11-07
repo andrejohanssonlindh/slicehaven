@@ -263,6 +263,8 @@ body.fighting #stats { display: none; }
 #fight .moves button { min-height: 38px; padding: 3px 5px; font-size: 13px; line-height: 1.15; text-align: center; }
 #fight .moves button small { display: block; font-size: 10px; opacity: 0.75; }
 #fight .moves button:disabled { cursor: default; }
+#fight .moves button.nope { opacity: 0.4; text-decoration: line-through; }
+#fight .moves button.nope small { text-decoration: none; }
 #fight .group .note { display: none; }
 /* Picked, waiting for the second tap (a phone; and what the timer takes): ringed. */
 #fight button.armed { box-shadow: 0 0 0 2px #f0d080, 0 0 10px #f0d08088; }

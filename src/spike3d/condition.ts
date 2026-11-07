@@ -66,7 +66,8 @@ export function harmBits(i: Injuries, exact: boolean): string[] {
   const bits: string[] = [];
   for (const [p, n] of Object.entries(i.wounds)) if (n) bits.push(exact ? `${partName(p)} ${n}` : partName(p));
   if (i.pain) bits.push(exact ? t('fight.pain', 'pain {n}', { n: i.pain }) : t('fight.painw', 'in pain'));
-  if (i.bleed) bits.push(exact ? t('fight.bleed', 'bleeding {r}', { r: i.bleed.rate }) : t('fight.bleedw', 'bleeding'));
+  if (i.bleed) bits.push(exact ? t('fight.bleed', 'bleeding {r} a round', { r: i.bleed.rate }) : t('fight.bleedw', 'bleeding'));
+  if (i.infection) bits.push(exact ? t('fight.infection', 'infection {n}', { n: i.infection.level }) : t('fight.infectionw', 'infected'));
   for (const b of i.broken) bits.push(t('fight.brokenpart', 'broken {b}', { b }));
   for (const s of i.short) bits.push(t(`fight.short.${s}`, SHORT[s]));
   return bits;
@@ -103,6 +104,19 @@ export function effectText(e: Effect): string {
     case 'attr': return t('fx.attr', '{a} lowered for good', { a: rollableName(`attr:${e.attr}`) });
     case 'hands': return t('fx.hands', 'hands crippled');
   }
+}
+
+/**
+ * A break or amputation risk once rolled, in words (the director: "breaks the left leg" or "the left leg nearly breaks"
+ * on the wound's own line, not "may break" and then a line after).
+ */
+export function riskText(e: Extract<Effect, { k: 'break' | 'cut' }>, happened: boolean): string {
+  if (e.k === 'break') {
+    const b = BONE[e.area] ?? e.area;
+    return happened ? t('fx.broke', 'breaks the {b}', { b }) : t('fx.nearbroke', 'the {b} nearly breaks', { b });
+  }
+  const a = `${e.side ? `${e.side} ` : ''}${e.area}`;
+  return happened ? t('fx.cutoff', 'cuts off the {a}', { a }) : t('fx.nearcut', 'nearly takes off the {a}', { a });
 }
 
 /** The rolls injuries weigh on, for the sheet. */
@@ -198,7 +212,7 @@ export function renderCondition(box: HTMLElement, i: Injuries, vitality: Dice, e
   for (const [p, n] of Object.entries(i.wounds)) if (n) lasting.push([t('cond.wound', '{part}: {n} of 3 wounds', { part: partName(p), n }), [p]]);
   if (i.pain) lasting.push([t('cond.pain', 'Pain {n}: −{n}D6 on fighting, moving and the attributes that need the body.', { n: i.pain }), []]);
   const bledAt = [...seen].reverse().find((h) => h.serious)?.part;
-  if (i.bleed) lasting.push([t('cond.bleed', 'Bleeding: {r} fatigue a round, until stopped (difficulty {d}).', { r: i.bleed.rate, d: i.bleed.diff }), bledAt ? [bledAt] : []]);
+  if (i.bleed) lasting.push([t('cond.bleed', 'Bleeding: {r} fatigue a round, each bringing a shock roll, until someone stops it with Healing against {d} (comes later). Knocked out while bleeding: a death roll; pass and it stops.', { r: i.bleed.rate, d: i.bleed.diff }), bledAt ? [bledAt] : []]);
   if (i.infection) lasting.push([t('cond.infection', 'Infection, level {n}.', { n: i.infection.level }), []]);
   if (i.internal) lasting.push([t('cond.internal', 'Internal injuries: {n}.', { n: i.internal }), ['torso']]);
   for (const b of i.broken) lasting.push([t('cond.broken', 'Broken: {b}.', { b }), [BROKEN_PART[b]]]);
