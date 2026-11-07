@@ -2,7 +2,12 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
-## 2026-11-07 — Unwieldy weapons, bleeding, broken bones
+## 2026-11-07 — Stopping to choose, looking over bodies, freeing a hand
+
+- **Tapping someone or something stops your walk.** Before, you walked on while choosing, and a fight then started from where you were heading (the jump you saw). A fight also stops everyone in it where they stand.
+- **The dead show their wounds**: their details sheet lists what they took (no fatigue, they're past that).
+- **Look a body over:** tap someone dead and you walk up and look them over. In the fight panel, tap the fallen foe's card once it's over. On easy you see everything at once. On normal and hard it's a **Medicine** roll against 8 (no Medicine: Alertness at −2D6), once per body: done well, their wounds exactly ("left leg: 2 of 3 wounds"); badly, only where ("Left leg: wounded"), and the title says "(roughly)". Your own sheet always shows your wounds exactly.
+- **Hands full in a fight, with more on you:** the Draw list now offers *Put away the …* (a side action), so you can draw something else next round. Out of a fight it already worked: I put away a sword and a buckler and could then draw any of the three.
 
 - **A quick strike with an unwieldy weapon** (the Binderakk hammer, the great axe…) was already refused by the rules, but the button looked like the others. It is now crossed out and greyed, and says "not with an unwieldy weapon".
 - **No more "You bleed" every round.** The card says it instead: "bleeding 2 a round" (and "infection 2" once there is one).

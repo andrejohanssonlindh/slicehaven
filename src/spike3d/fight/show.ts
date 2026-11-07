@@ -281,6 +281,10 @@ export function makePlayback(ctx: FightCtx): Playback {
           log(`${of(l.ids[0], ['fight.race.you', 'You both go for the {thing}: you are quicker'], ['fight.race', 'You both go for the {thing}: {who} is quicker'], { thing: ctx.kindName(l.item) })}${nums}.`, 'info');
           break;
         }
+        case 'stow':
+          if (l.who === 'hero') w.stowHeld(l.item);
+          log(of(l.who, ['fight.stowed.you', 'You put away the {thing}.'], ['fight.stowed', '{who} puts away the {thing}.'], { thing: ctx.kindName(l.item) }), l.who === 'hero' ? 'you' : 'they');
+          break;
         case 'draw':
           if (l.who === 'hero') w.drawOwn(l.item);
           log(of(l.who, ['fight.drew.you', 'You draw your {thing}.'], ['fight.drew', '{who} draws a {thing}.'], { thing: ctx.kindName(l.item) }), l.who === 'hero' ? 'you' : 'they');

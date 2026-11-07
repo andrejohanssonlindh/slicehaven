@@ -111,13 +111,17 @@ export function sideEntries(ctx: FightCtx): SideEntry[] {
   }
 
   const belt = (me.belt ?? []).filter((b) => canHold(me, b));
+  // Hands full with more on you: put something away first (a side action of its own), then draw next round.
+  const stowable = belt.length || !me.belt?.length ? [] : (['weapon', 'shield'] as const).filter((slot) => me[slot]);
   const inHand = [me.weapon, me.shield].filter((x) => !!x).map((x) => ctx.kindName(x!.id)).join(t('fight.and', ' and '));
   out.push({
     id: 'draw', label: t('fight.side.draw', 'Draw'),
     small: belt.length ? t('fight.side.drawD', '−1D6 on the next roll')
-      : me.belt?.length ? t('fight.side.handsfull', 'hands full')
+      : me.belt?.length ? t('fight.side.handsfull', 'hands full: put one away first')
         : inHand ? t('fight.side.inhand', 'nothing else on you ({what} in hand)', { what: inHand }) : t('fight.side.nothing', 'nothing carried on you'),
-    items: belt.map((b) => sideMove(ctx, `draw:${b.id}`, t('fight.draw', 'Your {name}', { name: ctx.kindName(b.id) }), { draw: b.id })),
+    items: belt.length
+      ? belt.map((b) => sideMove(ctx, `draw:${b.id}`, t('fight.draw', 'Your {name}', { name: ctx.kindName(b.id) }), { draw: b.id }))
+      : stowable.map((slot) => sideMove(ctx, `stow:${slot}`, t('fight.stow', 'Put away the {name}', { name: ctx.kindName(me[slot]!.id) }), { stow: slot }, t('fight.stowD', 'to free the hand: draw next round'))),
   });
 
   const near = fight.ground.filter((g) => spotted.has(g.id) && canHold(me, g) && Math.hypot(g.x - me.x, g.z - me.z) <= PICKUP_REACH);

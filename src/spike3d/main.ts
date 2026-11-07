@@ -461,7 +461,7 @@ const fight = makeFight(() => world, hero, notify, save, () => {
 });
 /** How tall the fitted fight view must be, metres: a body and what floats over it. */
 const FIT_TALL = 3.2;
-const talk = makeTalk(() => world, () => pipeline.renderer, hero, doer, notify, save, journal.added, (id) => fight.start(id));
+const talk = makeTalk(() => world, () => pipeline.renderer, hero, doer, notify, save, journal.added, (id) => fight.start(id), (id) => void condition.examine(id));
 
 function bindInput(): void {
   let down: { x: number; y: number; id: number; moved: number } | null = null;

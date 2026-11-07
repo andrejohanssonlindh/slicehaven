@@ -200,6 +200,8 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
 
   function open(target: ActTarget | null): void {
     const w = world();
+    // A tap on something stops a walk under way (the director: choosing shouldn't happen on the move).
+    w.stopHero();
     const kind = target ? THINGS.get(target.kind) : null;
     nameEl.textContent = kind ? t(`thing.${kind.id}.name`, cap(thingName(kind))) : t('act.here', 'Where you stand');
     lookEl.textContent = kind ? t(`thing.${kind.id}.look`, kind.look ?? '') : w.heroIndoors ? t('act.hereIn', 'A floor of boards and beaten earth.') : t('act.hereOut', 'Open ground.');

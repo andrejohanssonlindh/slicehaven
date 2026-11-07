@@ -12,6 +12,10 @@ import type { Hero } from '../core/hero';
 import type { SpikeWorld } from '../engine3d/world';
 import { t } from '../i18n';
 import { loadSettings } from '../ui/settings';
+import { rollTest } from '../core/dice';
+import { sheetDice } from '../core/npcsheet';
+import { Rng } from '../core/rng';
+import { showRolls } from '../ui/dice';
 
 /**
  * How someone is, in words a player can follow (B8a, the director's notes after the first fight): fatigue and
@@ -133,7 +137,7 @@ const USES: { label: [string, string]; use: RollUse }[] = [
  * body outline (the director: the outline in the details too), with the blows `seen` on it; pointing at a part (or
  * tapping it) lights the lines about it, and pointing at such a line lights its part.
  */
-export function renderCondition(box: HTMLElement, i: Injuries, vitality: Dice, exact: boolean, restMinutes: number, seen: SeenHit[] = []): void {
+export function renderCondition(box: HTMLElement, i: Injuries, vitality: Dice, exact: boolean, restMinutes: number, seen: SeenHit[] = [], harmExact = true): void {
   box.replaceChildren();
   const fig = bodyOutline(i, seen, true, null);
   fig.classList.add('cond-fig');
@@ -169,11 +173,12 @@ export function renderCondition(box: HTMLElement, i: Injuries, vitality: Dice, e
     }
     s.appendChild(p);
   };
-  if (i.dead) return line(sec(t('cond.state', 'State')), t('fight.dead', 'dead'));
-  if (i.out) line(sec(t('cond.state', 'State')), i.dying ? t('cond.dying', 'Dying: knocked out and bled out.') : t('cond.out', 'Knocked out. You come round when your fatigue is gone.'), 'bad');
+  if (i.dead) line(sec(t('cond.state', 'State')), t('cond.dead', 'Dead. What they took:'), 'bad');
+  else if (i.out) line(sec(t('cond.state', 'State')), i.dying ? t('cond.dying', 'Dying: knocked out and bled out.') : t('cond.out', 'Knocked out. You come round when your fatigue is gone.'), 'bad');
 
-  // Fatigue, and where it came from.
+  // Fatigue, and where it came from (not for the dead: only their wounds, below).
   const total = totalFatigue(i);
+  if (!i.dead) {
   const f = sec(exact ? t('cond.fatigue', 'Fatigue {n}', { n: total }) : t('cond.fatiguew', 'Fatigue: {w}', { w: fatigueWord(i, vitality) }));
   const bar = document.createElement('div');
   bar.className = 'bar';
@@ -204,15 +209,18 @@ export function renderCondition(box: HTMLElement, i: Injuries, vitality: Dice, e
     line(d, `${t(u.label[0], u.label[1])}: −${n}D6 (${ps.map((p) => `${whyName(p.why)} −${p.n}D6`).join(', ')})`, '', parts);
   }
   if (!any) line(d, t('cond.nodice', 'Nothing holds you back.'));
+  }
 
   // What lasts: wounds, pain, bleeding, breaks.
   const w = sec(t('cond.harm', 'Wounds and the rest'));
   // Each with the part(s) of the body it is on, for the outline.
   const lasting: [string, string[]][] = [];
-  for (const [p, n] of Object.entries(i.wounds)) if (n) lasting.push([t('cond.wound', '{part}: {n} of 3 wounds', { part: partName(p), n }), [p]]);
+  // (Not exact, as a foe's on normal, or a body looked over badly: where, not how many.)
+  for (const [p, n] of Object.entries(i.wounds)) if (n) lasting.push([harmExact ? t('cond.wound', '{part}: {n} of 3 wounds', { part: partName(p), n }) : t('cond.woundw', '{part}: wounded', { part: cap(partName(p)) }), [p]]);
   if (i.pain) lasting.push([t('cond.pain', 'Pain {n}: −{n}D6 on fighting, moving and the attributes that need the body.', { n: i.pain }), []]);
   const bledAt = [...seen].reverse().find((h) => h.serious)?.part;
-  if (i.bleed) lasting.push([t('cond.bleed', 'Bleeding: {r} fatigue a round, each bringing a shock roll, until someone stops it with Healing against {d} (comes later). Knocked out while bleeding: a death roll; pass and it stops.', { r: i.bleed.rate, d: i.bleed.diff }), bledAt ? [bledAt] : []]);
+  if (i.bleed && !harmExact) lasting.push([t('cond.bleedw', 'Bleeding.'), bledAt ? [bledAt] : []]);
+  else if (i.bleed) lasting.push([t('cond.bleed', 'Bleeding: {r} fatigue a round, each bringing a shock roll, until someone stops it with Healing against {d} (comes later). Knocked out while bleeding: a death roll; pass and it stops.', { r: i.bleed.rate, d: i.bleed.diff }), bledAt ? [bledAt] : []]);
   if (i.infection) lasting.push([t('cond.infection', 'Infection, level {n}.', { n: i.infection.level }), []]);
   if (i.internal) lasting.push([t('cond.internal', 'Internal injuries: {n}.', { n: i.internal }), ['torso']]);
   for (const b of i.broken) lasting.push([t('cond.broken', 'Broken: {b}.', { b }), [BROKEN_PART[b]]]);
@@ -231,9 +239,18 @@ export function renderCondition(box: HTMLElement, i: Injuries, vitality: Dice, e
 }
 
 export interface ConditionSheet {
-  /** Open the sheet on the hero (or someone in a fight, with their injuries). */
-  open(i?: Injuries, vitality?: Dice, title?: string, seen?: SeenHit[]): void;
+  /** Open the sheet on the hero (or someone in a fight, with their injuries). `exact` overrides the difficulty's. */
+  open(i?: Injuries, vitality?: Dice, title?: string, seen?: SeenHit[], exact?: boolean): void;
+  /**
+   * Look over someone lying dead or senseless (the director: see a body's injuries, by a skill roll where the
+   * difficulty hides them in a fight): on easy at once; else a Medicine roll against `EXAMINE_DIFFICULTY` (no
+   * Medicine: Alertness at −2D6), made once per body. Done well, their wounds and fatigue exactly; else in words.
+   */
+  examine(id: string, seen?: SeenHit[]): Promise<void>;
 }
+
+/** How hard reading someone's wounds is, lying still before you. */
+export const EXAMINE_DIFFICULTY = 8;
 
 /** The hero's condition sheet: the "You" button at the bottom left, or a tap on your card in a fight. */
 export function makeCondition(world: () => SpikeWorld, hero: Hero): ConditionSheet {
@@ -241,14 +258,36 @@ export function makeCondition(world: () => SpikeWorld, hero: Hero): ConditionShe
   el.querySelector('.close')!.addEventListener('click', () => (el.hidden = true));
   const openBtn = document.getElementById('condition-open')!;
   const vit = (): Dice => hero.dice['attr:Livskraft'] ?? { n: 2, mod: 0 };
-  function open(i?: Injuries, vitality?: Dice, title?: string, seen: SeenHit[] = []): void {
+  function open(i?: Injuries, vitality?: Dice, title?: string, seen: SeenHit[] = [], exact?: boolean): void {
     const rules = DIFFICULTY_RULES[loadSettings().difficulty];
     const own = !title;
     titleEl.textContent = title ?? t('cond.title', 'Your condition');
     const inj = i ?? world().injuriesOf('hero');
-    renderCondition(body, inj ?? unhurt(), vitality ?? vit(), own ? rules.ownExact : rules.foeExact, rules.restMinutes, seen);
+    renderCondition(body, inj ?? unhurt(), vitality ?? vit(), exact ?? (own ? rules.ownExact : rules.foeExact), rules.restMinutes, seen, own || (exact ?? rules.foeExact));
     el.hidden = false;
   }
   openBtn.addEventListener('click', () => (el.hidden ? open() : (el.hidden = true)));
-  return { open };
+  /** Bodies looked over, and how it went (kept for the page's life). */
+  const examined = new Map<string, boolean>();
+  async function examine(id: string, seen: SeenHit[] = []): Promise<void> {
+    const w = world();
+    const inj = w.injuriesOf(id) ?? unhurt();
+    const sheet = w.sheetOf(id);
+    const name = w.talkPerson(id)?.name ?? id;
+    const vitality = sheet ? sheetDice(sheet, 'attr:Livskraft') : { n: 2, mod: 0 };
+    let exact = DIFFICULTY_RULES[loadSettings().difficulty].foeExact;
+    if (!exact) {
+      if (!examined.has(id)) {
+        const med = hero.dice['Läkekonst'];
+        const alert = hero.dice['attr:Vaksamhet'] ?? { n: 2, mod: 0 };
+        const dice = med && med.n > 0 ? med : { n: Math.max(1, alert.n - 2), mod: alert.mod };
+        const roll = rollTest(dice, EXAMINE_DIFFICULTY, Rng.fromSeed(`examine:${id}:${Date.now()}`), med && med.n > 0 ? rollableName('Läkekonst') : rollableName('attr:Vaksamhet'));
+        await showRolls([roll]);
+        examined.set(id, !!roll.success);
+      }
+      exact = examined.get(id)!;
+    }
+    open(inj, vitality, exact ? name : t('cond.roughly', '{name} (roughly)', { name }), seen, exact);
+  }
+  return { open, examine };
 }

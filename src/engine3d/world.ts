@@ -1678,6 +1678,15 @@ export class SpikeWorld {
     return this.hero.legs.length > 0;
   }
 
+  /** The hero stops where they are (a tap on someone, a fight beginning: the director, walking on felt like a teleport). */
+  stopHero(): void {
+    if (!this.hero.legs.length) return;
+    this.hero.legs = [];
+    this.marker.visible = false;
+    this.faceWalker(this.heroFig, this.heroDir.x, this.heroDir.z, false);
+    this.placeHero();
+  }
+
   /** Where someone's feet are: on their storey's floor (or the stair under them) in a house, else on the ground. */
   private footY(a: Actor): number {
     const b = this.moves.house(a);
@@ -2683,6 +2692,9 @@ export class SpikeWorld {
   beginFight(ids: string[]): void {
     this.fighting = new Set(ids);
     this.follow = true;
+    // Everyone stops where they stand: the rules start the fight from there.
+    this.stopHero();
+    for (const c of this.cast) if (ids.includes(c.who.id)) c.mind.actor.legs = [];
     this.talkingWith = null;
     for (const id of ids) this.play(id, 'guard');
     this.faceFight();
@@ -3109,8 +3121,8 @@ export class SpikeWorld {
    * Put the weapon or shield the hero holds away on them (the director: why put down one and put away the other?).
    * A taken one stays its owner's (`mine` unchanged): carried, not given.
    */
-  stowHeld(): boolean {
-    const id = this.carry.held ?? this.carry.left;
+  stowHeld(which?: string): boolean {
+    const id = which && (this.carry.held === which || this.carry.left === which) ? which : this.carry.held ?? this.carry.left;
     const l = id ? this.carry.loose[id] : null;
     const def = l && THINGS.has(l.kind) ? THINGS.get(l.kind) : null;
     if (!id || !l || !(def?.weapon || def?.shield)) return false;

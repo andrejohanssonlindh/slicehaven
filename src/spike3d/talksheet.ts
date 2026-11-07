@@ -32,7 +32,7 @@ export interface Talk {
   readonly open_: boolean;
 }
 
-export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRenderer, hero: Hero, doer: Doer, notify: (text: string) => void, save: () => void, onLead: () => void = () => {}, onFight?: (id: string) => void): Talk {
+export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRenderer, hero: Hero, doer: Doer, notify: (text: string) => void, save: () => void, onLead: () => void = () => {}, onFight?: (id: string) => void, onExamine?: (id: string) => void): Talk {
   const el = document.getElementById('talk')!;
   const canvas = el.querySelector<HTMLCanvasElement>('.portrait canvas')!;
   const nameEl = el.querySelector<HTMLElement>('.name')!, whatEl = el.querySelector<HTMLElement>('.what')!, moodEl = el.querySelector<HTMLElement>('.mood')!;
@@ -198,9 +198,18 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
       close();
       const w = world(), at = w.personSpot(id);
       if (!at) return;
+      // A tap on someone stops a walk under way (the director: walking on while choosing ended in a jump).
+      w.stopHero();
       // The dead and the senseless don't talk (the director: "using skills on dead people works").
       const hurt = w.injuriesOf(id);
       const name = w.talkPerson(id)?.name ?? id;
+      // A body: walk up and look over its wounds (the director: see the injuries of the dead).
+      if (hurt?.dead && onExamine) {
+        if (w.reachTo(at) <= TALK_REACH) return onExamine(id);
+        if (w.walkTo(at.x, at.z, at.level) === null) return notify(t('talk.noway', 'You can\'t get to them.'));
+        pending = id;
+        return;
+      }
       if (hurt?.dead) return notify(t('talk.dead', '{name} is dead.', { name }));
       if (hurt?.out && !onFight) return notify(t('talk.out', '{name} lies senseless.', { name }));
       // Someone lying senseless: walk up, then the fight panel offers the killing stroke or leaving them (the director).
@@ -226,6 +235,7 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
         const id = pending;
         pending = null;
         w.walkTo(w.hero.x, w.hero.z);
+        if (w.injuriesOf(id)?.dead && onExamine) return onExamine(id);
         if (w.injuriesOf(id)?.out && onFight) return onFight(id);
         return start(id);
       }

@@ -165,6 +165,15 @@ describe('fatigue', () => {
     expect(demandDifficulty(g, 'a', STYLE)).toBeLessThan(12 + DEMAND_EXTRA);
   });
 
+  it('putting away in a fight frees the hand: the weapon goes on the belt, to be drawn again', () => {
+    const f = startFight([fighter('a', 0, 0), fighter('b', 1, 8)]);
+    const r = resolveRound(f, { a: { stow: 'weapon' } }, RULES, Rng.fromSeed(1));
+    const a = r.fight.fighters[0];
+    expect(a.weapon).toBeNull();
+    expect(a.belt?.map((b) => b.id)).toEqual(['a-sword']);
+    expect(r.log.some((l) => l.k === 'stow' && l.who === 'a')).toBe(true);
+  });
+
   it('knocked down: down through their next round (no moving, −1D6), then up on their own', () => {
     const f = startFight([fighter('a', 0, 0), fighter('b', 1, 6)]);
     f.fighters[1].injuries = { ...unhurt(), short: ['fall'] };

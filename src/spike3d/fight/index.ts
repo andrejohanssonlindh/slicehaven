@@ -112,6 +112,9 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
   window.addEventListener('resize', () => { layout(ctx); aimView(ctx); });
   el.usCard.addEventListener('click', () => { if (s.fight) condition.open(s.fight.fighters[0].injuries, ctx.vitalityOf(s.fight.fighters[0]), undefined, s.seen.hero); });
   el.themCard.addEventListener('click', () => {
+    // Down or dead once it's over: look them over (a Medicine roll where the difficulty hides it; exact if it goes well).
+    const foe = s.fight?.fighters[1];
+    if (foe && s.fight!.winner !== null && (foe.injuries.dead || foe.injuries.out)) return void condition.examine(s.foeId, s.seen[s.foeId]);
     // (On normal and hard in words, as the card: what holds them back and why, without the numbers.)
     if (s.fight && s.fight.fighters[1]) condition.open(s.fight.fighters[1].injuries, ctx.vitalityOf(s.fight.fighters[1]), nameOf(s.foeId), s.seen[s.foeId]);
   });

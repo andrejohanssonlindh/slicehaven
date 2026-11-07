@@ -224,6 +224,8 @@ export interface Choice {
   pickUp?: string;
   /** Draw something they carry (`Fighter.belt`), as the side action: −1D6 on the next attack or defence, as picking up. */
   draw?: string;
+  /** Put away what is in a hand (the weapon, or the shield), on them, as the side action: to free it for drawing. */
+  stow?: 'weapon' | 'shield';
   /** The main action, as the attacker in a melee: attack with a tactic, retreat, or (on someone knocked out) the mercy stroke. */
   attack?: AttackTactic;
   retreat?: boolean;
@@ -262,6 +264,7 @@ export type LogLine =
   | { k: 'move'; who: string; to: { x: number; z: number }; metres: number; ran?: boolean; roll?: Roll }
   | { k: 'pickUp'; who: string; item: string }
   | { k: 'draw'; who: string; item: string }
+  | { k: 'stow'; who: string; item: string }
   | { k: 'open'; attacker: number; rolls: Roll[] }
   /** Two reached for the same thing: Reaktion said who gets there first (`ids[0]` won). */
   | { k: 'race'; item: string; ids: string[]; rolls: Roll[] }
@@ -669,6 +672,14 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
         f.belt!.splice(i, 1);
         Object.assign(f, holding(f, item));
         log.push({ k: 'draw', who: f.id, item: item.id });
+      }
+    } else if (c.stow) {
+      // Put away what is in a hand, on the belt or back (the director: hands full, nothing else could be drawn).
+      const item = f[c.stow];
+      if (item) {
+        f[c.stow] = null;
+        f.belt = [...(f.belt ?? []), item];
+        log.push({ k: 'stow', who: f.id, item: item.id });
       }
     } else if (c.move && !inMelee(f)) moving.push({ f, to: c.move, run: !!c.move.run });
   }
