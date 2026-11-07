@@ -33,7 +33,7 @@ export interface Move {
 
 /** One of the side action's lists, or a side action on its own (`items` empty, `go` set). */
 export interface SideEntry {
-  id: 'rise' | 'move' | 'draw' | 'pickUp' | 'look';
+  id: 'move' | 'draw' | 'pickUp' | 'look';
   label: string;
   /** Why it is empty, or what it costs. */
   small: string;
@@ -57,7 +57,6 @@ export const withSide = (ctx: FightCtx, main: Choice): Choice => ({ ...(ctx.s.si
  */
 export function afterSide(ctx: FightCtx, me: Fighter): Fighter {
   const c = ctx.s.side?.choice;
-  if (c?.rise) return { ...me, injuries: { ...me.injuries, short: me.injuries.short.filter((x) => x !== 'fall') } };
   const item = c?.draw ? me.belt?.find((b) => b.id === c.draw) : c?.pickUp ? ctx.s.fight?.ground.find((g) => g.id === c.pickUp) : undefined;
   return item && canHold(me, item) ? holding(me, item) : me;
 }
@@ -109,12 +108,6 @@ export function sideEntries(ctx: FightCtx): SideEntry[] {
       for (const g of lying) items.push(...goTo(ctx, { x: g.x, z: g.z, item: g.id }));
     }
     out.push({ id: 'move', label: t('fight.side.move', 'Move'), small: t('fight.side.moveD', 'or tap the ground'), items });
-  }
-
-  // Knocked down: getting up is the side action that matters (till then −1D6 on everything, no moving).
-  if (me.injuries.short.includes('fall')) {
-    const rise = sideMove(ctx, 'rise', t('fight.side.rise', 'Get up'), { rise: true }, t('fight.side.riseD', 'you are down: −1D6 on everything, no moving'));
-    out.unshift({ id: 'rise', label: rise.label, small: rise.small ?? '', items: [], go: rise.go!, instant: rise.instant });
   }
 
   const belt = (me.belt ?? []).filter((b) => canHold(me, b));

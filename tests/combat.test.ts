@@ -165,16 +165,13 @@ describe('fatigue', () => {
     expect(demandDifficulty(g, 'a', STYLE)).toBeLessThan(12 + DEMAND_EXTRA);
   });
 
-  it('knocked down stays down until they get up (a side action); till then no moving', () => {
+  it('knocked down: down through their next round (no moving, −1D6), then up on their own', () => {
     const f = startFight([fighter('a', 0, 0), fighter('b', 1, 6)]);
     f.fighters[1].injuries = { ...unhurt(), short: ['fall'] };
     const r1 = resolveRound(f, { b: { move: { x: 2, z: 0 } } }, RULES, Rng.fromSeed(1));
-    const b1 = r1.fight.fighters[1];
-    expect(b1.injuries.short).toEqual(['fall']); // still down after the phase
-    expect(b1.x).toBe(6); // and didn't move
-    const r2 = resolveRound(r1.fight, { b: { rise: true } }, RULES, Rng.fromSeed(1));
-    expect(r2.fight.fighters[1].injuries.short).toEqual([]);
-    expect(r2.log.some((l) => l.k === 'rise' && l.who === 'b')).toBe(true);
+    expect(r1.fight.fighters[1].x).toBe(6); // couldn't move while down
+    expect(r1.fight.fighters[1].injuries.short).toEqual([]); // up at the end of that round
+    expect(r1.log.some((l) => l.k === 'rise' && l.who === 'b')).toBe(true);
   });
 
   it('closing in from both sides, nobody walks through the other; the round pauses when blades cross', () => {

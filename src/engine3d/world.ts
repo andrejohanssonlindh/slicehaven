@@ -2817,7 +2817,7 @@ export class SpikeWorld {
   /** Not knocked out, dying or dead (after a fight). */
   private canStand(id: string): boolean {
     const i = this.hurt[id];
-    // (Knocked down in a fight, they stay lying till they get up: no swing lifts them.)
+    // (Knocked down in a fight, they stay lying till they are up again: no swing lifts them.)
     return !i || (!i.out && !i.dead && !i.dying && !(this.fighting && i.short.includes('fall')));
   }
 
@@ -2831,7 +2831,7 @@ export class SpikeWorld {
     this.hurt[id] = structuredClone(i);
     // (A broken leg puts them on the ground for good: they lie there, awake. The hero, outside a fight, limps on as if
     // on a crutch, so they're never stuck before healing exists.)
-    // (Knocked down in a fight, they lie there until they get up: `Choice.rise`.)
+    // (Knocked down in a fight, they lie there until the end of their next round, when they get up.)
     const down = (grounded(i) && (id !== 'hero' || this.fighting)) || (!!this.fighting && i.short.includes('fall'));
     const lying = i.dead ? 'dead' : i.out || i.dying || down ? 'down' : null;
     // Going down: they fall (in a fight), then lie still; already lying, they stay.

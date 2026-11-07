@@ -75,7 +75,7 @@ Mounted combat waits for riding (C4), mystic actions for magic (B9).
 - **A beaten foe offers to yield** (`beaten`, `wantsToYield`, style `yieldAt`); **yielding lays your weapon down**, and each earlier yield to the same person makes the next plea 6 harder (`Standing.yielded`).
 - **The round pauses when blades cross** (`pauseOnOpen`, `Fight.midRound`) so both sides choose a tactic in their roles; a move stops at reach of a foe.
 - **The mercy stroke** kills (someone helpless, a blow meant to kill); no roll. Someone found senseless later (tapped) opens the fight panel already won: *Finish them* or *OK*.
-- **Knocked down stays down** (the director, 2026-11-07): the `fall` short effect is kept at the end of each phase until `Choice.rise` (the side action *Get up*; the styles' `getUp` line). The world keeps them lying (`canStand`).
+- **Knocked down** (the book, p. 112): the `fall` short effect lasts to the end of their next active phase, as the other short effects; till then no moving and −1D6. The world keeps them lying (`canStand`), and a `rise` log line says when they're up.
 - **Making a foe yield** (`Choice.demand`, `demandDifficulty`): the best of `SKILL_SETS.threaten` against `spare` + `DEMAND_EXTRA`, eased by `worseOff` (4 a point of `beaten` over yours), as the plea now is.
 - **Roles changing hands say why** (`roles.why`), and a careful defence that held by less than 10 says so (`kept`).
 - **Every melee weapon row is a kind**; those without a model are `standIn` (a look-alike's model, off the rack).

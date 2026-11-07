@@ -224,11 +224,6 @@ export interface Choice {
   pickUp?: string;
   /** Draw something they carry (`Fighter.belt`), as the side action: −1D6 on the next attack or defence, as picking up. */
   draw?: string;
-  /**
-   * Get up off the ground, as the side action (the director, 2026-11-07: knocked down stays down until they get up;
-   * till then −1D6 on everything and no moving).
-   */
-  rise?: boolean;
   /** The main action, as the attacker in a melee: attack with a tactic, retreat, or (on someone knocked out) the mercy stroke. */
   attack?: AttackTactic;
   retreat?: boolean;
@@ -283,6 +278,7 @@ export type LogLine =
   | { k: 'roles'; attacker: number; why?: 'counter' | 'held' | 'careful' }
   /** A careful defence held, but not by 10 (2 advantages): they keep defending. `by`: how much it held by. */
   | { k: 'kept'; who: string; by: number }
+  /** Knocked down earlier, they are back on their feet (the end of their next active phase). */
   | { k: 'rise'; who: string }
   | { k: 'end'; who: string; end: PhaseEnd }
   | { k: 'mercy'; who: string; target: string }
@@ -658,12 +654,7 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
   for (const f of resumed ? [] : order) {
     if (!canAct(f)) continue;
     const c = choices[f.id] ?? {};
-    if (c.rise && f.injuries.short.includes('fall')) {
-      const left = f.injuries.short.filter((s) => s !== 'fall');
-      shortBefore.set(f.id, Math.max(0, (shortBefore.get(f.id) ?? 0) - (f.injuries.short.length - left.length)));
-      f.injuries = { ...f.injuries, short: left };
-      log.push({ k: 'rise', who: f.id });
-    } else if (c.pickUp) {
+    if (c.pickUp) {
       const i = fight.ground.findIndex((g) => g.id === c.pickUp && dist(g, f) <= PICKUP_REACH);
       const item = fight.ground[i];
       if (item && canHold(f, item)) {
@@ -773,10 +764,10 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
     if (f.injuries.dead || f.gone) continue;
     const end = endOfPhase(f.injuries, pool(f, 'attr:Livskraft'), rng);
     const short = end.injuries.short.slice(shortBefore.get(f.id) ?? 0);
-    // Down stays down until they get up (`Choice.rise`), once: the other short effects wear off.
-    if (end.injuries.short.includes('fall') && !short.includes('fall')) short.push('fall');
     f.injuries = { ...end.injuries, short, blinded: false };
     if (end.rolls.length || end.notes.length) log.push({ k: 'end', who: f.id, end });
+    // Knocked down (p. 112): down, −1D6 and no moving until the end of their next active phase; then they are up.
+    if (end.injuries.short.includes('fall') && !short.includes('fall') && canAct(f)) log.push({ k: 'rise', who: f.id });
   }
 
   // The melee goes on (or ends with no one left in it); roles for the next round.

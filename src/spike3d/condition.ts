@@ -204,7 +204,7 @@ export function renderCondition(box: HTMLElement, i: Injuries, vitality: Dice, e
   for (const b of i.broken) lasting.push([t('cond.broken', 'Broken: {b}.', { b }), [BROKEN_PART[b]]]);
   for (const l of i.lost) { const p = lostPart(l); lasting.push([t('cond.lost', 'Lost: {a}.', { a: `${l.side ? `${l.side} ` : ''}${l.area}` }), p ? [p] : []]); }
   for (const a of i.armourOff) lasting.push([t('cond.armouroff', 'Armour torn off the {part}.', { part: partName(a) }), [a]]);
-  if (i.short.includes('fall')) lasting.push([t('cond.down', 'Knocked down: −1D6 on everything and no moving, until you get up (a side action).'), []]);
+  if (i.short.includes('fall')) lasting.push([t('cond.down', 'Knocked down: −1D6 on everything and no moving; you are back on your feet at the end of your next round.'), []]);
   const brief = i.short.filter((s) => s !== 'fall');
   if (brief.length) lasting.push([t('cond.short', 'Until your next turn: {s} (−1D6 each on everything you do).', { s: brief.map((s) => t(`fight.short.${s}`, SHORT[s])).join(', ') }), []]);
   // Blows seen that left no lasting wound still show where they landed.

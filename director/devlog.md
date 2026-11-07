@@ -11,7 +11,7 @@
 - **All your weapons from the creator can be drawn.** Only 17 weapons had a model; the rest of the melee ones now borrow a look-alike's (a sabre-like sword draws as the arming sword, and so on), and stay off the rack. Bows, crossbows and thrown weapons wait for ranged fighting (B8d).
 - **Draw** says "nothing else on you (the sword in hand)" instead of "nothing carried".
 - **"You are the attacker: choose how to strike"** (or the defender: how to defend), instead of one line for both.
-- **Knocked down means down.** They fall, lie there, and stay down until they spend a side action on **Get up**: till then −1D6 on everything and no moving. The foe gets up the same way. (The book has it wear off on its own; recorded as your rule.)
+- **Knocked down means down.** They fall and lie there through their next round (−1D6 on everything, no moving), and the log says when they're back on their feet. *(First built as "stays down until a Get up side action"; you remembered the book right: they rise during their next round, so that's what it does now.)*
 - **A blow that puts someone down plays the fall at once**, not a flinch, back to guard, then the fall.
 - **Stepping back you keep facing the foe**, and anyone in a fight turns to face the other when they stop.
 - **Why the attack changed hands is in the log**: "(a careful defence that held by 10 or more: 2 advantages)", "(a counter)", "(the defence held)"; and when a careful defence held by less than 10: "…it takes 10 (2 advantages) to win the attack back". *Careful* says it on its button too.

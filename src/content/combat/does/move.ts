@@ -2,7 +2,7 @@ import { ADJACENT, PICKUP_REACH, WALK } from '../../../core/combat';
 import type { FightDoing } from '../../../core/fightmind';
 
 /**
- * The side action: close in on the nearest foe (stopping just within reach), pick up a weapon lying near, get up, or stand.
+ * The side action: close in on the nearest foe (stopping just within reach), pick up a weapon lying near, or stand.
  * { "do": "closeIn", "run": true } runs when the foe is further than a walk; { "do": "pickUp", "within": 3 }.
  */
 const doings: FightDoing[] = [
@@ -31,13 +31,6 @@ const doings: FightDoing[] = [
       if (!near) return null;
       return Math.hypot(near.x - me.x, near.z - me.z) <= PICKUP_REACH ? { pickUp: near.id } : { move: { x: near.x, z: near.z } };
     },
-  },
-  {
-    id: 'getUp',
-    about: 'Knocked down: get up (till then −1D6 on everything and no moving).',
-    keys: [],
-    fills: 'side',
-    choose: (_line, { me }) => (me.injuries.short.includes('fall') ? { rise: true } : null),
   },
   { id: 'holdGround', about: 'Stand where they are.', keys: [], fills: 'side', choose: () => ({}) },
 ];
