@@ -22,7 +22,7 @@ describe('spike3d talking', () => {
     const w = evalIn(page);
     // Midday: the townsfolk wander the green. Stand among them.
     await w('(w.dayMinutes = 0, w.weather.setHour(10), 0)');
-    const someone = (await w(`(() => { const m = w.minds.find((m) => m.id.startsWith('towns') && !m.house); return m ? { id: m.id, x: m.x, z: m.z } : null; })()`)) as { id: string; x: number; z: number } | null;
+    const someone = (await w(`(() => { const m = w.schedule.minds.find((m) => m.id.startsWith('towns') && !m.house); return m ? { id: m.id, x: m.x, z: m.z } : null; })()`)) as { id: string; x: number; z: number } | null;
     expect(someone).not.toBeNull();
     await w(`(w.placeHeroAt(${someone!.x - 3.5}, ${someone!.z}), 0)`);
     await page.waitForTimeout(800);
@@ -41,7 +41,7 @@ describe('spike3d talking', () => {
     expect(await page.locator('#talk .choices button', { hasText: 'Attack' }).count()).toBe(1);
     await walkUp.click();
     await page.waitForSelector('#talk:not([hidden])', { timeout: 45_000 });
-    expect(await w('w.talkingWith')).toBe(someone!.id);
+    expect(await w('w.talking.talkingWith')).toBe(someone!.id);
     await page.waitForTimeout(600);
     await page.screenshot({ path: `${OUT}talk-3d.png` });
     const choices = await page.locator('#talk .choices button span').allTextContents();
@@ -61,7 +61,7 @@ describe('spike3d talking', () => {
     await page.screenshot({ path: `${OUT}talk-after.png` });
     // Closing lets them go on with their day.
     await page.click('#talk .close');
-    expect(await w('w.talkingWith')).toBeNull();
+    expect(await w('w.talking.talkingWith')).toBeNull();
     expect(errors).toEqual([]);
   });
 
@@ -70,7 +70,7 @@ describe('spike3d talking', () => {
     await ready(page);
     const w = evalIn(page);
     await w('(w.dayMinutes = 0, w.weather.setHour(10), 0)');
-    const g = (await w(`(() => { const m = w.minds.find((m) => m.id === 'guard'); return { x: m.x, z: m.z }; })()`)) as { x: number; z: number };
+    const g = (await w(`(() => { const m = w.schedule.minds.find((m) => m.id === 'guard'); return { x: m.x, z: m.z }; })()`)) as { x: number; z: number };
     await w(`(w.placeHeroAt(${g.x - 3.5}, ${g.z}), 0)`);
     await page.waitForTimeout(800);
     const p = (await page.evaluate(`(() => {

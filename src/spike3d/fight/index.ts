@@ -75,7 +75,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
   // A tap on the foe's bubble unfolds their whole column under their card (a phone); again folds it.
   el.intent.addEventListener('click', () => root.classList.toggle('show-foe'));
   el.themMoves.addEventListener('click', () => root.classList.remove('show-foe'));
-  el.back.addEventListener('click', () => world().faceFight());
+  el.back.addEventListener('click', () => world().fights.faceFight());
 
   /** The round line's words (⚔ Back to fight sits beside them on a phone). */
   const headText = document.createElement('span');
@@ -95,7 +95,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     nameOf,
     Name: (id) => { const n = nameOf(id); return n.charAt(0).toUpperCase() + n.slice(1); },
     kindName: (id) => {
-      const k = world().thingKind(id);
+      const k = world().gear.thingKind(id);
       return k && THINGS.has(k) ? thingName(THINGS.get(k)) : t('fight.aweapon', 'weapon');
     },
     vitalityOf: (f: Fighter): Dice => f.pools['attr:Livskraft'] ?? { n: 2, mod: 0 },
@@ -130,7 +130,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       return;
     }
     // (A weapon tapped is one you have found yourself: noticed from now on. In reach, its list opens; else the moves.)
-    if (item) world().notice(item.id);
+    if (item) world().senses.notice(item.id);
     const inReach = !!item && within(ctx, item, PICKUP_REACH);
     s.plan = inReach ? null : item ? { x: item.x, z: item.z, item: item.id } : ground ? { ...ground } : null;
     s.open = inReach ? 'pickUp' : s.plan ? 'move' : s.open;
@@ -158,7 +158,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     tabs.draw();
     intentBubble(ctx);
     // What you have noticed lying about, ringed in red (the director: weapons on the ground are hard to see).
-    world().markSpotted(fight.ground.filter((g) => world().hasNoticed(g.id)));
+    world().senses.markSpotted(fight.ground.filter((g) => world().senses.hasNoticed(g.id)));
     el.log.scrollTop = el.log.scrollHeight;
     timer.draw();
     aimView(ctx);
@@ -194,7 +194,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     const w = world();
     // Where they stand now (the world walked them), as the rules start the round from.
     for (const f of s.fight.fighters) {
-      const at = w.fighterAt(f.id);
+      const at = w.fights.fighterAt(f.id);
       if (at) { f.x = at.x; f.z = at.z; }
     }
     // The side action was looking round: an Alertness roll with 1D6 more for what lies about, before anything moves.
@@ -214,7 +214,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     const r = resolveRound(s.fight, { hero: mine, [s.foeId]: theirs }, rules, ctx.rng, { pauseOnOpen: true });
     s.fight = r.fight;
     await playback.show(r.log, w);
-    for (const f of s.fight.fighters) w.setInjuries(f.id, f.injuries);
+    for (const f of s.fight.fighters) w.fights.setInjuries(f.id, f.injuries);
     save();
     s.busy = false;
     if (s.fight.midRound) {
@@ -265,7 +265,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
   async function lookAbout(bonus: number): Promise<void> {
     if (!s.fight) return;
     looking = true;
-    const { found, roll } = world().noticeLying(bonus);
+    const { found, roll } = world().senses.noticeLying(bonus);
     looking = false;
     if (roll) await playback.rolls([{ ...roll, label: t('fight.lookroll', 'You: Alertness') }], [true]);
     const what = found.map((id) => t('fight.thething', 'the {name}', { name: ctx.kindName(id) })).join(', ');
@@ -287,15 +287,15 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
   /** The fight is over (OK, or got away): the world goes on. Fatigue comes back with time; the knocked out lie there till then. */
   function end(): void {
     const w = world();
-    if (s.fight) for (const f of s.fight.fighters) w.setInjuries(f.id, { ...f.injuries, short: [], shockDue: false, blinded: false });
-    w.endFight();
+    if (s.fight) for (const f of s.fight.fighters) w.fights.setInjuries(f.id, { ...f.injuries, short: [], shockDue: false, blinded: false });
+    w.fights.endFight();
     s.fight = null;
     s.plan = null;
     w.markSpot(null);
     root.hidden = true;
     el.back.hidden = true;
     w.viewAim = { x: 0, y: 0 };
-    w.markSpotted([]);
+    w.senses.markSpotted([]);
     onView(false);
     document.body.classList.remove('fighting');
     save();
@@ -304,16 +304,16 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
   function start(foe: string): void {
     const w = world();
     if (s.fight) return;
-    const me = w.fighterAt('hero'), them = w.fighterAt(foe), p = w.talkPerson(foe);
+    const me = w.fights.fighterAt('hero'), them = w.fights.fighterAt(foe), p = w.talking.talkPerson(foe);
     if (!me || !them || !p) return;
-    if (w.injuriesOf(foe)?.dead) return notify(t('fight.alreadydead', '{name} is dead.', { name: p.name }));
-    if (w.injuriesOf('hero')?.out) return notify(t('fight.youareout', 'You are knocked out.'));
-    const senseless = !!w.injuriesOf(foe)?.out;
+    if (w.fights.injuriesOf(foe)?.dead) return notify(t('fight.alreadydead', '{name} is dead.', { name: p.name }));
+    if (w.fights.injuriesOf('hero')?.out) return notify(t('fight.youareout', 'You are knocked out.'));
+    const senseless = !!w.fights.injuriesOf(foe)?.out;
     s.foeId = foe;
     names.set('hero', t('fight.youobj', 'you'));
     names.set(foe, p.name);
-    w.beginFight(['hero', foe]);
-    const a = personFighter(w, foe, w.sheetOf(foe), them);
+    w.fights.beginFight(['hero', foe]);
+    const a = personFighter(w, foe, w.acting.sheetOf(foe), them);
     s.fight = startFight([heroFighter(w, hero, me), a]);
     s.fight.ground = groundNear(w, (me.x + them.x) / 2, (me.z + them.z) / 2);
     playback.reset();
@@ -352,8 +352,8 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
       return s.fight !== null;
     },
     check() {
-      if (!world().injuriesOf('hero')?.dead) return;
-      s.fight = startFight([{ ...heroFighter(world(), hero, { x: 0, z: 0 }), injuries: world().injuriesOf('hero') as Injuries }]);
+      if (!world().fights.injuriesOf('hero')?.dead) return;
+      s.fight = startFight([{ ...heroFighter(world(), hero, { x: 0, z: 0 }), injuries: world().fights.injuriesOf('hero') as Injuries }]);
       s.foeId = '';
       playback.reset();
       root.hidden = false;

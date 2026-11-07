@@ -29,57 +29,57 @@ describe('spike3d fight', () => {
     await page.waitForTimeout(1500);
 
     // The hero's own gear (the shepherd's quarterstaff) is carried on them: tap yourself → Draw a weapon; Put away.
-    expect(await w('w.stowed.map((s) => s.kind)')).toEqual(['quarterstaff']);
+    expect(await w('w.gear.stowed.map((s) => s.kind)')).toEqual(['quarterstaff']);
     await w(`(window.spike.sheet.open(null), 0)`);
     await page.click('#act .offers button:has-text("Draw a weapon")');
-    expect(await w('w.holding')).toBe('quarterstaff');
-    expect(await w('w.inHand.has("hero")')).toBe(true);
+    expect(await w('w.carrying.holding')).toBe('quarterstaff');
+    expect(await w('w.figures.inHand.has("hero")')).toBe(true);
     await page.waitForTimeout(300);
     await page.screenshot({ path: `${OUT}/fight-drawn.png` });
     await w(`(window.spike.sheet.open(null), 0)`);
     await page.click('#act .offers button:has-text("Put away the quarterstaff")');
-    expect(await w('w.holding')).toBeNull();
-    expect(await w('w.stowed.length')).toBe(1);
+    expect(await w('w.carrying.holding')).toBeNull();
+    expect(await w('w.gear.stowed.length')).toBe(1);
 
     // The gong calls a fresh gladiator at the level picked; the rack hands out any weapon (then put it back down).
     const thing = async (kind: string) => (await w(`(() => {
-      for (const lc of w.chunks.values()) for (const g of lc.standing.objects) if (g.userData.thing?.kind === '${kind}') return w.targetOf(g);
+      for (const lc of w.chunks.values()) for (const g of lc.standing.objects) if (g.userData.thing?.kind === '${kind}') return w.acting.targetOf(g);
       return null;
     })()`)) as { id: string; x: number; z: number } | null;
     const gong = await thing('gong'), rack = await thing('weapon-rack');
     expect(gong && rack).toBeTruthy();
-    const level0 = await w('w.sheetOf("gladiator").level');
+    const level0 = await w('w.acting.sheetOf("gladiator").level');
     await w(`(w.placeHeroAt(${gong!.x}, ${gong!.z + 1.4}), window.spike.sheet.open(${JSON.stringify(gong)}), 0)`);
     await page.click('#act .offers button:has-text("call a fighter")');
     await page.waitForSelector('#act .offers button:has-text("Master")', { timeout: 15_000 });
     await page.screenshot({ path: `${OUT}/fight-gong.png` });
     await page.click('#act .offers button:has-text("Capable")');
-    expect(await w('w.sheetOf("gladiator").level')).toBe('capable');
+    expect(await w('w.acting.sheetOf("gladiator").level')).toBe('capable');
     expect(level0).toBe('novice');
     await w(`(w.placeHeroAt(${rack!.x}, ${rack!.z - 1.4}), window.spike.sheet.open(${JSON.stringify(rack)}), 0)`);
     await page.click('#act .offers button:has-text("Take something")');
     await page.waitForSelector('#act .offers button:has-text("Greatsword")', { timeout: 15_000 });
     await page.screenshot({ path: `${OUT}/fight-rack.png` });
     await page.click('#act .offers button:has-text("Hunting spear")');
-    expect(await w('w.holding')).toBe('hunting-spear');
-    expect(await w('w.inHand.has("hero")')).toBe(true);
+    expect(await w('w.carrying.holding')).toBe('hunting-spear');
+    expect(await w('w.figures.inHand.has("hero")')).toBe(true);
     await page.waitForTimeout(300);
     await page.screenshot({ path: `${OUT}/fight-spear.png` });
-    await w(`(w.act('verb:put-down', null, { id: 'hero', dice: () => ({ n: 3, mod: 0 }) }), 0)`);
-    expect(await w('w.holding')).toBeNull();
+    await w(`(w.acting.act('verb:put-down', null, { id: 'hero', dice: () => ({ n: 3, mod: 0 }) }), 0)`);
+    expect(await w('w.carrying.holding')).toBeNull();
 
     // The sword on the sand by the west gate, as something to act on.
     const sword = (await w(`(() => {
-      for (const lc of w.chunks.values()) for (const g of lc.standing.objects) if (g.userData.thing?.kind === 'arming-sword') return w.targetOf(g);
+      for (const lc of w.chunks.values()) for (const g of lc.standing.objects) if (g.userData.thing?.kind === 'arming-sword') return w.acting.targetOf(g);
       return null;
     })()`)) as { id: string; x: number; z: number } | null;
     expect(sword).not.toBeNull();
     await w(`(w.placeHeroAt(${sword!.x - 0.8}, ${sword!.z}), 0)`);
-    const r = (await w(`w.act('verb:pick-up', ${JSON.stringify(sword)}, { id: 'hero', dice: () => ({ n: 3, mod: 0 }) })`)) as { done: boolean };
+    const r = (await w(`w.acting.act('verb:pick-up', ${JSON.stringify(sword)}, { id: 'hero', dice: () => ({ n: 3, mod: 0 }) })`)) as { done: boolean };
     expect(r.done).toBe(true);
-    expect(await w('w.holding')).toBe('arming-sword');
+    expect(await w('w.carrying.holding')).toBe('arming-sword');
     // In the right hand, and not slowing the hero like something carried in both arms.
-    expect(await w('w.inHand.has("hero") && w.carryPace === 1')).toBe(true);
+    expect(await w('w.figures.inHand.has("hero") && w.carrying.pace === 1')).toBe(true);
     expect(await w(`w.chunks.size && [...w.chunks.values()].some((lc) => lc.standing.objects.some((g) => g.userData.thing?.id === ${JSON.stringify(sword!.id)}))`)).toBe(false);
     await page.waitForTimeout(400);
     await page.screenshot({ path: `${OUT}/fight-sword.png` });
@@ -88,11 +88,11 @@ describe('spike3d fight', () => {
     await w(`(w.placeHeroAt(${rack!.x}, ${rack!.z - 1.4}), window.spike.sheet.open(${JSON.stringify(rack)}), 0)`);
     await page.click('#act .offers button:has-text("Take something")');
     await page.click('#act .offers button:has-text("Buckler")');
-    expect(await w('w.shieldOf("hero")?.kind')).toBe('buckler');
-    expect(await w('w.wieldedBy("hero")?.kind')).toBe('arming-sword');
+    expect(await w('w.gear.shieldOf("hero")?.kind')).toBe('buckler');
+    expect(await w('w.gear.wieldedBy("hero")?.kind')).toBe('arming-sword');
     // Drawn: the buckler on the left forearm, the sword in the right hand.
-    expect(await w('w.figureOf("hero").rig.left.children.length')).toBe(1);
-    expect(await w('w.figureOf("hero").rig.hand.children.length')).toBe(1);
+    expect(await w('w.figures.figureOf("hero").rig.left.children.length')).toBe(1);
+    expect(await w('w.figures.figureOf("hero").rig.hand.children.length')).toBe(1);
     await w(`(w.placeHeroAt(${sword!.x - 0.8}, ${sword!.z}), 0)`);
     // (Zoomed in to see the buckler on the arm, then back.)
     for (let i = 0; i < 4; i++) await page.click('#zoom button[data-zoom="1"]');
@@ -105,8 +105,8 @@ describe('spike3d fight', () => {
     // Fight the gladiator: the panel opens, the world waits, they draw their own sword.
     await w(`(fight.start('gladiator'), 0)`);
     expect(await page.isVisible('#fight')).toBe(true);
-    expect(await w('w.inFight')).toBe(true);
-    expect(await w('w.wieldedBy("gladiator")?.kind')).toMatch(/sword/);
+    expect(await w('w.fights.inFight')).toBe(true);
+    expect(await w('w.gear.wieldedBy("gladiator")?.kind')).toMatch(/sword/);
     // Fast mode (the default, B8g F3): count what floats up over the fighters, and the body outlines in both cards.
     await page.evaluate(() => {
       const o = window as unknown as { floats: string[] };
@@ -120,7 +120,7 @@ describe('spike3d fight', () => {
     expect(await page.textContent('#fight .us .card')).toMatch(/arming sword and buckler/);
     // The view swings side-on to the fight (B8g): the line from you to them runs left to right on screen.
     await page.waitForTimeout(1500);
-    expect(await w(`(() => { const h = w.fighterAt('hero'), g = w.fighterAt('gladiator'); const want = Math.atan2(-(g.z - h.z), g.x - h.x); return Math.abs(Math.atan2(Math.sin(w.yaw - want), Math.cos(w.yaw - want))); })()`)).toBeLessThan(0.05);
+    expect(await w(`(() => { const h = w.fights.fighterAt('hero'), g = w.fights.fighterAt('gladiator'); const want = Math.atan2(-(g.z - h.z), g.x - h.x); return Math.abs(Math.atan2(Math.sin(w.yaw - want), Math.cos(w.yaw - want))); })()`)).toBeLessThan(0.05);
     // Every defence is shown, with a block row for the buckler; a dodge can't counter.
     expect(await page.$$eval('#fight .mine button[data-move^="def:"]', (bs) => bs.map((b) => (b as HTMLElement).dataset.move))).toEqual(
       ['def:parry:standard', 'def:parry:defensive', 'def:parry:counter', 'def:block:standard', 'def:block:defensive', 'def:block:counter', 'def:dodge:standard', 'def:dodge:defensive'],
@@ -131,14 +131,14 @@ describe('spike3d fight', () => {
     // opens with it (the director: the many options folded into lists, on your side; the middle is the log).
     await page.waitForSelector('#fight .mine .group.side button:not([disabled])', { timeout: 60_000 });
     expect(await page.locator('#fight .choices').count()).toBe(0);
-    await w(`(() => { const h = w.fighterAt('hero'); fight.tap(null, { x: h.x + 3, z: h.z + 1 }); return 0; })()`);
+    await w(`(() => { const h = w.fights.fighterAt('hero'); fight.tap(null, { x: h.x + 3, z: h.z + 1 }); return 0; })()`);
     expect(await page.textContent('#fight .mine button[data-move="walk:there"]')).toMatch(/^Walk there \(3\.\d m\)/);
     // Weapons lying about are noticed as they come into view (an Alertness roll; here a long look, 10D6 more, so it
     // can't miss), kept in the save, and ringed in the fight.
-    await w('w.noticeLying(10)');
+    await w('w.senses.noticeLying(10)');
     expect(((await w('w.saveState().noticed.seen')) as string[]).length).toBeGreaterThan(0);
     // The view is fitted so both fighters are on screen (closer in than walking about, once they are near).
-    expect(await w(`['hero', 'gladiator'].every((id) => { const s = w.screenOf(id); return s && s.x > 0 && s.x < 1; })`)).toBe(true);
+    expect(await w(`['hero', 'gladiator'].every((id) => { const s = w.figures.screenOf(id); return s && s.x > 0 && s.x < 1; })`)).toBe(true);
     await page.waitForTimeout(800);
     await page.screenshot({ path: `${OUT}/fight-plan.png` });
     // The panel leaves the fighters in view: at the bottom on a phone (the view aims above it); when wide, between
@@ -222,7 +222,7 @@ describe('spike3d fight', () => {
     // Moves are made together: both walked or ran.
     expect(log.some((l) => /^You (walk|run)/.test(l)) && log.some((l) => /^\w+ (walks|runs) /.test(l))).toBe(true);
     expect(sawIntent).toBe(true);
-    const heroDead = (await w('!!w.injuriesOf("hero")?.dead')) as boolean;
+    const heroDead = (await w('!!w.fights.injuriesOf("hero")?.dead')) as boolean;
     const labels = await page.$$eval('#fight .mine .group.other button', (bs) => bs.map((b) => b.textContent ?? ''));
     if (heroDead) expect(labels).toContain('New game');
     else {
@@ -230,25 +230,25 @@ describe('spike3d fight', () => {
       if (labels.includes('Finish them')) {
         await tapMove(page, '#fight .mine button[data-move="finish"]');
         await page.waitForSelector('#fight .mine button[data-move="ok"]', { timeout: 60_000 });
-        expect(await w('!!w.injuriesOf("gladiator")?.dead')).toBe(true);
+        expect(await w('!!w.fights.injuriesOf("gladiator")?.dead')).toBe(true);
       }
       await tapMove(page, '#fight .mine button[data-move="ok"]');
-      expect(await w('w.inFight')).toBe(false);
+      expect(await w('w.fights.inFight')).toBe(false);
       expect(await w('w.ppm')).toBeLessThan(63); // the zoom from before the fight
       // Fatigue comes back with time (Q49).
-      const before = (await w('w.injuriesOf("hero")?.fatigue ?? 0')) as number;
+      const before = (await w('w.fights.injuriesOf("hero")?.fatigue ?? 0')) as number;
       if (before > 0) {
         await page.waitForTimeout(4000); // a real second is a world minute with the clock stopped; easy: a point a minute
-        expect((await w('w.injuriesOf("hero").fatigue')) as number).toBeLessThan(before);
+        expect((await w('w.fights.injuriesOf("hero").fatigue')) as number).toBeLessThan(before);
       }
     }
     // Kept through a reload: whoever died is still dead.
-    const dead = (await w('["hero", "gladiator"].filter((id) => w.injuriesOf(id)?.dead)')) as string[];
+    const dead = (await w('["hero", "gladiator"].filter((id) => w.fights.injuriesOf(id)?.dead)')) as string[];
     await w('(window.spike.world, 0)');
     await page.evaluate(() => dispatchEvent(new Event('pagehide')));
     await page.reload();
     await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 90_000 });
-    expect(await w('["hero", "gladiator"].filter((id) => w.injuriesOf(id)?.dead)')).toEqual(dead);
+    expect(await w('["hero", "gladiator"].filter((id) => w.fights.injuriesOf(id)?.dead)')).toEqual(dead);
     if (dead.includes('hero')) expect(await page.isVisible('#fight')).toBe(true);
     expect(errors).toEqual([]);
   }, 400_000);

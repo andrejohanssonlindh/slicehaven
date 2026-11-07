@@ -21,14 +21,14 @@ describe('spike3d owners and the scale', () => {
     // Night: the guard stands at the speaker's spot and watches the hero in front of him.
     await w('(w.dayMinutes = 0, w.weather.setHour(23), 0)');
     await page.waitForTimeout(2500);
-    const g = (await w('w.minds.find((m) => m.id === "guard")')) as { x: number; z: number };
+    const g = (await w('w.schedule.minds.find((m) => m.id === "guard")')) as { x: number; z: number };
     await w(`(w.placeHeroAt(${g.x}, ${g.z} + 4), 0)`);
-    await page.waitForFunction(() => (window as any).spike.world.senses.find((s: { id: string }) => s.id === 'guard').sees.includes('hero'), undefined, { timeout: 15_000 });
+    await page.waitForFunction(() => (window as any).spike.world.senses.senses.find((s: { id: string }) => s.id === 'guard').sees.includes('hero'), undefined, { timeout: 15_000 });
 
     // The town's torch nearest the hero (any will do: the act needs no reach when called directly).
     const torch = (await w(`(() => {
       let best = null;
-      for (const [id, f] of w.placedFires) if (f.kind === 'torchpost') {
+      for (const [id, f] of w.lights.placedFires) if (f.kind === 'torchpost') {
         const p = f.torch.light.position, d = Math.hypot(p.x - w.hero.x, p.z - w.hero.z);
         if (!best || d < best.d) best = { id, kind: f.kind, x: p.x, z: p.z, d };
       }
@@ -37,19 +37,19 @@ describe('spike3d owners and the scale', () => {
     const target = JSON.stringify({ id: torch.id, kind: torch.kind, x: torch.x, z: torch.z, level: 0, house: null });
     const strong = '{ id: "hero", dice: () => ({ n: 9, mod: 0 }) }';
 
-    const r1 = (await w(`w.act('verb:putout', ${target}, ${strong})`)) as { wrongs?: unknown[]; events: { kind: string; by?: { id: string }[] }[] };
+    const r1 = (await w(`w.acting.act('verb:putout', ${target}, ${strong})`)) as { wrongs?: unknown[]; events: { kind: string; by?: { id: string }[] }[] };
     expect(r1.wrongs).toEqual([{ act: 'meddle', owner: { town: true } }]);
     expect(r1.events.find((e) => e.kind === 'seen')?.by?.map((b) => b.id)).toContain('guard');
-    const once = (await w('w.regardOf("guard")')) as number;
+    const once = (await w('w.owners.regardOf("guard")')) as number;
     expect(once).toBeLessThan(0);
-    expect(((await w('w.answers.find((a) => a.id === "guard")')) as { answer: string }).answer).toBe('grumble');
+    expect(((await w('w.owners.answers.find((a) => a.id === "guard")')) as { answer: string }).answer).toBe('grumble');
 
     // Lit again (the town lets anyone light its torches), and put out again: he scolds, and comes up to you.
-    expect(((await w(`w.act('verb:light', ${target}, ${strong})`)) as { wrongs?: unknown[] }).wrongs).toBeUndefined();
-    await w(`w.act('verb:putout', ${target}, ${strong})`);
-    expect((await w('w.regardOf("guard")')) as number).toBeLessThan(once);
-    expect(((await w('w.answers.find((a) => a.id === "guard")')) as { answer: string }).answer).toBe('scold');
-    await page.waitForFunction(() => (window as any).spike.world.minds.find((m: { id: string }) => m.id === 'guard').doing === 'confront', undefined, { timeout: 5000 });
+    expect(((await w(`w.acting.act('verb:light', ${target}, ${strong})`)) as { wrongs?: unknown[] }).wrongs).toBeUndefined();
+    await w(`w.acting.act('verb:putout', ${target}, ${strong})`);
+    expect((await w('w.owners.regardOf("guard")')) as number).toBeLessThan(once);
+    expect(((await w('w.owners.answers.find((a) => a.id === "guard")')) as { answer: string }).answer).toBe('scold');
+    await page.waitForFunction(() => (window as any).spike.world.schedule.minds.find((m: { id: string }) => m.id === 'guard').doing === 'confront', undefined, { timeout: 5000 });
     await page.screenshot({ path: `${OUT}owners-scold.png` });
 
     // What he thinks of you is kept with the map.
@@ -66,30 +66,30 @@ describe('spike3d owners and the scale', () => {
     // Into the inn: the taproom, the keeper's, open to anyone.
     expect(await w('w.walkIn("inn")')).not.toBeNull();
     await page.waitForFunction(() => (window as any).spike.world.hero.house === 'inn' && !(window as any).spike.world.hero.legs.length, undefined, { timeout: 20_000 });
-    const below = (await w('w.whoseAt(w.heroSpot())')) as { members: string[]; room: string; open: unknown; leave: boolean };
+    const below = (await w('w.owners.whoseAt(w.heroSpot())')) as { members: string[]; room: string; open: unknown; leave: boolean };
     expect(below.room).toBe('taproom');
     expect(below.open).toEqual([6, 24]);
     expect(below.members.length).toBe(1);
     // Up the stairs: not open to you.
     expect(await w('w.climb(1)')).not.toBeNull();
     await page.waitForFunction(() => (window as any).spike.world.hero.level === 1, undefined, { timeout: 20_000 });
-    const up = (await w('w.whoseAt(w.heroSpot())')) as { room: string; open: unknown; leave: boolean };
+    const up = (await w('w.owners.whoseAt(w.heroSpot())')) as { room: string; open: unknown; leave: boolean };
     expect(up.open).toBeNull();
     // A room for the night from the keeper: then you have leave.
     const hero = '{ kind: "human", people: "asharier", tags: [] }';
-    const r = (await w(`w.talkTo('talk:leave', 'keeper', { id: 'hero', dice: () => ({ n: 4, mod: 0 }) }, ${hero})`)) as { leave?: string };
+    const r = (await w(`w.talking.talkTo('talk:leave', 'keeper', { id: 'hero', dice: () => ({ n: 4, mod: 0 }) }, ${hero})`)) as { leave?: string };
     expect(r.leave).toBe('inn');
-    expect(((await w('w.whoseAt(w.heroSpot())')) as { leave: boolean }).leave).toBe(true);
+    expect(((await w('w.owners.whoseAt(w.heroSpot())')) as { leave: boolean }).leave).toBe(true);
 
     // Night: the villagers are at home. Into one of their homes, in front of them: a wrong, answered.
     await w('(w.weather.setHour(23), w.placeHeroAt(0, 14), 0)');
-    await page.waitForFunction(() => (window as any).spike.world.minds.some((m: { house: string | null }) => m.house && m.house.startsWith('home')), undefined, { timeout: 60_000 });
+    await page.waitForFunction(() => (window as any).spike.world.schedule.minds.some((m: { house: string | null }) => m.house && m.house.startsWith('home')), undefined, { timeout: 60_000 });
     await page.waitForTimeout(3000);
-    const home = (await w('w.minds.find((m) => m.house && m.house.startsWith("home"))')) as { id: string; house: string; x: number; z: number } | undefined;
+    const home = (await w('w.schedule.minds.find((m) => m.house && m.house.startsWith("home"))')) as { id: string; house: string; x: number; z: number } | undefined;
     expect(home).toBeDefined();
     await w(`(w.placeHeroAt(${home!.x}, ${home!.z} + 1.2), 0)`);
-    await page.waitForFunction((id) => (window as any).spike.world.regardOf(id) < 0, home!.id, { timeout: 15_000 });
-    expect(((await w(`w.answers.find((a) => a.id === ${JSON.stringify(home!.id)})`)) as { answer: string }).answer).toBe('grumble');
+    await page.waitForFunction((id) => (window as any).spike.world.owners.regardOf(id) < 0, home!.id, { timeout: 15_000 });
+    expect(((await w(`w.owners.answers.find((a) => a.id === ${JSON.stringify(home!.id)})`)) as { answer: string }).answer).toBe('grumble');
     await page.screenshot({ path: `${OUT}owners-trespass.png` });
     expect(errors).toEqual([]);
   });

@@ -49,17 +49,17 @@ describe('spike3d', () => {
     await page.evaluate(() => { const w = (window as any).spike.world; w.follow = false; w.focus.x = 6; w.focus.z = -16; });
     await page.waitForTimeout(800);
     await page.screenshot({ path: `${OUT}spike3d-stream.png` });
-    await page.evaluate(() => { const w = (window as any).spike.world; w.pool = 1; w.focus.x = 2; w.focus.z = 2; });
+    await page.evaluate(() => { const w = (window as any).spike.world; w.sky.pool = 1; w.focus.x = 2; w.focus.z = 2; });
     await page.waitForTimeout(800);
     await page.screenshot({ path: `${OUT}spike3d-pools.png` });
     // Mist on demand, looking at the washing line.
     await page.evaluate(() => { const w = (window as any).spike.world; w.follow = false; w.focus.x = 15.5; w.focus.z = 7; });
     await page.waitForTimeout(500);
     await page.screenshot({ path: `${OUT}spike3d-laundry.png` });
-    await page.evaluate(() => (window as any).spike.world.setMist(0.6));
+    await page.evaluate(() => (window as any).spike.world.sky.setMist(0.6));
     await page.waitForTimeout(5000);
     await page.screenshot({ path: `${OUT}spike3d-mist.png` });
-    await page.evaluate(() => { const w = (window as any).spike.world; w.setMist(0); w.follow = true; });
+    await page.evaluate(() => { const w = (window as any).spike.world; w.sky.setMist(0); w.follow = true; });
     await clickBtn(page, 'Inside');
     await page.locator('#zoom button[data-zoom="1"]').click();
     await page.waitForTimeout(2500);
@@ -96,8 +96,8 @@ describe('spike3d streaming', () => {
   it('streams chunks in and out as the view moves over a bigger world', async () => {
     const { page, errors } = await openPage(env, '/spike3d/?world=224&tier=low&nogov');
     await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 30_000 });
-    const count = () => page.evaluate(() => (window as any).spike.world.chunkCount as number);
-    const built = () => page.evaluate(() => (window as any).spike.world.chunksBuilt as number);
+    const count = () => page.evaluate(() => (window as any).spike.world.streaming.chunkCount as number);
+    const built = () => page.evaluate(() => (window as any).spike.world.streaming.chunksBuilt as number);
     await page.waitForTimeout(1500);
     const first = await count();
     // A phone-sized view of a 224 m world holds only a few of its 64 chunks.
@@ -149,7 +149,7 @@ describe('spike3d filaments', () => {
     await page.waitForTimeout(800);
     // Water is the fourth stop: life, light, earth, water.
     for (let k = 0; k < 4; k++) await clickBtn(page, 'Filaments');
-    expect(await page.evaluate(() => (window as any).spike.world.shownAspect)).toBe('hydro');
+    expect(await page.evaluate(() => (window as any).spike.world.filaments.shownAspect)).toBe('hydro');
     // Look at the lake's shore.
     await page.evaluate(() => { const w = (window as any).spike.world; w.focus.x = -9; w.focus.z = -5; });
     await page.waitForTimeout(1500);
@@ -159,7 +159,7 @@ describe('spike3d filaments', () => {
     // Fire by night: the torches warm their ground.
     await clickBtn(page, 'Night');
     for (let k = 0; k < 3; k++) await clickBtn(page, 'Filaments');
-    expect(await page.evaluate(() => (window as any).spike.world.shownAspect)).toBe('pyro');
+    expect(await page.evaluate(() => (window as any).spike.world.filaments.shownAspect)).toBe('pyro');
     await page.evaluate(() => { const w = (window as any).spike.world; w.focus.x = 3; w.focus.z = 3; });
     await page.waitForTimeout(2500);
     await page.screenshot({ path: `${OUT}spike3d-heat-fire.png` });
@@ -168,7 +168,7 @@ describe('spike3d filaments', () => {
     expect(r).toBeGreaterThanOrEqual(-2);
     // Off again after the last aspect (there are sixteen now, pyro is the seventh): no overlay left.
     for (let k = 0; k < 10; k++) await clickBtn(page, 'Filaments');
-    expect(await page.evaluate(() => (window as any).spike.world.shownAspect)).toBeNull();
+    expect(await page.evaluate(() => (window as any).spike.world.filaments.shownAspect)).toBeNull();
     expect(errors).toEqual([]);
   });
 });
@@ -183,13 +183,13 @@ describe('spike3d entering', () => {
     expect(await w('w.walkIn()')).not.toBeNull();
     await page.waitForFunction(() => !(window as any).spike.world.walking, undefined, { timeout: 40_000 });
     expect(await w('w.heroIndoors')).toBe(true);
-    expect(await w('w.inside')).toBe(true);
+    expect(await w('w.housing.inside')).toBe(true);
     await page.waitForTimeout(1500);
     await page.screenshot({ path: `${OUT}spike3d-hero-inside.png` });
     await w('w.walkTo(3, 3)');
     await page.waitForFunction(() => !(window as any).spike.world.walking, undefined, { timeout: 40_000 });
     expect(await w('w.heroIndoors')).toBe(false);
-    expect(await w('w.inside')).toBe(false);
+    expect(await w('w.housing.inside')).toBe(false);
     expect(errors).toEqual([]);
   });
 });

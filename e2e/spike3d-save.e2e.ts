@@ -19,7 +19,7 @@ describe('spike3d save', () => {
     // Walk into the first house; its hearth is the nearest.
     expect(await w('w.walkIn()')).not.toBeNull();
     await page.waitForFunction(() => !(window as any).spike.world.walking, undefined, { timeout: 40_000 });
-    const fire = (await w('w.firesNear()[0]')) as { id: string; kind: string; lit: boolean };
+    const fire = (await w('w.housing.firesNear()[0]')) as { id: string; kind: string; lit: boolean };
     expect(fire.lit).toBe(true);
     await w(`(w.states.set(${JSON.stringify(fire.id)}, ${JSON.stringify(fire.kind)}, 'lit', false), w.weather.setHour(20), 0)`);
     // Out: no smoke from its chimney, its light no longer in the pool.

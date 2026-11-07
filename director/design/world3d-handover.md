@@ -35,7 +35,7 @@
 | `core/world3d/filaments3d.ts` | The filament field, lazy, by cell |
 | `core/world3d/weather.ts`, `environment3d.ts`, `sky.ts` | Weather and the clock (`Weather.hour`, `advance`), one read of sky, fog, wind, wetness, cloud shadow |
 | `core/world3d/tiers.ts` | Quality tiers and the `Governor` that steps quality down and up |
-| `engine3d/world.ts` | `SpikeWorld`: builds and runs the scene (chunks, camera, cut-away, lights, people's figures, furniture models, field). It draws; it should not decide rules |
+| `engine3d/world/` | `SpikeWorld` (`index.ts`, the hub: scene, camera, the hero, the map's people, the saved state, the frame) and one part per area: drawing (`streaming`, `houses`, `trees`, `props`, `grass`, `shells`, `lights`, `sky`, `sight`, `filaments`, `figures`) and doing (`acting`, `schedule`, `senses`, `owners`, `talking`, `journal`, `carrying`, `gear`, `fights`). Callers name the part: `world.lights.toggleOrb()`. It draws and carries out; it should not decide rules |
 | `engine3d/pipeline.ts`, `materials.ts`, `shadow.ts`, `water.ts`, `rain.ts`, `heat.ts`, `smoke.ts` | The frame, materials, blob shadows, lake, rain, heat map, smoke |
 | `content/maps/*.json`, `content/maps/rules/` | Maps and map rules ([authoring](world3d-authoring.md)) |
 

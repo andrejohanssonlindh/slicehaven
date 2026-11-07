@@ -2,6 +2,14 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-07 — The 3D world split into parts (a refactor; nothing to see)
+
+- **Why:** `engine3d/world.ts` had grown to 4,224 lines (a tenth of the code), holding the drawing and every system (fights, carrying, talk, owners, leads, perception) in one class. Fights are paused, and B6 (inventory) and the first village would have added more, so this was the cheap moment.
+- **Now:** `src/engine3d/world/` is a hub and 20 parts, one file per area. The hub (`index.ts`, about 800 lines) holds what everything shares: the scene and camera, the map, the hero and the map's people, the saved state, and the frame. Your idea, *drawing of objects as files*, is how the drawing side is cut: `houses.ts`, `trees.ts`, `props.ts`, `grass.ts`, `shells.ts` (thatch and leaf fur), plus `lights.ts`, `sky.ts` (sun, fog, mist, lightning, rain, smoke), `sight.ts`, `streaming.ts` (chunks), `filaments.ts` and `figures.ts` (bodies, motions). The doing side: `acting.ts`, `schedule.ts` (the people's day), `senses.ts`, `owners.ts`, `talking.ts`, `journal.ts` (leads), `carrying.ts`, `gear.ts` (what is held), `fights.ts`. The biggest part is about 365 lines.
+- **How it fits the thing rewrite:** a kind of thing already says *what* it is in its own file (`content/things/kinds/`, models in `things/models/`); now *how a family of things is drawn* is one file too. A new family of drawn things (animals, carts) gets a file beside `trees.ts`. A new house type is still an entry in `buildings.ts`, drawn by `houses.ts`.
+- **Nothing changed in play.** All 135 browser tests and 861 unit tests pass as before. One dead piece went: a list of "house fires" that nothing filled any more.
+- The pattern is in [how we build things](design/architecture.md) ("World parts").
+
 ## 2026-11-07 — Stopping to choose, looking over bodies, freeing a hand
 
 - **Tapping someone or something stops your walk.** Before, you walked on while choosing, and a fight then started from where you were heading (the jump you saw). A fight also stops everyone in it where they stand.

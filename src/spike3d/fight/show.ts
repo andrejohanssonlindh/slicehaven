@@ -112,7 +112,7 @@ export function makePlayback(ctx: FightCtx): Playback {
   /** Words or a number rising slowly over someone and fading (the old-game way): red for a hit, pale for a miss. */
   function float(id: string, text: string, kind: 'hit' | 'miss', sub = ''): void {
     const stage = document.getElementById('stage');
-    const at = ctx.world().screenOf(id);
+    const at = ctx.world().figures.screenOf(id);
     if (!stage || !at) return;
     const f = document.createElement('div');
     f.className = `fight-float ${kind}`;
@@ -130,7 +130,7 @@ export function makePlayback(ctx: FightCtx): Playback {
 
   /** Wait until the fighters have walked where the round sent them (or a while, at most). */
   async function settle(w: SpikeWorld): Promise<void> {
-    for (let k = 0; k < 60 && (w.fighterMoving('hero') || w.fighterMoving(ctx.s.foeId)); k++) await sleep(100);
+    for (let k = 0; k < 60 && (w.fights.fighterMoving('hero') || w.fights.fighterMoving(ctx.s.foeId)); k++) await sleep(100);
   }
 
   /**
@@ -141,12 +141,12 @@ export function makePlayback(ctx: FightCtx): Playback {
    */
   async function exchange(l: Attack, landed: boolean): Promise<void> {
     const w = ctx.world();
-    const hitAt = w.motionTiming(l.who, 'strike')?.contact ?? 0.35;
-    w.play(l.who, 'strike');
+    const hitAt = w.figures.motionTiming(l.who, 'strike')?.contact ?? 0.35;
+    w.figures.play(l.who, 'strike');
     const meet: MotionAct | null = !l.hit && l.how !== 'none' ? l.how : null;
     if (meet) {
-      const lead = Math.max(0, hitAt - (w.motionTiming(l.target, meet)?.contact ?? 0));
-      setTimeout(() => w.play(l.target, meet), lead * 1000);
+      const lead = Math.max(0, hitAt - (w.figures.motionTiming(l.target, meet)?.contact ?? 0));
+      setTimeout(() => w.figures.play(l.target, meet), lead * 1000);
     }
     await sleep(hitAt * 1000);
     if (!l.hit) float(l.target, t(`fight.verdict.${l.how}`, VERDICT[l.how]), 'miss');
@@ -154,8 +154,8 @@ export function makePlayback(ctx: FightCtx): Playback {
       const r = l.result;
       // Going down this round (knocked out, killed, knocked off their feet): they fall at the blow, not flinch, get
       // up and then fall (the director).
-      if (goingDown.has(l.target) || r.after.out || r.after.dead || r.after.short.includes('fall')) { if (!w.isLying(l.target)) w.play(l.target, 'fall'); }
-      else if (r.net > 0) w.play(l.target, r.serious || r.fatigue >= 3 ? 'stagger' : 'flinch');
+      if (goingDown.has(l.target) || r.after.out || r.after.dead || r.after.short.includes('fall')) { if (!w.figures.isLying(l.target)) w.figures.play(l.target, 'fall'); }
+      else if (r.net > 0) w.figures.play(l.target, r.serious || r.fatigue >= 3 ? 'stagger' : 'flinch');
       if (landed) {
         seeHit(l);
         floatHit(l);
@@ -261,7 +261,7 @@ export function makePlayback(ctx: FightCtx): Playback {
     for (const l of lines) {
       switch (l.k) {
         case 'move': {
-          w.moveFighter(l.who, l.to.x, l.to.z);
+          w.fights.moveFighter(l.who, l.to.x, l.to.z);
           if (l.roll) await reveal([{ ...l.roll, label: `${ctx.Name(l.who)}: ${rollableName('attr:Förflyttning')}` }], [l.who === 'hero']);
           const m = { m: l.metres.toFixed(1) };
           const roll = l.roll ? said(l.roll, l.who, 'Run') : '';
@@ -282,16 +282,16 @@ export function makePlayback(ctx: FightCtx): Playback {
           break;
         }
         case 'stow':
-          if (l.who === 'hero') w.stowHeld(l.item);
+          if (l.who === 'hero') w.gear.stowHeld(l.item);
           log(of(l.who, ['fight.stowed.you', 'You put away the {thing}.'], ['fight.stowed', '{who} puts away the {thing}.'], { thing: ctx.kindName(l.item) }), l.who === 'hero' ? 'you' : 'they');
           break;
         case 'draw':
-          if (l.who === 'hero') w.drawOwn(l.item);
+          if (l.who === 'hero') w.gear.drawOwn(l.item);
           log(of(l.who, ['fight.drew.you', 'You draw your {thing}.'], ['fight.drew', '{who} draws a {thing}.'], { thing: ctx.kindName(l.item) }), l.who === 'hero' ? 'you' : 'they');
           break;
         case 'pickUp':
           await settle(w);
-          w.takeUp(l.who, l.item);
+          w.gear.takeUp(l.who, l.item);
           log(of(l.who, ['fight.pickedup.you', 'You pick up the {thing}.'], ['fight.pickedup', '{who} picks up the {thing}.'], { thing: ctx.kindName(l.item) }), l.who === 'hero' ? 'you' : 'they');
           break;
         case 'open': {
@@ -308,12 +308,12 @@ export function makePlayback(ctx: FightCtx): Playback {
           await showAttack(l);
           break;
         case 'drop':
-          w.dropAt(l.who, l.item, l.at.x, l.at.z);
-          w.notice(l.item); // (seen falling)
+          w.gear.dropAt(l.who, l.item, l.at.x, l.at.z);
+          w.senses.notice(l.item); // (seen falling)
           log(of(l.who, ['fight.dropped.you', 'You drop the {thing}.'], ['fight.dropped', '{who} drops the {thing}.'], { thing: ctx.kindName(l.item) }), l.who === 'hero' ? 'bad' : 'good');
           break;
         case 'retreat':
-          w.moveFighter(l.who, l.to.x, l.to.z);
+          w.fights.moveFighter(l.who, l.to.x, l.to.z);
           log(of(l.who, ['fight.retreats.you', 'You break off and step back.'], ['fight.retreats', '{who} breaks off and steps back.']), 'info');
           break;
         case 'roles': {
@@ -329,7 +329,7 @@ export function makePlayback(ctx: FightCtx): Playback {
             ['fight.kept', '{who}’s careful defence held by {by}, but it takes 10 (2 advantages) to win the attack back: you keep attacking.'], { by: l.by }), 'info');
           break;
         case 'rise':
-          w.setInjuries(l.who, fight().fighters.find((f) => f.id === l.who)!.injuries);
+          w.fights.setInjuries(l.who, fight().fighters.find((f) => f.id === l.who)!.injuries);
           log(of(l.who, ['fight.rise.you', 'You get back on your feet.'], ['fight.rise', '{who} gets back on their feet.']), l.who === 'hero' ? 'you' : 'they');
           break;
         case 'demand': {
@@ -370,12 +370,12 @@ export function makePlayback(ctx: FightCtx): Playback {
           log(of(l.who, ['fight.pleads.you', 'You ask to yield.'], ['fight.pleads', '{who} asks to yield.']), mine ? 'you' : 'they');
           await reveal([{ ...l.roll, label: t('fight.plearoll', '{who}: plea', { who: ctx.Name(l.who) }) }], [mine], [answer]);
           log(`${answer.replace(/\.$/, '')}${said(l.roll, l.who, 'Plea')}.`, l.granted ? 'info' : 'bad');
-          if (l.granted && mine) w.noteYield(foeId);
+          if (l.granted && mine) w.fights.noteYield(foeId);
           break;
         }
         case 'mercy':
           await settle(w);
-          w.play(l.who, 'finish');
+          w.figures.play(l.who, 'finish');
           if (ctx.fast()) await sleep(1300);
           log(of(l.who, ['fight.mercy.you', 'You give {target} the killing stroke.'], ['fight.mercy', '{who} gives {target} the killing stroke.'], { target: ctx.nameOf(l.target) }), l.who === 'hero' ? 'good' : 'bad');
           break;
@@ -385,7 +385,7 @@ export function makePlayback(ctx: FightCtx): Playback {
       }
       // Injuries show on the bodies and the cards as they happen (lying down when out).
       if (l.k === 'attack' || l.k === 'end' || l.k === 'mercy') {
-        for (const f of fight().fighters) w.setInjuries(f.id, f.injuries);
+        for (const f of fight().fighters) w.fights.setInjuries(f.id, f.injuries);
         cards(ctx);
       }
       flushRolls();

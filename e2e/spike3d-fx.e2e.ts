@@ -29,18 +29,18 @@ describe('spike3d magic lights, speed, and tapping round the back', () => {
     })`) as Promise<number>;
     await page.waitForTimeout(500);
     const calm = await worstGap('0');
-    const orbGap = await worstGap('w.toggleOrb()');
-    const rayGap = await worstGap('w.toggleRay()');
+    const orbGap = await worstGap('w.lights.toggleOrb()');
+    const rayGap = await worstGap('w.lights.toggleRay()');
     console.info(`frame gaps: calm ${calm.toFixed(0)} ms, raising the orb ${orbGap.toFixed(0)} ms, the ray ${rayGap.toFixed(0)} ms`);
     expect(orbGap).toBeLessThan(Math.max(300, calm * 4));
     expect(rayGap).toBeLessThan(Math.max(300, calm * 4));
-    await w('(w.toggleOrb(), w.toggleRay(), 0)');
-    await w('(w.toggleOrb(), w.toggleRay(), 0)');
+    await w('(w.lights.toggleOrb(), w.lights.toggleRay(), 0)');
+    await w('(w.lights.toggleOrb(), w.lights.toggleRay(), 0)');
     await page.waitForTimeout(1200);
-    expect(await w('w.orbOn && w.rayOn')).toBe(true);
+    expect(await w('w.lights.orbOn && w.lights.rayOn')).toBe(true);
     await page.screenshot({ path: `${OUT}spike3d-magic-light.png` });
-    await w('(w.toggleOrb(), w.toggleRay(), 0)');
-    expect(await w('w.orbOn || w.rayOn')).toBe(false);
+    await w('(w.lights.toggleOrb(), w.lights.toggleRay(), 0)');
+    expect(await w('w.lights.orbOn || w.lights.rayOn')).toBe(false);
 
     // Speed: three times a stroll covers the ground three times as fast.
     const dist = async (mul: number): Promise<number> => {
@@ -88,9 +88,9 @@ describe('spike3d lightning and fires', () => {
     const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; return ${fn}; })()`);
     expect(((await page.textContent('#build')) ?? '').length).toBeGreaterThan(0);
 
-    await w("(w.weather.setTime('night'), w.weather.set('storm'), w.autoBolts = false, 0)");
+    await w("(w.weather.setTime('night'), w.weather.set('storm'), w.sky.autoBolts = false, 0)");
     await page.waitForTimeout(1500);
-    await w('(w.strike(), 0)');
+    await w('(w.sky.strike(), 0)');
     // Freeze the world at the first instant of the bolt, so the picture catches it (a real bolt lasts half a second).
     await w('(w.update = () => {}, 0)');
     await page.waitForTimeout(200);
@@ -98,34 +98,34 @@ describe('spike3d lightning and fires', () => {
 
     await w('(delete w.update, w.weather.set("clear"), 0)');
     await page.waitForTimeout(2500);
-    expect(await w('w.lightFire()')).toBe(true);
-    expect(await w('w.campfires')).toBe(1);
+    expect(await w('w.lights.lightFire()')).toBe(true);
+    expect(await w('w.lights.campfires')).toBe(1);
     for (let i = 0; i < 3; i++) await page.click('#zoom button[data-zoom="1"]');
     await page.waitForTimeout(800);
     await page.screenshot({ path: `${OUT}spike3d-fire.png` });
-    await w('(w.douseFires(), 0)');
-    expect(await w('w.campfires')).toBe(0);
+    await w('(w.lights.douseFires(), 0)');
+    expect(await w('w.lights.campfires')).toBe(0);
 
     // Nothing is kept on the GPU after it is put away: campfires, the hand torch, the orb and the ray, again and again.
     const geos = () => page.evaluate('window.spike.pipeline.renderer.info.memory.geometries') as Promise<number>;
     // One round first: what is made once and then shared (a flame's or smoke's shape) is not a leak.
-    await w('(w.lightFire(), w.lightFire(), w.toggleTorch(), w.toggleOrb(), w.toggleRay(), 0)');
+    await w('(w.lights.lightFire(), w.lights.lightFire(), w.lights.toggleTorch(), w.lights.toggleOrb(), w.lights.toggleRay(), 0)');
     await page.waitForTimeout(300);
-    await w('(w.douseFires(), w.toggleTorch(), w.toggleOrb(), w.toggleRay(), 0)');
+    await w('(w.lights.douseFires(), w.lights.toggleTorch(), w.lights.toggleOrb(), w.lights.toggleRay(), 0)');
     await page.waitForTimeout(500);
     const before = await geos();
     for (let i = 0; i < 4; i++) {
-      await w('(w.lightFire(), w.lightFire(), w.toggleTorch(), w.toggleOrb(), w.toggleRay(), 0)');
+      await w('(w.lights.lightFire(), w.lights.lightFire(), w.lights.toggleTorch(), w.lights.toggleOrb(), w.lights.toggleRay(), 0)');
       await page.waitForTimeout(300);
-      await w('(w.douseFires(), w.toggleTorch(), w.toggleOrb(), w.toggleRay(), 0)');
+      await w('(w.lights.douseFires(), w.lights.toggleTorch(), w.lights.toggleOrb(), w.lights.toggleRay(), 0)');
       await page.waitForTimeout(300);
     }
     expect(await geos()).toBeLessThanOrEqual(before);
 
     // A strike on open ground by day leaves a burnt, fern-scarred patch that stays (and is ash to the filament field).
-    await w("(w.weather.setHour(12), w.autoBolts = false, w.strike({ x: w.hero.x + 3, z: w.hero.z + 4 }), 0)");
+    await w("(w.weather.setHour(12), w.sky.autoBolts = false, w.sky.strike({ x: w.hero.x + 3, z: w.hero.z + 4 }), 0)");
     await page.waitForTimeout(1500);
-    expect(await w('w.scorches.length')).toBe(2); // (the night's bolt left one too)
+    expect(await w('w.sky.scorches.length')).toBe(2); // (the night's bolt left one too)
     expect(await w('w.field.readAt(w.hero.x + 3, w.hero.z + 4).nekro.parts.some((p) => p.label.startsWith("Ash"))')).toBe(true);
     await page.screenshot({ path: `${OUT}spike3d-scorch.png` });
     expect(errors).toEqual([]);
@@ -137,7 +137,7 @@ describe('spike3d lightning and fires', () => {
       const { page, errors } = await openPage(env, '/spike3d/?nogov');
       await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 30_000 });
       const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; return ${fn}; })()`);
-      strikes.push(await w('(w.autoBolts = false, w.focus.x = 0, w.focus.z = 0, [w.strike(), w.strike()])'));
+      strikes.push(await w('(w.sky.autoBolts = false, w.focus.x = 0, w.focus.z = 0, [w.sky.strike(), w.sky.strike()])'));
       expect(errors).toEqual([]);
       await page.close();
     }

@@ -45,7 +45,7 @@ describe('spike3d actions', () => {
     const w = evalIn(page);
     expect(await w('w.walkIn()')).not.toBeNull();
     await stopped(page);
-    const fire = (await w('w.firesNear()[0]')) as { id: string; kind: string; lit: boolean };
+    const fire = (await w('w.housing.firesNear()[0]')) as { id: string; kind: string; lit: boolean };
     expect(fire.lit).toBe(true);
     await tapPiece(page, fire.kind);
     await page.waitForSelector('#act:not([hidden])');
@@ -96,7 +96,7 @@ describe('spike3d actions', () => {
     expect(await page.locator('#act .name').textContent()).toBe('Where you stand');
     await page.locator('#act .offers button', { hasText: 'Make a fire' }).click();
     await page.waitForFunction(() => /Not indoors/.test(document.getElementById('notice')!.textContent ?? ''), undefined, { timeout: 5_000 });
-    expect(await w('w.campfires')).toBe(0);
+    expect(await w('w.lights.campfires')).toBe(0);
     // Walking gets them up.
     expect(await w('w.walkIn()')).not.toBeNull();
     await stopped(page);
@@ -110,14 +110,14 @@ describe('spike3d actions', () => {
     const w = evalIn(page);
     await page.waitForTimeout(1500);
     const torch = (await w(`(() => {
-      for (const [id, f] of w.placedFires) if (f.kind === 'torchpost') return { id, kind: f.kind, x: f.torch.light.position.x, z: f.torch.light.position.z };
+      for (const [id, f] of w.lights.placedFires) if (f.kind === 'torchpost') return { id, kind: f.kind, x: f.torch.light.position.x, z: f.torch.light.position.z };
       return null;
     })()`)) as { id: string; kind: string; x: number; z: number } | null;
     expect(torch).not.toBeNull();
     const target = JSON.stringify({ id: torch!.id, kind: torch!.kind, x: torch!.x, z: torch!.z, level: 0, house: null });
-    const r = (await w(`w.act('verb:putout', ${target}, { id: 'hero', dice: () => ({ n: 3, mod: 0 }) })`)) as { done: boolean };
+    const r = (await w(`w.acting.act('verb:putout', ${target}, { id: 'hero', dice: () => ({ n: 3, mod: 0 }) })`)) as { done: boolean };
     expect(r.done).toBe(true);
-    expect(await w(`(() => { const f = w.placedFires.get(${JSON.stringify(torch!.id)}); return { flame: f.torch.flame.visible, pooled: w.torches.includes(f.torch) }; })()`)).toEqual({ flame: false, pooled: false });
+    expect(await w(`(() => { const f = w.lights.placedFires.get(${JSON.stringify(torch!.id)}); return { flame: f.torch.flame.visible, pooled: w.lights.torches.includes(f.torch) }; })()`)).toEqual({ flame: false, pooled: false });
     expect(errors).toEqual([]);
   });
 
@@ -126,18 +126,18 @@ describe('spike3d actions', () => {
     await ready(page);
     const w = evalIn(page);
     // The innkeeper's hearth, put out in the night; stand by the inn so they are not too far to stir.
-    const fire = (await w(`w.fireOf('inn')`)) as { id: string; kind: string; x: number; z: number };
+    const fire = (await w(`w.housing.fireOf('inn')`)) as { id: string; kind: string; x: number; z: number };
     expect(fire).not.toBeNull();
     await w(`(w.weather.setHour(5.9), w.states.set(${JSON.stringify(fire.id)}, ${JSON.stringify(fire.kind)}, 'lit', false), w.placeHeroAt(${fire.x + 6}, ${fire.z + 6}), 0)`);
     await w('(w.dayMinutes = 0, w.weather.setHour(6.05), 0)');
     // They walk to it and try, with their own sheet (B4): Survival if they have it, else Agility at −2D6. A try that
     // takes lights it; one that fails is tried again.
-    await page.waitForFunction(`window.spike.world.recentActs.some((a) => a.who === 'keeper' && a.target === ${JSON.stringify(fire.id)})`, undefined, { timeout: 60_000 });
-    const tries = (await w(`w.recentActs.filter((a) => a.who === 'keeper')`)) as { offer: string; skill: string; success: boolean }[];
+    await page.waitForFunction(`window.spike.world.acting.recentActs.some((a) => a.who === 'keeper' && a.target === ${JSON.stringify(fire.id)})`, undefined, { timeout: 60_000 });
+    const tries = (await w(`w.acting.recentActs.filter((a) => a.who === 'keeper')`)) as { offer: string; skill: string; success: boolean }[];
     expect(tries[0].offer).toBe('verb:light');
     expect(['Vildmarksvana', 'attr:Förflyttning']).toContain(tries[0].skill);
     expect(await w(`w.states.get(${JSON.stringify(fire.id)}, ${JSON.stringify(fire.kind)}, 'lit')`)).toBe(tries.some((a) => a.success));
-    expect((await w(`w.minds.find((m) => m.id === 'keeper').doing`))).toBe('tendfire');
+    expect((await w(`w.schedule.minds.find((m) => m.id === 'keeper').doing`))).toBe('tendfire');
     expect(errors).toEqual([]);
   });
 });

@@ -130,7 +130,7 @@ export function intentBubble(ctx: FightCtx): void {
 export function trackBubble(ctx: FightCtx): void {
   const fight = ctx.s.fight;
   if (!fight || ctx.el.root.hidden) return;
-  const at = fight.fighters[1] ? ctx.world().screenOf(fight.fighters[1].id) : null;
+  const at = fight.fighters[1] ? ctx.world().figures.screenOf(fight.fighters[1].id) : null;
   if (at && !ctx.el.intent.hidden) {
     ctx.el.intent.style.left = `${at.x * 100}%`;
     ctx.el.intent.style.top = `${at.y * 100}%`;

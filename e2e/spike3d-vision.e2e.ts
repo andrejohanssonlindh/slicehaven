@@ -34,10 +34,10 @@ describe('spike3d vision and the explored map', () => {
     await w(`(w.follow = false, w.focus.x = ${x0} + 60, w.focus.z = ${z0}, 0)`);
     await page.waitForTimeout(2500);
     await page.screenshot({ path: `${OUT}vision-remembered.png` });
-    expect(await w('w.chunkCount')).toBeLessThan(80);
+    expect(await w('w.streaming.chunkCount')).toBeLessThan(80);
 
     // Forgetting empties the map.
-    await w('(w.forgetMap(), 0)');
+    await w('(w.sight.forgetMap(), 0)');
     // (A frame may run before the next look, and the hero sees what is round them again: only the faraway past is gone.)
     expect(await w(`w.explored.has(${x0}, ${z0})`)).toBe(false);
     expect(await w('w.explored.count')).toBeLessThan(seen0 * 2);
@@ -50,7 +50,7 @@ describe('spike3d vision and the explored map', () => {
     const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; return ${fn}; })()`);
     await w('(w.weather.setHour(0), w.weather.set("clear"), w.dayMinutes = 0, 0)');
     // (Plain sight, not whatever the sight roll gave: B5.)
-    await w('(w.holdSight({ success: true, advantages: 0 }), 0)');
+    await w('(w.senses.holdSight({ success: true, advantages: 0 }), 0)');
     // Stand 42 m out in front of the door torch, facing it (the house is behind the torch, not in the way).
     const torch = (await w('(({ x, z }) => ({ x, z }))(w.layout.props.find((p) => p.kind === "walltorch"))')) as { x: number; z: number };
     // (The palisade across the village at z = 18 has one opening, the open gate at x = 4: look through it.)
@@ -62,9 +62,9 @@ describe('spike3d vision and the explored map', () => {
     await page.waitForTimeout(2500);
     const range = (await w('w.spec.range')) as number;
     expect(range).toBeLessThan(45);
-    expect(await w('w.sightLights.length')).toBeGreaterThan(0);
-    expect(await w(`w.seen(${torch.x}, ${torch.z})`)).toBeGreaterThan(0.2);
-    expect(await w(`w.seen(${torch.x} + 15, ${torch.z})`)).toBe(0);
+    expect(await w('w.sight.sightLights.length')).toBeGreaterThan(0);
+    expect(await w(`w.sight.seen(${torch.x}, ${torch.z})`)).toBeGreaterThan(0.2);
+    expect(await w(`w.sight.seen(${torch.x} + 15, ${torch.z})`)).toBe(0);
     // Look across at the torch from where the hero stands (the camera is let go to the torch).
     await w(`(w.follow = false, w.focus.x = ${torch.x}, w.focus.z = ${torch.z}, 0)`);
     await page.waitForTimeout(1500);
@@ -73,7 +73,7 @@ describe('spike3d vision and the explored map', () => {
     // Turned away, it is out of sight.
     await w(`(w.heroDir = { x: ${fx}, z: ${fz} }, w.facing = ${face + Math.PI}, 0)`);
     await page.waitForTimeout(800);
-    expect(await w(`w.seen(${torch.x}, ${torch.z})`)).toBe(0);
+    expect(await w(`w.sight.seen(${torch.x}, ${torch.z})`)).toBe(0);
     expect(errors).toEqual([]);
   });
 
@@ -84,13 +84,13 @@ describe('spike3d vision and the explored map', () => {
     await w("(w.weather.setTime('night'), w.weather.set('clear'), 0)");
     await page.waitForTimeout(1500);
     const near0 = (await w('w.spec.near')) as number, range0 = (await w('w.spec.range')) as number;
-    await w('(w.toggleTorch(), 0)');
+    await w('(w.lights.toggleTorch(), 0)');
     await page.waitForTimeout(1500);
-    expect(await w('w.torchOn')).toBe(true);
+    expect(await w('w.lights.torchOn')).toBe(true);
     expect((await w('w.spec.near')) as number).toBeGreaterThan(near0 + 2);
     expect((await w('w.spec.range')) as number).toBeGreaterThan(range0);
     await page.screenshot({ path: `${OUT}vision-hand-torch.png` });
-    await w('(w.toggleTorch(), 0)');
+    await w('(w.lights.toggleTorch(), 0)');
     await page.waitForTimeout(500);
     expect((await w('w.spec.near')) as number).toBeCloseTo(near0, 1);
     expect(errors).toEqual([]);

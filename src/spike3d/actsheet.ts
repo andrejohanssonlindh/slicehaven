@@ -54,7 +54,7 @@ export interface Sheet {
  * Whose a place is, in a line (plan B3c): on easy the household by name, else just "someone's"; the room; whether it
  * is open to you. Null in the wild.
  */
-export function whoseText(w: ReturnType<SpikeWorld['whoseAt']>, names: boolean): string | null {
+export function whoseText(w: ReturnType<SpikeWorld['owners']['whoseAt']>, names: boolean): string | null {
   if (!w) return null;
   if ('town' in w) return t('own.town', 'The town\'s.');
   const who = names && w.members.length
@@ -145,9 +145,9 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
     };
     if (what === 'gear') {
       // Your own weapons (the director: "there might be several, so one has to choose").
-      const gear = w.stowed;
+      const gear = w.gear.stowed;
       if (gear.length === 1) {
-        w.drawOwn(gear[0].id);
+        w.gear.drawOwn(gear[0].id);
         return notify(t('act.drew', 'You draw your {name}.', { name: thingName(THINGS.get(gear[0].kind)) }));
       }
       nameEl.textContent = t('act.pick.gear', 'Draw which?');
@@ -155,7 +155,7 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
       for (const g of gear) {
         const thing = THINGS.get(g.kind);
         add(cap(t(`thing.${g.kind}.name`, thingName(thing))), armsLine(thing, false), () => {
-          if (w.drawOwn(g.id)) notify(t('act.drew', 'You draw your {name}.', { name: thingName(thing) }));
+          if (w.gear.drawOwn(g.id)) notify(t('act.drew', 'You draw your {name}.', { name: thingName(thing) }));
           else notify(t('act.pick.nohand', 'No hand free for the {name}: put away what you hold first.', { name: thingName(thing) }));
         });
       }
@@ -167,7 +167,7 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
       for (const k of kinds) {
         const thing = THINGS.get(k);
         add(cap(t(`thing.${k}.name`, thingName(thing))), armsLine(thing, true), () => {
-          if (!w.takeFromStock(target, k)) notify(t('act.pick.nohand', 'No hand free for the {name}: put away what you hold first.', { name: thingName(thing) }));
+          if (!w.gear.takeFromStock(target, k)) notify(t('act.pick.nohand', 'No hand free for the {name}: put away what you hold first.', { name: thingName(thing) }));
           else notify(t('act.pick.took', 'You take the {name}.', { name: thingName(thing) }));
         });
       }
@@ -176,7 +176,7 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
       lookEl.textContent = t('act.pick.callslook', 'A fresh fighter takes the place of the last, rolled at the level you pick.');
       for (const level of PERSON_LEVELS) {
         add(cap(t(`level.${level}`, level)), t(`act.pick.level.${level}`, LEVEL_HINT[level]), () => {
-          const name = w.callFighter(kind.calls!, level);
+          const name = w.fights.callFighter(kind.calls!, level);
           notify(name ? t('act.pick.called', '{name} steps out onto the sand ({level}).', { name, level: t(`level.${level}`, level) }) : t('act.pick.nobody', 'No one answers.'));
         });
       }
@@ -186,7 +186,7 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
   }
 
   function doIt(offer: string, target: ActTarget | null): void {
-    void report(world().act(offer, target, doer), offer);
+    void report(world().acting.act(offer, target, doer), offer);
   }
 
   function choose(offer: string, target: ActTarget | null): void {
@@ -206,13 +206,13 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
     nameEl.textContent = kind ? t(`thing.${kind.id}.name`, cap(thingName(kind))) : t('act.here', 'Where you stand');
     lookEl.textContent = kind ? t(`thing.${kind.id}.look`, kind.look ?? '') : w.heroIndoors ? t('act.hereIn', 'A floor of boards and beaten earth.') : t('act.hereOut', 'Open ground.');
     // Looking at something that carries a lead gives it (plan B11): what you know of it, as the look.
-    const lead = target ? w.lookAt(target) : null;
+    const lead = target ? w.journal.lookAt(target) : null;
     if (lead) lookEl.textContent = lead.look;
     // Whose it is (B3c): a tapped thing in someone's house or the town's; names on easy.
-    const whose = target ? whoseText(w.whoseAt(target), loadSettings().difficulty === 'easy') : null;
+    const whose = target ? whoseText(w.owners.whoseAt(target), loadSettings().difficulty === 'easy') : null;
     if (whose) lookEl.textContent = `${lookEl.textContent} ${whose}`.trim();
     // What you carry (B3b), said where you stand.
-    const held = !target && w.holding && THINGS.has(w.holding) ? THINGS.get(w.holding) : null;
+    const held = !target && w.carrying.holding && THINGS.has(w.carrying.holding) ? THINGS.get(w.carrying.holding) : null;
     if (held) lookEl.textContent = `${lookEl.textContent} ${t('act.holding', 'You are carrying the {name}.', { name: t(`thing.${held.id}.name`, thingName(held)) })}`.trim();
     // What it weighs, on what can be taken; where you stand, what you can carry (B6).
     const kg = kind?.size && kind.weight !== undefined ? kind.weight : null;
@@ -227,7 +227,7 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
       save();
     }
     offersEl.replaceChildren();
-    const list = w.offersFor(target, doer);
+    const list = w.acting.offersFor(target, doer);
     for (const o of list) {
       const b = document.createElement('button');
       b.type = 'button';

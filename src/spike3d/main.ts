@@ -157,8 +157,8 @@ function applyQuality(): void {
   world.settings.shells = Math.min(2, q.shells);
   world.settings.lights = Math.min(3, q.lights);
   world.settings.shadowMap = q.shadowMap;
-  world.setShadowMap(q.shadowMap);
-  world.setGrass(q.grass);
+  world.sky.setShadowMap(q.shadowMap);
+  world.grass.setCount(q.grass);
   for (const b of buttons) b.refresh();
 }
 
@@ -200,11 +200,11 @@ function buildControls(): void {
   const diffName = { easy: t('spike.diff.easy', 'Game: easy'), normal: t('spike.diff.normal', 'Game: normal'), hard: t('spike.diff.hard', 'Game: hard') };
   button('row-game', () => diffName[loadSettings().difficulty], () => loadSettings().difficulty === 'easy', () => {
     saveSettings({ difficulty: cycle(DIFFICULTIES, loadSettings().difficulty) });
-    world.showSenses = loadSettings().difficulty === 'easy';
-    world.restMinutes = DIFFICULTY_RULES[loadSettings().difficulty].restMinutes;
+    world.senses.showSenses = loadSettings().difficulty === 'easy';
+    world.fights.restMinutes = DIFFICULTY_RULES[loadSettings().difficulty].restMinutes;
   });
   // Sight is rolled on entering the map and every six world hours; this rolls it now (as waking will).
-  button('row-game', () => t('spike.rollsight', 'Roll sight'), () => false, () => { world.rerollSight(); });
+  button('row-game', () => t('spike.rollsight', 'Roll sight'), () => false, () => { world.senses.rerollSight(); });
   const closeName = { ok: t('spike.dice.closeok', 'Rolls: press OK'), auto: t('spike.dice.closeauto', 'Rolls: go by themselves') };
   button('row-game', () => closeName[loadSettings().diceClose], () => false, () => { saveSettings({ diceClose: cycle(DICE_CLOSES, loadSettings().diceClose) }); });
   const diceRng = Rng.fromSeed(Date.now() >>> 0);
@@ -228,19 +228,19 @@ function buildControls(): void {
   for (const [id, name] of skies) button('row-sky', () => name, () => w.sky === id, () => w.set(id));
 
   // Lightning and fires, to test by hand: a bolt on demand in any weather, storms throwing their own, campfires beside the hero.
-  button('row-fx', () => t('spike.strike', 'Lightning'), () => false, () => { world.strike(); });
-  button('row-fx', () => t('spike.autobolts', 'Storm bolts'), () => world.autoBolts, () => { world.autoBolts = !world.autoBolts; });
-  button('row-fx', () => t('spike.fire', 'Fire ({n})', { n: world.campfires }), () => world.campfires > 0, () => {
-    if (!world.lightFire()) notify(t('spike.toomanyfires', 'That is enough fires.'));
+  button('row-fx', () => t('spike.strike', 'Lightning'), () => false, () => { world.sky.strike(); });
+  button('row-fx', () => t('spike.autobolts', 'Storm bolts'), () => world.sky.autoBolts, () => { world.sky.autoBolts = !world.sky.autoBolts; });
+  button('row-fx', () => t('spike.fire', 'Fire ({n})', { n: world.lights.campfires }), () => world.lights.campfires > 0, () => {
+    if (!world.lights.lightFire()) notify(t('spike.toomanyfires', 'That is enough fires.'));
   });
-  button('row-fx', () => t('spike.douse', 'Douse'), () => false, () => { world.douseFires(); });
+  button('row-fx', () => t('spike.douse', 'Douse'), () => false, () => { world.lights.douseFires(); });
 
-  button('row-fx', () => t('spike.torch', 'Torch'), () => world.torchOn, () => { world.toggleTorch(); });
-  button('row-fx', () => t('spike.orb', 'Light orb'), () => world.orbOn, () => { world.toggleOrb(); });
-  button('row-fx', () => t('spike.ray', 'Light ray'), () => world.rayOn, () => { world.toggleRay(); });
+  button('row-fx', () => t('spike.torch', 'Torch'), () => world.lights.torchOn, () => { world.lights.toggleTorch(); });
+  button('row-fx', () => t('spike.orb', 'Light orb'), () => world.lights.orbOn, () => { world.lights.toggleOrb(); });
+  button('row-fx', () => t('spike.ray', 'Light ray'), () => world.lights.rayOn, () => { world.lights.toggleRay(); });
   button('row-fx', () => t('spike.speed', 'Walk ×{n}', { n: world.speedMul }), () => world.speedMul > 1, () => { world.speedMul = cycle([1, 2, 3], world.speedMul); });
 
-  button('row-look', () => t('spike.inside', 'Inside'), () => world.inside, () => { world.inside = !world.inside; });
+  button('row-look', () => t('spike.inside', 'Inside'), () => world.housing.inside, () => { world.housing.inside = !world.housing.inside; });
   button('row-look', () => t('spike.up', 'Upstairs'), () => world.heroLevel > 0, () => {
     if (world.climb(1) === null) notify(t('spike.nostairs', 'No stairs up from here.'));
   });
@@ -259,11 +259,11 @@ function buildControls(): void {
 
   // Filaments: cycle the heat map through the eight aspects, then off.
   button('row-magic', () => {
-    const a = world.shownAspect;
+    const a = world.filaments.shownAspect;
     return a ? t('spike.magic', 'Filaments: {n}', { n: ASPECTS.find((x) => x.id === a)!.gloss }) : t('spike.magicoff', 'Filaments: off');
-  }, () => world.shownAspect !== null, () => {
+  }, () => world.filaments.shownAspect !== null, () => {
     const ids = [null, ...ASPECTS.map((x) => x.id)] as const;
-    world.showFilaments(ids[(ids.indexOf(world.shownAspect as never) + 1) % ids.length]);
+    world.filaments.showFilaments(ids[(ids.indexOf(world.filaments.shownAspect as never) + 1) % ids.length]);
   });
 
   // Vision: past it the world is grey, then black, and is not built or animated.
@@ -277,10 +277,10 @@ function buildControls(): void {
   // The hero's Alertness: how far and how wide they see.
   button('row-perf', () => t('spike.alertness', 'Alertness {n}', { n: world.alertness }), () => world.alertness !== 10, () => { world.alertness = cycle([4, 7, 10, 14, 18], world.alertness); });
   // Mist on demand (what a spell will do): off leaves it to the weather.
-  button('row-perf', () => (world.mistAmount > 0 ? t('spike.mist', 'Fog {n}%', { n: Math.round(world.mistAmount * 100) }) : t('spike.mistoff', 'Fog: weather')), () => world.mistAmount > 0, () => {
-    world.setMist(cycle([0, 0.25, 0.5, 0.75, 1], world.mistAmount));
+  button('row-perf', () => (world.sky.mistAmount > 0 ? t('spike.mist', 'Fog {n}%', { n: Math.round(world.sky.mistAmount * 100) }) : t('spike.mistoff', 'Fog: weather')), () => world.sky.mistAmount > 0, () => {
+    world.sky.setMist(cycle([0, 0.25, 0.5, 0.75, 1], world.sky.mistAmount));
   }, 'fog');
-  button('row-perf', () => t('spike.forget', 'Forget map'), () => false, () => { world.forgetMap(); });
+  button('row-perf', () => t('spike.forget', 'Forget map'), () => false, () => { world.sight.forgetMap(); });
   button('row-perf', () => t('spike.tier', 'Tier: {n}', { n: tier.name }), () => false, () => {
     setTier(cycle(['low', 'medium', 'high'] as TierName[], tier.name));
   }, 'perf');
@@ -290,7 +290,7 @@ function buildControls(): void {
   }, 'perf');
   button('row-perf', () => t('spike.shadow', 'Shadow {n}', { n: world.settings.shadowMap }), () => false, () => {
     world.settings.shadowMap = cycle([512, 1024, 2048, 4096], world.settings.shadowMap);
-    world.setShadowMap(world.settings.shadowMap);
+    world.sky.setShadowMap(world.settings.shadowMap);
   }, 'perf');
   button('row-perf', () => t('spike.lights', 'Lights {n}', { n: world.settings.lights }), () => world.settings.lights > 0, () => {
     world.settings.lights = cycle([0, 1, 2, 3], world.settings.lights);
@@ -307,7 +307,7 @@ function buildControls(): void {
   adminButton('wind', () => t('spike.winddir', 'Blows {n}', { n: WIND_DIRS[w.windDir].name }), () => false, () => { w.pinWind(w.windForce, w.windDir + 1); });
   // Fog: "Auto" leaves it to the weather (rain brings a little); the others fix how thick it lies.
   for (const v of [0, 0.25, 0.5, 0.75, 1]) {
-    adminButton('fog', () => (v === 0 ? t('spike.fogauto', 'Auto') : `${Math.round(v * 100)}%`), () => Math.abs(world.mistAmount - v) < 0.01, () => { world.setMist(v); });
+    adminButton('fog', () => (v === 0 ? t('spike.fogauto', 'Auto') : `${Math.round(v * 100)}%`), () => Math.abs(world.sky.mistAmount - v) < 0.01, () => { world.sky.setMist(v); });
   }
   buildAdmin();
   for (const b of buttons) b.refresh();
@@ -516,13 +516,13 @@ function bindInput(): void {
         const r = canvas.getBoundingClientRect();
         const nx = ((e.clientX - r.left) / r.width) * 2 - 1, ny = -(((e.clientY - r.top) / r.height) * 2 - 1);
         const slack = { x: TAP_SLACK / (r.width / 2), y: TAP_SLACK / (r.height / 2) };
-        const hit = world.tapped(nx, ny, slack);
+        const hit = world.acting.tapped(nx, ny, slack);
         fight.tap(hit && typeof hit === 'object' && !('person' in hit) ? hit.id : null, world.groundAt(nx, ny));
         down = null;
         return;
       }
       // Knocked out (left lying after a fight): nothing to do but come round, as fatigue goes.
-      const hurt = world.injuriesOf('hero');
+      const hurt = world.fights.injuriesOf('hero');
       if (hurt?.out) {
         notify(t('spike.out', 'You are knocked out. You come round when your fatigue is gone ("You" shows it).'));
         down = null;
@@ -532,7 +532,7 @@ function bindInput(): void {
       const nx = ((e.clientX - r.left) / r.width) * 2 - 1, ny = -(((e.clientY - r.top) / r.height) * 2 - 1);
       // A tap on a thing (or near enough, on a phone) shows what it is and what can be tried; on the hero, the spot they stand on.
       const slack = { x: TAP_SLACK / (r.width / 2), y: TAP_SLACK / (r.height / 2) };
-      const hit = e.shiftKey ? null : world.tapped(nx, ny, slack);
+      const hit = e.shiftKey ? null : world.acting.tapped(nx, ny, slack);
       if (hit && typeof hit === 'object' && 'person' in hit) {
         sheet.close();
         talk.open(hit.person);
@@ -547,10 +547,10 @@ function bindInput(): void {
       }
       sheet.close();
       talk.close();
-      const house = e.shiftKey ? world.pick(nx, ny) : world.houseTapped(nx, ny);
+      const house = e.shiftKey ? world.housing.pick(nx, ny) : world.housing.houseTapped(nx, ny);
       if (e.shiftKey && house !== null) {
         // Dev: shift-click lifts or lowers that roof by hand.
-        world.toggleRoof(house);
+        world.housing.toggleRoof(house);
         for (const b of buttons) b.refresh();
       } else if (!world.heroIndoors && house !== null) {
         // Outside, tapping a house walks in through its door.
@@ -642,10 +642,10 @@ function loop(now: number): void {
     const sorted = [...frameMs].sort((a, b) => a - b);
     const med = sorted[Math.floor(sorted.length / 2)] ?? 0;
     for (const b of buttons) b.refresh();
-    const shown = world.shownAspect;
+    const shown = world.filaments.shownAspect;
     let magic = '';
     if (shown) {
-      const r = world.heroReading()[shown];
+      const r = world.filaments.heroReading()[shown];
       const info = ASPECTS.find((x) => x.id === shown)!;
       magic = `${info.name} at hero: ${r.level > 0 ? '+' : ''}${r.level} ${LEVEL_NAMES[r.level]}\n` + r.parts.map((p) => `  ${p.value > 0 ? '+' : ''}${p.value.toFixed(1)} ${p.label}`).join('\n');
     }
@@ -654,7 +654,7 @@ function loop(now: number): void {
       `calls ${info.render.calls}  tris ${(info.render.triangles / 1000).toFixed(1)}k`,
       `${pipeline.rw}×${pipeline.rh} ×${pipeline.factor}  ${world.ppm} px/m`,
       `tier ${tier.name}${governor.level ? ` -${governor.level}` : ''}  shadow ${world.settings.shadowMap}`,
-      `chunks ${world.chunkCount}`,
+      `chunks ${world.streaming.chunkCount}`,
       `houses ${world.houses.length}/${world.layout.houses.length}  furnished ${world.houseIndex.made}  chunks held ${world.placed.generatedChunks}`,
       magic,
     ].filter(Boolean).join('\n');
@@ -688,34 +688,34 @@ setTimeout(() => {
   if (map.problems.length) console.warn(`spike3d: map ${map.name} has problems:\n${map.problems.join('\n')}`);
   const size = Number(params.get('world')) || map.ground.size;
   world = new SpikeWorld({ shells: Math.min(2, tier.shells), lights: Math.min(3, tier.lights), shadowMap: tier.shadowMap }, TIERS.high.grass, { ...map, ground: { ...map.ground, size } });
-  world.setGrass(tier.grass);
+  world.grass.setCount(tier.grass);
   // Perception (B5): the hero sees with their own Alertness (and a tirak's darkvision); sight is rolled against 8,
   // shown on easy (the dice, and how sharp it is), rolled unseen otherwise.
   const units = (id: string): number => { const d = diceOf(hero, id); return d.n * 4 + d.mod; };
   if (units('attr:Vaksamhet') > 0) world.alertness = units('attr:Vaksamhet');
-  world.darkSight = Math.min(1, units('F:Mörkersyn') / 12);
-  world.showSenses = loadSettings().difficulty === 'easy';
-  world.restMinutes = DIFFICULTY_RULES[loadSettings().difficulty].restMinutes;
+  world.senses.darkSight = Math.min(1, units('F:Mörkersyn') / 12);
+  world.senses.showSenses = loadSettings().difficulty === 'easy';
+  world.fights.restMinutes = DIFFICULTY_RULES[loadSettings().difficulty].restMinutes;
   // Owners and the scale (B3c): who the hero is, as the people see them; and what they say unasked.
   world.heroWho = { kind: hero.kind, people: hero.people, tags: hero.tags };
   world.onSpeak = (_who, name, text) => notify(`${name}: "${text}"`);
   world.onNote = (text) => notify(text);
   // How dangerous the hero looks: their physique and fearsome marks (scars…); weapons shown come with items.
-  world.heroLook = { physique: units('attr:Kroppsbyggnad') || 10, marks: FEARSOME_MARKS.filter((m) => diceOf(hero, m).n > 0).length, weapons: 0, tags: hero.tags ?? [] };
+  world.owners.heroLook = { physique: units('attr:Kroppsbyggnad') || 10, marks: FEARSOME_MARKS.filter((m) => diceOf(hero, m).n > 0).length, weapons: 0, tags: hero.tags ?? [] };
   // Stepping into a house, or another room of it: whose it is (names on easy) and whether it is open to you.
-  world.onEnterPlace = (at) => {
-    const line = whoseText(world.whoseAt(at), loadSettings().difficulty === 'easy');
+  world.owners.onEnterPlace = (at) => {
+    const line = whoseText(world.owners.whoseAt(at), loadSettings().difficulty === 'easy');
     if (line && at.house) notify(line);
   };
   // Noticing something lying about as it comes into view (plan B8): in a fight its log says it, else a line (with
   // the roll on easy).
-  world.onNotice = (id, kind, roll) => {
+  world.senses.onNotice = (id, kind, roll) => {
     if (fight.on) return fight.noticed(id, roll);
     const nums = roll && loadSettings().difficulty === 'easy' ? ` (${t('fight.roll.Alertness', 'Alertness')} ${rollText(roll)})` : '';
     const name = thingName(THINGS.get(kind));
     notify(t('spike.noticed', 'You notice {what} on the ground{roll}.', { what: `${/^[aeiou]/i.test(name) ? 'an' : 'a'} ${name}`, roll: nums }));
   };
-  world.onSightRoll = (who, roll, sight) => {
+  world.senses.onSightRoll = (who, roll, sight) => {
     if (who !== 'hero' || loadSettings().difficulty !== 'easy') return;
     void showRolls([{ ...roll, label: t('spike.sight', 'Sight') }]).then(() => {
       notify(t(`spike.sight.${sightWord(sight)}`, {
@@ -731,7 +731,7 @@ setTimeout(() => {
   fit();
   new ResizeObserver(fit).observe(stage);
   // Build the shaders of every kind of house now: one built when a new kind streams in later would stall the game.
-  const warm = world.warmHouses();
+  const warm = world.housing.warm();
   pipeline.renderer.compile(world.scene, world.camera);
   warm.done();
   const saved = saving ? loadWorld(mapName, localStorage) : null;
@@ -741,7 +741,7 @@ setTimeout(() => {
   }
   // The hero's own gear (the director: use what you have from creation), carried on them until drawn.
   const gear = gearKinds(hero.gear ?? []);
-  world.outfit(gear.kinds, `${hero.from}:${hero.name}:${(hero.gear ?? []).join(',')}`);
+  world.gear.outfit(gear.kinds, `${hero.from}:${hero.name}:${(hero.gear ?? []).join(',')}`);
   fight.check();
   if (saving) {
     setInterval(save, 5000);

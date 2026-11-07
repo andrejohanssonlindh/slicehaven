@@ -44,7 +44,7 @@ export interface SideEntry {
 
 /** How the foe fights: their own style (the map's `fights`), else their kind's. */
 export function foeStyle(ctx: FightCtx): Style {
-  const p = ctx.world().talkPerson(ctx.s.foeId);
+  const p = ctx.world().talking.talkPerson(ctx.s.foeId);
   return styleFor(p?.tags ?? [], p?.fights);
 }
 
@@ -87,7 +87,7 @@ function sideMove(ctx: FightCtx, key: string, label: string, choice: Choice, sma
 /** The side action's lists, in order: Move (free only), Draw, Pick up, and Look around. */
 export function sideEntries(ctx: FightCtx): SideEntry[] {
   const { fight, foeId, plan } = ctx.s;
-  const spotted = { has: (id: string) => ctx.world().hasNoticed(id) };
+  const spotted = { has: (id: string) => ctx.world().senses.hasNoticed(id) };
   if (!fight) return [];
   const me = fight.fighters[0], foe = fight.fighters[1];
   const free = roleOf(fight, 'hero') === 'free';
@@ -207,7 +207,7 @@ function plea(ctx: FightCtx, defending: boolean): Move {
   const style = foeStyle(ctx);
   const best = PLEA_SKILLS.map((s) => ({ s, d: ctx.hero.dice[s] ?? { n: 0, mod: 0 } })).reduce((a, b) => (units(b.d) > units(a.d) ? b : a));
   const dice = best.d.n > 0 ? best.d : { n: 1, mod: 0 };
-  const difficulty = pleaDifficulty(ctx.s.fight!, 'hero', style, ctx.world().yieldedTo(ctx.s.foeId));
+  const difficulty = pleaDifficulty(ctx.s.fight!, 'hero', style, ctx.world().fights.yieldedTo(ctx.s.foeId));
   const easy = ctx.level().foeExact;
   return {
     key: 'yield', label: t('fight.pleadN', 'Ask to yield'),

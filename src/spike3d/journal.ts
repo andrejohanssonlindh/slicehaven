@@ -19,14 +19,14 @@ export function makeJournal(world: () => SpikeWorld): Journal {
   const openBtn = document.getElementById('journal-open')!;
 
   const whoCares = (c: Cares): string => {
-    if (c.person) return world().personNamed(c.person) ?? c.person;
+    if (c.person) return world().talking.personNamed(c.person) ?? c.person;
     const label = c.is ? FACETS[c.is]?.label ?? c.is : '';
     return t('journal.anyone', 'any {what}', { what: label.toLowerCase() });
   };
 
   function render(): void {
     list.replaceChildren();
-    const leads = world().journal;
+    const leads = world().journal.entries;
     if (!leads.length) {
       const p = document.createElement('p');
       p.className = 'none';

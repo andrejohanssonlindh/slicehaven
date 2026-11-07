@@ -46,7 +46,7 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
 
   function drawPortrait(): void {
     if (!who) return;
-    const data = world().portrait(renderer(), who, PORTRAIT_PX);
+    const data = world().talking.portrait(renderer(), who, PORTRAIT_PX);
     if (!data) return;
     canvas.width = canvas.height = PORTRAIT_PX;
     canvas.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(data), PORTRAIT_PX, PORTRAIT_PX), 0, 0);
@@ -63,15 +63,15 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
   /** The name, what they are, how they seem, and what can be tried now. */
   function refresh(): void {
     if (!who) return;
-    const w = world(), p = w.talkPerson(who);
+    const w = world(), p = w.talking.talkPerson(who);
     if (!p) return close();
-    const c = w.talkCase(visitor, p.id);
+    const c = w.talking.talkCase(visitor, p.id);
     nameEl.textContent = p.name;
     const calling = [...p.tags].reverse().find((id) => FACETS[id]?.dim === 'station' && FACETS[id]?.parent !== 'station');
     const people = [...p.tags].reverse().find((id) => FACETS[id]?.dim === 'people');
     whatEl.textContent = [people, calling].filter(Boolean).map((id) => FACETS[id!].label).join(', ');
     // On easy, how they see you on their scale too (B3c).
-    const view = w.regardOf(p.id);
+    const view = w.owners.regardOf(p.id);
     moodEl.textContent = [moodOf(p, c) ?? '', loadSettings().difficulty === 'easy' ? t('talk.view', '(Their view of you: {n})', { n: view > 0 ? `+${view}` : String(view) }) : ''].filter(Boolean).join(' ');
     choicesEl.replaceChildren();
     // "Ask about something you know…" opens the list of leads (B11), with a way back.
@@ -115,7 +115,7 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
     askingLeads = false;
     busy = true;
     log(label, 'you');
-    const r = world().talkTo(offer, who, doer, visitor);
+    const r = world().talking.talkTo(offer, who, doer, visitor);
     if (!r.done) log(r.reason ?? '', 'info');
     else {
       if (r.roll && !r.hidden) await showRolls([{ ...r.roll, label: r.skill ? rollableName(r.skill) : r.roll.label }]);
@@ -133,10 +133,10 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
     const w = world();
     who = id;
     askingLeads = false;
-    w.talkingWith = id;
+    w.talking.talkingWith = id;
     logEl.replaceChildren();
     el.hidden = false;
-    const p = w.talkPerson(id);
+    const p = w.talking.talkPerson(id);
     if (p) log(t('talk.meet', 'You turn to {name}.', { name: p.name }), 'info');
     refresh();
     // (The person turns to face the hero first: draw them once they have.)
@@ -149,13 +149,13 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
    * away you are shouldn't matter for an attack; with a bow later it really won't).
    */
   function far(id: string, metres: number): void {
-    const w = world(), p = w.talkPerson(id);
+    const w = world(), p = w.talking.talkPerson(id);
     if (!p) return;
     nameEl.textContent = p.name;
     whatEl.textContent = '';
     moodEl.textContent = '';
     // Their face, as in a talk (drawn from where they stand).
-    const data = w.portrait(renderer(), id, PORTRAIT_PX);
+    const data = w.talking.portrait(renderer(), id, PORTRAIT_PX);
     canvas.width = canvas.height = PORTRAIT_PX;
     if (data) canvas.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(data), PORTRAIT_PX, PORTRAIT_PX), 0, 0);
     else canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
@@ -172,7 +172,7 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
     };
     button(t('talk.walkup', 'Walk up and talk'), '', () => {
       close();
-      const at = world().personSpot(id);
+      const at = world().talking.personSpot(id);
       // Walk up to them; they stop for you once you're close (see `tick`).
       if (!at || world().walkTo(at.x, at.z, at.level) === null) return notify(t('talk.noway', 'You can\'t get to them.'));
       pending = id;
@@ -185,7 +185,7 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
     el.hidden = true;
     who = null;
     pending = null;
-    world().talkingWith = null;
+    world().talking.talkingWith = null;
   }
   el.querySelector('.close')!.addEventListener('click', close);
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !el.hidden) close(); });
@@ -196,13 +196,13 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
     },
     open(id) {
       close();
-      const w = world(), at = w.personSpot(id);
+      const w = world(), at = w.talking.personSpot(id);
       if (!at) return;
       // A tap on someone stops a walk under way (the director: walking on while choosing ended in a jump).
       w.stopHero();
       // The dead and the senseless don't talk (the director: "using skills on dead people works").
-      const hurt = w.injuriesOf(id);
-      const name = w.talkPerson(id)?.name ?? id;
+      const hurt = w.fights.injuriesOf(id);
+      const name = w.talking.talkPerson(id)?.name ?? id;
       // A body: walk up and look over its wounds (the director: see the injuries of the dead).
       if (hurt?.dead && onExamine) {
         if (w.reachTo(at) <= TALK_REACH) return onExamine(id);
@@ -225,7 +225,7 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
     close,
     tick() {
       if (!pending) return;
-      const w = world(), at = w.personSpot(pending);
+      const w = world(), at = w.talking.personSpot(pending);
       if (!at) {
         pending = null;
         return;
@@ -235,8 +235,8 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
         const id = pending;
         pending = null;
         w.walkTo(w.hero.x, w.hero.z);
-        if (w.injuriesOf(id)?.dead && onExamine) return onExamine(id);
-        if (w.injuriesOf(id)?.out && onFight) return onFight(id);
+        if (w.fights.injuriesOf(id)?.dead && onExamine) return onExamine(id);
+        if (w.fights.injuriesOf(id)?.out && onFight) return onFight(id);
         return start(id);
       }
       if (!w.walking) {

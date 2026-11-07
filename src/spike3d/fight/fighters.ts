@@ -44,14 +44,14 @@ export const slotFree = (f: Fighter, item: FightItem): boolean => (item.shield ?
 /** The hero as a fighter: their sheet, what they hold, no armour yet (the hero has none in the world). */
 export function heroFighter(w: SpikeWorld, hero: Hero, at: { x: number; z: number }): Fighter {
   const phys = hero.dice['attr:Kroppsbyggnad'] ?? { n: 2, mod: 0 };
-  const held = w.wieldedBy('hero');
+  const held = w.gear.wieldedBy('hero');
   const row = held ? rowOfKind(held.kind) : undefined;
-  const sh = w.shieldOf('hero');
+  const sh = w.gear.shieldOf('hero');
   return {
     id: 'hero', side: 0, x: at.x, z: at.z, pools: Object.fromEntries(FIGHT_IDS.map((id) => [id, hero.dice[id] ?? { n: 0, mod: 0 }])),
     physique: phys, baseDamage: baseDamage(units(phys)), baseArmour: baseArmour(units(phys)), armour: { cut: 0, crush: 0, thrust: 0 }, loadDice: 0,
-    weapon: held && row ? { id: held.id, weapon: row } : null, shield: sh ? itemOf(sh.id, sh.kind) : null, injuries: w.injuriesOf('hero') ?? unhurt(), drew: false,
-    belt: w.stowed.flatMap((s) => { const it = itemOf(s.id, s.kind); return it && it.weapon?.sv !== IMPROVISED ? [it] : []; }),
+    weapon: held && row ? { id: held.id, weapon: row } : null, shield: sh ? itemOf(sh.id, sh.kind) : null, injuries: w.fights.injuriesOf('hero') ?? unhurt(), drew: false,
+    belt: w.gear.stowed.flatMap((s) => { const it = itemOf(s.id, s.kind); return it && it.weapon?.sv !== IMPROVISED ? [it] : []; }),
   };
 }
 
@@ -61,23 +61,23 @@ export function personFighter(w: SpikeWorld, id: string, sheet: RolledSheet | nu
   const phys = dice('attr:Kroppsbyggnad');
   const own = sheet?.gear.weapon ? rowOf(sheet.gear.weapon) : undefined;
   const kind = own ? kindOfRow(own.sv) : null;
-  const held = w.wieldedBy(id) ?? (kind ? (w.drawWeapon(id, kind), w.wieldedBy(id)) : null);
+  const held = w.gear.wieldedBy(id) ?? (kind ? (w.gear.drawWeapon(id, kind), w.gear.wieldedBy(id)) : null);
   const row = held ? rowOfKind(held.kind) : undefined;
   const armour = sheet?.gear.armour ? ARMOUR.find((a) => a.sv === sheet.gear.armour) : undefined;
   // Their own shield, if their sheet has one and their weapon leaves a hand for it.
   const shieldKind = sheet?.gear.shield ? kindOfShield(sheet.gear.shield) : null;
-  const sh = w.shieldOf(id) ?? (shieldKind && !(held && THINGS.has(held.kind) && THINGS.get(held.kind).hands === 2) ? (w.drawShield(id, shieldKind), w.shieldOf(id)) : null);
+  const sh = w.gear.shieldOf(id) ?? (shieldKind && !(held && THINGS.has(held.kind) && THINGS.get(held.kind).hands === 2) ? (w.gear.drawShield(id, shieldKind), w.gear.shieldOf(id)) : null);
   return {
     id, side: 1, x: at.x, z: at.z, pools: Object.fromEntries(FIGHT_IDS.map((s) => [s, dice(s)])),
     physique: phys, baseDamage: baseDamage(units(phys)), baseArmour: baseArmour(units(phys)),
     armour: armour ? { cut: armour.h, crush: armour.k, thrust: armour.s } : { cut: 0, crush: 0, thrust: 0 }, loadDice: loadDiceOf(armour?.load ?? 0),
-    weapon: held && row ? { id: held.id, weapon: row } : null, shield: sh ? itemOf(sh.id, sh.kind) : null, injuries: w.injuriesOf(id) ?? unhurt(), drew: false,
+    weapon: held && row ? { id: held.id, weapon: row } : null, shield: sh ? itemOf(sh.id, sh.kind) : null, injuries: w.fights.injuriesOf(id) ?? unhurt(), drew: false,
   };
 }
 
 /** What lies about the fight: weapons on the ground near it, as the rules see them. */
 export function groundNear(w: SpikeWorld, x: number, z: number): Fight['ground'] {
-  return w.weaponsLying(x, z, GROUND_REACH).flatMap((g) => {
+  return w.gear.weaponsLying(x, z, GROUND_REACH).flatMap((g) => {
     const it = itemOf(g.id, g.kind);
     return it ? [{ ...it, x: g.x, z: g.z } satisfies FightItem & { x: number; z: number }] : [];
   });

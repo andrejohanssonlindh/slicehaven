@@ -262,7 +262,7 @@ export function makeCondition(world: () => SpikeWorld, hero: Hero): ConditionShe
     const rules = DIFFICULTY_RULES[loadSettings().difficulty];
     const own = !title;
     titleEl.textContent = title ?? t('cond.title', 'Your condition');
-    const inj = i ?? world().injuriesOf('hero');
+    const inj = i ?? world().fights.injuriesOf('hero');
     renderCondition(body, inj ?? unhurt(), vitality ?? vit(), exact ?? (own ? rules.ownExact : rules.foeExact), rules.restMinutes, seen, own || (exact ?? rules.foeExact));
     el.hidden = false;
   }
@@ -271,9 +271,9 @@ export function makeCondition(world: () => SpikeWorld, hero: Hero): ConditionShe
   const examined = new Map<string, boolean>();
   async function examine(id: string, seen: SeenHit[] = []): Promise<void> {
     const w = world();
-    const inj = w.injuriesOf(id) ?? unhurt();
-    const sheet = w.sheetOf(id);
-    const name = w.talkPerson(id)?.name ?? id;
+    const inj = w.fights.injuriesOf(id) ?? unhurt();
+    const sheet = w.acting.sheetOf(id);
+    const name = w.talking.talkPerson(id)?.name ?? id;
     const vitality = sheet ? sheetDice(sheet, 'attr:Livskraft') : { n: 2, mod: 0 };
     let exact = DIFFICULTY_RULES[loadSettings().difficulty].foeExact;
     if (!exact) {

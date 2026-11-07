@@ -63,7 +63,7 @@
 
 Places (`MapSpec.places`): `{ "at": [x, z] }`, `{ "area": … }` (circle, rect, ring), `{ "path": [[x, z], …], "loop": true }`, `{ "road": 0, "from": m, "to": m }`, `{ "around": area, "margin": m }`.
 
-Events (`MapSpec.events`): `{ "id": "market", "hours": [10, 16] }` runs every day; without `hours` it runs only when started. In code (scripts, tests, the debug hook): `world.startEvent("hanging")`, `world.endEvent(...)`, `world.clearEvent(...)` (back to the map's hours). `world.minds` lists what everyone is doing.
+Events (`MapSpec.events`): `{ "id": "market", "hours": [10, 16] }` runs every day; without `hours` it runs only when started. In code (scripts, tests, the debug hook): `world.schedule.startEvent("hanging")`, `world.schedule.endEvent(...)`, `world.schedule.clearEvent(...)` (back to the map's hours). `world.schedule.minds` lists what everyone is doing.
 
 The **`crowd`** map rule makes `count` people from `kinds` and `homes` taken in turn, all on one schedule, named `<id><n>`, numbered so `attend` spreads them out.
 

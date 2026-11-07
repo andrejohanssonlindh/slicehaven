@@ -63,8 +63,8 @@ describe('spike3d houses streaming', () => {
     expect((await ids()).length).toBeLessThan(total / 2);
 
     // Far from the hamlet and the first stretch of the town, their furnished rooms are let go of, not kept for ever.
-    await w('w.forgetFar()');
-    const held = (await w('w.held')) as { furnished: number; generated: number };
+    await w('w.streaming.forgetFar()');
+    const held = (await w('w.streaming.held')) as { furnished: number; generated: number };
     expect(held.furnished).toBeLessThan((await w('w.layout.houses.length')) as number / 2);
     expect(held.furnished).toBeLessThan(madeAtStart + 40);
 
