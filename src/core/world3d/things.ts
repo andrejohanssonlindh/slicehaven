@@ -166,6 +166,11 @@ export interface ThingDef {
    */
   moves?: WayOfMoving;
   /**
+   * Drawn with another kind's model until it has its own (2026-11-07: every weapon in the table can be owned from the
+   * creator, but only some have models). A rack leaves these out of its stock.
+   */
+  standIn?: boolean;
+  /**
    * A rack or chest that hands out things of a family (a weapon rack: `weapon`): *take from it* lists every kind under
    * it to pick from, and the one picked is put in your hand. Never runs out (a test ground's, for now).
    */

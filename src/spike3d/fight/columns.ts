@@ -38,7 +38,7 @@ export function card(ctx: FightCtx, box: HTMLElement, f: Fighter, name: string, 
   wpn.className = 'wpn';
   wpn.textContent = ` · ${exactHarm ? `${weapon} (${rollableName(skill)} ${dice})` : weapon}`;
   top.append(b, wpn);
-  if (own || lv.foeExact) {
+  {
     const more = document.createElement('span');
     more.className = 'more';
     more.textContent = t('fight.details', 'details ›');
@@ -172,11 +172,11 @@ function sideGroup(ctx: FightCtx, box: HTMLElement): void {
     return;
   }
   for (const e of entries) {
-    const picked = e.go ? s.side?.key === 'look' : e.items.find((m) => m.key === s.side?.key);
+    const picked = e.go ? s.side?.key === e.id : e.items.find((m) => m.key === s.side?.key);
     const small = picked && picked !== true ? `✓ ${picked.label}` : picked ? `✓ ${t('fight.side.picked', 'picked')}` : e.small;
     const go = e.go ?? (e.items.length ? () => { s.open = e.id as 'move' | 'draw' | 'pickUp'; ctx.refresh(); } : null);
     // (Unfolding a list, or picking a side action to go with a blow, plays nothing: one tap, even on a phone.)
-    const b = moveButton(ctx, e.go ? e.label : `${e.label} ▸`, small, e.go ? 'look' : `side:${e.id}`, go, { instant: !e.go || e.instant });
+    const b = moveButton(ctx, e.go ? e.label : `${e.label} ▸`, small, e.go ? e.id : `side:${e.id}`, go, { instant: !e.go || e.instant });
     b.classList.toggle('picked', !!picked);
     grid.appendChild(b);
   }

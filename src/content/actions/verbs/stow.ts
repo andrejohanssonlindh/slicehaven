@@ -1,6 +1,6 @@
 import type { VerbDef } from '../../../core/world3d/actions';
 
-/** Put away the weapon you hold, on you (plan B8a): your own only; someone else's is put down or given back. */
+/** Put away the weapon or shield you hold, on you (plan B8a): any, a taken one too (it stays its owner's). */
 const stow: VerbDef = {
   id: 'stow',
   label: 'Put away the {name}',

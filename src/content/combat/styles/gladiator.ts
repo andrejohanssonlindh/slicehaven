@@ -10,6 +10,7 @@ const style: FightStyle = {
   lines: [
     { when: { foeDown: true }, do: 'finish' },
     { when: { beaten: 1.75 }, do: 'offerYield' },
+    { do: 'getUp' },
     { do: 'pickUp' },
     { do: 'closeIn', run: true },
     { when: { attacking: true, foeBeaten: 1 }, do: 'strike', weights: { standard: 1, powerful: 3 } },

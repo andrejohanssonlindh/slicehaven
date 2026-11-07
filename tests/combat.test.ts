@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  type Fight, type Fighter, type LogLine, acceptYield, attackPool, attackWhy, beaten, bestDamage, moreDamage, refuseYield, bonusDice, damageDice, defenceOptions, defencePool, dropFrom, fists, parseProps, pleaDifficulty,
+  type Fight, type Fighter, type LogLine, DEMAND_EXTRA, acceptYield, attackPool, demandDifficulty, attackWhy, beaten, bestDamage, moreDamage, refuseYield, bonusDice, damageDice, defenceOptions, defencePool, dropFrom, fists, parseProps, pleaDifficulty,
   resolveRound, roleOf, seizeInitiative, startFight, tacticFatigue, weaponFromRow, weaponOf,
 } from '../src/core/combat';
 import { type Injuries, recoverFatigue, unhurt } from '../src/core/damage';
@@ -138,7 +138,43 @@ describe('fatigue', () => {
     // A foe far more tired and hurt is easier to talk down.
     const g = structuredClone(f);
     g.fighters[1].injuries = { ...unhurt(), fatigue: 10, wounds: { torso: 1 } };
-    expect(pleaDifficulty(g, 'a', STYLE)).toBe(6); // 12 − 4 (tired) − 4 (hurt more), never under 6
+    const eased = pleaDifficulty(g, 'a', STYLE);
+    expect(eased).toBeLessThan(12);
+    // The worse off they are (here a broken arm too), the easier, never under 6.
+    const h = structuredClone(g);
+    h.fighters[1].injuries = { ...h.fighters[1].injuries, fatigue: 30, broken: ['leftArm'] };
+    expect(pleaDifficulty(h, 'a', STYLE)).toBeLessThan(eased);
+    expect(pleaDifficulty(h, 'a', STYLE)).toBeGreaterThanOrEqual(6);
+  });
+
+  it('making the foe yield: harder than a plea; granted, they lay down their weapons and the fight is won', () => {
+    const f = startFight([fighter('a', 0, 0), fighter('b', 1, 1.5)]);
+    f.melee = { attacker: 0, opened: 0 };
+    expect(demandDifficulty(f, 'a', STYLE)).toBe(12 + DEMAND_EXTRA);
+    const yes = resolveRound(f, { a: { demand: { dice: { n: 9, mod: 0 }, difficulty: 6 } } }, RULES, Rng.fromSeed(1));
+    expect(yes.fight.winner).toBe(0);
+    expect(yes.fight.spared).toBe('b');
+    expect(yes.fight.fighters[1].weapon).toBeNull();
+    expect(yes.log.some((l) => l.k === 'demand' && l.granted)).toBe(true);
+    expect(yes.log.some((l) => l.k === 'attack')).toBe(false);
+    const no = resolveRound(f, { a: { demand: { dice: { n: 1, mod: 0 }, difficulty: 40 } } }, RULES, Rng.fromSeed(1));
+    expect(no.fight.winner).toBeNull();
+    expect(no.log.some((l) => l.k === 'attack')).toBe(false); // the attacker spent their blow on it
+    const g = structuredClone(f);
+    g.fighters[1].injuries = { ...unhurt(), fatigue: 20, wounds: { torso: 2 } };
+    expect(demandDifficulty(g, 'a', STYLE)).toBeLessThan(12 + DEMAND_EXTRA);
+  });
+
+  it('knocked down stays down until they get up (a side action); till then no moving', () => {
+    const f = startFight([fighter('a', 0, 0), fighter('b', 1, 6)]);
+    f.fighters[1].injuries = { ...unhurt(), short: ['fall'] };
+    const r1 = resolveRound(f, { b: { move: { x: 2, z: 0 } } }, RULES, Rng.fromSeed(1));
+    const b1 = r1.fight.fighters[1];
+    expect(b1.injuries.short).toEqual(['fall']); // still down after the phase
+    expect(b1.x).toBe(6); // and didn't move
+    const r2 = resolveRound(r1.fight, { b: { rise: true } }, RULES, Rng.fromSeed(1));
+    expect(r2.fight.fighters[1].injuries.short).toEqual([]);
+    expect(r2.log.some((l) => l.k === 'rise' && l.who === 'b')).toBe(true);
   });
 
   it('closing in from both sides, nobody walks through the other; the round pauses when blades cross', () => {

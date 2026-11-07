@@ -1766,8 +1766,39 @@ export class SpikeWorld {
     const speed = HERO_SPEED * this.speedMul * this.carryPace;
     const pose = this.moves.step(h, dt, speed);
     this.placeHero();
-    if (pose) this.faceWalker(this.heroFig, pose.dx, pose.dz, pose.moving);
-    if (!h.legs.length) this.marker.visible = false;
+    if (pose) {
+      const f = this.fighting?.has('hero') ? this.facingInFight('hero', pose) : pose;
+      this.faceWalker(this.heroFig, f.dx, f.dz, pose.moving);
+    }
+    if (!h.legs.length) {
+      this.marker.visible = false;
+      // Stopped in a fight: turn to the foe.
+      if (this.fighting?.has('hero')) {
+        const f = this.facingInFight('hero', { dx: 0, dz: 0, moving: false });
+        this.faceWalker(this.heroFig, f.dx, f.dz, false);
+      }
+    }
+  }
+
+  /**
+   * Which way a fighter faces as they go (the director: stepping back, you kept your back to the foe): towards the
+   * nearest other fighter when standing or going away from them (stepping back, still watching), else the way they go.
+   */
+  private facingInFight(id: string, pose: { dx: number; dz: number; moving: boolean }): { dx: number; dz: number; moving: boolean } {
+    const me = this.fighterAt(id);
+    if (!me || !this.fighting) return pose;
+    let foe: { x: number; z: number } | null = null, best = Infinity;
+    for (const o of this.fighting) {
+      const h = this.hurt[o];
+      if (o === id || h?.dead || h?.out) continue;
+      const p = this.fighterAt(o);
+      const d = p ? Math.hypot(p.x - me.x, p.z - me.z) : Infinity;
+      if (p && d < best) { best = d; foe = p; }
+    }
+    if (!foe) return pose;
+    const tx = foe.x - me.x, tz = foe.z - me.z;
+    const going = Math.hypot(pose.dx, pose.dz) > 1e-6;
+    return !going || pose.dx * tx + pose.dz * tz < 0 ? { dx: tx, dz: tz, moving: pose.moving } : pose;
   }
 
   /** A person faces the way they go (a standing still direction keeps the last), and walks or stands. */
@@ -2439,7 +2470,8 @@ export class SpikeWorld {
       stowed: (doer) => (doer === 'hero' ? this.stowed.map((s) => s.kind) : []),
       handFor: (doer, kind) => (doer === 'hero' ? this.handFor(kind) : null),
       aHandFree: (doer) => doer === 'hero' && this.aHandFree(),
-      holdsOwn: (doer) => doer === 'hero' && !!this.carry.held && !!this.carry.loose[this.carry.held]?.mine,
+      // (Any weapon or shield can be carried on you, a taken one too: the director, 2026-11-07.)
+      holdsOwn: (doer) => doer === 'hero' && !!(this.carry.held ?? this.carry.left),
       leadStudy: (t) => {
         const id = this.propLeads.get(t.id), def = id ? LEADS[id] : undefined, rec = id ? this.leads[id] : undefined;
         return id && def?.study && rec && !rec.studied ? { lead: id, study: def.study } : null;
@@ -2785,7 +2817,8 @@ export class SpikeWorld {
   /** Not knocked out, dying or dead (after a fight). */
   private canStand(id: string): boolean {
     const i = this.hurt[id];
-    return !i || (!i.out && !i.dead && !i.dying);
+    // (Knocked down in a fight, they stay lying till they get up: no swing lifts them.)
+    return !i || (!i.out && !i.dead && !i.dying && !(this.fighting && i.short.includes('fall')));
   }
 
   /** What fights have done to someone (`hero` too); null if nothing yet. */
@@ -2798,7 +2831,9 @@ export class SpikeWorld {
     this.hurt[id] = structuredClone(i);
     // (A broken leg puts them on the ground for good: they lie there, awake. The hero, outside a fight, limps on as if
     // on a crutch, so they're never stuck before healing exists.)
-    const lying = i.dead ? 'dead' : i.out || i.dying || (grounded(i) && (id !== 'hero' || this.fighting)) ? 'down' : null;
+    // (Knocked down in a fight, they lie there until they get up: `Choice.rise`.)
+    const down = (grounded(i) && (id !== 'hero' || this.fighting)) || (!!this.fighting && i.short.includes('fall'));
+    const lying = i.dead ? 'dead' : i.out || i.dying || down ? 'down' : null;
     // Going down: they fall (in a fight), then lie still; already lying, they stay.
     const cur = this.motions.get(id);
     if (lying && !this.lying(id)) {
@@ -2879,6 +2914,11 @@ export class SpikeWorld {
   }
 
   /** Lying where they are (knocked out, dying, dead: a lying motion). */
+  /** Is someone lying on the ground (falling, down, dead)? */
+  isLying(id: string): boolean {
+    return this.lying(id);
+  }
+
   private lying(id: string): boolean {
     const a = this.motions.get(id)?.act;
     return !!a && LYING_ACTS.has(a);
@@ -2942,7 +2982,7 @@ export class SpikeWorld {
     const a = c.mind.actor;
     if (!this.canStand(c.who.id) || !this.fighting?.has(c.who.id)) return { dx: a.dir.x, dz: a.dir.z, moving: false };
     const going = walkOn(c.mind, this.moves, dt, 1.6);
-    if (going) return going;
+    if (going) return this.facingInFight(c.who.id, going);
     let foe: { x: number; z: number } | null = null, best = Infinity;
     for (const id of this.fighting) {
       if (id === c.who.id) continue;
@@ -2975,7 +3015,7 @@ export class SpikeWorld {
 
   /** One of the map's people takes up their own shield (from their sheet's gear) for a fight, as `drawWeapon` does a weapon. */
   drawShield(who: string, kind: string): string | null {
-    const id = `${who}:shield`;
+    const id = this.ownGearId(who, 'shield');
     if (this.carry.loose[id]) return this.carry.loose[id].wield === who ? id : null;
     const a = this.cast.find((c) => c.who.id === who)?.mind.actor;
     if (!a || !THINGS.has(kind)) return null;
@@ -2985,11 +3025,23 @@ export class SpikeWorld {
   }
 
   /**
+   * The id of someone's own weapon or shield: `gladiator:weapon`. Someone called afresh (`callFighter`) comes with
+   * their own gear: what the last one left lying, or what the hero took, stays where it is (`gladiator:weapon:2`).
+   */
+  private ownGearId(who: string, slot: 'weapon' | 'shield'): string {
+    const n = this.freshGear[who] ?? 0;
+    return n ? `${who}:${slot}:${n + 1}` : `${who}:${slot}`;
+  }
+
+  /** How often each called fighter has come afresh (not saved, as they aren't). */
+  private freshGear: Record<string, number> = {};
+
+  /**
    * One of the map's people draws their own weapon (a kind of thing, from their sheet's gear) for a fight: it is a loose
    * thing from now on, theirs, held in their hand, and saved. Already drawn, or lost (lying somewhere), nothing changes.
    */
   drawWeapon(who: string, kind: string): string | null {
-    const id = `${who}:weapon`;
+    const id = this.ownGearId(who, 'weapon');
     if (this.carry.loose[id]) return this.carry.loose[id].wield === who ? id : null;
     const a = this.cast.find((c) => c.who.id === who)?.mind.actor;
     if (!a || !THINGS.has(kind)) return null;
@@ -3053,11 +3105,15 @@ export class SpikeWorld {
     return true;
   }
 
-  /** Put what the hero holds away on them (only their own: something of someone else's is put down or given back). */
+  /**
+   * Put the weapon or shield the hero holds away on them (the director: why put down one and put away the other?).
+   * A taken one stays its owner's (`mine` unchanged): carried, not given.
+   */
   stowHeld(): boolean {
     const id = this.carry.held ?? this.carry.left;
     const l = id ? this.carry.loose[id] : null;
-    if (!id || !l?.mine) return false;
+    const def = l && THINGS.has(l.kind) ? THINGS.get(l.kind) : null;
+    if (!id || !l || !(def?.weapon || def?.shield)) return false;
     l.stowed = true;
     if (this.carry.held === id) this.carry.held = null;
     else this.carry.left = null;
@@ -3095,6 +3151,7 @@ export class SpikeWorld {
     delete this.hurt[c.who.id];
     this.motions.delete(c.who.id);
     for (const [id, l] of Object.entries(this.carry.loose)) if (l.wield === c.who.id) delete this.carry.loose[id];
+    this.freshGear[c.who.id] = this.called;
     const a = c.mind.actor;
     a.x = c.who.start[0];
     a.z = c.who.start[1];
@@ -4083,7 +4140,10 @@ export class SpikeWorld {
       // near, even someone the hero can't see (in the dark, behind a wall): just the mark, floating (Q43).
       const s = c.mind.senses, heard = lastHeard(s, 'any');
       const near = shown || Math.hypot(a.x - this.hero.x, a.z - this.hero.z) <= MARK_REACH;
-      const mark = !this.showSenses || !near ? null : s.sees.includes('hero') ? this.markMats.eye : heard && heard.left > HEARD_SHOWN ? this.markMats.heard : null;
+      // (The senseless don't look any more, so what they last saw would hang on: no mark over them, and they see nothing.)
+      const senseless = !!hurt && (hurt.out || hurt.dead || hurt.dying);
+      if (senseless) s.sees = [];
+      const mark =!this.showSenses || !near || senseless ? null : s.sees.includes('hero') ? this.markMats.eye : heard && heard.left > HEARD_SHOWN ? this.markMats.heard : null;
       c.mark.visible = mark !== null;
       if (mark) {
         c.mark.material = mark;

@@ -38,6 +38,42 @@ const ROWS: Record<string, { moves: WayOfMoving; row: string; look: string; spot
 };
 
 const kg = (s: string): number => Number(/[\d.]+/.exec(s)?.[0] ?? 1);
+const cm = (s: string): number => Number(/[\d.]+/.exec(s)?.[0] ?? 80);
+
+/**
+ * Every other melee weapon in the table, so whatever the hero owns from the creator can be drawn and fought with
+ * (the director, 2026-11-07: "cannot use all my owned weapons"). Until it has a model of its own it is drawn with a
+ * look-alike's (`standIn`), picked by its skill, its hands and its length; racks leave these out. A real model: give
+ * it a line in `ROWS` above and a model file, and it stops being a stand-in.
+ */
+function lookAlike(skill: string, twoHanded: boolean, length: number): string | null {
+  switch (skill) {
+    case 'Svärd': return twoHanded ? 'greatsword' : length < 80 ? 'short-sword' : 'arming-sword';
+    case 'Yxa': return twoHanded ? 'great-axe' : length < 75 ? 'hand-axe' : 'battle-axe';
+    case 'Dolk': return 'dagger';
+    case 'Spjut': return 'hunting-spear';
+    case 'Stav': return 'quarterstaff';
+    case 'Klubba': return twoHanded ? 'war-hammer' : length < 70 ? 'cudgel' : 'steel-mace';
+    case 'Kedjevapen': return 'flail';
+    default: return null; // brawling weapons, and ranged ones (B8d), wait
+  }
+}
+
+const slug = (s: string): string => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
+const modelled = new Set(Object.values(ROWS).map((w) => w.row));
+const standIns: ThingDef[] = WEAPONS.flatMap((row): ThingDef[] => {
+  if (!row.melee || modelled.has(row.sv)) return [];
+  const twoHanded = row.h1 === '–';
+  const like = lookAlike(row.skill, twoHanded, cm(row.length));
+  const id = slug(row.en);
+  if (!like || ROWS[id]) return [];
+  const model = MODELS[like];
+  return [{
+    id, is: 'weapon', standIn: true, look: `${row.en}.`, name: row.en.toLowerCase(), weapon: row.sv, hands: twoHanded ? 2 : 1,
+    moves: ROWS[like].moves, model, weight: kg(row.weight), value: row.price, ...(ROWS[like].spot ? { spot: ROWS[like].spot } : {}), draw: (p) => model.draw(p.seed),
+  }];
+});
 
 export default [
   family,
@@ -48,4 +84,5 @@ export default [
     if (!model) throw new Error(`weapon ${id} has no model in content/things/models/${id}.ts`);
     return { id, is: 'weapon', look: w.look, name: row.en.toLowerCase(), weapon: row.sv, hands: row.h1 === '–' ? 2 : 1, moves: w.moves, model, weight: kg(row.weight), value: row.price, ...(w.spot ? { spot: w.spot } : {}), draw: (p) => model.draw(p.seed) };
   }),
+  ...standIns,
 ] satisfies ThingDef[];

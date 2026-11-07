@@ -2,6 +2,25 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-07 — Your fight notes, the wall of them
+
+- **The second gladiator now fights.** After the first one died, their sword lay on the sand; the new one answering the gong came without a weapon, and a check on their shield then crashed, so Attack zoomed in and nothing happened. Each called fighter now brings their own weapon and shield; what the last one dropped stays where it lies.
+- **Finish them off later:** tap someone lying senseless (fight over or not): you walk up, and the fight panel offers *Finish them* or *OK* to leave them.
+- **No eye over the senseless and the dead** (they kept what they last saw).
+- **Put away anything you hold**: a weapon or shield from the rack, or one taken off a foe (it stays theirs).
+- **All your weapons from the creator can be drawn.** Only 17 weapons had a model; the rest of the melee ones now borrow a look-alike's (a sabre-like sword draws as the arming sword, and so on), and stay off the rack. Bows, crossbows and thrown weapons wait for ranged fighting (B8d).
+- **Draw** says "nothing else on you (the sword in hand)" instead of "nothing carried".
+- **"You are the attacker: choose how to strike"** (or the defender: how to defend), instead of one line for both.
+- **Knocked down means down.** They fall, lie there, and stay down until they spend a side action on **Get up**: till then −1D6 on everything and no moving. The foe gets up the same way. (The book has it wear off on its own; recorded as your rule.)
+- **A blow that puts someone down plays the fall at once**, not a flinch, back to guard, then the fall.
+- **Stepping back you keep facing the foe**, and anyone in a fight turns to face the other when they stop.
+- **Why the attack changed hands is in the log**: "(a careful defence that held by 10 or more: 2 advantages)", "(a counter)", "(the defence held)"; and when a careful defence held by less than 10: "…it takes 10 (2 advantages) to win the attack back". *Careful* says it on its button too.
+- **The foe's details open on every difficulty** (in words off easy), and say what "down" does.
+- **Yielding:** asking to yield is easier the worse off the foe is than you (fatigue against their shock roll, wounds, breaks, down, empty-handed). New in Other: **Make them yield**, your best threatening skill against how hard they are to cow (harder than letting you go); it works, they lay down their weapons and you've won without killing.
+- **Your question, when does the gladiator give up?** It offers to yield at "beaten 1.75" (about: fatigue near their shock roll's average plus a wound or two, or a broken bone), and needs a plea at 16 before your gains. The coward offers at 0.5, anyone else at 1. Now you can also make them.
+- **For later** (in the plan): a reaction dodge against arrows (B8d); looting someone who yielded (B8f, B6); a foe who gets up thinking less of you, and one who wakes disarmed going for a weapon or fleeing (B8f).
+- **Checked:** unit tests (new: making them yield, staying down until up), the fight browser tests, and the whole path in a browser: a fight, leave them, tap them again and finish them, pick up and put away their buckler, call a new gladiator, the fight starts.
+
 ## 2026-11-06 — The phone in a fight
 
 - **The log is about four times as tall.** The sheet now takes the bottom 58% (it was 45%). Your moves take what they need, up to half of it, and the log gets the rest (at least five lines, usually ten or more).

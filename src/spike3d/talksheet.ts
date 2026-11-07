@@ -202,7 +202,14 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
       const hurt = w.injuriesOf(id);
       const name = w.talkPerson(id)?.name ?? id;
       if (hurt?.dead) return notify(t('talk.dead', '{name} is dead.', { name }));
-      if (hurt?.out) return notify(t('talk.out', '{name} lies senseless.', { name }));
+      if (hurt?.out && !onFight) return notify(t('talk.out', '{name} lies senseless.', { name }));
+      // Someone lying senseless: walk up, then the fight panel offers the killing stroke or leaving them (the director).
+      if (hurt?.out) {
+        if (w.reachTo(at) <= TALK_REACH) return onFight!(id);
+        if (w.walkTo(at.x, at.z, at.level) === null) return notify(t('talk.noway', 'You can\'t get to them.'));
+        pending = id;
+        return;
+      }
       if (w.reachTo(at) <= TALK_REACH) return start(id);
       far(id, w.reachTo(at));
     },
@@ -219,6 +226,7 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
         const id = pending;
         pending = null;
         w.walkTo(w.hero.x, w.hero.z);
+        if (w.injuriesOf(id)?.out && onFight) return onFight(id);
         return start(id);
       }
       if (!w.walking) {

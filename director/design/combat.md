@@ -74,7 +74,11 @@ Mounted combat waits for riding (C4), mystic actions for magic (B9).
 - **A broken leg, hip, spine or neck grounds them** (`grounded`): no moving or retreating, −1D6 on fighting and moving; a broken arm drops what it holds. The hero limps outside a fight until healing exists.
 - **A beaten foe offers to yield** (`beaten`, `wantsToYield`, style `yieldAt`); **yielding lays your weapon down**, and each earlier yield to the same person makes the next plea 6 harder (`Standing.yielded`).
 - **The round pauses when blades cross** (`pauseOnOpen`, `Fight.midRound`) so both sides choose a tactic in their roles; a move stops at reach of a foe.
-- **The mercy stroke** kills (someone helpless, a blow meant to kill); no roll.
+- **The mercy stroke** kills (someone helpless, a blow meant to kill); no roll. Someone found senseless later (tapped) opens the fight panel already won: *Finish them* or *OK*.
+- **Knocked down stays down** (the director, 2026-11-07): the `fall` short effect is kept at the end of each phase until `Choice.rise` (the side action *Get up*; the styles' `getUp` line). The world keeps them lying (`canStand`).
+- **Making a foe yield** (`Choice.demand`, `demandDifficulty`): the best of `SKILL_SETS.threaten` against `spare` + `DEMAND_EXTRA`, eased by `worseOff` (4 a point of `beaten` over yours), as the plea now is.
+- **Roles changing hands say why** (`roles.why`), and a careful defence that held by less than 10 says so (`kept`).
+- **Every melee weapon row is a kind**; those without a model are `standIn` (a look-alike's model, off the rack).
 - **A defender's side action**: picking something up is allowed while defending (the book gives a side action in your active phase; the defender has no main action).
 - **The knocked out wake when their fatigue is all gone** (`recoverFatigue`); the dying don't.
 - **The hero wears no armour yet** (there is none on them in the world); people wear their sheet's armour as one suit.

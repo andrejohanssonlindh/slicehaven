@@ -15,7 +15,7 @@ export const ATTACKS: Record<AttackTactic, [name: string, does: string]> = {
 };
 export const DEFENCES: Record<DefenceTactic, [name: string, does: string]> = {
   standard: [t('fight.tac.std', 'Standard'), ''],
-  defensive: [t('fight.tac.careN', 'Careful'), t('fight.tac.careD', '+1D6, +1 fatigue')],
+  defensive: [t('fight.tac.careN', 'Careful'), t('fight.tac.careD', '+1D6, +1 fatigue; attack back only if it holds by 10')],
   counter: [t('fight.tac.counterN', 'Counter'), t('fight.tac.counterD', '−1D6, attack next, +1 fatigue')],
 };
 export const WAYS: Record<'parry' | 'block' | 'dodge', string> = { parry: t('fight.how.parry', 'parry'), block: t('fight.how.block', 'block'), dodge: t('fight.how.dodge', 'dodge') };

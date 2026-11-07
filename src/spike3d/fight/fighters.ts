@@ -66,7 +66,7 @@ export function personFighter(w: SpikeWorld, id: string, sheet: RolledSheet | nu
   const armour = sheet?.gear.armour ? ARMOUR.find((a) => a.sv === sheet.gear.armour) : undefined;
   // Their own shield, if their sheet has one and their weapon leaves a hand for it.
   const shieldKind = sheet?.gear.shield ? kindOfShield(sheet.gear.shield) : null;
-  const sh = w.shieldOf(id) ?? (shieldKind && THINGS.get(held?.kind ?? '')?.hands !== 2 ? (w.drawShield(id, shieldKind), w.shieldOf(id)) : null);
+  const sh = w.shieldOf(id) ?? (shieldKind && !(held && THINGS.has(held.kind) && THINGS.get(held.kind).hands === 2) ? (w.drawShield(id, shieldKind), w.shieldOf(id)) : null);
   return {
     id, side: 1, x: at.x, z: at.z, pools: Object.fromEntries(FIGHT_IDS.map((s) => [s, dice(s)])),
     physique: phys, baseDamage: baseDamage(units(phys)), baseArmour: baseArmour(units(phys)),

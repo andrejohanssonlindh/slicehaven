@@ -103,16 +103,19 @@ const hasGear: GateDef = {
   check: (c) => ((c.world.stowed?.(c.doer.id) ?? []).length ? null : 'You carry nothing to draw.'),
 };
 
-/** Holding something of their own (their gear, or a weapon taken from a rack): putting it away is offered only then. */
+/**
+ * Holding a weapon or shield, to carry on them (their gear, one from a rack, one taken off a foe: the director,
+ * 2026-11-07, any of them can be put away): putting it away is offered only then.
+ */
 const holdingOwn: GateDef = {
   id: 'holding-own',
-  about: 'The doer holds something that is their own and can be carried on them (a weapon).',
+  about: 'The doer holds a weapon or shield, which can be carried on them.',
   kind: 'requirement',
   hides: true,
   check: (c) => {
     const k = c.world.holding?.(c.doer.id);
     const def = k && c.world.things.has(k) ? c.world.things.get(k) : null;
-    return (def?.weapon || def?.shield) && c.world.holdsOwn?.(c.doer.id) ? null : 'You hold nothing of yours to put away.';
+    return (def?.weapon || def?.shield) && c.world.holdsOwn?.(c.doer.id) ? null : 'You hold nothing to put away.';
   },
 };
 

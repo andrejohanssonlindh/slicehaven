@@ -204,7 +204,9 @@ export function renderCondition(box: HTMLElement, i: Injuries, vitality: Dice, e
   for (const b of i.broken) lasting.push([t('cond.broken', 'Broken: {b}.', { b }), [BROKEN_PART[b]]]);
   for (const l of i.lost) { const p = lostPart(l); lasting.push([t('cond.lost', 'Lost: {a}.', { a: `${l.side ? `${l.side} ` : ''}${l.area}` }), p ? [p] : []]); }
   for (const a of i.armourOff) lasting.push([t('cond.armouroff', 'Armour torn off the {part}.', { part: partName(a) }), [a]]);
-  if (i.short.length) lasting.push([t('cond.short', 'Until your next turn: {s}.', { s: i.short.map((s) => t(`fight.short.${s}`, SHORT[s])).join(', ') }), []]);
+  if (i.short.includes('fall')) lasting.push([t('cond.down', 'Knocked down: −1D6 on everything and no moving, until you get up (a side action).'), []]);
+  const brief = i.short.filter((s) => s !== 'fall');
+  if (brief.length) lasting.push([t('cond.short', 'Until your next turn: {s} (−1D6 each on everything you do).', { s: brief.map((s) => t(`fight.short.${s}`, SHORT[s])).join(', ') }), []]);
   // Blows seen that left no lasting wound still show where they landed.
   for (const part of BODY_PARTS) {
     const n = seen.filter((h) => h.part === part).length;

@@ -163,7 +163,7 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
     else if (what === 'stock' && kind.stock) {
       nameEl.textContent = t('act.pick.stock', 'Take which?');
       lookEl.textContent = t('act.pick.stocklook', 'Your skill with each is in brackets.');
-      const kinds = THINGS.placeable.filter((k) => k !== kind.id && THINGS.get(k).chain.includes(kind.stock!));
+      const kinds = THINGS.placeable.filter((k) => k !== kind.id && THINGS.get(k).chain.includes(kind.stock!) && !THINGS.get(k).standIn);
       for (const k of kinds) {
         const thing = THINGS.get(k);
         add(cap(t(`thing.${k}.name`, thingName(thing))), armsLine(thing, true), () => {

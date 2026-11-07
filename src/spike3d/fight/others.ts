@@ -1,8 +1,8 @@
 import { styleFor } from '../../content/combat';
-import { rollableName } from '../../content/rollables';
+import { SKILL_SETS, rollableName } from '../../content/rollables';
 import { diceText } from '../../core/chargen/tables';
 import {
-  ADJACENT, type Choice, type Fighter, PICKUP_REACH, PLEA_SKILLS, RUN, WALK, between, canAct, canHold, holding, pleaDifficulty, roleOf,
+  ADJACENT, type Choice, type Fighter, PICKUP_REACH, PLEA_SKILLS, RUN, WALK, between, canAct, canHold, demandDifficulty, holding, pleaDifficulty, roleOf,
 } from '../../core/combat';
 import type { Style } from '../../core/fightmind';
 import { t } from '../../i18n';
@@ -33,7 +33,7 @@ export interface Move {
 
 /** One of the side action's lists, or a side action on its own (`items` empty, `go` set). */
 export interface SideEntry {
-  id: 'move' | 'draw' | 'pickUp' | 'look';
+  id: 'rise' | 'move' | 'draw' | 'pickUp' | 'look';
   label: string;
   /** Why it is empty, or what it costs. */
   small: string;
@@ -57,6 +57,7 @@ export const withSide = (ctx: FightCtx, main: Choice): Choice => ({ ...(ctx.s.si
  */
 export function afterSide(ctx: FightCtx, me: Fighter): Fighter {
   const c = ctx.s.side?.choice;
+  if (c?.rise) return { ...me, injuries: { ...me.injuries, short: me.injuries.short.filter((x) => x !== 'fall') } };
   const item = c?.draw ? me.belt?.find((b) => b.id === c.draw) : c?.pickUp ? ctx.s.fight?.ground.find((g) => g.id === c.pickUp) : undefined;
   return item && canHold(me, item) ? holding(me, item) : me;
 }
@@ -110,10 +111,19 @@ export function sideEntries(ctx: FightCtx): SideEntry[] {
     out.push({ id: 'move', label: t('fight.side.move', 'Move'), small: t('fight.side.moveD', 'or tap the ground'), items });
   }
 
+  // Knocked down: getting up is the side action that matters (till then −1D6 on everything, no moving).
+  if (me.injuries.short.includes('fall')) {
+    const rise = sideMove(ctx, 'rise', t('fight.side.rise', 'Get up'), { rise: true }, t('fight.side.riseD', 'you are down: −1D6 on everything, no moving'));
+    out.unshift({ id: 'rise', label: rise.label, small: rise.small ?? '', items: [], go: rise.go!, instant: rise.instant });
+  }
+
   const belt = (me.belt ?? []).filter((b) => canHold(me, b));
+  const inHand = [me.weapon, me.shield].filter((x) => !!x).map((x) => ctx.kindName(x!.id)).join(t('fight.and', ' and '));
   out.push({
     id: 'draw', label: t('fight.side.draw', 'Draw'),
-    small: belt.length ? t('fight.side.drawD', '−1D6 on the next roll') : (me.belt?.length ? t('fight.side.handsfull', 'hands full') : t('fight.side.nothing', 'nothing carried')),
+    small: belt.length ? t('fight.side.drawD', '−1D6 on the next roll')
+      : me.belt?.length ? t('fight.side.handsfull', 'hands full')
+        : inHand ? t('fight.side.inhand', 'nothing else on you ({what} in hand)', { what: inHand }) : t('fight.side.nothing', 'nothing carried on you'),
     items: belt.map((b) => sideMove(ctx, `draw:${b.id}`, t('fight.draw', 'Your {name}', { name: ctx.kindName(b.id) }), { draw: b.id })),
   });
 
@@ -163,12 +173,32 @@ export function otherMoves(ctx: FightCtx, done: { newGame: Go; end: Go; accept: 
   // They offered to yield: accept, or choose anything else and fight on.
   if (fight.offer === foeId) out.push({ key: 'accept', label: t('fight.accept', 'Accept their surrender'), go: done.accept });
   const role = roleOf(fight, 'hero');
+  out.push(demand(ctx, role === 'defender'));
   out.push(plea(ctx, role === 'defender'));
   if (role === 'free') {
     out.push({ key: 'hold', label: t('fight.hold', 'Hold your ground'), small: t('fight.holdD', 'let them come'), go: () => ctx.play({}) });
     if (between(fight, 'hero', foeId) > 12) out.push({ key: 'flee', label: t('fight.flee', 'Get away'), small: t('fight.fleeD', 'end the fight'), go: done.end });
   }
   return out;
+}
+
+/**
+ * Make them yield (the director: a way to win without killing), the main action: the best of the threatening skills
+ * (`SKILL_SETS.threaten`; none, Presence at −2D6) against how hard they are to cow (`demandDifficulty`: their style,
+ * easier the worse off they are than you). On easy the difficulty shows. A defender still defends.
+ */
+function demand(ctx: FightCtx, defending: boolean): Move {
+  const skills = SKILL_SETS.threaten;
+  const best = skills.map((s) => ({ s, d: ctx.hero.dice[s] ?? { n: 0, mod: 0 } })).reduce((a, b) => (units(b.d) > units(a.d) ? b : a), { s: 'attr:Intryck', d: { n: 0, mod: 0 } });
+  const presence = ctx.hero.dice['attr:Intryck'] ?? { n: 2, mod: 0 };
+  const use = best.d.n > 0 ? best : { s: 'attr:Intryck', d: { n: Math.max(1, presence.n - 2), mod: presence.mod } };
+  const difficulty = demandDifficulty(ctx.s.fight!, 'hero', foeStyle(ctx));
+  const easy = ctx.level().foeExact;
+  return {
+    key: 'demand', label: t('fight.demandN', 'Make them yield'),
+    small: t('fight.pleadD', '{skill} {dice}{vs}', { skill: rollableName(use.s), dice: diceText(use.d), vs: easy ? t('fight.pleavs', ' against {d}', { d: difficulty }) : '' }),
+    go: () => ctx.play(withSide(ctx, { demand: { dice: use.d, difficulty }, ...(defending ? { defend: 'standard' as const } : {}) })),
+  };
 }
 
 /**

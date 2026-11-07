@@ -224,6 +224,11 @@ export interface Choice {
   pickUp?: string;
   /** Draw something they carry (`Fighter.belt`), as the side action: −1D6 on the next attack or defence, as picking up. */
   draw?: string;
+  /**
+   * Get up off the ground, as the side action (the director, 2026-11-07: knocked down stays down until they get up;
+   * till then −1D6 on everything and no moving).
+   */
+  rise?: boolean;
   /** The main action, as the attacker in a melee: attack with a tactic, retreat, or (on someone knocked out) the mercy stroke. */
   attack?: AttackTactic;
   retreat?: boolean;
@@ -241,6 +246,12 @@ export interface Choice {
    * `PLEA_SKILLS`) against the foe's `pleaDifficulty`. Granted, the fight ends and the foe has won, sparing them.
    */
   plead?: { dice: Dice; difficulty: number };
+  /**
+   * Make the foe yield, as the main action (the director: a way to win without killing): a threatening roll with the
+   * pool given against their `demandDifficulty`. It works: they lay down their weapons and the fight is won.
+   * A defender still defends.
+   */
+  demand?: { dice: Dice; difficulty: number };
 }
 
 /** The rules a fight is played by that come from content: the wound tables, the ground's difficulty to run on. */
@@ -268,10 +279,15 @@ export type LogLine =
   }
   | { k: 'drop'; who: string; item: string; at: { x: number; z: number } }
   | { k: 'retreat'; who: string; to: { x: number; z: number } }
-  | { k: 'roles'; attacker: number }
+  /** Roles swap: a counter, a plain defence that held, or a careful one that held by 10 or more (2 advantages). */
+  | { k: 'roles'; attacker: number; why?: 'counter' | 'held' | 'careful' }
+  /** A careful defence held, but not by 10 (2 advantages): they keep defending. `by`: how much it held by. */
+  | { k: 'kept'; who: string; by: number }
+  | { k: 'rise'; who: string }
   | { k: 'end'; who: string; end: PhaseEnd }
   | { k: 'mercy'; who: string; target: string }
   | { k: 'plead'; who: string; roll: Roll; granted: boolean }
+  | { k: 'demand'; who: string; target: string; roll: Roll; granted: boolean }
   | { k: 'over'; winner: number };
 
 export type Defence = 'parry' | 'block' | 'dodge' | 'none';
@@ -642,7 +658,12 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
   for (const f of resumed ? [] : order) {
     if (!canAct(f)) continue;
     const c = choices[f.id] ?? {};
-    if (c.pickUp) {
+    if (c.rise && f.injuries.short.includes('fall')) {
+      const left = f.injuries.short.filter((s) => s !== 'fall');
+      shortBefore.set(f.id, Math.max(0, (shortBefore.get(f.id) ?? 0) - (f.injuries.short.length - left.length)));
+      f.injuries = { ...f.injuries, short: left };
+      log.push({ k: 'rise', who: f.id });
+    } else if (c.pickUp) {
       const i = fight.ground.findIndex((g) => g.id === c.pickUp && dist(g, f) <= PICKUP_REACH);
       const item = fight.ground[i];
       if (item && canHold(f, item)) {
@@ -693,13 +714,23 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
     const foe = nearestFoe(fight, f);
     if (roll.success && foe) yieldTo(fight, f, foe.side, rng, log);
   }
+  // Making the foe yield: the same, the other way round.
+  for (const f of fight.fighters) {
+    const p = choices[f.id]?.demand;
+    if (!p || !canAct(f) || fight.winner !== null) continue;
+    const roll = rollTest(p.dice, p.difficulty, rng, 'Demand');
+    const foe = nearestFoe(fight, f);
+    log.push({ k: 'demand', who: f.id, target: foe?.id ?? '', roll, granted: !!roll.success });
+    if (roll.success && foe) yieldTo(fight, foe, f.side, rng, log);
+  }
 
   // The main action: the attacking side strikes (or retreats); someone knocked out can be given the mercy stroke.
   let nextAttacker: number | null = fight.melee?.attacker ?? null;
+  let swapWhy: 'counter' | 'held' | 'careful' | undefined;
   for (const a of fight.fighters) {
     if (!canAct(a) || fight.spared) continue;
     const c = choices[a.id] ?? {};
-    if (c.plead) continue;
+    if (c.plead || c.demand) continue;
     if (c.mercy) {
       const v = fight.fighters.find((f) => f.id === c.mercy);
       // The mercy stroke (p. 101): someone knocked out can't defend, and it is given to kill (reading: it does).
@@ -730,7 +761,10 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
     if (canAct(d)) {
       d.injuries = structuredClone(d.injuries);
       if (dTactic !== 'standard') addFatigue(d.injuries, tacticFatigue(null, dTactic, weaponOf(d)), dTactic === 'defensive' ? 'careful' : 'counter');
-      if (swaps(dTactic, hit, margin)) nextAttacker = d.side;
+      if (swaps(dTactic, hit, margin)) {
+        nextAttacker = d.side;
+        swapWhy = dTactic === 'counter' ? 'counter' : dTactic === 'defensive' ? 'careful' : 'held';
+      } else if (dTactic === 'defensive' && !hit) log.push({ k: 'kept', who: d.id, by: -margin });
     }
   }
 
@@ -738,7 +772,10 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
   for (const f of fight.fighters) {
     if (f.injuries.dead || f.gone) continue;
     const end = endOfPhase(f.injuries, pool(f, 'attr:Livskraft'), rng);
-    f.injuries = { ...end.injuries, short: end.injuries.short.slice(shortBefore.get(f.id) ?? 0), blinded: false };
+    const short = end.injuries.short.slice(shortBefore.get(f.id) ?? 0);
+    // Down stays down until they get up (`Choice.rise`), once: the other short effects wear off.
+    if (end.injuries.short.includes('fall') && !short.includes('fall')) short.push('fall');
+    f.injuries = { ...end.injuries, short, blinded: false };
     if (end.rolls.length || end.notes.length) log.push({ k: 'end', who: f.id, end });
   }
 
@@ -749,7 +786,7 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
     if (!engaged) fight.melee = null;
     else if (nextAttacker !== null && nextAttacker !== fight.melee.attacker) {
       fight.melee = { ...fight.melee, attacker: nextAttacker };
-      log.push({ k: 'roles', attacker: nextAttacker });
+      log.push({ k: 'roles', attacker: nextAttacker, ...(swapWhy ? { why: swapWhy } : {}) });
     }
   }
   delete fight.upper;
@@ -786,18 +823,38 @@ export const between = (fight: Fight, a: string, b: string): number => {
 export const PLEA_SKILLS = ['Argumentera', 'Charm'];
 
 /**
+ * How much worse off the foe is than you, in difficulty: 4 for each point they are more `beaten` (fatigue against
+ * their shock roll, wounds, broken bones, on the ground, empty-handed), never below 0. A winded, hurt foe is glad to
+ * stop (the director: asking to yield should feel their injuries).
+ */
+function worseOff(me: Fighter, foe: Fighter): number {
+  return Math.max(0, Math.round(4 * (beaten(foe) - beaten(me))));
+}
+
+/**
  * How hard a foe is to talk into letting you yield (the director: "an alternative to try to give up"): their style's
- * `spare`, 2 easier for each 5 fatigue they carry over yours (a winded foe is glad to stop), 4 easier if they are hurt
- * more than you (wounds), never under 6; and 6 harder for each time you have yielded to them before (the director:
- * pick up another weapon after yielding, and they won't forgive you so easily).
+ * `spare`, easier the worse off they are than you (`worseOff`), never under 6; and 6 harder for each time you have
+ * yielded to them before (the director: pick up another weapon after yielding, and they won't forgive you so easily).
  */
 export function pleaDifficulty(fight: Fight, pleader: string, style: { spare: number }, yieldedBefore = 0): number {
   const me = fight.fighters.find((f) => f.id === pleader);
   const foe = me ? nearestFoe(fight, me) : null;
   if (!me || !foe) return style.spare + 6 * yieldedBefore;
-  const wounds = (f: Fighter) => Object.values(f.injuries.wounds).reduce((s, n) => s + (n ?? 0), 0);
-  const tired = Math.max(0, Math.floor((foe.injuries.fatigue - me.injuries.fatigue) / 5));
-  return Math.max(6, style.spare - 2 * tired - (wounds(foe) > wounds(me) ? 4 : 0)) + 6 * yieldedBefore;
+  return Math.max(6, style.spare - worseOff(me, foe)) + 6 * yieldedBefore;
+}
+
+/** How much harder making someone yield is than letting yourself yield: they must give up, not just let you go. */
+export const DEMAND_EXTRA = 4;
+
+/**
+ * How hard a foe is to force into yielding (the director: so you can win without killing): their style's `spare` and
+ * `DEMAND_EXTRA`, easier the worse off they are than you, never under 6.
+ */
+export function demandDifficulty(fight: Fight, demander: string, style: { spare: number }): number {
+  const me = fight.fighters.find((f) => f.id === demander);
+  const foe = me ? nearestFoe(fight, me) : null;
+  if (!me || !foe) return style.spare + DEMAND_EXTRA;
+  return Math.max(6, style.spare + DEMAND_EXTRA - worseOff(me, foe));
 }
 
 /**

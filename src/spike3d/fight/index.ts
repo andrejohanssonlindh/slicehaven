@@ -112,7 +112,8 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
   window.addEventListener('resize', () => { layout(ctx); aimView(ctx); });
   el.usCard.addEventListener('click', () => { if (s.fight) condition.open(s.fight.fighters[0].injuries, ctx.vitalityOf(s.fight.fighters[0]), undefined, s.seen.hero); });
   el.themCard.addEventListener('click', () => {
-    if (s.fight && s.fight.fighters[1] && ctx.level().foeExact) condition.open(s.fight.fighters[1].injuries, ctx.vitalityOf(s.fight.fighters[1]), nameOf(s.foeId), s.seen[s.foeId]);
+    // (On normal and hard in words, as the card: what holds them back and why, without the numbers.)
+    if (s.fight && s.fight.fighters[1]) condition.open(s.fight.fighters[1].injuries, ctx.vitalityOf(s.fight.fighters[1]), nameOf(s.foeId), s.seen[s.foeId]);
   });
 
   /** A tap on the world: plan to go there (free), or to the weapon tapped; in reach of a foe, only breaking off moves you. */
@@ -213,7 +214,11 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     for (const f of s.fight.fighters) w.setInjuries(f.id, f.injuries);
     save();
     s.busy = false;
-    if (s.fight.midRound) ctx.log(t('fight.choose', 'Choose how to strike or defend.'), 'info');
+    if (s.fight.midRound) {
+      ctx.log(roleOf(s.fight, 'hero') === 'attacker'
+        ? t('fight.choose.attack', 'You are the attacker: choose how to strike.')
+        : t('fight.choose.defend', 'You are the defender: choose how to defend.'), 'info');
+    }
     // Beaten badly enough, they offer to yield (the director: "some type of plead cutoff").
     offerYield(style);
     const me = s.fight.fighters[0];
@@ -299,8 +304,8 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     const me = w.fighterAt('hero'), them = w.fighterAt(foe), p = w.talkPerson(foe);
     if (!me || !them || !p) return;
     if (w.injuriesOf(foe)?.dead) return notify(t('fight.alreadydead', '{name} is dead.', { name: p.name }));
-    if (w.injuriesOf(foe)?.out) return notify(t('fight.alreadyout', '{name} lies senseless.', { name: p.name }));
     if (w.injuriesOf('hero')?.out) return notify(t('fight.youareout', 'You are knocked out.'));
+    const senseless = !!w.injuriesOf(foe)?.out;
     s.foeId = foe;
     names.set('hero', t('fight.youobj', 'you'));
     names.set(foe, p.name);
@@ -317,6 +322,13 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
     document.body.classList.add('fighting');
     tabs.reset();
     requestAnimationFrame(() => trackBubble(ctx));
+    // Lying senseless (after a fight, or found so): nothing to fight; the killing stroke, or OK to leave them be.
+    if (senseless) {
+      s.fight.winner = 0;
+      ctx.log(t('fight.foundout', '{name} lies senseless. Finish them, or leave them be (OK).', { name: p.name }), 'info');
+      refresh();
+      return;
+    }
     ctx.log(t('fight.begins', 'You face {name}. The fight is on.', { name: p.name }), 'info');
     if (!s.fight.fighters[0].weapon) {
       ctx.log(s.fight.fighters[0].belt?.length

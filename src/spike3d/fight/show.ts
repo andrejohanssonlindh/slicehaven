@@ -50,6 +50,8 @@ export function makePlayback(ctx: FightCtx): Playback {
   /** Rolls made but not shown (fast mode), waiting to go behind the next log line. */
   let stash: Roll[] = [];
   let lastLine: HTMLElement | null = null;
+  /** Who goes down in the round being shown (from its end-of-phase lines), so the blow that does it plays a fall. */
+  let goingDown = new Set<string>();
   const logEl = ctx.el.log;
 
   function log(text: string, kind: 'you' | 'they' | 'info' | 'good' | 'bad' = 'info'): void {
@@ -150,7 +152,10 @@ export function makePlayback(ctx: FightCtx): Playback {
     if (!l.hit) float(l.target, t(`fight.verdict.${l.how}`, VERDICT[l.how]), 'miss');
     else if (l.result) {
       const r = l.result;
-      if (r.net > 0 && !r.after.out && !r.after.dead) w.play(l.target, r.serious || r.fatigue >= 3 ? 'stagger' : 'flinch');
+      // Going down this round (knocked out, killed, knocked off their feet): they fall at the blow, not flinch, get
+      // up and then fall (the director).
+      if (goingDown.has(l.target) || r.after.out || r.after.dead || r.after.short.includes('fall')) { if (!w.isLying(l.target)) w.play(l.target, 'fall'); }
+      else if (r.net > 0) w.play(l.target, r.serious || r.fatigue >= 3 ? 'stagger' : 'flinch');
       if (landed) {
         seeHit(l);
         floatHit(l);
@@ -248,6 +253,7 @@ export function makePlayback(ctx: FightCtx): Playback {
   async function show(lines: LogLine[], w: SpikeWorld): Promise<void> {
     const fight = () => ctx.s.fight!;
     const foeId = ctx.s.foeId;
+    goingDown = new Set(lines.flatMap((l) => (l.k === 'end' && (l.end.injuries.out || l.end.injuries.dead) ? [l.who] : [])));
     for (const l of lines) {
       switch (l.k) {
         case 'move': {
@@ -302,10 +308,32 @@ export function makePlayback(ctx: FightCtx): Playback {
           w.moveFighter(l.who, l.to.x, l.to.z);
           log(of(l.who, ['fight.retreats.you', 'You break off and step back.'], ['fight.retreats', '{who} breaks off and steps back.']), 'info');
           break;
-        case 'roles':
+        case 'roles': {
           ctx.s.roleWhy = 'won';
-          log(of(l.attacker === 0 ? 'hero' : foeId, ['fight.turns.you', 'Now you press the attack.'], ['fight.turns', 'Now {who} presses the attack.']), 'info');
+          // Why the attack changed hands (the director: a careful defence won it back and nothing said so).
+          const why = l.why === 'careful' ? t('fight.turns.careful', ' (a careful defence that held by 10 or more: 2 advantages)')
+            : l.why === 'counter' ? t('fight.turns.counter', ' (a counter)') : l.why === 'held' ? t('fight.turns.held', ' (the defence held)') : '';
+          log(`${of(l.attacker === 0 ? 'hero' : foeId, ['fight.turns.you', 'Now you press the attack'], ['fight.turns', 'Now {who} presses the attack'])}${why}.`, 'info');
           break;
+        }
+        case 'kept':
+          log(of(l.who, ['fight.kept.you', 'Your careful defence held by {by}, but it takes 10 (2 advantages) to win the attack back: you defend again.'],
+            ['fight.kept', '{who}’s careful defence held by {by}, but it takes 10 (2 advantages) to win the attack back: you keep attacking.'], { by: l.by }), 'info');
+          break;
+        case 'rise':
+          w.setInjuries(l.who, fight().fighters.find((f) => f.id === l.who)!.injuries);
+          log(of(l.who, ['fight.rise.you', 'You get back on your feet.'], ['fight.rise', '{who} gets back on their feet.']), l.who === 'hero' ? 'you' : 'they');
+          break;
+        case 'demand': {
+          const mine = l.who === 'hero';
+          const answer = l.granted
+            ? of(l.target, ['fight.yields.you', 'You give up and lay down your weapons.'], ['fight.yields', '{who} gives up and lays down their weapons.'])
+            : of(l.target, ['fight.defies.you', 'You won’t give up.'], ['fight.defies', '{who} won’t give up.']);
+          log(of(l.who, ['fight.demands.you', 'You tell {foe} to give up.'], ['fight.demands', '{who} tells you to give up.'], { foe: ctx.nameOf(l.target) }), mine ? 'you' : 'they');
+          await reveal([{ ...l.roll, label: t('fight.demandroll', '{who}: make them yield', { who: ctx.Name(l.who) }) }], [mine], [answer]);
+          log(`${answer.replace(/\.$/, '')}${said(l.roll, l.who, 'Threat')}.`, l.granted === mine ? 'good' : 'bad');
+          break;
+        }
         case 'end': {
           if (l.end.rolls.length) await reveal(l.end.rolls.map((r) => ({ ...r, label: `${ctx.Name(l.who)}: ${r.label ?? ''}` })), l.end.rolls.map(() => l.who === 'hero'));
           // Each note with the roll that made it, if one did ("knocked out (Shock roll 3D6+1 = 4 < 6)"): the shock

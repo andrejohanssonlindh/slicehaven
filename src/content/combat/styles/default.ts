@@ -6,6 +6,7 @@ const style: FightStyle = {
   spare: 8,
   lines: [
     { when: { beaten: 1 }, do: 'offerYield' },
+    { do: 'getUp' },
     { do: 'pickUp' },
     { do: 'closeIn' },
     { do: 'strike', weights: { standard: 4, quick: 1, powerful: 1 } },
