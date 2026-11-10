@@ -214,9 +214,9 @@ const things: ThingDef[] = [
 const SELLS: Record<string, string[]> = {
   taproom: ['loaf', 'waterskin'],
   bakery: ['loaf'],
-  herbalist: ['herbs'],
-  general: ['backpack', 'side-pouch', 'waterskin', 'pan', 'tinderbox', 'purse', 'basket'],
-  smithy: ['dagger', 'hand-axe', 'short-sword', 'arming-sword', 'buckler', 'pan'],
+  herbalist: ['herbs', 'medical-kit'],
+  general: ['backpack', 'side-pouch', 'waterskin', 'pan', 'tinderbox', 'purse', 'basket', 'wilderness-gear', 'writing-kit', 'fishing-gear', 'hunting-gear'],
+  smithy: ['dagger', 'hand-axe', 'short-sword', 'arming-sword', 'buckler', 'pan', 'weapon-care-kit', 'craft-tools'],
 };
 for (const t of things) if (SELLS[t.id]) t.sells = { kinds: SELLS[t.id] };
 

@@ -36,6 +36,8 @@ export function pageHero(): Hero {
       // What they own from the creator: every weapon and shield chosen or bought (several are possible).
       const owned = [...Object.values(s.equipment.weapons), ...s.equipment.bought.flatMap((b) => Array<string>(Math.max(1, b.qty)).fill(b.name))];
       h.gear = owned.filter((n) => WEAPONS.some((w) => w.sv === n) || SHIELDS.some((w) => w.sv === n));
+      // Their equipment packages (plan B6): the fixed ones, and those picked where the creator left a choice.
+      h.packages = d.packages.map((p) => (p.name !== '?' ? p.name : s.equipment.packages[p.key])).filter((n): n is string => !!n);
       // Their silver: what the creator gave, less what they bought there (plan B6).
       h.silver = Math.max(0, d.silver - s.equipment.bought.reduce((n, b) => n + b.cost * Math.max(1, b.qty), 0));
       if (Object.keys(h.dice).some((k) => !k.startsWith('attr:'))) return h;

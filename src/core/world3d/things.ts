@@ -115,6 +115,8 @@ export interface ThingDef {
   sells?: SellsDef;
   /** A purse (plan B6): it holds coins (`Loose.coins`), the hero's money. */
   purse?: boolean;
+  /** An equipment package of the creator this bundle is (its Swedish key, `Tjuvutrustning`; plan B6). */
+  package?: string;
   /** What it is worth, in coins (a first guess until prices come with B6): taking it weighs more against a poor owner. */
   value?: number;
   /** How much it matters to its owner beyond its price (a guard's sword, an heirloom): 0 to 3, each step half as much again. */

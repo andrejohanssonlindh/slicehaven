@@ -24,7 +24,7 @@ describe('spike3d pack', () => {
     // The kit: a pack worn, the rest laid in; the tinderbox in a pocket.
     expect(await w('w.pack.worn?.l.kind')).toBe('backpack');
     const kinds = (await w('w.pack.items.map((i) => w.carry.loose[i.id].kind).sort()')) as string[];
-    expect(kinds).toEqual(['loaf', 'pan', 'purse', 'side-pouch', 'tinderbox', 'waterskin']);
+    expect(kinds).toEqual(['loaf', 'purse', 'side-pouch', 'tinderbox', 'wilderness-gear']);
     expect(await w(`w.carry.loose[${JSON.stringify(await idOf('purse'))}].in.grid`)).toBe('pocket:0');
     expect(await w(`w.carry.loose[${JSON.stringify(await idOf('tinderbox'))}].in.grid`)).toMatch(/^pocket:/);
     expect(await w('w.pack.carriedKg')).toBeGreaterThan(4);
@@ -57,8 +57,8 @@ describe('spike3d pack', () => {
     expect(await w('w.carrying.holding')).toBeNull();
     expect(await w(`!!w.carry.loose[${JSON.stringify(loaf)}].in`)).toBe(true);
 
-    // Put down on the ground: it lies there, drawn; packed again from there (yours: no wrong).
-    const pan = await idOf('pan');
+    // Put down on the ground (the wilderness gear, the shepherd's package): it lies there, drawn; packed again from there (yours: no wrong).
+    const pan = await idOf('wilderness-gear');
     expect(await w(`w.pack.drop(${JSON.stringify(pan)})`)).toBe(true);
     expect(await w(`w.carrying.looseDrawn.has(${JSON.stringify(pan)})`)).toBe(true);
     const target = await w(`w.acting.targetOf(w.carrying.looseDrawn.get(${JSON.stringify(pan)}).g)`);

@@ -1,6 +1,6 @@
 import { type Sky, WIND_DIRS, clockText } from '../core/environment';
 import { ASPECTS, LEVEL_NAMES } from '../core/filaments';
-import { gearKinds } from '../content/things/gear';
+import { gearKinds, packageKinds } from '../content/things/gear';
 import { MAPS, mapNamed } from '../content/maps';
 import { clearWorld, loadWorld, saveWorld } from '../core/world3d/save';
 import { rollPool, rollTable, rollTest } from '../core/dice';
@@ -745,7 +745,9 @@ setTimeout(() => {
   }
   // The hero's own gear (the director: use what you have from creation), carried on them until drawn.
   const gear = gearKinds(hero.gear ?? []);
-  world.gear.outfit(gear.kinds, `${hero.from}:${hero.name}:${(hero.gear ?? []).join(',')}:${hero.silver ?? 0}`, hero.silver ?? 0);
+  // (And their equipment packages, each a bundle in the pack, plan B6.)
+  const bundles = packageKinds(hero.packages ?? []).kinds;
+  world.gear.outfit(gear.kinds, `${hero.from}:${hero.name}:${(hero.gear ?? []).join(',')}:${hero.silver ?? 0}:${bundles.join(',')}`, hero.silver ?? 0, bundles);
   fight.check();
   if (saving) {
     setInterval(save, 5000);

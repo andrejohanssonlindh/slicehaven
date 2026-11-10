@@ -2,6 +2,15 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-10 — Your packages from the creator (B6)
+
+- **Each equipment package you own is a bundle in your pack.** The book keeps packages loose ("a reasonable amount" of gear, with examples), so each is one thing with its own size and weight. *Thief's tools* are a small sack (2 × 1, 0.8 kg); *wilderness gear* a big bag with tent, blankets, lantern and kettle (3 × 4, 5 kg); the others in between. Thirteen packages, [described here](design/inventory.md#what-you-start-with-built-2026-11-10); the Animal package waits for creatures.
+- **Everyone also gets** the backpack, a purse with their silver, a side pouch, a loaf and a tinderbox. The pan and waterskin are no longer free: buy them at the store. The default shepherd carries wilderness gear (9.3 kg of their 13).
+- **If it doesn't all fit,** the side pouch is fitted at the start, and anything left over is put down at your feet.
+- **Shops sell bundles too:** the store has wilderness, writing, fishing and hunting gear; the herbalist a medical kit; the smith a weapon care kit and craft tools.
+- B6 can count as done for now. What's left (tools that help skills, base fatigue from load, lifting rolls, chests) waits until something needs it.
+- Tests: kit and package tests added; the pack and trade browser tests updated; carry, act, fight and save pass. Saves from before are dropped (the kit changed).
+
 ## 2026-11-10 — Money and trade (B6)
 
 - **Silver in a purse.** Your money is coins in a purse in your first pocket: what the creator gave you, less what you bought there (the shepherd has 8 s). The Pack sheet says "Silver: 8 s"; tap the purse and it says what it holds. Drop it and the silver lies with it. [The design](design/money.md).

@@ -90,7 +90,7 @@ export class Pack {
    * The hero's kit (`content/things/kit.ts`): the pack on their back and what is in it, given with their gear
    * (`Gear.outfit`). What was the last hero's kit goes; things they put in the pack from the world stay, where they lie.
    */
-  kitUp(silver = 0): void {
+  kitUp(silver = 0, bundles: readonly string[] = []): void {
     const carry = this.carry;
     for (const id of Object.keys(carry.loose)) if (id.startsWith('hero:kit:') && onHero(carry.loose[id])) delete carry.loose[id];
     if (carry.held && !carry.loose[carry.held]) carry.held = null;
@@ -101,10 +101,23 @@ export class Pack {
     // The purse first, so it gets a pocket.
     const purseId = KIT_ID(HERO_KIT.purse, 0), purseAt = this.spotFor(HERO_KIT.purse, purseId);
     if (purseAt) carry.loose[purseId] = { kind: HERO_KIT.purse, seed: 1, home, at: null, mine: true, in: purseAt, coins: roundSilver(silver) };
-    HERO_KIT.items.forEach((kind, n) => {
+    // Their packages' bundles, biggest first (so they fit), then what everyone has. If not all of it fits, the side
+    // pouch is fitted and the rest tried again; what still finds no room is put down at their feet.
+    const size = (k: string): number => (THINGS.has(k) ? cellsOf(THINGS.get(k).shape, THINGS.get(k).size)?.length ?? 0 : 0);
+    const kinds = [...[...bundles].sort((a, b) => size(b) - size(a)), ...HERO_KIT.items].filter((k) => THINGS.has(k));
+    const left: string[] = [];
+    kinds.forEach((kind, n) => {
       const id = KIT_ID(kind, n), at = this.spotFor(kind, id);
-      if (at) carry.loose[id] = { kind, seed: n + 1, home, at: null, mine: true, in: at };
+      carry.loose[id] = { kind, seed: n + 1, home, at: null, mine: true, ...(at ? { in: at } : {}) };
+      if (!at) left.push(id);
     });
+    const addon = Object.keys(carry.loose).find((id) => id.startsWith('hero:kit:') && carry.loose[id].in && THINGS.get(carry.loose[id].kind).addon);
+    if (left.length && addon) this.fit(addon);
+    for (const id of left) {
+      const at = this.spotFor(carry.loose[id].kind, id);
+      if (at) carry.loose[id].in = at;
+      else this.w.carrying.layDown(id);
+    }
     // (Anything from the world left in a pocket or side that is gone now is laid in again where it fits.)
     for (const it of this.items) if (!this.grids.some((g) => g.id === it.at!.grid)) this.relay(it.id);
   }

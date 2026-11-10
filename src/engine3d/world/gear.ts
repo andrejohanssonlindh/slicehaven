@@ -102,7 +102,7 @@ export class Gear {
    * carried at the belt or on the back, not in hand. Given once per hero (`key`: who they are and what they own); a
    * new hero or other gear replaces what the last one carried (anything dropped in the world stays where it lies).
    */
-  outfit(kinds: string[], key: string, silver = 0): void {
+  outfit(kinds: string[], key: string, silver = 0, bundles: readonly string[] = []): void {
     const carry = this.carry, hero = this.w.hero;
     if (carry.outfit === key) return;
     for (const [id, l] of Object.entries(carry.loose)) if (l.stowed || (id.startsWith('hero:own:') && (carry.held === id || carry.left === id))) delete carry.loose[id];
@@ -113,7 +113,7 @@ export class Gear {
       carry.loose[`hero:own:${kind}:${n}`] = { kind, seed: n + 1, home: { x: hero.x, z: hero.z, level: 0, house: null, rot: 0, room: null }, at: null, mine: true, stowed: true };
     });
     // (The pack and what is in it, plan B6: given with the gear.)
-    this.w.pack.kitUp(silver);
+    this.w.pack.kitUp(silver, bundles);
     carry.outfit = key;
     this.showHeld();
   }

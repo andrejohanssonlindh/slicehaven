@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { THINGS } from '../src/content/things';
 import { HERO_KIT } from '../src/content/things/kit';
+import { packageKinds } from '../src/content/things/gear';
+import { PACKAGES } from '../src/content/chargen/equipment';
 import { ACTIONS } from '../src/content/actions';
 import {
   type Grid, type PackItem, PACK, POCKET, SIDE, autoPack, cellsOf, coverOf, extent, findSpot, fits, freeSide, gridsOf, turned,
@@ -88,13 +90,22 @@ describe('the kinds and the kit', () => {
     for (const id of [HERO_KIT.pack, ...HERO_KIT.items]) expect(modelOf(THINGS.get(id)), id).toBeDefined();
   });
 
-  it('the kit all fits at the start, and the pack has sides for the side pouch', () => {
+  it('the kit all fits at the start, with three of the biggest packages; the pack has sides for the side pouch', () => {
     const bag = THINGS.get(HERO_KIT.pack).bag!;
     expect(bag.sides).toBeGreaterThan(0);
     expect(THINGS.get('side-pouch').addon).toBeDefined();
     const grids = gridsOf(HERO_KIT.pockets, bag, {});
-    const items = HERO_KIT.items.map((k) => ({ id: k, cells: cellsOf(THINGS.get(k).shape, THINGS.get(k).size)!, size: THINGS.get(k).size! }));
-    expect(autoPack(grids, items)).not.toBeNull();
+    const asItem = (k: string, n: number) => ({ id: `${k}:${n}`, cells: cellsOf(THINGS.get(k).shape, THINGS.get(k).size)!, size: THINGS.get(k).size! });
+    const bundles = THINGS.placeable.filter((id) => THINGS.get(id).package).sort((a, b) => asItem(b, 0).cells.length - asItem(a, 0).cells.length).slice(0, 3);
+    // Two of the biggest fit as they come; with three, once the side pouch is fitted (as the kit does when it must).
+    expect(autoPack(grids, [HERO_KIT.purse, ...bundles.slice(0, 2), ...HERO_KIT.items].map(asItem))).not.toBeNull();
+    const fitted = gridsOf(HERO_KIT.pockets, bag, { left: THINGS.get('side-pouch').addon! });
+    expect(autoPack(fitted, [HERO_KIT.purse, ...bundles, ...HERO_KIT.items.filter((k) => !THINGS.get(k).addon)].map(asItem))).not.toBeNull();
+  });
+
+  it('every equipment package of the creator is a bundle, but the animal (it waits for creatures)', () => {
+    expect(packageKinds(PACKAGES).missing).toEqual(['Djur']);
+    for (const k of packageKinds(PACKAGES).kinds) expect(modelOf(THINGS.get(k)), k).toBeDefined();
   });
 
   it('putting in the pack is a verb on things and on what you hold', () => {

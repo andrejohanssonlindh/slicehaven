@@ -1,4 +1,4 @@
-/* Browser test: money and trade (B6): the hero's purse holds their silver; the general store's keeper sells (Buy… list, a tinderbox bought into the pack, paid) and buys (the pan sold, silver in); the inn's room is paid for. */
+/* Browser test: money and trade (B6): the hero's purse holds their silver; the general store's keeper sells (Buy… list, a tinderbox bought into the pack, paid) and buys (a tinderbox sold, silver in); the inn's room is paid for. */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { OUT, openPage, startEnv, stopEnv, type Env } from './harness';
 
@@ -43,15 +43,15 @@ describe('spike3d trade', () => {
     // The pan is too dear now (20 s).
     await page.locator('#talk .choices button', { hasText: 'Pan: 20 s' }).click();
     await page.waitForFunction(() => /can't pay/.test(document.querySelector('#talk .log')!.textContent ?? ''), undefined, { timeout: 10_000 });
-    expect(await count('pan')).toBe(1);
+    expect(await count('pan')).toBe(0);
 
-    // Sell the pan back: half its price, into the purse.
+    // Sell a tinderbox back: half its price, into the purse.
     await page.locator('#talk .choices button', { hasText: 'Something else' }).click();
     await page.locator('#talk .choices button', { hasText: 'Sell something' }).click();
-    await page.locator('#talk .choices button', { hasText: 'Pan: 10 s' }).click();
-    await page.waitForFunction(() => /pays you 10 s/.test(document.querySelector('#talk .log')!.textContent ?? ''), undefined, { timeout: 10_000 });
-    expect(await w('w.pack.money')).toBe(15);
-    expect(await count('pan')).toBe(0);
+    await page.locator('#talk .choices button', { hasText: 'Tinderbox: 1.5 s' }).first().click();
+    await page.waitForFunction(() => /pays you 1.5 s/.test(document.querySelector('#talk .log')!.textContent ?? ''), undefined, { timeout: 10_000 });
+    expect(await w('w.pack.money')).toBe(6.5);
+    expect(await count('tinderbox')).toBe(1);
     await page.click('#talk .close');
 
     // A room at the inn: paid for out of the purse.
@@ -62,7 +62,7 @@ describe('spike3d trade', () => {
     const hero = '{ id: "hero", dice: () => ({ n: 3, mod: 0 }) }';
     const r = (await w(`w.talking.talkTo('talk:leave', ${JSON.stringify(inn)}, ${hero}, { kind: 'human', tags: [] })`)) as { done: boolean; pay?: number };
     expect(r).toMatchObject({ done: true, pay: 1 });
-    expect(await w('w.pack.money')).toBe(14);
+    expect(await w("w.pack.money")).toBe(5.5);
     expect(errors).toEqual([]);
   }, 180_000);
 });
