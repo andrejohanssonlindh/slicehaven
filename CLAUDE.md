@@ -28,7 +28,7 @@ Every new ask gets a senior-dev check **before any code**: which established pat
 
 ## The ruleset
 - The director turned the project toward recreating the tabletop ruleset. **Never write the brand name** of the ruleset in the repo, UI or commits. World names are fine (decision Q1). Data is mechanics plus our own short summaries, never copied prose.
-- Extracted book text lives in `reference/` (gitignored; never commit it or paste it in).
+- Extracted book text lives in `reference/` (gitignored; never commit it or paste it in). The base books are `reference/regel.txt`, `rp.txt`; the extra books (combat, adventurer's handbook, aspect compendium, place books) are in `reference/books/`, catalogued page by page in **`reference/books/INDEX.md`**: grep, then read single pages, never whole books.
 
 ## Cold start: where to read
 Every new session, in this order, and nothing more until the task needs it:

@@ -2,6 +2,13 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-10 — Ten more books as reference text; the plan after B6
+
+- **Ten books extracted to text** (on the computer only, never in the repo): the combat book, the adventurer's handbook, the aspect compendium (spells), and seven place books (Cermira, the Mithera forest, the Shadowland, the Tarkas desert, the city of Zhirim Mian, the fortress Lashorakh, the elven valley Kinané'an oro). 292 pages, a text file per page.
+- **A page index** says roughly what each book covers and where, so a later session can look up one page without reading a whole book.
+- **What they hold for us:** the combat book adds fights in poor light, in water, in tight spaces, three-sided fights, full mounted rules and some fifty fighting schools (most other rules match the base book we built from); the handbook adds weapons and thirteen mounts; the compendium has the spells for magic; the place books are towns, forests and forts to borrow from.
+- **The plan:** effects (B7), then magic (B9), then the start village (D3), with a map maker we both use first (C5, Q51). New items: more weapons (B8h) and the combat book's situations and schools (B8i), both later.
+
 ## 2026-11-10 — Your packages from the creator (B6)
 
 - **Each equipment package you own is a bundle in your pack.** The book keeps packages loose ("a reasonable amount" of gear, with examples), so each is one thing with its own size and weight. *Thief's tools* are a small sack (2 × 1, 0.8 kg); *wilderness gear* a big bag with tent, blankets, lantern and kettle (3 × 4, 5 kg); the others in between. Thirteen packages, [described here](design/inventory.md#what-you-start-with-built-2026-11-10); the Animal package waits for creatures.
