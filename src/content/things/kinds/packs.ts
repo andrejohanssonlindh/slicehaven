@@ -17,11 +17,11 @@ export default [
   { id: 'pack', is: 'container', abstract: true, size: 'hands', spot: 6 },
   {
     id: 'backpack', is: 'pack', name: 'backpack', look: 'A leather pack with two straps and a flap.',
-    bag: { grid: [5, 6], sides: 2 }, weight: 1.2, value: 4, ...loose('backpack'),
+    bag: { grid: [5, 6], sides: 2 }, weight: 1.2, value: 15, ...loose('backpack'),
   },
   { id: 'pack-addon', is: 'container', abstract: true, size: 'bag', spot: 8 },
   {
     id: 'side-pouch', is: 'pack-addon', name: 'side pouch', look: 'A narrow pouch with loops to fit on the side of a pack.',
-    addon: { grid: [2, 4] }, shape: [2, 2], weight: 0.2, value: 1, ...loose('side-pouch'),
+    addon: { grid: [2, 4] }, shape: [2, 2], weight: 0.2, value: 1.5, ...loose('side-pouch'),
   },
 ] satisfies ThingDef[];

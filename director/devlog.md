@@ -2,6 +2,15 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-10 — Money and trade (B6)
+
+- **Silver in a purse.** Your money is coins in a purse in your first pocket: what the creator gave you, less what you bought there (the shepherd has 8 s). The Pack sheet says "Silver: 8 s"; tap the purse and it says what it holds. Drop it and the silver lies with it. [The design](design/money.md).
+- **Prices from the book's price list** where it has the thing (a backpack 15 s, an iron pan 20 s, flint and steel 3 s); our own where it doesn't (a loaf 0.2 s, a night at the inn 1 s).
+- **Shops sell in their hours.** A shop's room says what it sells; its people sell it, and buy the same kinds back at half. Hamlet got a storekeeper (store), a miller who bakes (bakery) and a dwarf smith (smithy).
+- **In a talk with a seller:** *See what … sells…* (with prices), *Sell something to …*, and *Haggle* (a Trade roll, once a day per seller: 10–30 % off that day, or 10 % on if it goes badly). How they feel about you moves prices too.
+- **The inn's room now costs 1 s**; without it, the keeper tells you the price.
+- Tests: 9 new unit tests (prices, haggling, paying, the talk), a new browser test (`spike3d-trade`: buy a tinderbox, fail to afford the pan, sell the pan, pay for a room). Talk, owners, pack, carry, act, save, leads and senses tests pass. Saves from before are dropped.
+
 ## 2026-11-10 — Pockets and the pack (B6)
 
 - **A Pack button** (bottom left, above *You*) opens your pockets and your pack. There are two pockets of 2 × 2 cells and a backpack of 5 × 6, with a column on each side for an add-on, as you pictured it: rectangular, add-ons on the side. [The design](design/inventory.md).

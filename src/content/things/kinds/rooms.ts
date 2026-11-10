@@ -207,4 +207,17 @@ const things: ThingDef[] = [
   ], SHOP),
 ];
 
+/**
+ * What each shop sells (plan B6, `core/world3d/trade.ts`): its household sell these kinds in its open hours, and buy
+ * them back at half. The fishmonger and the weaver have nothing yet (no fish or cloth as things).
+ */
+const SELLS: Record<string, string[]> = {
+  taproom: ['loaf', 'waterskin'],
+  bakery: ['loaf'],
+  herbalist: ['herbs'],
+  general: ['backpack', 'side-pouch', 'waterskin', 'pan', 'tinderbox', 'purse', 'basket'],
+  smithy: ['dagger', 'hand-axe', 'short-sword', 'arming-sword', 'buckler', 'pan'],
+};
+for (const t of things) if (SELLS[t.id]) t.sells = { kinds: SELLS[t.id] };
+
 export default things;

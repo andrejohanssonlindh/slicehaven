@@ -24,8 +24,9 @@ describe('spike3d pack', () => {
     // The kit: a pack worn, the rest laid in; the tinderbox in a pocket.
     expect(await w('w.pack.worn?.l.kind')).toBe('backpack');
     const kinds = (await w('w.pack.items.map((i) => w.carry.loose[i.id].kind).sort()')) as string[];
-    expect(kinds).toEqual(['loaf', 'pan', 'side-pouch', 'tinderbox', 'waterskin']);
-    expect(await w(`w.carry.loose[${JSON.stringify(await idOf('tinderbox'))}].in.grid`)).toBe('pocket:0');
+    expect(kinds).toEqual(['loaf', 'pan', 'purse', 'side-pouch', 'tinderbox', 'waterskin']);
+    expect(await w(`w.carry.loose[${JSON.stringify(await idOf('purse'))}].in.grid`)).toBe('pocket:0');
+    expect(await w(`w.carry.loose[${JSON.stringify(await idOf('tinderbox'))}].in.grid`)).toMatch(/^pocket:/);
     expect(await w('w.pack.carriedKg')).toBeGreaterThan(4);
 
     // The sheet: pockets and the pack, a thing picked, then moved by tapping a cell.

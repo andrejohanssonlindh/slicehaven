@@ -84,6 +84,8 @@ export interface Loose {
   worn?: boolean;
   /** An add-on fitted on this side of the pack the hero wears (plan B6): its grid holds what is `in` that side. */
   fitted?: Side;
+  /** The silver in it, if it is a purse (plan B6, `core/world3d/trade.ts`). */
+  coins?: number;
 }
 
 /** Is a loose thing on the hero (held, stowed, packed, worn, fitted), rather than lying somewhere or with someone else? */

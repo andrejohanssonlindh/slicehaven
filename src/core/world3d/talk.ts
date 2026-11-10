@@ -6,6 +6,7 @@ import { type Library, type Setting, type Visitor, expandObject, limitOf, readPe
 import { type Doer, type Line, type Offer, bestSkill } from './actions';
 import { type AskResult, type LeadDef, type LeadsState, askAbout, heldBack, openLeads, pressed } from './leads';
 import { rollTest } from '../dice';
+import { HAGGLE_DIFFICULTY, HAGGLE_SKILLS, type Haggle, ROOM_PRICE, buyPrice, haggleSteps, sellPrice, silverText } from './trade';
 
 /**
  * Talking to someone in the 3D world (plan B3d): the action frame's social resolve. What can be tried on a person is
@@ -53,7 +54,29 @@ export interface TalkMemory {
   social: Record<string, Memory>;
   tokens: Token[];
   fails: Record<string, number>;
+  /** Haggling with each seller (plan B6): the day it was tried and how many steps it took off. */
+  haggle?: Record<string, Haggle>;
 }
+
+/**
+ * Trading with someone who sells (plan B6, `core/world3d/trade.ts`): what they sell, what of the hero's they'd buy
+ * (prices are worked out here, from mood and haggling), the hero's silver, the day, and whether the hero has room for
+ * a kind of thing (in the pack, on them, or a free hand).
+ */
+export interface TradeCase {
+  sells: readonly { kind: string; name: string; value: number }[];
+  buys: readonly { id: string; name: string; value: number }[];
+  money: number;
+  day: number;
+  room(kind: string): boolean;
+}
+
+/** Offers for trading: the lists (the page shows `tradeAsks` under them), one thing (`buy:<kind>`, `sell:<id>`), haggling. */
+export const ASK_BUY = 'talk:buy';
+export const ASK_SELL = 'talk:sell';
+export const BUY = 'buy:';
+export const SELL = 'sell:';
+export const HAGGLE = 'talk:haggle';
 
 export const newTalkMemory = (): TalkMemory => ({ social: {}, tokens: [], fails: {} });
 
@@ -72,6 +95,10 @@ export interface TalkCase {
   holding?: HeldThing;
   /** Whether the person is afraid of the hero, or bold (B3c's `sizeUp`): a threat is easier or harder. */
   nerve?: { afraid: boolean; bold: boolean };
+  /** The hero's silver (plan B6): a room at an inn is paid for. Left out: nothing is asked. */
+  money?: number;
+  /** Trading, if this person sells and is open now (plan B6). */
+  trade?: TradeCase;
 }
 
 /** A thing the hero holds that belongs to a household, as a talk sees it. */
@@ -150,6 +177,57 @@ function opensNow(k: CheckDef, p: TalkPerson, c: TalkCase): boolean {
   return !!h?.opens?.includes('always');
 }
 
+/** How many steps of 10 % haggling took off with this seller today (−1: put on; 0: not tried, or another day). */
+function offToday(p: TalkPerson, c: TalkCase): number {
+  const h = c.memory.haggle?.[p.id];
+  return h && c.trade && h.day === c.trade.day ? h.off : 0;
+}
+
+/** Has the hero haggled with this seller today? */
+const haggledToday = (p: TalkPerson, c: TalkCase): boolean => !!c.trade && c.memory.haggle?.[p.id]?.day === c.trade.day;
+
+/** What they sell at their price for you now, or what of yours they would buy: the list under Buy… or Sell…. */
+export function tradeAsks(p: TalkPerson, c: TalkCase, which: 'buy' | 'sell'): Offer[] {
+  const t = c.trade;
+  if (!t) return [];
+  const mood = c.memory.social[p.id]?.mood ?? 0, off = offToday(p, c);
+  if (which === 'buy') return t.sells.map((s) => ({ id: BUY + s.kind, label: `${cap(s.name)}: ${silverText(buyPrice(s.value, mood, off))}`, skills: [], from: 'verb' as const }));
+  return t.buys.map((b) => ({ id: SELL + b.id, label: `${cap(b.name)}: ${silverText(sellPrice(b.value, mood, off))}`, skills: [], from: 'verb' as const }));
+}
+
+const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** Buying, selling or haggling (plan B6); null for any other offer. */
+function aboutTrade(offer: string, p: TalkPerson, doer: Doer, c: TalkCase, rng: Rng): TalkResult | null {
+  const t = c.trade;
+  if (!t || !(offer.startsWith(BUY) || offer.startsWith(SELL) || offer === HAGGLE)) return null;
+  const mood = c.memory.social[p.id]?.mood ?? 0, off = offToday(p, c);
+  if (offer.startsWith(BUY)) {
+    const s = t.sells.find((x) => x.kind === offer.slice(BUY.length));
+    if (!s) return { done: false, reason: `${p.name} doesn't sell that.`, hidden: false, success: false, lines: [] };
+    const price = buyPrice(s.value, mood, off);
+    if (price > t.money) return { done: false, reason: `You can't pay ${silverText(price)}: you have ${silverText(t.money)}.`, hidden: false, success: false, lines: [] };
+    if (!t.room(s.kind)) return { done: false, reason: `You have no room for the ${s.name}.`, hidden: false, success: false, lines: [] };
+    return { done: true, hidden: false, success: true, buy: { kind: s.kind, price }, lines: [{ text: `You pay ${silverText(price)} for the ${s.name}.`, tone: 'good' }] };
+  }
+  if (offer.startsWith(SELL)) {
+    const b = t.buys.find((x) => x.id === offer.slice(SELL.length));
+    if (!b) return { done: false, reason: `${p.name} won't buy that.`, hidden: false, success: false, lines: [] };
+    const price = sellPrice(b.value, mood, off);
+    return { done: true, hidden: false, success: true, sell: { id: b.id, price }, lines: [{ text: `${p.name} pays you ${silverText(price)} for the ${b.name}.`, tone: 'good' }] };
+  }
+  // Haggling: once a day with each seller, a trading roll; done well, prices come down; badly, up.
+  if (haggledToday(p, c)) return { done: false, reason: `You have already haggled with ${p.name} today.`, hidden: false, success: false, lines: [] };
+  const r = socialRoll(doer, HAGGLE_SKILLS, HAGGLE_DIFFICULTY - 2 * mood, rng, 'Haggle');
+  if (!r) return { done: true, hidden: false, success: false, lines: [{ text: 'You have no way to go about it.', tone: 'info' }] };
+  const steps = haggleSteps(!!r.roll.success, r.roll.advantages ?? 0);
+  (c.memory.haggle ??= {})[p.id] = { day: t.day, off: steps };
+  const moodNote: Line[] = mood ? [{ text: `(${mood > 0 ? 'easier: they like you' : 'harder: they are wary of you'})`, tone: 'info' }] : [];
+  return steps > 0
+    ? { done: true, roll: r.roll, skill: r.skill, hidden: false, success: true, lines: [...r.notes, ...moodNote, { text: `"Fine, fine." ${steps * 10} % off, today.`, tone: 'good' }] }
+    : { done: true, roll: r.roll, skill: r.skill, hidden: false, success: false, lines: [...r.notes, ...moodNote, { text: `"If you don't like my prices, they just went up." 10 % more, today.`, tone: 'bad' }] };
+}
+
 /** What can be tried with them: asking about their work, then the tries that are open; talking ones only while they'll still listen. */
 export function talkOffers(p: TalkPerson, c: TalkCase): Offer[] {
   const s = stateOf(c), o = objectOf(p, c);
@@ -173,7 +251,16 @@ export function talkOffers(p: TalkPerson, c: TalkCase): Offer[] {
       { id: DEMAND, label: `Threaten ${p.name} into letting you keep the ${h.name}`, skills: skillsOf(c, 'threaten'), from: 'skill' },
     ]
     : [];
-  return [...work, ...things, ...leads, ...press, ...leave, ...openChecks(o, s)
+  // A seller, open now (B6): what they sell, what they'd buy of yours, and haggling once a day.
+  const t = c.trade;
+  const trade: Offer[] = t
+    ? [
+      ...(t.sells.length ? [{ id: ASK_BUY, label: `See what ${p.name} sells…`, skills: [], from: 'verb' as const }] : []),
+      ...(t.buys.length ? [{ id: ASK_SELL, label: `Sell something to ${p.name}…`, skills: [], from: 'verb' as const }] : []),
+      ...(listens && !haggledToday(p, c) ? [{ id: HAGGLE, label: `Haggle with ${p.name} over prices`, skills: [...HAGGLE_SKILLS], from: 'skill' as const }] : []),
+    ]
+    : [];
+  return [...work, ...trade, ...things, ...leads, ...press, ...leave, ...openChecks(o, s)
     .filter((k) => opensNow(k, p, c) && (!k.talk || left === undefined || left > 0))
     .map((k) => ({ id: k.id, label: named(k.label, p), skills: [...k.skills], from: 'skill' as const }))];
 }
@@ -197,6 +284,12 @@ export interface TalkResult {
   given?: string;
   /** They answer it as the culture says, from where their view of you now stands (a threat that failed). */
   answer?: boolean;
+  /** Bought (plan B6): a thing of this kind, for this much silver. */
+  buy?: { kind: string; price: number };
+  /** Sold (plan B6): the hero's thing, for this much silver. */
+  sell?: { id: string; price: number };
+  /** Silver the hero paid (a room at an inn). */
+  pay?: number;
 }
 
 /** The fitting skills for an effort: those of the library's general hook for it (`persuade`, `threaten`). */
@@ -282,8 +375,19 @@ export function talk(offer: string, p: TalkPerson, doer: Doer, c: TalkCase, rng:
     mem.talks += 1;
     // Someone who likes you says yes; someone cross with you says no; anyone else needs asking well. A room at an inn
     // is the keeper's trade: yes unless they're wary of you (paid for once there is money).
+    // (A room is paid for, plan B6: its price, moved by their mood and haggling, like anything they sell.)
     const room = !!p.leaveAsk;
-    if (room && mem.mood >= 0) return { done: true, hidden: false, success: true, leave: p.home, lines: [{ text: `"A room's yours for the night. Up the stairs."`, tone: 'good' }, { text: '(No coin changes hands yet: paying comes with money.)', tone: 'info' }] };
+    if (room && mem.mood >= 0) {
+      const price = c.money !== undefined ? buyPrice(ROOM_PRICE, mem.mood, offToday(p, c)) : 0;
+      if (c.money !== undefined && price > c.money) {
+        mem.talks -= 1;
+        return { done: false, reason: `A room is ${silverText(price)} a night, and you have ${silverText(c.money)}.`, hidden: false, success: false, lines: [] };
+      }
+      return {
+        done: true, hidden: false, success: true, leave: p.home, ...(price ? { pay: price } : {}),
+        lines: [{ text: `"A room's yours for the night. Up the stairs."`, tone: 'good' }, ...(price ? [{ text: `You pay ${silverText(price)}.`, tone: 'info' as const }] : [])],
+      };
+    }
     if (mem.mood >= 1) return { done: true, hidden: false, success: true, leave: p.home, lines: [{ text: `"Of course. Make yourself at home, today."`, tone: 'good' }] };
     if (mem.mood <= -2) return { done: true, hidden: false, success: false, lines: [{ text: `"After what you did? No."`, tone: 'bad' }] };
     const best = bestSkill(doer, COAX_SKILLS);
@@ -299,6 +403,8 @@ export function talk(offer: string, p: TalkPerson, doer: Doer, c: TalkCase, rng:
   }
   const thing = aboutThing(offer, p, doer, c, rng);
   if (thing) return thing;
+  const trade = aboutTrade(offer, p, doer, c, rng);
+  if (trade) return trade;
   if (offer.startsWith(LEAD_ASK) && c.leads) {
     const r = askAbout(c.leads.state, c.leads.defs, offer.slice(LEAD_ASK.length), p, c.flags, c.leads.hours);
     if (!r) return { done: false, reason: 'You know nothing of that to ask about.', hidden: false, success: false, lines: [] };

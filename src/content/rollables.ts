@@ -81,7 +81,7 @@ export function defaultHero(): Hero {
   const dice: Hero['dice'] = {};
   for (const [a, v] of Object.entries(SHEPHERD_ATTRS)) dice[`attr:${a}`] = attrDice(v);
   for (const [s, v] of Object.entries(SHEPHERD_SKILLS)) dice[s] = skillDice(v);
-  return { name: 'Shepherd', from: 'Default shepherd', dice, kind: 'human', people: 'asharier', tags: ['asharier', 'asharien', 'job-herder'], gear: ['Stridsstav'] };
+  return { name: 'Shepherd', from: 'Default shepherd', dice, kind: 'human', people: 'asharier', tags: ['asharier', 'asharien', 'job-herder'], gear: ['Stridsstav'], silver: 8 };
 }
 
 /** The creator's families as skill-web kinds. */

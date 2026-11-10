@@ -31,10 +31,13 @@ export function pageHero(): Hero {
     const r = loadRoster();
     const s = r.chars.find((c) => c.id === r.current) ?? r.chars[0];
     if (s) {
-      const h = heroFromChar(s.details?.name ?? '', derive(s, CONTENT));
+      const d = derive(s, CONTENT);
+      const h = heroFromChar(s.details?.name ?? '', d);
       // What they own from the creator: every weapon and shield chosen or bought (several are possible).
       const owned = [...Object.values(s.equipment.weapons), ...s.equipment.bought.flatMap((b) => Array<string>(Math.max(1, b.qty)).fill(b.name))];
       h.gear = owned.filter((n) => WEAPONS.some((w) => w.sv === n) || SHIELDS.some((w) => w.sv === n));
+      // Their silver: what the creator gave, less what they bought there (plan B6).
+      h.silver = Math.max(0, d.silver - s.equipment.bought.reduce((n, b) => n + b.cost * Math.max(1, b.qty), 0));
       if (Object.keys(h.dice).some((k) => !k.startsWith('attr:'))) return h;
     }
   } catch {

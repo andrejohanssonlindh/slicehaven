@@ -1,6 +1,7 @@
 import { THINGS } from '../content/things';
 import { thingName } from '../core/world3d/actions';
 import { kgText } from '../core/world3d/carry';
+import { silverText } from '../core/world3d/trade';
 import { type Grid, type PackItem, type PackSpot, type Side, PACK, SIDE, SIDES, coverOf, extent, turned } from '../core/world3d/inventory';
 import type { SpikeWorld } from '../engine3d/world';
 import { t } from '../i18n';
@@ -168,7 +169,7 @@ export function makePackSheet(world: () => SpikeWorld, capacity: () => number, n
     const weight = document.createElement('p');
     weight.className = 'weight';
     const have = pack.carriedKg, can = capacity();
-    weight.textContent = t('pack.weight', 'You carry {have} of {can}.', { have: kgText(have), can: kgText(can) });
+    weight.textContent = `${t('pack.weight', 'You carry {have} of {can}.', { have: kgText(have), can: kgText(can) })} ${t('pack.silver', 'Silver: {s}.', { s: silverText(pack.money) })}`;
     if (have > can) weight.classList.add('over');
     body.appendChild(weight);
 
@@ -221,7 +222,8 @@ export function makePackSheet(world: () => SpikeWorld, capacity: () => number, n
       const l = loose[picked], def = THINGS.get(l.kind);
       const what = document.createElement('p');
       what.className = 'what';
-      what.textContent = `${nameOf(l.kind)}, ${kgText(def.weight ?? 0)}. ${t('pack.tapcell', 'Tap a cell to move it.')}`;
+      const worth = def.purse ? t('pack.holds', 'holds {s}', { s: silverText(l.coins ?? 0) }) : t('pack.worth', 'worth {s}', { s: silverText(def.value ?? 0) });
+      what.textContent = `${nameOf(l.kind)}, ${kgText(def.weight ?? 0)}, ${worth}. ${t('pack.tapcell', 'Tap a cell to move it.')}`;
       bar.appendChild(what);
       const id = picked;
       bar.appendChild(button(t('pack.turn', 'Turn'), () => changed(pack.turn(id), t('pack.noturn', 'No room to turn it here.'))));

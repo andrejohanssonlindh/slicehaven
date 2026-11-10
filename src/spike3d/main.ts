@@ -745,7 +745,7 @@ setTimeout(() => {
   }
   // The hero's own gear (the director: use what you have from creation), carried on them until drawn.
   const gear = gearKinds(hero.gear ?? []);
-  world.gear.outfit(gear.kinds, `${hero.from}:${hero.name}:${(hero.gear ?? []).join(',')}`);
+  world.gear.outfit(gear.kinds, `${hero.from}:${hero.name}:${(hero.gear ?? []).join(',')}:${hero.silver ?? 0}`, hero.silver ?? 0);
   fight.check();
   if (saving) {
     setInterval(save, 5000);
@@ -757,7 +757,7 @@ setTimeout(() => {
   loading.hidden = true;
   const built = performance.now() - t0;
   console.info(`spike3d: world built in ${built.toFixed(0)} ms`);
-  (window as unknown as { spike: unknown }).spike = { world, pipeline, setTier, built, governor, fight, sheet, packSheet, hero, get tier() { return tier; } };
+  (window as unknown as { spike: unknown }).spike = { world, pipeline, setTier, built, governor, fight, sheet, packSheet, talk, hero, get tier() { return tier; } };
   requestAnimationFrame((n) => {
     last = n;
     loop(n);

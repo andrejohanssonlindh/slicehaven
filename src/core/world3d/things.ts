@@ -2,6 +2,7 @@ import type { Welcome } from './standing';
 import type { Size } from './carry';
 import type { FSource, SourceKind } from './filaments3d';
 import type { AddonDef, BagDef, ShapeDef } from './inventory';
+import type { SellsDef } from './trade';
 import type { BuildingPlan } from './house';
 import type { MeshData } from './mesh';
 import type { WayOfMoving } from './motion';
@@ -107,6 +108,13 @@ export interface ThingDef {
   bag?: BagDef;
   /** An add-on for a pack (plan B6): fitted on a side, it gives this grid beside the pack. Inherited. */
   addon?: AddonDef;
+  /**
+   * A kind of room that is a shop (plan B6, `core/world3d/trade.ts`): what its household sell, in its open hours (its
+   * `welcome` hours), at each kind's `value` in silver; they buy the same kinds from you at half.
+   */
+  sells?: SellsDef;
+  /** A purse (plan B6): it holds coins (`Loose.coins`), the hero's money. */
+  purse?: boolean;
   /** What it is worth, in coins (a first guess until prices come with B6): taking it weighs more against a poor owner. */
   value?: number;
   /** How much it matters to its owner beyond its price (a guard's sword, an heirloom): 0 to 3, each step half as much again. */

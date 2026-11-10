@@ -13,7 +13,7 @@ import type { Injuries } from '../damage';
  * No migrations while the design moves: a save of another version is dropped. Bump `WORLD_SAVE_VERSION` whenever
  * the shape changes or the maps change in a way that moves things (ids are where things stand).
  */
-export const WORLD_SAVE_VERSION = 10;
+export const WORLD_SAVE_VERSION = 11;
 
 export interface WorldSave {
   v: number;

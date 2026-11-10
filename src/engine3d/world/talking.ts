@@ -8,7 +8,7 @@ import type { Visitor } from '../../core/skillweb';
 import { type Doer, type Spot, thingName } from '../../core/world3d/actions';
 import { returnedRegard, worthOf } from '../../core/world3d/carry';
 import { answerFor, giveLeave, hasLeave, moodsFromScale, regardOf, shiftRegard, talkOntoScale } from '../../core/world3d/standing';
-import { LOAN_HOURS, type TalkCase, type TalkPerson, type TalkResult, talk } from '../../core/world3d/talk';
+import { LOAN_HOURS, type TalkCase, type TalkPerson, type TalkResult, type TradeCase, talk } from '../../core/world3d/talk';
 import type { SpikeWorld } from './index';
 
 /**
@@ -121,6 +121,10 @@ export class Talking {
     // What it did to their mood goes onto their scale (scaled by the roll's advantages), and leave given is kept.
     talkOntoScale(w.standing, id, before, c.memory.social[id]?.mood ?? 0, r.roll?.advantages ?? 0);
     if (r.leave) giveLeave(w.standing, r.leave, w.worldHours);
+    // Money (B6): a room paid for; a thing bought (paid, then into the pack, on you, or a hand); a thing sold.
+    if (r.pay) w.pack.pay(r.pay);
+    if (r.buy && !w.pack.buy(r.buy.kind, r.buy.price)) r.lines = [{ text: 'It came to nothing: you could not pay or carry it.', tone: 'bad' }];
+    if (r.sell && !w.pack.sell(r.sell.id, r.sell.price)) r.lines = [{ text: 'It came to nothing.', tone: 'bad' }];
     // The ways to take through talk (B3b): lent until tomorrow, given back, given to keep; a failed threat answered.
     const l = (r.borrow ?? r.giveBack ?? r.given) ? w.carry.loose[(r.borrow ?? r.giveBack ?? r.given)!] : null;
     if (l && r.borrow) l.loan = w.worldHours + LOAN_HOURS;
@@ -152,11 +156,36 @@ export class Talking {
       : undefined;
     const card = person ? w.cast.find((c) => c.who.id === person) : null;
     const who = card ? w.owners.whoToThem(card) : null;
+    const trade = card?.who.home ? this.tradeOf(card.who.home) : null;
     return {
       hero, flags: w.flags, memory: w.talkMemory, library: LIBRARY, leads: { state: w.leads, defs: LEADS, hours: w.worldHours },
       hasLeave: (house) => hasLeave(w.standing, house, w.worldHours),
+      money: w.pack.money,
       ...(holding ? { holding } : {}),
       ...(who ? { nerve: { afraid: who.afraid, bold: who.bold } } : {}),
+      ...(trade ? { trade } : {}),
+    };
+  }
+
+  /**
+   * Trading with a household whose house is a shop (plan B6): what its room kind `sells`, in its open hours (the room's
+   * `welcome` hours), and what of the hero's they would buy. Null if it sells nothing or is shut.
+   */
+  private tradeOf(house: string): TradeCase | null {
+    const w = this.w;
+    const room = w.layout.houses.find((h) => h.id === house)?.room ?? 'home';
+    const sells = THINGS.has(room) ? THINGS.get(room).sells : undefined;
+    if (!sells?.kinds.length) return null;
+    const [open, shut] = w.owners.houseWelcome(house)?.hours ?? [8, 19];
+    const hour = w.weather.hour ?? 12;
+    if (hour < open || hour >= shut) return null;
+    const named = (kind: string) => ({ name: thingName(THINGS.get(kind)), value: THINGS.get(kind).value ?? 0 });
+    return {
+      sells: sells.kinds.filter((k) => THINGS.has(k)).map((kind) => ({ kind, ...named(kind) })),
+      buys: w.pack.sellable(sells.kinds, house).map(({ id, kind }) => ({ id, ...named(kind) })),
+      money: w.pack.money,
+      day: Math.floor(w.worldHours / 24),
+      room: (kind) => w.pack.canTake(kind),
     };
   }
 }

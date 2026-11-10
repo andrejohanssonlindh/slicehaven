@@ -20,6 +20,8 @@ export interface Hero {
   load?: number;
   /** The weapons and shields they own, by their row in the weapon and shield tables (`Stridssvärd`): their gear from the creator. */
   gear?: string[];
+  /** Their silver at the start (plan B6): the creator's, less what they bought there. Put in their purse. */
+  silver?: number;
 }
 
 export const NO_DICE: Dice = { n: 0, mod: 0 };

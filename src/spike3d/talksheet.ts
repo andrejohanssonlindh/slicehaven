@@ -2,7 +2,8 @@ import { FACETS } from '../content/people';
 import { rollableName } from '../content/rollables';
 import type { Hero } from '../core/hero';
 import type { Doer } from '../core/world3d/actions';
-import { ASK_LEADS, leadAsks, moodOf, patienceLeft, talkOffers } from '../core/world3d/talk';
+import { ASK_BUY, ASK_LEADS, ASK_SELL, BUY, SELL, leadAsks, moodOf, patienceLeft, talkOffers, tradeAsks } from '../core/world3d/talk';
+import { silverText } from '../core/world3d/trade';
 
 /** The way back from the list of leads. */
 const BACK = 'talk:back';
@@ -41,8 +42,9 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
   let who: string | null = null;
   let pending: string | null = null;
   let busy = false;
-  /** Showing the list of leads to ask about (B11). */
-  let askingLeads = false;
+  /** Showing a list under a choice: leads to ask about (B11), what they sell, what of yours they'd buy (B6). */
+  let listing: 'leads' | 'buy' | 'sell' | null = null;
+  const LISTS: Record<string, 'leads' | 'buy' | 'sell'> = { [ASK_LEADS]: 'leads', [ASK_BUY]: 'buy', [ASK_SELL]: 'sell' };
 
   function drawPortrait(): void {
     if (!who) return;
@@ -75,7 +77,9 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
     moodEl.textContent = [moodOf(p, c) ?? '', loadSettings().difficulty === 'easy' ? t('talk.view', '(Their view of you: {n})', { n: view > 0 ? `+${view}` : String(view) }) : ''].filter(Boolean).join(' ');
     choicesEl.replaceChildren();
     // "Ask about something you know…" opens the list of leads (B11), with a way back.
-    const list = askingLeads ? [...leadAsks(p, c), { id: BACK, label: t('talk.back', '← Something else'), skills: [] as string[] }] : talkOffers(p, c);
+    const back = { id: BACK, label: t('talk.back', '← Something else'), skills: [] as string[] };
+    const list = listing === 'leads' ? [...leadAsks(p, c), back] : listing ? [...tradeAsks(p, c, listing), back] : talkOffers(p, c);
+    if (listing === 'buy' || listing === 'sell') log(t('talk.purse', 'You have {s}.', { s: silverText(w.pack.money) }), 'info');
     for (const o of list) {
       const b = document.createElement('button');
       b.type = 'button';
@@ -91,7 +95,7 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
       choicesEl.appendChild(b);
     }
     // Anyone can be fought (B8a): the fight takes over from the talk.
-    if (onFight && !askingLeads) {
+    if (onFight && !listing) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'fight';
@@ -108,11 +112,12 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
 
   async function choose(offer: string, label: string): Promise<void> {
     if (!who || busy) return;
-    if (offer === ASK_LEADS || offer === BACK) {
-      askingLeads = offer === ASK_LEADS;
+    if (LISTS[offer] || offer === BACK) {
+      listing = LISTS[offer] ?? null;
       return refresh();
     }
-    askingLeads = false;
+    // (Buying or selling keeps the list open, for the next one.)
+    if (!(offer.startsWith(BUY) || offer.startsWith(SELL))) listing = null;
     busy = true;
     log(label, 'you');
     const r = world().talking.talkTo(offer, who, doer, visitor);
@@ -132,7 +137,7 @@ export function makeTalk(world: () => SpikeWorld, renderer: () => THREE.WebGLRen
   function start(id: string): void {
     const w = world();
     who = id;
-    askingLeads = false;
+    listing = null;
     w.talking.talkingWith = id;
     logEl.replaceChildren();
     el.hidden = false;

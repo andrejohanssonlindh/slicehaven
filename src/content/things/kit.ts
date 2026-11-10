@@ -8,6 +8,8 @@ export const HERO_KIT = {
   pockets: [[2, 2], [2, 2]] as const,
   /** The pack worn on the back (a kind with `bag`). */
   pack: 'backpack',
+  /** A purse with the hero's silver in it (plan B6), in a pocket. */
+  purse: 'purse',
   /** What is in the pockets and the pack at the start, by kind (laid where they first fit). */
   items: ['side-pouch', 'waterskin', 'pan', 'loaf', 'tinderbox'],
 };

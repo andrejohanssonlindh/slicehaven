@@ -6,6 +6,7 @@ import {
   SIDE, autoPack, cellsOf, findSpot, fits, freeSide, gridsOf,
 } from '../../core/world3d/inventory';
 import type { ActTarget } from '../../core/world3d/actions';
+import { payFrom, roundSilver } from '../../core/world3d/trade';
 import type { SpikeWorld } from './index';
 
 /**
@@ -89,7 +90,7 @@ export class Pack {
    * The hero's kit (`content/things/kit.ts`): the pack on their back and what is in it, given with their gear
    * (`Gear.outfit`). What was the last hero's kit goes; things they put in the pack from the world stay, where they lie.
    */
-  kitUp(): void {
+  kitUp(silver = 0): void {
     const carry = this.carry;
     for (const id of Object.keys(carry.loose)) if (id.startsWith('hero:kit:') && onHero(carry.loose[id])) delete carry.loose[id];
     if (carry.held && !carry.loose[carry.held]) carry.held = null;
@@ -97,12 +98,114 @@ export class Pack {
     if (!THINGS.has(HERO_KIT.pack)) return;
     const home = { x: this.w.hero.x, z: this.w.hero.z, level: 0, house: null, rot: 0, room: null };
     carry.loose[KIT_ID(HERO_KIT.pack, 0)] = { kind: HERO_KIT.pack, seed: 1, home, at: null, mine: true, worn: true };
+    // The purse first, so it gets a pocket.
+    const purseId = KIT_ID(HERO_KIT.purse, 0), purseAt = this.spotFor(HERO_KIT.purse, purseId);
+    if (purseAt) carry.loose[purseId] = { kind: HERO_KIT.purse, seed: 1, home, at: null, mine: true, in: purseAt, coins: roundSilver(silver) };
     HERO_KIT.items.forEach((kind, n) => {
       const id = KIT_ID(kind, n), at = this.spotFor(kind, id);
       if (at) carry.loose[id] = { kind, seed: n + 1, home, at: null, mine: true, in: at };
     });
     // (Anything from the world left in a pocket or side that is gone now is laid in again where it fits.)
     for (const it of this.items) if (!this.grids.some((g) => g.id === it.at!.grid)) this.relay(it.id);
+  }
+
+  /** The purses on the hero (in a pocket, the pack, or a hand), in the order they are paid from: id and coins. */
+  get purses(): { id: string; coins: number }[] {
+    return Object.entries(this.carry.loose)
+      .filter(([, l]) => onHero(l) && THINGS.has(l.kind) && THINGS.get(l.kind).purse)
+      .map(([id, l]) => ({ id, coins: l.coins ?? 0 }));
+  }
+
+  /** The hero's silver: what their purses hold. */
+  get money(): number {
+    return roundSilver(this.purses.reduce((n, p) => n + p.coins, 0));
+  }
+
+  /** Pay out of the hero's purses. False (and nothing paid) if they don't hold enough. */
+  pay(price: number): boolean {
+    const left = payFrom(this.purses, price);
+    if (!left) return false;
+    for (const [id, coins] of Object.entries(left)) this.carry.loose[id].coins = coins;
+    return true;
+  }
+
+  /** Silver into the hero's first purse; with none on them, a new purse in the pack (or at their feet). */
+  receive(silver: number): void {
+    const first = this.purses[0];
+    if (first) {
+      this.carry.loose[first.id].coins = roundSilver(first.coins + silver);
+      return;
+    }
+    const id = this.newId(HERO_KIT.purse);
+    this.give(id, HERO_KIT.purse);
+    this.carry.loose[id].coins = roundSilver(silver);
+  }
+
+  /** A fresh id for a thing the hero gets (bought, or a purse): `got:<kind>:<n>`. */
+  private newId(kind: string): string {
+    let n = 1;
+    while (this.carry.loose[`got:${kind}:${n}`]) n++;
+    return `got:${kind}:${n}`;
+  }
+
+  /**
+   * Can the hero take a thing of this kind now: room in the pack, or carried on them (a weapon or shield), or a free
+   * hand for it?
+   */
+  canTake(kind: string): boolean {
+    const def = THINGS.has(kind) ? THINGS.get(kind) : null;
+    return !!def && (this.hasRoom(kind) || !!def.weapon || !!def.shield || this.w.gear.handFor(kind) !== null);
+  }
+
+  /** A new thing of a kind for the hero, theirs (bought): into the pack, else on them (a weapon), else into a hand. */
+  give(id: string, kind: string): boolean {
+    const def = THINGS.get(kind), hero = this.w.hero;
+    const home = { x: hero.x, z: hero.z, level: 0, house: null, rot: 0, room: null };
+    const l: Loose = { kind, seed: Object.keys(this.carry.loose).length + 1, home, at: null, mine: true };
+    const at = this.spotFor(kind, id), gear = this.w.gear;
+    this.carry.loose[id] = l;
+    if (at) l.in = at;
+    else if (def.weapon || def.shield) l.stowed = true;
+    else {
+      const hand = gear.handFor(kind);
+      if (!hand) {
+        delete this.carry.loose[id];
+        return false;
+      }
+      gear.intoHand(id, hand);
+      this.w.carrying.nowHolding();
+      gear.showHeld();
+    }
+    return true;
+  }
+
+  /** Buy a thing: paid for, then given. False (nothing paid) if it can't be paid or taken. */
+  buy(kind: string, price: number): string | null {
+    if (!this.canTake(kind) || !this.pay(price)) return null;
+    const id = this.newId(kind);
+    return this.give(id, kind) ? id : null;
+  }
+
+  /** Sell one of the hero's things: it leaves them, and the silver comes into their purse. */
+  sell(id: string, price: number): boolean {
+    const carry = this.carry, l = carry.loose[id];
+    if (!l || !onHero(l) || l.worn || THINGS.get(l.kind).purse) return false;
+    if (carry.held === id) {
+      carry.held = null;
+      carry.hidden = false;
+    }
+    if (carry.left === id) carry.left = null;
+    delete carry.loose[id];
+    this.w.gear.showHeld();
+    this.receive(price);
+    return true;
+  }
+
+  /** The hero's things a seller of these kinds would buy: in the pack or on them, not worn, not a purse, not theirs. */
+  sellable(kinds: readonly string[], sellerHouse: string | null): { id: string; kind: string }[] {
+    return Object.entries(this.carry.loose)
+      .filter(([, l]) => onHero(l) && !l.worn && !l.fitted && kinds.includes(l.kind) && !(sellerHouse && l.home.house === sellerHouse && !l.mine))
+      .map(([id, l]) => ({ id, kind: l.kind }));
   }
 
   /** Lay a packed thing again where it first fits; if nowhere, it is put down. */
