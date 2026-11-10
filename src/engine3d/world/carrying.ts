@@ -84,35 +84,63 @@ export class Carrying {
 
   /** The hero picks a thing up: it leaves where it was and is held (in their arms, or out of sight). */
   pickUp(t: ActTarget, hidden: boolean): boolean {
-    const l = this.looseOf(t), gear = this.w.gear;
-    if (!l || l.by) return false;
-    this.feetChanged(l.at ?? l.home);
-    l.at = null;
-    this.carry.loose[t.id] = l;
+    const gear = this.w.gear, l = this.takeFromWorld(t);
+    if (!l) return false;
     const hand = hidden ? 'right' : gear.handFor(l.kind) ?? 'right';
     gear.intoHand(t.id, hand);
     if (hand === 'right') this.carry.hidden = hidden;
-    this.sawCarry.clear();
-    this.carryStage = this.stageAt(l, this.w.heroSpot());
-    this.undraw(t.id);
-    this.removePiece(t.id);
+    this.nowHolding();
     gear.showHeld();
     return true;
+  }
+
+  /**
+   * Take a thing out of the world for the hero (to a hand or the pack): it is loose from now on, no longer drawn where
+   * it was, nor stopping feet. Null if it can't be taken (someone else carries it, or it has no model).
+   */
+  takeFromWorld(t: ActTarget): Loose | null {
+    const l = this.looseOf(t);
+    if (!l || l.by) return null;
+    this.feetChanged(l.at ?? l.home);
+    l.at = null;
+    this.carry.loose[t.id] = l;
+    this.undraw(t.id);
+    this.removePiece(t.id);
+    return l;
+  }
+
+  /** What the hero holds changed (picked up, taken out of the pack): how far it has gone from home starts from here. */
+  nowHolding(): void {
+    const id = this.carry.held, l = id ? this.carry.loose[id] : null;
+    this.sawCarry.clear();
+    this.carryStage = l ? this.stageAt(l, this.w.heroSpot()) : 'home';
   }
 
   /** The hero puts down what they hold, just in front of them, turned the way they face. */
   putDown(): boolean {
     const carry = this.carry;
-    const id = carry.held ?? carry.left, l = id ? carry.loose[id] : null;
-    if (!id || !l) return false;
+    const id = carry.held ?? carry.left;
+    return id ? this.layDown(id) : false;
+  }
+
+  /**
+   * Lay one of the hero's things on the ground just in front of them, turned the way they face: what they hold, or
+   * something from their pockets or pack (plan B6).
+   */
+  layDown(id: string): boolean {
+    const carry = this.carry, l = carry.loose[id];
+    if (!l || l.at || l.worn) return false;
     const yaw = this.w.heroFig.want, s = this.w.heroSpot();
     // (Far enough ahead that the hero isn't standing in it once it stops feet.)
     const ahead = PUT_DOWN_AHEAD + (modelOf(THINGS.get(l.kind))?.d ?? 0) / 2;
     l.at = { x: s.x + Math.sin(yaw) * ahead, z: s.z + Math.cos(yaw) * ahead, level: s.level, house: s.house, rot: yaw };
+    delete l.in;
+    delete l.stowed;
+    delete l.fitted;
     if (carry.held === id) {
       carry.held = null;
       carry.hidden = false;
-    } else carry.left = null;
+    } else if (carry.left === id) carry.left = null;
     this.w.gear.showHeld();
     this.drawLoose(id, l);
     this.feetChanged(l.at);

@@ -94,6 +94,10 @@ export interface ActWorld {
   stowed?: (doer: string) => string[];
   /** Is what the doer holds their own (it can be put away on them)? */
   holdsOwn?: (doer: string) => boolean;
+  /** Everything the doer carries, in kg: held, packed, worn, stowed (plan B6). Left out: only what they hold. */
+  carried?: (doer: string) => number;
+  /** Is there room in the doer's pockets or pack for a thing of this kind now (plan B6)? Left out: no pack, no room. */
+  packRoom?: (doer: string, kind: string) => boolean;
 }
 
 /** What the owner gate asks of the world (plan B3c). */
@@ -108,6 +112,8 @@ export interface OwnerView {
   leave(doer: string, house: string): boolean;
   /** How well off a household is (what a thing taken from them is worth to them, B3b). Left out: common. */
   wealth?(house: string): Wealth;
+  /** Is this placed or loose thing the doer's own (their gear dropped, a thing given them to keep)? Then it is no one else's. */
+  mine?(doer: string, id: string): boolean;
 }
 
 /** A fact about a spot: true or false there (indoors, raining, among houses). One entry in `content/actions/facts.ts`. */
@@ -166,8 +172,13 @@ export type Outcome =
   | { lead: string }
   /** What a study of the thing taught about a lead: its true read, or the plausible wrong one (the lead's file has both). */
   | { learn: string; truth: boolean }
-  /** The doer picks the thing up and holds it: openly, or out of sight (slipped away unseen). Plan B3b. */
-  | { carry: 'open' | 'hidden' }
+  /**
+   * The doer picks the thing up and holds it: openly, or out of sight (slipped away unseen; into the pack when it fits
+   * there, plan B6). Or straight into their pockets or pack (`pack`, plan B6).
+   */
+  | { carry: 'open' | 'hidden' | 'pack' }
+  /** The doer puts what they hold into their pockets or pack, where it first fits (plan B6). */
+  | { pack: true }
   /** The doer puts down what they hold, where they stand. */
   | { putDown: true }
   /** The doer picks one of what the thing offers (its `stock` or the levels of whom it `calls`); the page asks which. */
@@ -242,7 +253,9 @@ export type ActEvent =
   | { kind: 'lead'; lead: string }
   | { kind: 'learn'; lead: string; truth: boolean }
   /** The doer picked up the thing (held openly, or out of sight); they put down what they held, here. */
-  | { kind: 'carry'; target: ActTarget; hidden: boolean }
+  | { kind: 'carry'; target: ActTarget; hidden: boolean; pack?: true }
+  /** The doer put what they held into their pockets or pack (plan B6). */
+  | { kind: 'pack' }
   | { kind: 'putdown'; at: Spot }
   /** Something to pick from the thing: which of its stock to take, or how good a fighter to call (the page asks). */
   | { kind: 'choose'; what: 'stock' | 'calls' | 'gear'; target: ActTarget | null }
@@ -386,8 +399,9 @@ function apply(outs: readonly Outcome[], target: ActTarget | null, at: Spot, nam
     else if ('learn' in o) events.push({ kind: 'learn', lead: o.learn, truth: o.truth });
     else if ('carry' in o) {
       if (!target) throw new Error('carrying needs a thing to pick up');
-      events.push({ kind: 'carry', target, hidden: o.carry === 'hidden' });
-    } else if ('putDown' in o) events.push({ kind: 'putdown', at });
+      events.push({ kind: 'carry', target, hidden: o.carry !== 'open', ...(o.carry === 'pack' ? { pack: true as const } : {}) });
+    } else if ('pack' in o) events.push({ kind: 'pack' });
+    else if ('putDown' in o) events.push({ kind: 'putdown', at });
     else if ('choose' in o) {
       if (!target && o.choose !== 'gear') throw new Error('choosing needs a thing to choose from');
       events.push({ kind: 'choose', what: o.choose, target });

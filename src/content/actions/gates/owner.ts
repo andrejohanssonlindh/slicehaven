@@ -21,6 +21,7 @@ function whose(c: GateCase): Owner | null {
 function allowed(c: GateCase): boolean {
   const o = c.world.owners, owner = whose(c);
   if (!o || !owner) return true;
+  if (c.target && o.mine?.(c.doer.id, c.target.id)) return true;
   const house = 'house' in owner ? owner.house : null;
   return mayDo({
     owner, act: actOf(c), culture: o.culture, hour: c.world.view.hour,
@@ -38,7 +39,7 @@ const owner: GateDef = {
   check: (c) => (allowed(c) ? null : 'house' in (whose(c) ?? {}) ? 'It is not yours: this is someone\'s home.' : 'That is the town\'s.'),
   wrong: (c): Wrong | null => {
     const w = whose(c);
-    if (!w) return null;
+    if (!w || (c.target && c.world.owners?.mine?.(c.doer.id, c.target.id))) return null;
     // What the thing is worth to them (B3b): its value against the household's wealth, and its importance.
     const kind = c.target ? c.world.things.get(c.target.kind) : null, o = c.world.owners;
     const wealth = 'house' in w && o?.wealth ? o.wealth(w.house) : 'common';

@@ -138,7 +138,10 @@ export class Acting {
         welcome: (at) => w.owners.welcomeAt(at),
         leave: (doer, house) => doer === 'hero' && hasLeave(w.standing, house, w.worldHours),
         wealth: (house) => w.owners.houseWealth(house),
+        mine: (doer, id) => doer === 'hero' && !!w.carry.loose[id]?.mine,
       },
+      carried: (doer) => (doer === 'hero' ? w.pack.carriedKg : 0),
+      packRoom: (doer, kind) => doer === 'hero' && w.pack.hasRoom(kind),
       holding: (doer) => (doer === 'hero' ? w.carrying.holding : null),
       stowed: (doer) => (doer === 'hero' ? gear.stowed.map((s) => s.kind) : []),
       handFor: (doer, kind) => (doer === 'hero' ? gear.handFor(kind) : null),
@@ -175,7 +178,9 @@ export class Acting {
       if (e.kind === 'time' && hero && w.weather.hour !== null) w.weather.advance(e.minutes / 60);
       else if (e.kind === 'make' && e.thing === 'campfire') w.lights.lightFire();
       else if (e.kind === 'sit' && hero) this.sitHero(e.target);
-      else if (e.kind === 'carry' && hero) w.carrying.pickUp(e.target, e.hidden);
+      // (Slipped away unseen, it goes into the pack when there's room, plan B6; else it is held out of sight.)
+      else if (e.kind === 'carry' && hero) (e.hidden && w.pack.stash(e.target)) || (!e.pack && w.carrying.pickUp(e.target, e.hidden));
+      else if (e.kind === 'pack' && hero) w.pack.stashHeld();
       else if (e.kind === 'putdown' && hero) w.carrying.putDown();
       else if (e.kind === 'stow' && hero) w.gear.stowHeld();
       else if (e.kind === 'noise') w.senses.makeNoise({ ...e.at, loud: e.loud, kind: e.sound, by: doer.id });

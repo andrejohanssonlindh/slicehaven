@@ -32,6 +32,7 @@ import { SEE_SLOTS, WORLD } from '../materials';
 import { blobShadow } from '../shadow';
 import { Acting } from './acting';
 import { Carrying } from './carrying';
+import { Pack } from './pack';
 import { Fights } from './fights';
 import { Figures, personFigure } from './figures';
 import { Filaments } from './filaments';
@@ -64,7 +65,7 @@ export type { Figure, Person, WorldSettings } from './types';
  *   `sight.ts` (what the hero sees), `filaments.ts` (the field fed and shown), `figures.ts` (bodies and motions).
  * - Doing: `acting.ts` (taps and the action frame), `schedule.ts` (the people's day), `senses.ts` (seeing, hearing,
  *   noticing), `owners.ts` (whose things are, the scale), `talking.ts`, `journal.ts` (leads), `carrying.ts`,
- *   `gear.ts` (what is held), `fights.ts`.
+ *   `gear.ts` (what is held), `pack.ts` (pockets and the pack), `fights.ts`.
  *
  * A part keeps its own working state; what is saved is plain data here (`saveState`). A part reaches the others
  * through the hub (`this.w.lights`). Rules stay in `core/`: a part only carries out what the rules say.
@@ -211,6 +212,7 @@ export class SpikeWorld {
   readonly fights = new Fights(this);
   readonly gear = new Gear(this);
   readonly carrying = new Carrying(this);
+  readonly pack = new Pack(this);
   readonly owners = new Owners(this);
   readonly talking = new Talking(this);
   readonly senses = new Senses(this);

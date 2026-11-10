@@ -1,6 +1,7 @@
 import type { GateCase, GateDef } from '../../../core/world3d/actions';
 import { thingName } from '../../../core/world3d/actions';
 import { HAUL_SKILL, carriable, carryCapacity, hideable, kgText } from '../../../core/world3d/carry';
+import { cellsOf } from '../../../core/world3d/inventory';
 
 /**
  * Gates about hands and sizes (plan B3b; rules `core/world3d/carry.ts`). Until pockets and the bag come (B6), whatever
@@ -80,8 +81,45 @@ const weight: GateDef = {
     const kg = kindOf(c)?.weight ?? 0;
     const k = c.world.holding?.(c.doer.id);
     const held = k && c.world.things.has(k) ? (c.world.things.get(k).weight ?? 0) : 0;
+    const have = c.world.carried ? c.world.carried(c.doer.id) : held;
     const can = carryCapacity(c.doer.dice('attr:Kroppsbyggnad'), c.doer.dice(HAUL_SKILL), c.doer.load ?? 0);
-    return held + kg <= can ? null : `The {name} is too heavy for you: it weighs ${kgText(kg)}, and you can carry ${kgText(can)}.`;
+    if (have + kg <= can) return null;
+    return have > 0
+      ? `The {name} is too heavy for you: it weighs ${kgText(kg)}, you carry ${kgText(have)} already, and you can carry ${kgText(can)}.`
+      : `The {name} is too heavy for you: it weighs ${kgText(kg)}, and you can carry ${kgText(can)}.`;
+  },
+};
+
+/** Small enough for pockets or a pack (pocket or bag size, plan B6); otherwise not offered. */
+const packable: GateDef = {
+  id: 'packable',
+  about: 'The thing can go in pockets or a pack (pocket or bag size).',
+  kind: 'requirement',
+  hides: true,
+  check: (c) => (cellsOf(kindOf(c)?.shape, kindOf(c)?.size) ? null : 'The {name} is too big for your pack.'),
+};
+
+/** Room for it in the doer's pockets or pack now (plan B6); refused with why (they have none, or it's full). */
+const roomInPack: GateDef = {
+  id: 'room-in-pack',
+  about: 'There is room for the thing (the one acted on, or the one held) in the doer\'s pockets or pack.',
+  kind: 'requirement',
+  check: (c) => {
+    const k = c.target?.kind ?? c.world.holding?.(c.doer.id);
+    return k && c.world.packRoom?.(c.doer.id, k) ? null : 'There is no room for the {name} in your pockets or pack.';
+  },
+};
+
+/** Holding something small enough for pockets or a pack: putting it there is offered only then. */
+const holdingPackable: GateDef = {
+  id: 'holding-packable',
+  about: 'The doer holds something of pocket or bag size.',
+  kind: 'requirement',
+  hides: true,
+  check: (c) => {
+    const k = c.world.holding?.(c.doer.id);
+    const def = k && c.world.things.has(k) ? c.world.things.get(k) : null;
+    return def && cellsOf(def.shape, def.size) ? null : 'You hold nothing that fits a pack.';
   },
 };
 
@@ -119,4 +157,4 @@ const holdingOwn: GateDef = {
   },
 };
 
-export default [handsFree, handForIt, aHandFree, holding, size, weight, small, hasGear, holdingOwn];
+export default [handsFree, handForIt, aHandFree, holding, size, weight, small, hasGear, holdingOwn, packable, roomInPack, holdingPackable];

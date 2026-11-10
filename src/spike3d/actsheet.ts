@@ -219,7 +219,7 @@ export function makeSheet(world: () => SpikeWorld, notify: (text: string) => voi
     if (kg !== null) lookEl.textContent = `${lookEl.textContent} ${t('act.weighs', 'It weighs about {kg}.', { kg: kgText(kg) })}`.trim();
     if (!target) {
       const can = carryCapacity(doer.dice('attr:Kroppsbyggnad'), doer.dice(HAUL_SKILL), doer.load ?? 0);
-      lookEl.textContent = `${lookEl.textContent} ${t('act.capacity', 'You can carry {kg} without trouble.', { kg: kgText(can) })}`.trim();
+      lookEl.textContent = `${lookEl.textContent} ${t('act.capacity2', 'You carry {have} of the {kg} you can carry without trouble.', { have: kgText(w.pack.carriedKg), kg: kgText(can) })}`.trim();
     }
     if (lead?.added) {
       notify(t('act.leadadded', 'Lead added: {title}.', { title: lead.title }));

@@ -24,6 +24,8 @@ import { rollText } from './fight/words';
 import { THINGS } from '../content/things';
 import { thingName } from '../core/world3d/actions';
 import { makeJournal } from './journal';
+import { makePackSheet } from './packsheet';
+import { HAUL_SKILL, carryCapacity } from '../core/world3d/carry';
 
 /**
  * M0, the 3D spike: one house with a working cut-away, ground with stamped mud
@@ -426,6 +428,8 @@ const doer = heroDoer(hero);
 /** The journal of leads (plan B11). */
 const journal = makeJournal(() => world);
 const sheet = makeSheet(() => world, notify, save, doer, journal.added);
+/** The hero's pockets and pack (plan B6, the "Pack" button). */
+const packSheet = makePackSheet(() => world, () => carryCapacity(doer.dice('attr:Kroppsbyggnad'), doer.dice(HAUL_SKILL), doer.load ?? 0), notify, save);
 /** Talking to someone tapped (plan B3d). */
 /** A fight with someone tapped (plan B8a): it takes over from the talk, and the world waits while it lasts. */
 /** The hero's condition: fatigue and where it came from, dice off rolls, wounds (the "You" button). */
@@ -753,7 +757,7 @@ setTimeout(() => {
   loading.hidden = true;
   const built = performance.now() - t0;
   console.info(`spike3d: world built in ${built.toFixed(0)} ms`);
-  (window as unknown as { spike: unknown }).spike = { world, pipeline, setTier, built, governor, fight, sheet, hero, get tier() { return tier; } };
+  (window as unknown as { spike: unknown }).spike = { world, pipeline, setTier, built, governor, fight, sheet, packSheet, hero, get tier() { return tier; } };
   requestAnimationFrame((n) => {
     last = n;
     loop(n);

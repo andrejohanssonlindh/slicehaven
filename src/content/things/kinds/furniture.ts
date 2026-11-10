@@ -1,5 +1,6 @@
 import type { Size } from '../../../core/world3d/carry';
 import type { SourceKind } from '../../../core/world3d/filaments3d';
+import type { ShapeDef } from '../../../core/world3d/inventory';
 import type { ThingDef } from '../../../core/world3d/things';
 import { MODELS } from '../models';
 
@@ -76,18 +77,18 @@ const SEATS: Record<string, number> = { stool: 0.45, innbench: 0.45, bed: 0.5 };
  * grain), and what it is worth, in coins (a first guess until prices come with B6). A piece not listed is part of the room (a hearth, a shelf, the pegs) and stays put.
  * Heavy pieces can be tried, and are too heavy to carry alone.
  */
-const TAKE: Record<string, { size: Size; weight: number; value?: number; importance?: number }> = {
+const TAKE: Record<string, { size: Size; weight: number; value?: number; importance?: number; shape?: ShapeDef }> = {
   stool: { size: 'hands', weight: 3, value: 2 },
   broom: { size: 'hands', weight: 1, value: 1 },
   keg: { size: 'hands', weight: 16, value: 6 },
   sacks: { size: 'hands', weight: 20, value: 4 },
-  basket: { size: 'bag', weight: 1, value: 1 },
+  basket: { size: 'bag', weight: 1, value: 1, shape: [3, 3] },
   kindling: { size: 'hands', weight: 4, value: 0.5 },
   pallet: { size: 'hands', weight: 5, value: 1 },
   footlocker: { size: 'hands', weight: 12, value: 8 },
   nets: { size: 'hands', weight: 5, value: 3 },
   haybale: { size: 'hands', weight: 15, value: 1 },
-  herbs: { size: 'pocket', weight: 0.2, value: 1 },
+  herbs: { size: 'pocket', weight: 0.2, value: 1, shape: [1, 2] },
   table: { size: 'heavy', weight: 30, value: 6 },
   longTable: { size: 'heavy', weight: 60, value: 10 },
   innbench: { size: 'heavy', weight: 25, value: 5 },

@@ -2,6 +2,18 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-10 — Pockets and the pack (B6)
+
+- **A Pack button** (bottom left, above *You*) opens your pockets and your pack. There are two pockets of 2 × 2 cells and a backpack of 5 × 6, with a column on each side for an add-on, as you pictured it: rectangular, add-ons on the side. [The design](design/inventory.md).
+- **Everyone starts with a kit:** the backpack on your back, and in it a side pouch, a waterskin, a pan, a loaf and a tinderbox (in a pocket). It's one kit for everyone until the creator's equipment packages give their own.
+- **Tap a thing, then tap a cell** to move it there. *Turn*, *Take out* (into a hand), *Put down* (on the ground), *Fit on the side* (the side pouch: a 2 × 4 grid beside the pack; *Take off* when it's empty), and *Auto-pack*.
+- **Shapes:** rectangles, and odd ones written as rows. The pan is the first odd one: its head and a handle along one side. Shapes turn a quarter at a time.
+- **In the world:** small things offer *Put the … in your pack*. When you hold something small, the spot you stand on offers the same. A thing slipped away unseen goes into the pack if it fits. Something of someone else's packed in front of them is a *take*; your own things never are.
+- **Weight:** everything on you now counts, the pack, its contents and your weapons included. *You* says "You carry 6.2 kg of the 13 kg…". The carried-weight rule wasn't found, so as you said we started without it: nothing over capacity can be picked up.
+- New things to find lying about when dropped: the backpack, side pouch, waterskin, loaf, tinderbox and pan, each with a simple model. The basket (3 × 3) and the herb bundles (1 × 2) got shapes.
+- **Saves from before are dropped** (the save's shape changed).
+- Tests: 9 new unit tests for the pack's rules; a new browser test (`spike3d-pack`); carrying, actions, owners, save and fight tests pass.
+
 ## 2026-11-07 — The 3D world split into parts (a refactor; nothing to see)
 
 - **Why:** `engine3d/world.ts` had grown to 4,224 lines (a tenth of the code), holding the drawing and every system (fights, carrying, talk, owners, leads, perception) in one class. Fights are paused, and B6 (inventory) and the first village would have added more, so this was the cheap moment.

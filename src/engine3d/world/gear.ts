@@ -112,6 +112,8 @@ export class Gear {
       if (!THINGS.has(kind)) return;
       carry.loose[`hero:own:${kind}:${n}`] = { kind, seed: n + 1, home: { x: hero.x, z: hero.z, level: 0, house: null, rot: 0, room: null }, at: null, mine: true, stowed: true };
     });
+    // (The pack and what is in it, plan B6: given with the gear.)
+    this.w.pack.kitUp();
     carry.outfit = key;
     this.showHeld();
   }

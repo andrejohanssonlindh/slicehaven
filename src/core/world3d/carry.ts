@@ -1,4 +1,5 @@
 import type { ActKind, CultureDef } from './standing';
+import type { PackSpot, Side } from './inventory';
 
 /**
  * Taking and carrying (plan B3b, first slice; design: director/design/actions.md, "The ways to take"). Pure rules.
@@ -77,7 +78,16 @@ export interface Loose {
   hand?: 'left';
   /** Carried on the hero, not in hand (at the belt, on the back): their own gear, drawn when wanted. Not in the world. */
   stowed?: boolean;
+  /** In the hero's pockets or pack (plan B6): which grid, the cell and the turn (`core/world3d/inventory.ts`). Out of sight. */
+  in?: PackSpot;
+  /** The pack the hero wears on their back (plan B6): its grid holds what is `in` the pack. */
+  worn?: boolean;
+  /** An add-on fitted on this side of the pack the hero wears (plan B6): its grid holds what is `in` that side. */
+  fitted?: Side;
 }
+
+/** Is a loose thing on the hero (held, stowed, packed, worn, fitted), rather than lying somewhere or with someone else? */
+export const onHero = (l: Loose): boolean => !l.at && !l.by && !l.wield;
 
 /**
  * What giving a thing back does to its owner's view of you: a loan returned, a little goodwill; something taken and

@@ -1,6 +1,7 @@
 import type { Welcome } from './standing';
 import type { Size } from './carry';
 import type { FSource, SourceKind } from './filaments3d';
+import type { AddonDef, BagDef, ShapeDef } from './inventory';
 import type { BuildingPlan } from './house';
 import type { MeshData } from './mesh';
 import type { WayOfMoving } from './motion';
@@ -97,6 +98,15 @@ export interface ThingDef {
   spot?: number;
   /** What it weighs, kilograms (plan B6): what can be carried is set against the carrier's capacity (`carryCapacity`). */
   weight?: number;
+  /**
+   * The cells it takes in a pocket or a pack (plan B6, `core/world3d/inventory.ts`): a rectangle `[w, h]`, or rows with
+   * `#` for a cell (`['##..', '####']`, a pan and its handle). Left out, its size gives one (pocket 1×1, bag 2×2).
+   */
+  shape?: ShapeDef;
+  /** A pack worn on the back (plan B6): its grid of cells, and how many sides take an add-on. Inherited. */
+  bag?: BagDef;
+  /** An add-on for a pack (plan B6): fitted on a side, it gives this grid beside the pack. Inherited. */
+  addon?: AddonDef;
   /** What it is worth, in coins (a first guess until prices come with B6): taking it weighs more against a poor owner. */
   value?: number;
   /** How much it matters to its owner beyond its price (a guard's sword, an heirloom): 0 to 3, each step half as much again. */
