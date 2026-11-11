@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#1a1420" />
+    <title>Slicehaven · Map maker</title>
+    <link rel="stylesheet" href="/src/ui/style.css" />
+    <link rel="stylesheet" href="/src/mapmaker/mapmaker.css" />
+  </head>
+  <body>
+    <div id="topbar">
+      <a class="btn" href="../" aria-label="Back to the start">←</a>
+      <span class="logo">SLICEHAVEN</span>
+      <span class="tag">map maker</span>
+      <span class="spacer"></span>
+      <select id="map-pick" aria-label="Map"></select>
+    </div>
+    <div id="stage">
+      <canvas id="plan"></canvas>
+      <div id="zoom">
+        <button type="button" data-zoom="1" aria-label="Zoom in">+</button>
+        <button type="button" data-zoom="-1" aria-label="Zoom out">−</button>
+        <button type="button" id="fit" aria-label="Whole map">▢</button>
+      </div>
+      <div id="hint" hidden></div>
+    </div>
+    <div id="panel">
+      <div id="sel"></div>
+      <div class="bar" id="tools"></div>
+      <div class="bar" id="file"></div>
+      <div id="problems"></div>
+    </div>
+    <dialog id="dlg"><form method="dialog" id="dlg-form"></form></dialog>
+    <script type="module" src="/src/mapmaker/main.ts"></script>
+  </body>
+</html>

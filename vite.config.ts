@@ -1,4 +1,6 @@
 import { execSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
+import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
 /** Which build this is: commit count, short hash and build time, shown on the 3D spike so the director can see the latest loaded. */
@@ -16,9 +18,40 @@ function buildStamp(): string {
   return `v${rev} ${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}Z`;
 }
 
+/**
+ * The map maker's "Save to file" (plan C5), on the dev server only: POST /__maps/<name> writes
+ * src/content/maps/<name>.json. Names are one plain word; the body must be a map whose name matches.
+ */
+function mapSaver(): Plugin {
+  return {
+    name: 'slicehaven-map-saver',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const m = req.method === 'POST' && req.url?.match(/\/__maps\/([a-z0-9-]+)$/);
+        if (!m) return next();
+        let body = '';
+        req.on('data', (c) => (body += c));
+        req.on('end', () => {
+          try {
+            const spec = JSON.parse(body);
+            if (spec.name !== m[1]) throw new Error(`the map is called ${spec.name}, not ${m[1]}`);
+            writeFileSync(new URL(`./src/content/maps/${m[1]}.json`, import.meta.url), body);
+            res.end('saved');
+          } catch (e) {
+            res.statusCode = 400;
+            res.end(String((e as Error).message));
+          }
+        });
+      });
+    },
+  };
+}
+
 // Served from https://andrejohanssonlindh.github.io/slicehaven/
 export default defineConfig({
   base: '/slicehaven/',
+  plugins: [mapSaver()],
   define: { __BUILD__: JSON.stringify(buildStamp()) },
   build: {
     chunkSizeWarningLimit: 2000, // three.js and the world are ~740 kB
@@ -31,6 +64,7 @@ export default defineConfig({
         spike3d: 'spike3d/index.html',
         npcs: 'npcs/index.html',
         models: 'models/index.html',
+        mapmaker: 'mapmaker/index.html',
       },
     },
   },

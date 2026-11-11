@@ -2,21 +2,14 @@
 
 Newest on top. Answer in chat (just reference the number, e.g. "Q31: A"). Answered questions move to the [archive](archive/questions-answered.md); what they decided goes to the [decisions](decisions.md). Each question names the [plan](todo.md) item it holds up.
 
-## Q51 A map maker we both use? (C5, before the start village D3)
-You asked whether to build a map maker so I can sketch maps and you finish them, or the other way round.
+## Q52 Sending a map from the phone straight to Claude? (C5)
+Today, on the phone, **Copy for Claude** puts the whole map on the clipboard and you paste it into the chat (a few kilobytes of text; Claude saves it as the file). It works, but it's clumsy for many small changes.
 
-**My recommendation: yes, and build it on the map files we already have.** Maps are JSON files today: rules ("a street of houses here", "a farm there") that the game grows into a full map, plus things placed at exact spots. A map maker page would open such a file in the 3D view and let you, on the phone:
-- tap to place, move, turn and remove houses, props and people;
-- paint the ground (road, grass, water) and draw where the rules go (a street, a palisade);
-- save it, which writes the same JSON, so I can read it, change it by rules and send it back.
+**The smoother way:** a **Send** button that saves the map straight into the repository on GitHub, on a side branch (`maps-inbox`, never `main`, so a half-done map can't break the game), and I pick it up from there. For that the page needs a **GitHub key**, made once by you: a "fine-grained token" that can only write files in this one repository, pasted into the map maker on your phone (it stays in that browser, never in the code). It takes about two minutes on github.com; I'd write the steps.
 
-So it works both ways: I lay out a village from a description, you move what feels wrong; you block out a place roughly, I fill in the detail. Saving would go to the browser first, with a "copy the file" button you paste into the chat (or I pick it up from a link), until we find something smoother.
+**My recommendation:** B for now, A when the start village begins and we pass maps back and forth a lot.
 
-**Answer:** A, build it like this; B, the same but smaller first (place and move things only); C, not yet, I'll keep writing the maps by hand.
-
----
-
-*Older open questions: none.*
+**Answer:** A, set up the Send button now; B, copying is fine for now; C, never (no keys in the browser).
 
 ---
 

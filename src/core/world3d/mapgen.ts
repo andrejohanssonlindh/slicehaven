@@ -223,6 +223,21 @@ export interface MapSpec {
   events?: MapEvent[];
   /** How the place weighs what is done in it: a culture's id (`content/cultures/`, plan B3c). Left out: the default one. */
   culture?: string;
+  /** Notes pinned to the map by whoever is making it (the director or Claude, in the map maker): the game ignores them. */
+  notes?: MapNote[];
+}
+
+/** A note on a spot of the map (and, with `r`, the area round it): how the director and Claude talk about places. */
+export interface MapNote {
+  id: string;
+  at: XZ;
+  text: string;
+  /** How far round the spot it is about, metres (left out: just the spot). */
+  r?: number;
+  /** Who wrote it. */
+  by?: 'director' | 'claude';
+  /** Dealt with (kept so the answer can be read). */
+  done?: boolean;
 }
 
 export interface CompiledMap {
@@ -360,13 +375,14 @@ export interface CompileOptions {
 
 /** The keys each part of a map may have: anything else is a typo, and is reported. */
 const KEYS = {
-  map: ['name', 'about', 'seed', 'size', 'roads', 'lake', 'rivers', 'mud', 'doorMud', 'houses', 'rules', 'wild', 'trees', 'props', 'hero', 'people', 'places', 'events', 'culture'],
+  map: ['name', 'about', 'seed', 'size', 'roads', 'lake', 'rivers', 'mud', 'doorMud', 'houses', 'rules', 'wild', 'trees', 'props', 'hero', 'people', 'places', 'events', 'culture', 'notes'],
   house: ['id', 'room', 'size', 'roof', 'walls', 'wallH', 'seed', 'plan', 'torch', 'at'],
   at: ['x', 'z', 'rot', 'road', 'm', 't', 'side', 'gap'],
   wild: ['trees', 'mix', 'shrubs', 'boulders', 'grain', 'area'],
   person: ['id', 'is', 'seed', 'look', 'home', 'at', 'does', 'level'],
   place: ['at', 'face', 'area', 'path', 'loop', 'road', 'from', 'to', 'around', 'margin'],
   event: ['id', 'hours'],
+  note: ['id', 'at', 'text', 'r', 'by', 'done'],
 };
 
 /** A place worked out from what the map says. */
@@ -427,6 +443,13 @@ export function compileMap(spec: MapSpec, things: Things, opts: CompileOptions =
   }
   if (spec.wild) strayKeys(spec.wild, KEYS.wild, 'wild', problem);
   for (const p of spec.people ?? []) strayKeys(p, KEYS.person, `person ${p.id}`, problem);
+  const noteIds = new Set<string>();
+  for (const n of spec.notes ?? []) {
+    strayKeys(n, KEYS.note, `note ${n.id}`, problem);
+    if (noteIds.has(n.id)) problem(`two notes are called ${n.id}`);
+    noteIds.add(n.id);
+    if (!Array.isArray(n.at) || n.at.length !== 2 || typeof n.text !== 'string') problem(`note ${n.id}: needs a spot ("at": [x, z]) and a "text"`);
+  }
 
   // The rules, in order, each in its phase (a rule nobody wrote is told so).
   const ctx: RuleContext = {

@@ -1,7 +1,8 @@
 import { type Sky, WIND_DIRS, clockText } from '../core/environment';
 import { ASPECTS, LEVEL_NAMES } from '../core/filaments';
 import { gearKinds, packageKinds } from '../content/things/gear';
-import { MAPS, mapNamed } from '../content/maps';
+import { MAPS, compile, mapNamed } from '../content/maps';
+import { loadDraft } from '../mapmaker/drafts';
 import { clearWorld, loadWorld, saveWorld } from '../core/world3d/save';
 import { rollPool, rollTable, rollTest } from '../core/dice';
 import { Rng } from '../core/rng';
@@ -678,16 +679,19 @@ setTimeout(() => {
   const t0 = performance.now();
   // ?map=hamlet loads another map (see content/maps). ?world=192 makes the patch bigger, to see chunks stream in as you pan.
   const name = params.get('map') ?? 'spike';
-  if (!(name in MAPS)) console.warn(`spike3d: no map called ${name}; maps are ${Object.keys(MAPS).join(', ')}`);
+  // ?draft: the map as it is in the map maker (plan C5, "Look in 3D"), kept in this browser.
+  const draft = params.has('draft') ? loadDraft(name) : null;
+  if (!(name in MAPS) && !draft) console.warn(`spike3d: no map called ${name}; maps are ${Object.keys(MAPS).join(', ')}`);
   // The map picker in the top bar: every map there is; picking one loads the page again with it (other settings kept).
   const pick = document.getElementById('map-pick') as HTMLSelectElement;
   for (const m of Object.keys(MAPS).sort()) pick.add(new Option(m[0].toUpperCase() + m.slice(1), m));
-  pick.value = name in MAPS ? name : 'spike';
+  if (draft && !(name in MAPS)) pick.add(new Option(name, name));
+  pick.value = name in MAPS || draft ? name : 'spike';
   pick.addEventListener('change', () => {
     params.set('map', pick.value);
     location.search = params.toString();
   });
-  const map = mapNamed(name in MAPS ? name : 'spike');
+  const map = draft ? compile(draft) : mapNamed(name in MAPS ? name : 'spike');
   mapName = map.name;
   if (map.problems.length) console.warn(`spike3d: map ${map.name} has problems:\n${map.problems.join('\n')}`);
   const size = Number(params.get('world')) || map.ground.size;

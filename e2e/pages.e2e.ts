@@ -14,7 +14,7 @@ describe('pages', () => {
   it('the hub links only to pages that open', async () => {
     const { page, errors } = await openPage(env, '/');
     const links = await page.locator('.hub a').evaluateAll((as) => as.map((a) => (a as HTMLAnchorElement).getAttribute('href')));
-    expect(links).toEqual(['spike3d/', 'models/', 'chargen/', 'npcs/', 'skills/', 'director/']);
+    expect(links).toEqual(['spike3d/', 'mapmaker/', 'models/', 'chargen/', 'npcs/', 'skills/', 'director/']);
     expect(errors).toEqual([]);
     await page.context().close();
   });

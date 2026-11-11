@@ -60,5 +60,8 @@ A map is a JSON file, `content/maps/<name>.json` (its `name` the same). It is fo
 - **See it**: `/spike3d/?map=hamlet`. Problems also go to the browser console. `?world=N` overrides the size.
 - Deterministic: same spec, same world (the seed is in the spec).
 
+## The map maker and notes
+`/mapmaker/` shows a map from above and edits what is placed by hand ([map maker](map-maker.md)). A map can carry **notes** (`"notes": [{ "id": "n1", "at": [x, z], "text": "…", "r": 6, "by": "director" }]`, `done: true` when dealt with): the director's are requests about that spot, Claude answers with its own (`"by": "claude"`) and ticks theirs off. **Before changing a map, read its notes; after, look at it:** `npm run map:shot -- <name>` saves `e2e/out/map-<name>.png` and prints the notes and problems (`--draft-file x.json` for a map pasted in the chat but not yet saved). Write map files as `mapToJson` does (one entry a line).
+
 ## What is not done
 Houses and placed things stream by chunk ([scale](world3d-scale.md)). Still missing, each on [the plan](../todo.md): a farmstead rule (C1), fields and pasture (C2, C3), a map maker page (C5). Not on the plan yet: a `fence` and `path` along a line, hills in the ground (a map has only a lake and roads).

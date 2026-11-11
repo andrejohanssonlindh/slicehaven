@@ -2,6 +2,9 @@
 
 *Archive of the questions in [questions](../questions.md) once answered or dropped. Newest on top. What they decided, if it still stands, is in the [decisions](../decisions.md).*
 
+## 2026-11-11
+- **Q51 A map maker we both use?** → **yes, build it** (A), with **notes on places** to say what you want where; the phone only needs to place things, markers and text; the computer most of what Claude can do; and Claude should be able to use it too. Built as [the map maker](../design/map-maker.md), first slice the same day.
+
 ## 2026-11-04
 - **Q50 Floating damage numbers on normal and hard (B8g)** → **A, as a start:** numbers on easy only. On normal and hard a short word floats up (*"deep cut"*, *"glancing"*) and the icon lands on the body outline.
 - **Q48 Fighting with a skill you don't have** → **2D6**: the base value of every combat skill.

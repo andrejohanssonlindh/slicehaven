@@ -2,6 +2,16 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-11 — The map maker, first slice (C5)
+
+- **`/mapmaker/`** (the hub → Map maker): a map seen from above, drawn from what the game builds: ground, lake, roads, houses with their doors, every tree and thing, where people start, named places, the hero's star.
+- **On the phone:** drag to look about, pinch or +/− to zoom. Things placed by hand have a light ring: tap to pick, drag to move, ⟲ ⟳ to turn, Remove. **+ Thing** (search the kinds) then tap to place, as many as you like. A house along a road can be moved too (it is then pinned to that spot). Things made by rules say so when tapped (rules get their own editing later).
+- **Notes:** **+ Note**, tap a spot, write; give it an area in metres if it's about more than the spot. Yours are yellow, mine blue, done ones grey. They live in the map file, so I read them where they stand and answer beside them.
+- **Your changes are a draft** in that browser (✎ in the list), with Undo. **Look in 3D** walks the draft. **Copy for Claude** puts the map on the clipboard to paste to me; on the computer with the dev server, **Save to file** writes it straight to the repository. **New map** starts an empty one.
+- **For me:** `npm run map:shot -- <name>` draws the same plan to a picture and lists the notes, so I can look at a layout and read your notes against it. The edits are plain tested functions.
+- On a computer the panel sits at the side; on the phone it has a fixed height, so picking something doesn't shift the map under your finger.
+- Tests: map edits (every map writes back unchanged), the hub, a phone run of place, drag, note, undo and Look in 3D. Q51 answered; **Q52** asks about sending from the phone without copying.
+
 ## 2026-11-10 — Ten more books as reference text; the plan after B6
 
 - **Ten books extracted to text** (on the computer only, never in the repo): the combat book, the adventurer's handbook, the aspect compendium (spells), and seven place books (Cermira, the Mithera forest, the Shadowland, the Tarkas desert, the city of Zhirim Mian, the fortress Lashorakh, the elven valley Kinané'an oro). 292 pages, a text file per page.
