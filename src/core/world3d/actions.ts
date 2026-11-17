@@ -121,7 +121,7 @@ export interface FactDef {
   id: string;
   about: string;
   /** `target` is the thing acted on, if any (embers in a hearth are a fact about the hearth). */
-  holds(at: Spot, view: WorldView, target?: ActTarget | null, world?: Pick<ActWorld, 'states' | 'things'>): boolean;
+  holds(at: Spot, view: WorldView, target?: ActTarget | null, world?: Pick<ActWorld, 'states' | 'things' | 'holding'>, doer?: Doer): boolean;
   /** Said when a gate needs it false and it is true ("You are among the houses."), and the other way round. */
   whenTrue: string;
   whenFalse: string;
@@ -447,7 +447,7 @@ export function perform(offer: string, target: ActTarget | null, at: Spot, doer:
     for (const h of v.roll.harder ?? []) {
       const f = lib.facts[h.fact];
       if (!f) throw new Error(`verb ${v.id}: no fact called ${h.fact}`);
-      if (f.holds(at, world.view, target, world)) {
+      if (f.holds(at, world.view, target, world, doer)) {
         difficulty += h.add;
         (h.add > 0 ? harder : easier).push(h.note);
       }

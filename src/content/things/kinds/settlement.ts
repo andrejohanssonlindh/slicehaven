@@ -68,6 +68,7 @@ const things: ThingDef[] = [
     id: 'stall',
     is: 'structure',
     look: 'A market stall under a striped awning.',
+    material: 'cloth',
     foot: [{ box: [1.1, 0.45], at: [0, 0.35] }],
     // Its awning is a pattern, a small one.
     filament: { kind: 'art', weight: 0.6 },

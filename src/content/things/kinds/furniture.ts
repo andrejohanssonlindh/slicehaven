@@ -2,6 +2,7 @@ import type { Size } from '../../../core/world3d/carry';
 import type { SourceKind } from '../../../core/world3d/filaments3d';
 import type { ShapeDef } from '../../../core/world3d/inventory';
 import type { ThingDef } from '../../../core/world3d/things';
+import type { Material } from '../../../core/world3d/effects';
 import { MODELS } from '../models';
 
 /**
@@ -103,6 +104,22 @@ const TAKE: Record<string, { size: Size; weight: number; value?: number; importa
   cratestack: { size: 'heavy', weight: 60, value: 6 },
 };
 
+/**
+ * What each piece is made of, as fire sees it (plan B7, the rules' burning materials): straw catches at 2, cloth and
+ * twigs at 6, wood at 10, wool at 14. Not listed (a hearth, the anvil, the forge, a tub of water): it doesn't burn.
+ */
+const MATERIAL: Record<string, Material> = {
+  pallet: 'straw', straw: 'straw', haybale: 'straw', herbs: 'straw', litter: 'straw', hayRack: 'wood',
+  table: 'wood', stool: 'wood', longTable: 'wood', innbench: 'wood', bed: 'wood', footlocker: 'wood', keg: 'wood',
+  aleKegs: 'wood', cratestack: 'wood', counter: 'wood', shelf: 'wood', pegs: 'wood', kneadtrough: 'wood',
+  mortarBench: 'wood', loom: 'wood', workbench: 'wood', fishRack: 'wood', toolrack: 'wood', bucket: 'wood',
+  broom: 'cloth', kindling: 'cloth', basket: 'cloth', sacks: 'cloth', nets: 'cloth', hungNet: 'cloth', hanging: 'cloth',
+  rug: 'wool', coalbin: 'wood',
+};
+
+/** What brings water against a fire when carried, in dice (the rules: a big bucket +3D6). */
+const DOUSES: Record<string, number> = { bucket: 3 };
+
 /** The family every piece of furniture is a kind of: an item in a room. */
 const family: ThingDef = { id: 'furniture', is: 'item', abstract: true };
 
@@ -111,6 +128,9 @@ export default [
   ...Object.entries(PIECES).map(([id, p]): ThingDef => {
     const model = MODELS[id];
     if (!model) throw new Error(`furniture ${id} has no model in content/things/models/${id}.ts`);
-    return { id, is: p.is, look: p.look, furniture: { mount: p.mount, model }, ...(p.gives ? { filament: p.gives } : {}), ...(SEATS[id] ? { seat: SEATS[id] } : {}), ...TAKE[id] };
+    return {
+      id, is: p.is, look: p.look, furniture: { mount: p.mount, model }, ...(p.gives ? { filament: p.gives } : {}), ...(SEATS[id] ? { seat: SEATS[id] } : {}), ...TAKE[id],
+      ...(MATERIAL[id] ? { material: MATERIAL[id] } : {}), ...(DOUSES[id] ? { douses: DOUSES[id] } : {}),
+    };
   }),
 ] satisfies ThingDef[];

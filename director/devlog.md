@@ -2,6 +2,22 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-17 — Effects (B7), first slice: things burn
+
+*B7 was agreed as next on 2026-11-10. [The design](design/effects.md) is new; say if its shape is wrong before more is built on it.*
+
+- **The shape:** an effect on a thing is a state on its kind (saved, redrawn and gated like *lit*), given by what the kind is. Anything with a **material** can be burning (with so many dice) and burnt. The rules run in one pure file every round of 4 seconds, the rules' phase, in a fight and out.
+- **Burning, from the rules:**
+  - A fire near something rolls its dice against the material: straw 2, cloth and twigs 6, wood 10, wool 14, leather 18.
+  - It grows a die a round up to what the material can give, and sets what stands near it alight.
+  - Rain takes dice off it (a storm puts most fires out). When its fuel is spent it's burnt: black, still standing, worth nothing.
+- **Hearths, ovens, forges and torches keep their fire to themselves;** only an open fire (a campfire) and what is already burning set things alight. Otherwise every straw pallet beside a hearth would go up.
+- **New tries:** *Set fire to the …* (Survival, easy, a minute; harm to whoever owns it) and *Put out the flames on the …* (Speed, tricky; much harder once it blazes; **a bucket in your hands makes it much easier**, which is a use for the bucket from the last fix).
+- **Shown:** the pixel fire and a light on what burns, bigger with its dice; burnt things go black.
+- **Materials given:** furniture (pallets and straw, wood for most pieces, cloth for brooms, baskets, sacks and hangings, a wool rug), and outdoors woodpiles, carts, fences, hay, washing, benches, barrels, crates and stalls. Houses, trees and grass don't burn yet (next slices).
+- **Not yet:** people catching fire outside a fight, getting wet, smoke from what burns.
+- Tests: 956 unit tests (7 new on fire: catching, reach, spreading, rain, burning out, wood against straw, which kinds burn); a new browser test (a stool in the inn set alight, drawn, put out); acting, save, fire, owners and carrying browser tests.
+
 ## 2026-11-17 — Walking round people (B12), rooms that can't wall a hearth off
 
 - **People are passed, not walked through.** A walk is still planned round walls and furniture. On the way, anyone within about 2 m ahead and close to the line makes the walker step aside, away from them; head on, both step to their own right, so they pass on the same hand. Stepping aside only happens where the floor allows, and the walker slows when it's tight. The step aside fades near the end of the walk, so you still arrive where you tapped. Whoever stands where you're going (to talk, to fight) isn't stepped round. With the keys you can't walk into anyone. This is for everyone, not only you.

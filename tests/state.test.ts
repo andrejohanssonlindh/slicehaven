@@ -15,7 +15,9 @@ const memory = (): Storage => {
 describe('states on placed things (B1)', () => {
   it('come from the kind, inherited: every fire, the hearth and the torch post too, starts lit', () => {
     for (const k of ['hearth', 'oven', 'forge', 'campfire', 'torchpost', 'walltorch']) expect(THINGS.get(k).states?.lit, k).toEqual({ default: true });
-    expect(THINGS.get('table').states).toBeUndefined();
+    // A table has no states of its own: only what fire gives anything wooden (B7).
+    expect(Object.keys(THINGS.get('table').states ?? {}).sort()).toEqual(['burning', 'burnt']);
+    expect(THINGS.get('boulder').states).toBeUndefined();
   });
 
   it('store only what differs from the start, so an untouched world saves as nothing', () => {

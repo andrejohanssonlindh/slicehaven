@@ -38,6 +38,24 @@ export const FACTS: FactDef[] = [
     whenFalse: 'Only where there are embers.',
   },
   {
+    id: 'blazing',
+    about: 'The thing acted on burns with three dice or more (plan B7).',
+    holds: (_at, _view, target, world) => !!target && !!world && world.states.has(target.kind, 'burning') && Number(world.states.get(target.id, target.kind, 'burning')) >= 3,
+    whenTrue: 'Not while it blazes.',
+    whenFalse: 'Only once it blazes.',
+  },
+  {
+    // A bucket of water in the hands (a kind that `douses`).
+    id: 'carrying-water',
+    about: 'The doer holds something that brings water against a fire (a bucket).',
+    holds: (_at, _view, _target, world, doer) => {
+      const k = doer && world?.holding?.(doer.id);
+      return !!k && !!world && world.things.has(k) && (world.things.get(k).douses ?? 0) > 0;
+    },
+    whenTrue: 'Not with water in your hands.',
+    whenFalse: 'Only with water at hand.',
+  },
+  {
     id: 'bulky',
     about: 'The thing acted on is bag-sized (not a pocket\'s worth): harder to hide (plan B3b).',
     holds: (_at, _view, target, world) => !!target && !!world && world.things.get(target.kind).size === 'bag',

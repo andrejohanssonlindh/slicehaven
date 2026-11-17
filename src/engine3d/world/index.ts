@@ -37,6 +37,7 @@ import { Pack } from './pack';
 import { Fights } from './fights';
 import type { SavedStain } from '../blood';
 import { Bleeding } from './bleeding';
+import { Effects } from './effects';
 import { Figures, personFigure } from './figures';
 import { Filaments } from './filaments';
 import { Gear } from './gear';
@@ -216,6 +217,7 @@ export class SpikeWorld {
   // --- the parts ---
   readonly figures = new Figures(this);
   readonly bleeding = new Bleeding(this);
+  readonly effects = new Effects(this);
   readonly fights = new Fights(this);
   readonly gear = new Gear(this);
   readonly carrying = new Carrying(this);
@@ -341,6 +343,7 @@ export class SpikeWorld {
       for (const hs of this.houses) if (hs.fireOf?.id === c.id) this.housing.showFire(hs);
       this.lights.showPlacedFire(c.id);
       this.lights.syncFires();
+      if (c.key === 'burning' || c.key === 'burnt') this.effects.refresh(c.id);
     });
   }
 
@@ -802,6 +805,7 @@ export class SpikeWorld {
     }
     this.figures.step(dt);
     this.bleeding.step(dt);
+    this.effects.step(dt);
 
     this.placeCamera();
     this.updateSee();

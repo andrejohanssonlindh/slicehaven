@@ -2,6 +2,7 @@ import { TORCH_FIRE } from '../../../core/world3d/filaments3d';
 import { addBox, addOrientedBox, emptyMesh } from '../../../core/world3d/mesh';
 import type { ThingDef } from '../../../core/world3d/things';
 import { solid } from '../parts';
+import { FIRE_DICE } from '../../effects/burning';
 
 const POST_HEIGHT = 1.9;
 const BRACKET_HEIGHT = 2.25;
@@ -47,6 +48,9 @@ const things: ThingDef[] = [
     is: 'fire',
     look: 'A campfire of three logs, burning.',
     foot: [{ circle: 0.4 }],
+    // An open fire: what stands close can catch (the rules: a campfire is 2D6). Hearths, ovens, forges and torches in
+    // their brackets keep their fire to themselves.
+    spreads: FIRE_DICE.campfire,
     // A full fire: it lifts the field's fire reading by itself.
     filament: { kind: 'fire', weight: 1 },
     flame: { y: 0, size: 1, count: 20, power: 10, lightY: 0.7 },

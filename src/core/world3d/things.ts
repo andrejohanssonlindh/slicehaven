@@ -10,6 +10,7 @@ import type { RoomLine, RoomRecipe } from './roomplan';
 import type { Lumps, PlacedProp } from './props';
 import { type Shape, circle } from './space';
 import { type StateDef, placedId } from './state';
+import { BURN_STATES, type Material } from './effects';
 import type { TreeModel } from './tree';
 
 /**
@@ -131,6 +132,15 @@ export interface ThingDef {
    * door's `open`. Merged down the tree: a kind adds to what it inherits, and may change a start.
    */
   states?: Record<string, StateDef>;
+  /**
+   * What it is made of, as fire sees it (plan B7, `core/world3d/effects.ts`): a kind with a material can burn, and
+   * gets the states `burning` (the fire's dice, 0 when not) and `burnt`. Stone and iron say nothing.
+   */
+  material?: Material;
+  /** An open fire (a campfire): while lit it sets what stands close alight with this many dice (plan B7). A hearth keeps its fire to itself. */
+  spreads?: number;
+  /** Carried in the hands, it brings this many dice of water against a fire (a bucket: 3, as the rules give a big bucket). */
+  douses?: number;
   /** The ground it takes up: what stops feet, and (if `blocksSight`) the eye. Function form for what changes with the placement. */
   foot?: Foot[] | ((p: Placed) => Shape[]);
   /** The eye cannot see through it. */
@@ -274,6 +284,8 @@ export class Things {
     Object.assign(out, own);
     out.tags = [...new Set([...(parent?.tags ?? []), ...(own.tags ?? [])])];
     if (parent?.states || own.states) out.states = { ...parent?.states, ...own.states };
+    // What can burn can be burning, and burnt (plan B7).
+    if (out.material) out.states = { ...(out.states as Record<string, StateDef> | undefined), ...BURN_STATES };
     out.chain = chain;
     const t = out as unknown as Thing;
     this.made.set(id, t);
