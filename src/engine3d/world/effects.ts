@@ -73,6 +73,7 @@ export class Effects {
       if (k.spreads && w.lights.fireLit({ id: tag.id, kind: tag.kind })) {
         sources.push({ id: tag.id, x: v.x, z: v.z, house: tag.house, level: tag.level, dice: k.spreads });
       }
+      if (k.toughness && states.get(tag.id, tag.kind, 'broken') === true) this.wreck(g);
       if (!k.material) continue;
       groups.set(tag.id, g);
       const burnt = states.get(tag.id, tag.kind, 'burnt') === true;
@@ -210,8 +211,15 @@ export class Effects {
   /** A thing's `burning` or `burnt` changed by hand (set alight, put out): draw it now, not at the next round. */
   refresh(id: string): void {
     const s = this.standing().find((x) => x.tag.id === id);
-    if (!s || !THINGS.has(s.tag.kind) || !THINGS.get(s.tag.kind).material) return;
-    const states = this.w.states;
+    if (!s || !THINGS.has(s.tag.kind)) return;
+    const states = this.w.states, k = THINGS.get(s.tag.kind);
+    if (k.toughness && states.get(id, s.tag.kind, 'broken') === true && !s.g.userData.wrecked) {
+      this.wreck(s.g);
+      // It no longer stands in the way.
+      const at = s.g.getWorldPosition(new THREE.Vector3());
+      this.w.carrying.feetChanged({ x: at.x, z: at.z, house: s.tag.house, level: s.tag.level });
+    }
+    if (!k.material) return;
     if (states.get(id, s.tag.kind, 'burnt') === true) this.char(s.g);
     const dice = Number(states.get(id, s.tag.kind, 'burning'));
     this.show(id, dice, s.g);
@@ -238,6 +246,15 @@ export class Effects {
     const c = box.getCenter(new THREE.Vector3());
     const torch = w.lights.placeTorch(c.x, box.min.y, c.z, null, { size: 0.35 + dice * 0.22, power: 4 + dice * 2, lightY: 0.3 + dice * 0.15 });
     this.flames.set(id, { torch, dice });
+  }
+
+  /** What is smashed lies as wreckage: flattened to the floor, askew (once). */
+  private wreck(g: THREE.Object3D): void {
+    if (g.userData.wrecked) return;
+    g.userData.wrecked = true;
+    g.scale.y *= 0.22;
+    g.rotation.z += 0.12;
+    g.rotation.x -= 0.08;
   }
 
   /** What burnt is black (every part of it; once). */

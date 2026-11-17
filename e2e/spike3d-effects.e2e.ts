@@ -52,6 +52,30 @@ describe('spike3d effects', () => {
     expect(errors).toEqual([]);
   });
 
+  it('a stool smashed lies as wreckage: no longer in the way, not to be sat on', async () => {
+    const { page, errors } = await openPage(env, '/spike3d/?nogov&map=hamlet', { storage: quick });
+    await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 60_000 });
+    const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; return ${fn}; })()`);
+    const stool = (await w(`(() => {
+      const hs = w.standingOf('inn');
+      const g = hs.furniture.find((f) => f.userData.thing && f.userData.thing.kind === 'stool');
+      return w.acting.targetOf(g);
+    })()`)) as { id: string; kind: string; x: number; z: number };
+    const t = JSON.stringify(stool);
+    const blocks = () => w(`(() => { const b = w.moves.byId('inn'); return w.carrying.furnitureRects(b, 0).length; })()`) as Promise<number>;
+    const before = await blocks();
+    const offers = () => w(`w.acting.offersFor(${t}, { id: 'hero', dice: () => ({ n: 3, mod: 0 }) }).map((o) => o.id)`) as Promise<string[]>;
+    expect(await offers()).toContain('verb:smash');
+    const r = (await w(`w.acting.act('verb:smash', ${t}, { id: 'hero', dice: () => ({ n: 10, mod: 0 }) })`)) as { done: boolean; success?: boolean };
+    expect(r).toMatchObject({ done: true, success: true });
+    expect(await w(`w.states.get(${JSON.stringify(stool.id)}, 'stool', 'broken')`)).toBe(true);
+    expect(await blocks()).toBe(before - 1);
+    const after = await offers();
+    expect(after).not.toContain('verb:sit');
+    expect(after).not.toContain('verb:smash');
+    expect(errors).toEqual([]);
+  });
+
   it('out in a storm you get soaked, and stay wet a while under a roof', async () => {
     const { page, errors } = await openPage(env, '/spike3d/?nogov&map=hamlet', { storage: quick });
     await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 60_000 });

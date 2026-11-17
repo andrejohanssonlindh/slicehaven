@@ -2,6 +2,15 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-17 — Effects (B7), fourth slice: things that break
+
+*Your playtest note: stools stacked in a doorway make a wall; Divinity lets you break things.*
+
+- **Smash the …** on standing furniture: a Physique roll, tricky. +6 for something sturdy, −4 for something flimsy. How tough something is comes from its material and weight: a straw pallet 5, a stool 11, a table 18, a bed 20. It's loud, and harm to the owner.
+- **Broken, it lies as wreckage:** flattened and askew, out of everyone's way (the walking grid frees its spot), not to be sat on or picked up. It can still burn.
+- **Not yet:** fences, carts and barrels outdoors; smashing with a weapon in a fight; mending.
+- Tests: 959 unit tests (1 new: how tough things are); a new browser test (a stool smashed: out of the way, no longer a seat).
+
 ## 2026-11-17 — Effects (B7), third slice: getting wet
 
 - **Rain soaks you:** out in it, your clothes are wet (−1D6 against fire) after about two and a half minutes of play and soaked through (−2D6) after five. A storm is twice as fast, and standing out in a downpour counts −4D6 while you're in it, as the rules give.

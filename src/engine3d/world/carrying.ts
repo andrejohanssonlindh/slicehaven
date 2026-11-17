@@ -254,23 +254,32 @@ export class Carrying {
     const out: { x: number; z: number; hw: number; hd: number }[] = [];
     this.w.houseIndex.entry(b.place).room.forEach((r, ri) => {
       if (r.level !== level) return;
-      for (const f of footprints(r.plan)) if (!this.carry.loose[pieceId(b.place.id, ri, f.id)]) out.push(f);
+      for (const f of footprints(r.plan)) {
+        const id = pieceId(b.place.id, ri, f.id), kind = r.models.get(f.id)?.kind;
+        if (!this.carry.loose[id] && !(kind && this.broken(id, kind))) out.push(f);
+      }
     });
-    for (const l of Object.values(this.carry.loose)) {
+    for (const [id, l] of Object.entries(this.carry.loose)) {
       const model = modelOf(THINGS.get(l.kind));
-      if (!model || l.at?.house !== b.place.id || l.at.level !== level) continue;
+      if (!model || l.at?.house !== b.place.id || l.at.level !== level || this.broken(id, l.kind)) continue;
       const p = houseToLocal(b.place, l.at.x, l.at.z);
       out.push({ x: p.x, z: p.z, ...turnedHalf(model.w, model.d, l.at.rot - b.place.rot) });
     }
     return out;
   }
 
+  /** Is it smashed (plan B7)? Wreckage lies flat and stops no one. */
+  private broken(id: string, kind: string): boolean {
+    const s = this.w.states;
+    return s.has(kind, 'broken') && s.get(id, kind, 'broken') === true;
+  }
+
   /** Loose things lying out of doors in a rectangle, as what stops feet. */
   looseOutdoors(x0: number, z0: number, x1: number, z1: number): Shape[] {
     const out: Shape[] = [];
-    for (const l of Object.values(this.carry.loose)) {
+    for (const [id, l] of Object.entries(this.carry.loose)) {
       const at = l.at, model = modelOf(THINGS.get(l.kind));
-      if (!at || at.house || !model || at.x < x0 - 2 || at.x > x1 + 2 || at.z < z0 - 2 || at.z > z1 + 2) continue;
+      if (!at || at.house || !model || at.x < x0 - 2 || at.x > x1 + 2 || at.z < z0 - 2 || at.z > z1 + 2 || this.broken(id, l.kind)) continue;
       out.push({ kind: 'box', x: at.x, z: at.z, hw: model.w / 2, hd: model.d / 2, rot: at.rot });
     }
     return out;

@@ -137,6 +137,8 @@ export interface ThingDef {
    * gets the states `burning` (the fire's dice, 0 when not) and `burnt`. Stone and iron say nothing.
    */
   material?: Material;
+  /** How hard it is to smash (plan B7, things that break): the difficulty of a Physique roll, about. Having it gives the state `broken`. */
+  toughness?: number;
   /** An open fire (a campfire): while lit it sets what stands close alight with this many dice (plan B7). A hearth keeps its fire to itself. */
   spreads?: number;
   /** Carried in the hands, it brings this many dice of water against a fire (a bucket: 3, as the rules give a big bucket). */
@@ -286,6 +288,8 @@ export class Things {
     if (parent?.states || own.states) out.states = { ...parent?.states, ...own.states };
     // What can burn can be burning, and burnt (plan B7).
     if (out.material) out.states = { ...(out.states as Record<string, StateDef> | undefined), ...BURN_STATES };
+    // What can be smashed can be broken.
+    if (out.toughness) out.states = { ...(out.states as Record<string, StateDef> | undefined), broken: { default: false } };
     out.chain = chain;
     const t = out as unknown as Thing;
     this.made.set(id, t);

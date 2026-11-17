@@ -117,6 +117,14 @@ const MATERIAL: Record<string, Material> = {
   rug: 'wool', coalbin: 'wood',
 };
 
+/**
+ * How hard a standing piece is to smash (plan B7, the director's wall of stools): its material's own, and a point for
+ * every 4 kg. A stool about 11, a table 17, a bed 20, a straw pallet 5. Hung and flat pieces aren't smashed.
+ */
+const TOUGH: Record<Material, number> = { straw: 4, cloth: 6, wood: 10, wool: 8, leather: 12 };
+const toughnessOf = (id: string, mount: Mount): number | undefined =>
+  mount === 'floor' && MATERIAL[id] ? TOUGH[MATERIAL[id]] + Math.round((TAKE[id]?.weight ?? 10) / 4) : undefined;
+
 /** What brings water against a fire when carried, in dice (the rules: a big bucket +3D6). */
 const DOUSES: Record<string, number> = { bucket: 3 };
 
@@ -131,6 +139,7 @@ export default [
     return {
       id, is: p.is, look: p.look, furniture: { mount: p.mount, model }, ...(p.gives ? { filament: p.gives } : {}), ...(SEATS[id] ? { seat: SEATS[id] } : {}), ...TAKE[id],
       ...(MATERIAL[id] ? { material: MATERIAL[id] } : {}), ...(DOUSES[id] ? { douses: DOUSES[id] } : {}),
+      ...(toughnessOf(id, p.mount) ? { toughness: toughnessOf(id, p.mount) } : {}),
     };
   }),
 ] satisfies ThingDef[];

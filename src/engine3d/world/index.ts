@@ -343,7 +343,7 @@ export class SpikeWorld {
       for (const hs of this.houses) if (hs.fireOf?.id === c.id) this.housing.showFire(hs);
       this.lights.showPlacedFire(c.id);
       this.lights.syncFires();
-      if (c.key === 'burning' || c.key === 'burnt') this.effects.refresh(c.id);
+      if (c.key === 'burning' || c.key === 'burnt' || c.key === 'broken') this.effects.refresh(c.id);
     });
   }
 

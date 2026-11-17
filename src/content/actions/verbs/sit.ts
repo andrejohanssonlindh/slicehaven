@@ -5,7 +5,7 @@ const sit: VerbDef = {
   id: 'sit',
   label: 'Sit on the {name}',
   on: { has: 'seat' },
-  gates: [{ gate: 'hands-free' }, { gate: 'owner', act: 'sit' }],
+  gates: [{ gate: 'state', key: 'broken', is: false, optional: true }, { gate: 'hands-free' }, { gate: 'owner', act: 'sit' }],
   success: [{ sit: true }],
 };
 

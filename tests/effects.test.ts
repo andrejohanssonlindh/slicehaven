@@ -89,6 +89,19 @@ describe('effects: burning (B7)', () => {
     expect(outWet).toBeGreaterThan(out);
   });
 
+  it('standing furniture can be smashed, harder the sturdier: a pallet, a stool, a table, a bed', () => {
+    const tough = (k: string) => THINGS.get(k).toughness;
+    expect(tough('pallet')).toBe(5);
+    expect(tough('stool')).toBe(11);
+    expect(tough('table')).toBe(18);
+    expect(tough('bed')).toBe(20);
+    expect(THINGS.get('stool').states?.broken).toEqual({ default: false });
+    // A hung shelf and a rug aren't smashed; a hearth isn't either.
+    expect(tough('shelf')).toBeUndefined();
+    expect(tough('rug')).toBeUndefined();
+    expect(tough('hearth')).toBeUndefined();
+  });
+
   it('what has a material can be burning and burnt; what has none (stone, iron, a hearth) cannot', () => {
     expect(THINGS.get('stool').states).toMatchObject({ burning: { default: 0 }, burnt: { default: false } });
     expect(THINGS.get('haybale').material).toBe('straw');

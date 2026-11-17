@@ -45,6 +45,20 @@ export const FACTS: FactDef[] = [
     whenFalse: 'Only once it blazes.',
   },
   {
+    id: 'sturdy',
+    about: 'The thing acted on is sturdy: toughness 15 or more (a table, a bed; plan B7).',
+    holds: (_at, _view, target, world) => !!target && !!world && (world.things.get(target.kind).toughness ?? 0) >= 15,
+    whenTrue: 'Not something this sturdy.',
+    whenFalse: 'Only something sturdy.',
+  },
+  {
+    id: 'flimsy',
+    about: 'The thing acted on is flimsy: toughness 7 or less (straw, a basket; plan B7).',
+    holds: (_at, _view, target, world) => !!target && !!world && (world.things.get(target.kind).toughness ?? 99) <= 7,
+    whenTrue: 'Not something this flimsy.',
+    whenFalse: 'Only something flimsy.',
+  },
+  {
     // A bucket of water in the hands (a kind that `douses`).
     id: 'carrying-water',
     about: 'The doer holds something that brings water against a fire (a bucket).',

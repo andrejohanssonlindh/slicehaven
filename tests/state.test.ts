@@ -15,8 +15,8 @@ const memory = (): Storage => {
 describe('states on placed things (B1)', () => {
   it('come from the kind, inherited: every fire, the hearth and the torch post too, starts lit', () => {
     for (const k of ['hearth', 'oven', 'forge', 'campfire', 'torchpost', 'walltorch']) expect(THINGS.get(k).states?.lit, k).toEqual({ default: true });
-    // A table has no states of its own: only what fire gives anything wooden (B7).
-    expect(Object.keys(THINGS.get('table').states ?? {}).sort()).toEqual(['burning', 'burnt']);
+    // A table has no states of its own: only what fire gives anything wooden, and breaking anything smashable (B7).
+    expect(Object.keys(THINGS.get('table').states ?? {}).sort()).toEqual(['broken', 'burning', 'burnt']);
     expect(THINGS.get('boulder').states).toBeUndefined();
   });
 

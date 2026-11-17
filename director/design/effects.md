@@ -33,8 +33,14 @@ The rules already have most of this **for people**, from the fight rules: *ignit
 - Under a roof you dry in about ten minutes, by a lit fire (a hearth too) in two; out of doors when the rain stops, slower.
 - The *You* sheet says how wet you are. Everyone of the map gets wet the same way. Not saved yet (a reload dries you).
 
+## Things that break (fourth slice, built 2026-11-17)
+*Your playtest note: a wall of stools in a doorway.*
+- A kind with **toughness** can be smashed, and gets the state `broken`. Standing furniture of a material has one: the material's own (straw 4, cloth 6, wool 8, wood 10, leather 12) and a point for every 4 kg. A pallet 5, a stool 11, a table 18, a bed 20.
+- ***Smash the …*:** Physique, tricky; +6 for something sturdy (15 or more), −4 for something flimsy (7 or less). Loud, and harm to the owner.
+- **Broken**, it lies as wreckage (flattened, askew), stops no one's feet, and can't be sat on or picked up. It can still burn.
+- **Not yet:** outdoor props (fences, carts, barrels: they stop feet through another index, which knows no ids), smashing in a fight with a weapon (damage against toughness), mending.
+
 ## Next slices (not built)
-1. **Things that break** (the director's playtest note: a wall of stools in a doorway): damage and toughness on kinds, *broken* as a state, smashed in a fight with a weapon.
-2. **Fear and other effects on the mind** with B8f and magic (B9): a spell is an ability that applies effects.
-3. **People fleeing fire and fetching water** (behaviours).
-4. **Houses burning** (thatch catches, a house fire is 3D6–5D6), grass and trees.
+1. **Fear and other effects on the mind** with B8f and magic (B9): a spell is an ability that applies effects.
+2. **People fleeing fire and fetching water** (behaviours).
+3. **Houses burning** (thatch catches, a house fire is 3D6–5D6), grass and trees.

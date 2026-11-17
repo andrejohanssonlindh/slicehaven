@@ -13,7 +13,8 @@ const state: GateDef = {
   check({ use, target, world }) {
     if (!target) return 'There is nothing here to change.';
     const key = String(use.key);
-    if (!world.states.has(target.kind, key)) return 'That does not change.';
+    // ("optional": a kind that can't be in the state at all passes, as if at its start: what can't break is never broken.)
+    if (!world.states.has(target.kind, key)) return use.optional ? null : 'That does not change.';
     const v = world.states.get(target.id, target.kind, key);
     return (use.is !== undefined ? v === use.is : v !== use.not) ? null : 'It is not so.';
   },
