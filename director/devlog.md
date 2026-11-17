@@ -2,6 +2,13 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-17 — Walking round people (B12), rooms that can't wall a hearth off
+
+- **People are passed, not walked through.** A walk is still planned round walls and furniture. On the way, anyone within about 2 m ahead and close to the line makes the walker step aside, away from them; head on, both step to their own right, so they pass on the same hand. Stepping aside only happens where the floor allows, and the walker slows when it's tight. The step aside fades near the end of the walk, so you still arrive where you tapped. Whoever stands where you're going (to talk, to fight) isn't stepped round. With the keys you can't walk into anyone. This is for everyone, not only you.
+- **Not yet:** two people in a narrow doorway don't wait for each other; they squeeze past slowly.
+- **Rooms:** the room solver now places a piece only where the door still reaches a spot beside everything in the room, so a counter can't wall off a hearth again. Tested for every kind of room at every size.
+- Tests: 949 unit tests (3 new: passing someone, meeting head on, keys); the reach check on every room; browser tests for walking, talking, fights and owners.
+
 ## 2026-11-17 — Your playtest notes outside combat: fixes, and the rest on the plan
 
 *Your notes from the last week or two of play. Everything is sorted [on the plan](todo.md) (the list under "Next up"), with what was fixed and where the rest went.*

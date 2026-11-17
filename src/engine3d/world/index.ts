@@ -310,6 +310,8 @@ export class SpikeWorld {
       },
       furniture: (b, level) => this.carrying.furnitureRects(b, level),
     });
+    // Everyone who walks passes everyone else on the way (B12).
+    this.moves.crowd = () => [this.hero, ...this.cast.map((c) => c.mind.actor)];
 
     // The map's people, each with a mind that follows their schedule. Everyone answers what the hero does wrong as the
     // place's culture says (B3c).

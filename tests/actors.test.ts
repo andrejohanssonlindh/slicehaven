@@ -152,3 +152,42 @@ describe('rounds', () => {
     expect(outdoors).toBeGreaterThan(0);
   });
 });
+
+describe('walking round people (B12)', () => {
+  it('a walker steps round someone standing on their way, keeps clear of them, and still ends where they meant to', () => {
+    const { w } = setup();
+    const a = newActor(40, 40), b = newActor(40, 50);
+    w.crowd = () => [a, b];
+    expect(w.walkTo(a, 40, 60)).not.toBeNull();
+    let closest = Infinity;
+    for (let t = 0; t < 60 && a.legs.length; t += 0.05) {
+      w.step(a, 0.05, 1.4);
+      closest = Math.min(closest, Math.hypot(a.x - b.x, a.z - b.z));
+    }
+    expect(closest).toBeGreaterThan(0.5);
+    expect(Math.hypot(a.x - 40, a.z - 60)).toBeLessThan(0.3);
+  });
+
+  it('two who meet head on pass each other on the same hand', () => {
+    const { w } = setup();
+    const a = newActor(40, 40), b = newActor(40, 56);
+    w.crowd = () => [a, b];
+    w.walkTo(a, 40, 56);
+    w.walkTo(b, 40, 40);
+    let closest = Infinity;
+    for (let t = 0; t < 60 && (a.legs.length || b.legs.length); t += 0.05) {
+      w.step(a, 0.05, 1.4);
+      w.step(b, 0.05, 1.4);
+      closest = Math.min(closest, Math.hypot(a.x - b.x, a.z - b.z));
+    }
+    expect(closest).toBeGreaterThan(0.5);
+  });
+
+  it('keys never walk into someone', () => {
+    const { w } = setup();
+    const a = newActor(40, 40), b = newActor(40, 41);
+    w.crowd = () => [a, b];
+    for (let i = 0; i < 40; i++) w.steer(a, 0, 1, 0.05);
+    expect(Math.hypot(a.x - b.x, a.z - b.z)).toBeGreaterThanOrEqual(0.4);
+  });
+});

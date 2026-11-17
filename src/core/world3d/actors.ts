@@ -39,6 +39,8 @@ export interface Actor {
   legS: number;
   /** The way they last went (world x, z). */
   dir: { x: number; z: number };
+  /** Metres stepped aside from the walk's line to pass someone (plan B12); left out, none. */
+  side?: number;
 }
 
 export const newActor = (x: number, z: number): Actor => ({ x, z, house: null, level: 0, foot: null, stair: null, legs: [], legI: 0, legS: 0, dir: { x: 0, z: 1 } });
@@ -80,9 +82,44 @@ const flatLength = (pts: readonly { x: number; z: number }[]): number => pts.red
 /** Metres to walk along some legs. */
 export const legsLength = (legs: readonly Leg[]): number => legs.reduce((n, l) => n + (l.kind === 'walk' ? pathLength(l.path) : flatLength(l.pts)), 0);
 
+/**
+ * Walking round people (plan B12, the director's playtest notes: everyone walked through everyone). A walk is planned
+ * round walls and furniture only; people move, so they are passed on the way instead: someone standing within
+ * `LOOK` metres ahead and nearer the line than `CLEAR` makes the walker step aside, away from them (head-on, to
+ * their own right, so two who meet pass on the same hand), up to `AWAY` metres off the line, only where the floor
+ * allows; close in with no room to pass, they slow. Near the end of a walk the step aside fades, so they arrive
+ * where they meant to. Keys never walk into a body.
+ */
+export const PASSING = { LOOK: 1.8, CLEAR: 0.62, AWAY: 0.7, SIDESTEP: 1.4, CLOSE: 0.75, SLOW: 0.25, BODY: 0.42 };
+
 export class Walking {
   /** One grid for each storey above the ground of a house that has them (made when first asked). */
   private readonly upper = new Map<string, NavGrid[]>();
+  /** Everyone who walks on this map (the hero and the map's people), to be passed on the way; null: nobody is. */
+  crowd: (() => readonly Actor[]) | null = null;
+
+  /** Who stands near `a` on the same floor (not on stairs), within `r` metres. */
+  private near(a: Actor, r: number): Actor[] {
+    if (!this.crowd) return [];
+    return this.crowd().filter((o) => o !== a && !o.stair && !a.stair && o.house === a.house && o.level === a.level && Math.abs(o.x - a.x) < r && Math.abs(o.z - a.z) < r);
+  }
+
+  /**
+   * Who is in the way going along (dx, dz) from where `a` stands (ahead, or still alongside, being passed): how far
+   * ahead and how far off their line (to the left, +), the nearest; null if nobody.
+   */
+  private blocker(a: Actor, dx: number, dz: number, end: P2 | null): { ahead: number; lat: number; still: boolean } | null {
+    let best: { ahead: number; lat: number; still: boolean } | null = null;
+    for (const o of this.near(a, PASSING.LOOK + 1)) {
+      // Whoever stands where the walk ends is who they're going to (to talk, to fight): not someone to pass.
+      if (end && Math.hypot(o.x - end.x, o.z - end.z) < 1.5) continue;
+      const rx = o.x - a.x, rz = o.z - a.z;
+      const ahead = rx * dx + rz * dz, lat = rx * -dz + rz * dx;
+      if (ahead <= -0.4 || ahead > PASSING.LOOK || Math.abs(lat) > PASSING.CLEAR) continue;
+      if (!best || ahead < best.ahead) best = { ahead, lat, still: !o.legs.length };
+    }
+    return best;
+  }
 
   constructor(readonly ground: NavGrid, private readonly size: number, private readonly houses: WalkHouses) {}
 
@@ -199,13 +236,46 @@ export class Walking {
   step(a: Actor, dt: number, speed: number): Pose | null {
     this.settle(a);
     if (!a.legs.length) return null;
-    a.legS += dt * speed;
     const leg = a.legs[a.legI];
+    // Passing people (B12): step aside from whoever is in the way, or slow when there's no room yet.
+    let pace = 1;
+    let side = a.side ?? 0;
+    if (leg.kind === 'walk' && this.crowd) {
+      const last = a.legI === a.legs.length - 1;
+      const left = pathLength(leg.path) - a.legS;
+      const fin = a.legs[a.legs.length - 1];
+      const b = this.blocker(a, a.dir.x, a.dir.z, fin.kind === 'walk' ? fin.path[fin.path.length - 1] : null);
+      // (Arriving, nobody is passed any more: the walk ends where it was meant to.)
+      let want = 0;
+      if (b && !(last && left < 1.2)) {
+        const away = Math.abs(b.lat) < 0.12 ? -1 : -Math.sign(b.lat);
+        want = Math.max(-PASSING.AWAY, Math.min(PASSING.AWAY, side + away * (PASSING.CLEAR - Math.abs(b.lat) + 0.05)));
+        if (b.still && b.ahead > 0 && b.ahead < PASSING.CLOSE) pace = PASSING.SLOW;
+      }
+      const d = want - side, max = PASSING.SIDESTEP * dt;
+      side += Math.max(-max, Math.min(max, d));
+    }
+    a.legS += dt * speed * pace;
     let p: { x: number; z: number; dx: number; dz: number; done: boolean };
     if (leg.kind === 'walk') {
       p = followPath(leg.path, a.legS);
       a.foot = null;
+      if (side) {
+        // Off the line only where the floor allows it; else as far as it does.
+        const nav = this.nav(leg.house ? this.houses.byId(leg.house) : null, leg.level);
+        for (let k = 0; k < 4 && side; k++) {
+          const sx = p.x - p.dz * side, sz = p.z + p.dx * side;
+          if (nav.walkable(sx, sz)) {
+            p = { ...p, x: sx, z: sz };
+            break;
+          }
+          side = k < 3 ? side / 2 : 0;
+        }
+      }
+      a.side = side || undefined;
+      if (p.done) a.side = undefined;
     } else {
+      a.side = undefined;
       const c = followClimb(leg.pts, a.legS);
       p = c;
       a.foot = c.y;
@@ -289,9 +359,13 @@ export class Walking {
       }
     }
     const nav = this.nav(b, a.level);
+    // (Never into someone: a step that ends inside a body and nearer them than before is not taken, B12.)
+    const others = this.near(a, 2);
+    const intoSomeone = (nx: number, nz: number): boolean =>
+      others.some((o) => Math.hypot(o.x - nx, o.z - nz) < PASSING.BODY && Math.hypot(o.x - nx, o.z - nz) < Math.hypot(o.x - a.x, o.z - a.z));
     for (const [sx, sz] of [[1, 1], [1, 0], [0, 1]]) {
       const nx = a.x + wx * step * sx, nz = a.z + wz * step * sz;
-      if (nav.walkable(nx, nz)) {
+      if (nav.walkable(nx, nz) && !intoSomeone(nx, nz)) {
         a.x = nx;
         a.z = nz;
         break;
