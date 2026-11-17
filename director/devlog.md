@@ -2,6 +2,16 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-17 — Injuries you can see: exhaustion, hurt limbs, blood
+
+- **Your three questions, all yes, and built** ([how](design/animation.md#injuries-you-can-see-your-follow-up-built-the-same-day)). The rules didn't change: they already kept fatigue, wounds per part and bleeding. Now it shows.
+- **Exhaustion in bands:** fresh (0–10), winded (11–20), worn (21–30), spent (31+). The more tired, the more bent over, the lower the guard, the harder the breath, the more they rock on their feet. I added the 21–30 step between your 11–20 and 30+; the bands are four numbers in one file if you want them elsewhere.
+- **A hurt arm** is held in across the belly and strikes weakly. **A hurt leg** limps (a stiff knee, a dip and a lurch on each step on it), and standing, the weight stays on the good leg.
+- **Blood:** the wounded part reddens; whoever bleeds drips, and the drops stain the ground: a pool where they stand or lie, a trail where they walk. Stains dry away in four minutes.
+- **See it:** `/models/` → new buttons *Fatigue*, *Hurt*, *Bleeding* (with Standing, Walking, On guard). In play: the arena.
+- **Not yet:** stains aren't saved, rain doesn't wash them (effects, B7), a lost limb is still drawn.
+- Tests: 4 new unit tests (the bands, reading the limbs, spent, hurt arm and leg); fight, save, walk and models browser tests.
+
 ## 2026-11-17 — How bodies move: the animator
 
 - **Your ask:** movement was robotic; a better framework with a skeleton, slight movement standing still and in combat, something to build on. **The framework held** (a skeleton, movement as data), so it's built on, not replaced. What was missing sat between the data and the screen. [The design, and how to add to it](design/animation.md).

@@ -1,5 +1,6 @@
+import type { Condition } from './condition';
 import { DEFAULT_BLEND, type Motion, type MotionRoot, overPose, sampleMotion } from './motion';
-import { type Cycle, type Joint, type Pose, type Turns, addPose, blendPose, cyclePose, scalePose } from './pose';
+import { type Cycle, type Joint, type Pose, type Turn, type Turns, addPose, blendPose, cyclePose, mirrorPose, scalePose } from './pose';
 
 /**
  * The animator: what a body shows each frame, put together in layers from data. Pure: the engine keeps one `AnimState`
@@ -53,6 +54,23 @@ export interface Life {
   look: { seconds: number; yaw: number; pitch: number; reach: number; lead: number; settle: number };
 }
 
+/**
+ * How a body's condition shows (`Condition`, from the rules' injuries; data: `WEAR` in `content/people/condition.ts`):
+ * what being spent, a hurt arm and a hurt leg do to whatever the body is doing.
+ */
+export interface Wear {
+  /** Added to the pose by how tired they are (all of it when spent): bent over, the guard sunk. */
+  spent: Pose;
+  /** How hard the spent breathe (0–1, as effort), and how much more they rock on their feet. */
+  breath: number;
+  sway: number;
+  /** Where a hurt left arm is held (mirrored for the right), and how much of the pose a useless one takes. */
+  arm: Turns;
+  armHold: number;
+  /** A hurt leg: how much the weight is kept off it, how stiff its knee is in a step, and the dip and lurch of a step on it. */
+  leg: { favour: number; stiff: number; dip: number; lurch: number };
+}
+
 /** A person's own way of moving: the same data played a little differently for each. */
 export interface Manner {
   /** How fast their slow loops run (1 typical). */
@@ -101,6 +119,8 @@ export interface AnimState {
   going: number;
   /** How hard they have been working (0–1): rises fast, fades slowly. */
   effort: number;
+  /** How tired they show (0–1), eased toward their condition's, so a new band of fatigue comes on over a moment. */
+  tired: number;
   /** Their own clocks: the breath's (it runs faster with effort) and the slow loops'. */
   breath: number;
   clock: number;
@@ -118,7 +138,7 @@ export interface AnimState {
 }
 
 export const newAnim = (manner: Manner): AnimState => ({
-  phase: manner.phase, speed: 0, going: 0, effort: 0, breath: manner.phase * 7, clock: manner.phase * 50,
+  phase: manner.phase, speed: 0, going: 0, effort: 0, tired: -1, breath: manner.phase * 7, clock: manner.phase * 50,
   lookYaw: 0, lookPitch: 0, key: '', leave: 0, from: null, since: 0, blend: 0, last: null,
 });
 
@@ -126,6 +146,7 @@ export interface AnimLib {
   /** Slowest first. */
   gaits: readonly Gait[];
   life: Life;
+  wear: Wear;
 }
 
 export interface AnimInput {
@@ -144,6 +165,8 @@ export interface AnimInput {
   turning?: number;
   /** Something to look at, as a direction from the body's facing (radians: to its left, and upward). */
   look?: { yaw: number; pitch: number } | null;
+  /** The shape they are in (tired, a hurt arm or leg); left out, fit. */
+  condition?: Condition | null;
   manner: Manner;
 }
 
@@ -215,7 +238,11 @@ function lifePose(s: AnimState, lib: AnimLib, inp: AnimInput, full: number): Pos
 
     // Weight from foot to foot: the hips move over one foot and drop on the other side, the legs lean to keep the
     // feet where they are, the free knee eases, the shoulders tip the other way and the head stays upright.
-    const w = drift(s.clock / L.sway.seconds, m.phase) * st.sway * still * size * full;
+    // The spent rock more; a hurt leg keeps the weight on the other one (unless seated).
+    const c = inp.condition, W = lib.wear;
+    const favour = c ? clamp((c.legR - c.legL) * W.leg.favour, -1, 1) * Math.min(1, st.sway * 3) : 0;
+    const rock = drift(s.clock / L.sway.seconds, m.phase) * st.sway * size * (1 + Math.max(0, s.tired) * (W.sway - 1));
+    const w = clamp(rock * (1 - Math.abs(favour) * 0.75) + favour, -1.6, 1.6) * still * full;
     if (w !== 0) {
       const sx = w * L.sway.shift, lean = Math.asin(clamp(sx / 0.5, -1, 1)), roll = w * L.sway.roll;
       shiftX = sx;
@@ -255,6 +282,46 @@ function lifePose(s: AnimState, lib: AnimLib, inp: AnimInput, full: number): Pos
   return { joints, lift, shift: [shiftX, 0] };
 }
 
+const ARM_JOINTS = { L: ['shoulderL', 'elbowL', 'wristL'], R: ['shoulderR', 'elbowR', 'wristR'] } as const;
+const ZERO: Turn = [0, 0, 0];
+
+/**
+ * A step on a hurt leg: its knee hardly bends, and while it bears the weight the body dips and lurches over it. `bear`
+ * is how much each leg bears now (the right from its heel coming down, the first half of the loop; then the left).
+ */
+function limp(pose: Pose, c: Condition, W: Wear, phase: number, going: number): Pose {
+  if (going <= 0 || (c.legL <= 0 && c.legR <= 0)) return pose;
+  const wave = Math.sin(TAU * phase);
+  const joints: { [J in Joint]?: Turn } = { ...pose.joints };
+  let lift = pose.lift ?? 0, lurch = 0;
+  for (const [side, hurt, bear, sign] of [['L', c.legL, Math.max(0, -wave), -1], ['R', c.legR, Math.max(0, wave), 1]] as const) {
+    if (hurt <= 0) continue;
+    const knee = joints[`knee${side}`] ?? ZERO, k = 1 - W.leg.stiff * hurt * going;
+    joints[`knee${side}`] = [knee[0] * k, knee[1], knee[2]];
+    lift -= W.leg.dip * hurt * bear * going;
+    lurch += sign * W.leg.lurch * hurt * bear * going;
+  }
+  const spine = joints.spine ?? ZERO;
+  joints.spine = [spine[0] + Math.abs(lurch) * 0.5, spine[1], spine[2] + lurch];
+  return { ...pose, joints, lift };
+}
+
+/** A hurt arm does less of what the body asks of it, and is held in across the belly instead. */
+function nurse(pose: Pose, c: Condition, W: Wear): Pose {
+  if (c.armL <= 0 && c.armR <= 0) return pose;
+  const joints: { [J in Joint]?: Turn } = { ...pose.joints };
+  const held = { L: W.arm, R: mirrorPose({ joints: W.arm }).joints };
+  for (const [side, hurt] of [['L', c.armL], ['R', c.armR]] as const) {
+    const k = hurt * W.armHold;
+    if (k <= 0) continue;
+    for (const j of ARM_JOINTS[side]) {
+      const a = joints[j] ?? ZERO, b = held[side][j] ?? ZERO;
+      joints[j] = [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
+    }
+  }
+  return { ...pose, joints };
+}
+
 /**
  * Move one person's animation on by a frame and say what to show. `s` is changed in place (it is working state).
  */
@@ -272,13 +339,18 @@ export function animate(s: AnimState, lib: AnimLib, inp: AnimInput): Shown {
   s.phase += moved / Math.max(0.05, gait.stride * inp.hip);
 
   // Effort comes quickly and goes slowly; the breath runs on its own clock so its speed can change without a jump.
-  const work = Math.max(stance.effort, gait.effort * s.going);
+  // How tired they show comes on over a moment (at once the first time: someone met already spent is spent).
+  const cond = inp.condition ?? null, W = lib.wear;
+  const tired = cond?.tired ?? 0;
+  s.tired = s.tired < 0 ? tired : s.tired + (tired - s.tired) * toward(dt, 1.2);
+  const work = Math.max(stance.effort, gait.effort * s.going, s.tired * W.breath);
   s.effort += (work - s.effort) * toward(dt, work > s.effort ? 2.5 : 9);
   s.breath += (dt * manner.tempo * (1 + s.effort * 1.2)) / L.breath.seconds;
   s.clock += dt * manner.tempo;
 
   // 1–2. Stance and gait, then what the arms hold.
   let pose = blendPose(cyclePose(stance.loop, s.clock / stance.seconds), gait.pose, smooth(s.going));
+  if (cond) pose = limp(pose, cond, W, s.phase, smooth(s.going));
   if (inp.hold) pose = { ...pose, joints: { ...pose.joints, ...inp.hold.joints } };
 
   // 3. A motion over it.
@@ -297,6 +369,8 @@ export function animate(s: AnimState, lib: AnimLib, inp: AnimInput): Shown {
   const wantPitch = inp.look ? clamp(-inp.look.pitch, -0.6, 0.6) : glance(t * 0.7, manner.phase * 97 + 5) * L.look.pitch * stance.look * still;
   s.lookYaw += (wantYaw * full - s.lookYaw) * toward(dt, L.look.settle);
   s.lookPitch += (wantPitch * full - s.lookPitch) * toward(dt, L.look.settle);
+  // Their condition, on someone up and about: a hurt arm nursed, the spent bent over.
+  if (full && cond) pose = addPose(nurse(pose, cond, W), W.spent, s.tired);
   if (life !== 'none') pose = addPose(pose, lifePose(s, lib, inp, full));
 
   // A change never snaps: ease out of what was last shown.

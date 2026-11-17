@@ -34,10 +34,26 @@ The engine only says what the person is doing (how far they moved, seated or fig
 | A way of moving (sneak, limp, trudge with a load, sprint) | A `Gait` in the same file: four poses, the speed it is for, its stride. Gaits are blended by speed today; choosing one by state (sneaking, a hurt leg) is one small input to add when the first one comes |
 | A thing held differently (a torch up, a bow, a tray) | A hold in `HOLDS` |
 | A one-off movement (get up, pick up, wave, drink, cast a spell) | A motion file in `content/motions/`, as before; now with `ease` on keys, `blend`/`leave` seconds, and `life` |
-| A new small movement (shivering in rain, a limp, trembling when afraid) | A layer in `lifePose` with its sizes in `LIFE`. This is where **effects (B7)** will show on a body |
+| A new small movement (shivering in rain, trembling when afraid) | A layer in `lifePose` with its sizes in `LIFE`. This is where **effects (B7)** will show on a body |
+| A new way a condition shows (a wince of pain, a hunch over broken ribs, blindness groping) | A field on `Condition` (`core/world3d/condition.ts`, read from the injuries) and its sizes in `WEAR` |
 | A kind of person carrying themselves differently (the old stoop, a guard stands straight) | `Manner` is from the seed today; a kind can give its own later (a property on the kind, not an `if`) |
 
 **Judge it on `/models/`:** People → the second button cycles *Standing, Walking, Running, On guard*; Motions plays any motion over the fighting stance, slowed down.
+
+## Injuries you can see (your follow-up, built the same day)
+*"Is it possible to wire in so that injuries, for example to an arm or a leg, are visible in the animations? Could we add states for the resting movement in combat based on exhaustion, perhaps 0–10, 11–20, 30+? Could we add visual bleeding?"* Yes to all three. Nothing in the rules changed: the rules already keep fatigue, wounds per body part, breaks, lost parts and bleeding for everyone. A small pure step (`core/world3d/condition.ts`) turns that into **the shape a body is in**, and the animator and the engine show it.
+
+| What | How it shows | Where the numbers are |
+|---|---|---|
+| **Exhaustion, in bands of fatigue:** fresh 0–10, winded 11–20, worn 21–30, spent 31+ | More and more bent over from the waist, head hanging, shoulders rounded, **the guard sinking** (the weapon drops toward the ground), lower on the legs, rocking on the feet, breathing hard. A new band comes on over a second or so. It shows outside fights too, walking included | `TIRED_BANDS` and `WEAR.spent` in `content/people/condition.ts` |
+| **A hurt arm** (by thirds per wound; broken or lost is useless) | Held in across the belly, and it does less of whatever the body asks: a strike with a wounded sword arm is a weak, short one | `WEAR.arm`, `armHold` |
+| **A hurt leg** | Standing, the weight stays on the good leg and the hurt knee hangs easy. Walking, **a limp**: the hurt knee hardly bends, and each step on it dips and lurches over it | `WEAR.leg` |
+| **Blood on the body** | The wounded part's clothes and skin redden with each wound, more while it bleeds | `stains` in the condition; `rig.stain` |
+| **Bleeding** | Drops fall from the worst wound, faster the faster the rules say they bleed, and **stain the ground**; standing or lying still, the stains grow into a pool; walking leaves a trail. Stains dry away after four minutes. The dead stop bleeding | `engine3d/blood.ts`; the world's part `engine3d/world/bleeding.ts` |
+
+**See it:** `/models/` → three new buttons: *Fatigue* (the four bands), *Hurt* (each arm and leg, the body, the head), *Bleeding*. They work with Standing, Walking, Running and On guard, and in the Motions view. In play: the arena, as the fight wears on.
+
+**Limits for now:** stains aren't saved (a reload cleans the sand) and rain doesn't wash them (that's an effect, B7). A lost limb is still drawn (bodies can't lose parts yet). A wounded head or body reddens but changes no movement; pain could be a wince or a hunch when wanted. Exactly which wound bleeds isn't kept by the rules, so blood runs from the most-wounded part.
 
 ## Not done, on purpose
 - **Feet aren't pinned to the ground** (no leg solver). They slide a little when a stance changes, and don't adapt to slopes or stairs. A two-bone leg solver is the natural next step if it shows.

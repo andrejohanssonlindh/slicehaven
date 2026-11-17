@@ -211,6 +211,8 @@ export class Figures {
         motion: m && pl ? { motion: m, t: time - pl.since } : null,
         turning,
         look: this.lookOf(p.id, f),
+        // The shape they are in (tired, a hurt arm or leg), from what fights have done to them.
+        condition: w.bleeding.conditionOf(p.id, f),
         manner: f.manner,
       });
       placeRoot(f.rig, shown.root, f.yaw);

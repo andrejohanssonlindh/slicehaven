@@ -1,5 +1,6 @@
 import type { AnimLib, Gait, Life, Stance } from '../../core/world3d/animate';
 import { type Cycle, type Pose, type Turns, mirrorPose } from '../../core/world3d/pose';
+import { WEAR } from './condition';
 
 /**
  * How bodies stand and move, as data for the animator (`core/world3d/animate.ts`): **stances** (ways of being still),
@@ -155,7 +156,7 @@ export const LIFE: Life = {
 };
 
 /** Everything the animator needs besides the person. */
-export const ANIM: AnimLib = { gaits: GAITS, life: LIFE };
+export const ANIM: AnimLib = { gaits: GAITS, life: LIFE, wear: WEAR };
 
 /** The walk's loop on its own (tests, and anything that wants just the steps). */
 export const WALK_LOOP: Cycle = WALK.loop;

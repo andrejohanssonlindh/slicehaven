@@ -34,6 +34,7 @@ import { Acting } from './acting';
 import { Carrying } from './carrying';
 import { Pack } from './pack';
 import { Fights } from './fights';
+import { Bleeding } from './bleeding';
 import { Figures, personFigure } from './figures';
 import { Filaments } from './filaments';
 import { Gear } from './gear';
@@ -62,7 +63,8 @@ export type { Figure, Person, WorldSettings } from './types';
  *
  * - Drawing: `streaming.ts` (chunks round the view), `houses.ts`, `trees.ts`, `props.ts`, `grass.ts`, `shells.ts`,
  *   `lights.ts` (every flame and the pool of lights), `sky.ts` (sun, fog, mist, wind, lightning, rain, smoke),
- *   `sight.ts` (what the hero sees), `filaments.ts` (the field fed and shown), `figures.ts` (bodies and motions).
+ *   `sight.ts` (what the hero sees), `filaments.ts` (the field fed and shown), `figures.ts` (bodies and motions),
+ *   `bleeding.ts` (what injuries look like: the condition a body shows, blood on it and on the ground).
  * - Doing: `acting.ts` (taps and the action frame), `schedule.ts` (the people's day), `senses.ts` (seeing, hearing,
  *   noticing), `owners.ts` (whose things are, the scale), `talking.ts`, `journal.ts` (leads), `carrying.ts`,
  *   `gear.ts` (what is held), `pack.ts` (pockets and the pack), `fights.ts`.
@@ -209,6 +211,7 @@ export class SpikeWorld {
 
   // --- the parts ---
   readonly figures = new Figures(this);
+  readonly bleeding = new Bleeding(this);
   readonly fights = new Fights(this);
   readonly gear = new Gear(this);
   readonly carrying = new Carrying(this);
@@ -726,6 +729,7 @@ export class SpikeWorld {
     this.noticeTried = { ...s.noticed?.tried };
     // What fights left: those knocked out or killed lie where they fell (B8a).
     this.hurt = s.hurt ? structuredClone(s.hurt) : {};
+    this.bleeding.blood.clear();
     this.fights.layDown();
     this.carry = s.carry ? structuredClone(s.carry) : newCarry();
     this.standing = s.standing ? structuredClone(s.standing) : newStanding();
@@ -790,6 +794,7 @@ export class SpikeWorld {
       this.focus.z += (tz - this.focus.z) * k;
     }
     this.figures.step(dt);
+    this.bleeding.step(dt);
 
     this.placeCamera();
     this.updateSee();

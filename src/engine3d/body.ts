@@ -17,6 +17,10 @@ export const BODY_SHELLS = [
   { layer: 2, offset: 0.04, density: 0.22, tint: 0.88 },
 ];
 
+/** The colour of blood on a body, and how much of a soaked part it covers. */
+const BLOOD = new THREE.Color('#8a1010');
+const BLOOD_COVER = 0.8;
+
 const OPTS = { ao: true, wettable: true } as const;
 let shared: { base: THREE.MeshLambertMaterial; shells: THREE.MeshLambertMaterial[] } | null = null;
 
@@ -76,6 +80,10 @@ export interface BodyRig {
   /** The left forearm: a shield is worn on it (plan B8a), at the middle of the forearm, in the forearm's space. */
   left: THREE.Object3D;
   pose(p: Pose): void;
+  /** Where a joint is now, in the world (into `out`): where blood runs from. */
+  jointWorld(j: Joint, out: THREE.Vector3): THREE.Vector3;
+  /** Blood on the body: each joint's parts reddened by this much (0 clean … 1 soaked); joints left out are clean. */
+  stain(marks: Partial<Record<Joint, number>>): void;
   /** Show 0, 1 or 2 shell layers. */
   setShells(n: number): void;
   dispose(): void;
@@ -130,6 +138,25 @@ export function makeBodyRig(model: BodyModel): BodyRig {
         bones[i].rotation.set(t?.[0] ?? 0, t?.[1] ?? 0, t?.[2] ?? 0);
       });
       root.position.set((p.shift?.[0] ?? 0) * model.height, rootY + (p.lift ?? 0) * model.height, (p.shift?.[1] ?? 0) * model.height);
+    },
+    jointWorld(j: Joint, out: THREE.Vector3) {
+      return bones[JOINTS.indexOf(j)].getWorldPosition(out);
+    },
+    stain(marks) {
+      for (const geo of new Set(geos)) {
+        const col = geo.getAttribute('color') as THREE.BufferAttribute, bone = geo.getAttribute('skinIndex');
+        const clean = (geo.userData.clean ??= Float32Array.from(col.array as Float32Array)) as Float32Array;
+        const out = col.array as Float32Array;
+        for (let v = 0; v < col.count; v++) {
+          const k = Math.min(1, marks[JOINTS[bone.getX(v)]] ?? 0) * BLOOD_COVER;
+          // Blood keeps a little of the shading under it.
+          const shade = 0.5 + 0.5 * Math.max(clean[v * 3], clean[v * 3 + 1], clean[v * 3 + 2]);
+          out[v * 3] = clean[v * 3] + (BLOOD.r * shade - clean[v * 3]) * k;
+          out[v * 3 + 1] = clean[v * 3 + 1] + (BLOOD.g * shade - clean[v * 3 + 1]) * k;
+          out[v * 3 + 2] = clean[v * 3 + 2] + (BLOOD.b * shade - clean[v * 3 + 2]) * k;
+        }
+        col.needsUpdate = true;
+      }
     },
     setShells(n: number) {
       shellMeshes.forEach((m, i) => { m.visible = i < n; });

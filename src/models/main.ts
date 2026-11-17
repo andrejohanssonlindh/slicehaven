@@ -4,7 +4,12 @@ import { bodySpecOf } from '../content/people/bodies';
 import { ANIM, GAITS, HOLDS, READY, STAND } from '../content/people/poses';
 import { MOTIONS } from '../content/motions';
 import type { PersonSpec } from '../core/persons';
+import { TIRED_BANDS } from '../content/people/condition';
+import { type BodyPart, unhurt } from '../core/damage';
 import { type AnimState, type Manner, animate, mannerOf, newAnim } from '../core/world3d/animate';
+import { type Condition, PART_JOINTS, conditionOf } from '../core/world3d/condition';
+import type { Joint } from '../core/world3d/pose';
+import { Blood } from '../engine3d/blood';
 import { buildBody } from '../core/world3d/body';
 import { BODY_SHELLS, type BodyRig, holdOnRig, makeBodyRig, placeRoot } from '../engine3d/body';
 import { WORLD, lit } from '../engine3d/materials';
@@ -62,7 +67,26 @@ let rigs: { rig: BodyRig; x: number; z: number; manner: Manner; anim: AnimState 
 /** What the people on the stands do: stand at ease, walk, run, or stand on guard. */
 type Doing = 'stand' | 'walk' | 'run' | 'guard';
 const DOINGS: Doing[] = ['stand', 'walk', 'run', 'guard'];
-const state = { turning: true, doing: 'stand' as Doing, shells: 2, angle: 0, zoom: 1 };
+/** What can be shown hurt (badly: two wounds), for judging how a condition looks. */
+const HURTS: (BodyPart | null)[] = [null, 'leftArm', 'rightArm', 'leftLeg', 'rightLeg', 'torso', 'head'];
+const state = { turning: true, doing: 'stand' as Doing, shells: 2, angle: 0, zoom: 1, tired: 0, hurt: null as BodyPart | null, bleed: false };
+const blood = new Blood();
+const spot3 = new THREE.Vector3();
+
+/** The condition the gallery shows, made the way the world makes it: from injuries as the rules keep them. */
+let condition: Condition = conditionOf(null, TIRED_BANDS);
+function setCondition(): void {
+  const inj = unhurt();
+  inj.fatigue = TIRED_BANDS[state.tired].from;
+  if (state.hurt) inj.wounds[state.hurt] = 2;
+  if (state.bleed) inj.bleed = { rate: 2, diff: 10 };
+  condition = conditionOf(inj, TIRED_BANDS);
+  const marks: Partial<Record<Joint, number>> = {};
+  for (const [part, k] of Object.entries(condition.stains) as [BodyPart, number][]) for (const j of PART_JOINTS[part]) marks[j] = k;
+  rigs.forEach((r) => r.rig.stain(marks));
+  actor?.stain(marks);
+  if (!state.bleed) blood.clear();
+}
 const ZOOMS = [24, 32, 48, 64];
 const list = document.getElementById('cast')!;
 
@@ -228,6 +252,15 @@ const DOING_NAMES: Record<Doing, () => string> = {
   guard: () => t('models.guard', 'On guard'),
 };
 toggle(() => DOING_NAMES[state.doing](), () => state.doing !== 'stand', () => { state.doing = DOINGS[(DOINGS.indexOf(state.doing) + 1) % DOINGS.length]; });
+toggle(() => t('models.cond', 'Fatigue: {band}', { band: `${TIRED_BANDS[state.tired].name} (${TIRED_BANDS[state.tired].from}+)` }), () => state.tired > 0, () => {
+  state.tired = (state.tired + 1) % TIRED_BANDS.length;
+  setCondition();
+});
+toggle(() => t('models.hurt', 'Hurt: {part}', { part: state.hurt ?? t('models.nohurt', 'nothing') }), () => !!state.hurt, () => {
+  state.hurt = HURTS[(HURTS.indexOf(state.hurt) + 1) % HURTS.length];
+  setCondition();
+});
+toggle(() => t('models.bleed', 'Bleeding'), () => state.bleed, () => { state.bleed = !state.bleed; setCondition(); });
 toggle(() => t('models.shells', 'Shells {n}', { n: state.shells }), () => state.shells > 0, () => {
   state.shells = (state.shells + 1) % 3;
   rigs.forEach((r) => r.rig.setShells(state.shells));
@@ -259,6 +292,7 @@ function buildActor(): void {
     holdOnRig(actor, thingGroup(model.draw(1)), { grip: model.grip, shield: !!kind.shield });
   }
   scene.add(actor.group);
+  setCondition();
   view.t = 0;
 }
 
@@ -347,16 +381,25 @@ function stepMotion(dt: number): void {
     stance: READY,
     hold: view.held && !THINGS.get(view.held).shield ? HOLDS.wield : null,
     motion: m ? { motion: m, t: Math.min(view.t, m.seconds) } : null,
+    condition,
     manner: actorManner,
   });
   actor.pose(shown.pose);
   placeRoot(actor, shown.root, state.angle);
+  drip('actor', actor, dt);
   if (!m) return;
   const k = m.seconds > 0 ? Math.min(1, view.t / m.seconds) : 1;
   const hit = Object.entries(m.marks ?? {}).filter(([, at]) => Math.abs(at - k) < 0.06).map(([n]) => n);
   nowLine.textContent = `${(Math.min(view.t, m.seconds)).toFixed(2)} s${hit.length ? ` · ${hit.join(', ').toUpperCase()}` : ''}`;
   nowLine.classList.toggle('mark', hit.length > 0);
   if (nowLine.parentElement !== list) list.prepend(nowLine);
+}
+
+/** Blood runs from a bleeding body's wound to the ground under it. */
+function drip(id: string, rig: BodyRig, dt: number): void {
+  if (condition.bleed <= 0) return;
+  rig.group.updateWorldMatrix(true, true);
+  blood.bleed(id, rig.jointWorld(condition.bleedFrom, spot3), 0, condition.bleed, dt);
 }
 
 // --- the loop ---
@@ -384,14 +427,18 @@ function loop(now: number): void {
       hip: r.rig.model.joints.root.at[1],
       stance: state.doing === 'guard' ? READY : STAND,
       motion: state.doing === 'guard' ? { motion: MOTIONS.guard, t: 0 } : null,
+      condition,
       manner: r.manner,
     });
     r.rig.pose(shown.pose);
+    drip(`stand${r.x},${r.z}`, r.rig, dt);
   }
+  blood.step(dt);
   pipeline.render(scene, camera, new THREE.Vector2(0, 0), 1 / ZOOMS[state.zoom]);
   requestAnimationFrame(loop);
 }
 
+scene.add(blood.group);
 build();
 buildFurniture();
 buildActor();
@@ -400,5 +447,5 @@ fillList();
 centre();
 fit();
 new ResizeObserver(fit).observe(stage);
-(window as unknown as { models: unknown }).models = { rigs, furnItems, state, view, build, BODY_SHELLS, pipeline, target, placeCamera, get show() { return show; }, get actor() { return actor; } };
+(window as unknown as { models: unknown }).models = { rigs, furnItems, state, view, build, setCondition, blood, BODY_SHELLS, pipeline, target, placeCamera, get show() { return show; }, get actor() { return actor; } };
 requestAnimationFrame((n) => { last = n; loop(n); });

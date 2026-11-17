@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { MOTIONS } from '../src/content/motions';
+import { TIRED_BANDS } from '../src/content/people/condition';
 import { ANIM, GAITS, HOLDS, READY, SIT, STAND } from '../src/content/people/poses';
+import { type Injuries, unhurt } from '../src/core/damage';
+import { type Condition, conditionOf } from '../src/core/world3d/condition';
 import { type AnimInput, type AnimState, type Shown, animate, mannerOf, newAnim } from '../src/core/world3d/animate';
 import { type Motion, sampleMotion } from '../src/core/world3d/motion';
 import { JOINTS, type Joint, type Pose, addPose, blendPose, mirrorPose } from '../src/core/world3d/pose';
@@ -143,6 +146,77 @@ describe('the animator', () => {
     const held = run(s, 2, { hold: HOLDS.carry, moved: 1.4 / 60 });
     expect(turn(held.pose, 'shoulderL')).toBeLessThan(-0.6);
     expect(Math.abs(turn(held.pose, 'hipL')) + Math.abs(turn(held.pose, 'hipR'))).toBeGreaterThan(0.1);
+  });
+});
+
+describe('a body\'s condition', () => {
+  const hurt = (f: (i: Injuries) => void): Condition => {
+    const i = unhurt();
+    f(i);
+    return conditionOf(i, TIRED_BANDS);
+  };
+
+  it('fatigue falls in the director\'s bands: 0–10, 11–20, 21–30, over 30', () => {
+    expect(TIRED_BANDS.map((b) => b.from)).toEqual([0, 11, 21, 31]);
+    expect(conditionOf(null, TIRED_BANDS).tired).toBe(0);
+    expect(hurt((i) => { i.fatigue = 10; }).band).toBe('fresh');
+    expect(hurt((i) => { i.fatigue = 11; }).band).toBe('winded');
+    expect(hurt((i) => { i.fatigue = 8; i.baseFatigue = 14; }).band).toBe('worn');
+    expect(hurt((i) => { i.fatigue = 45; }).tired).toBe(1);
+  });
+
+  it('reads the limbs: wounds by thirds, a break or a lost part useless; blood runs from the worst wound', () => {
+    const c = hurt((i) => { i.wounds = { leftArm: 1, rightLeg: 2 }; i.broken = ['rightArm']; i.lost = [{ area: 'foot', side: 'left' }]; i.bleed = { rate: 2, diff: 10 }; });
+    expect(c.armL).toBeCloseTo(1 / 3);
+    expect(c.armR).toBe(1);
+    expect(c.legL).toBe(1);
+    expect(c.legR).toBeCloseTo(2 / 3);
+    expect(c.bleed).toBe(2);
+    expect(c.bleedFrom).toBe('kneeR');
+    expect(c.stains.rightLeg).toBeGreaterThan(c.stains.leftArm!);
+    expect(hurt(() => {}).bleed).toBe(0);
+  });
+
+  it('the spent stand bent over with the guard sunk, and breathe hard', () => {
+    const fresh = newAnim(manner), spent = newAnim(manner);
+    const a = run(fresh, 4, { stance: READY, motion: { motion: MOTIONS.guard, t: 0 } });
+    const b = run(spent, 4, { stance: READY, motion: { motion: MOTIONS.guard, t: 0 }, condition: hurt((i) => { i.fatigue = 35; }) });
+    expect(turn(b.pose, 'chest') - turn(a.pose, 'chest')).toBeGreaterThan(0.12);
+    expect(turn(b.pose, 'elbowR') - turn(a.pose, 'elbowR')).toBeGreaterThan(0.2);
+    expect(spent.effort).toBeGreaterThan(fresh.effort + 0.2);
+    // A new band comes on over a moment, not in a frame.
+    const s = newAnim(manner);
+    const before = run(s, 1);
+    const after = animate(s, ANIM, base({ condition: hurt((i) => { i.fatigue = 35; }) }));
+    expect(apart(before.pose, after.pose)).toBeLessThan(0.05);
+  });
+
+  it('a hurt arm is held in and does less; a hurt leg limps and the weight stays off it', () => {
+    const arm = hurt((i) => { i.broken = ['rightArm']; });
+    const strike = MOTIONS.strike, at = strike.marks!.contact * strike.seconds;
+    const whole = run(newAnim(manner), 1, { stance: READY, motion: { motion: strike, t: at } });
+    const nursed = run(newAnim(manner), 1, { stance: READY, motion: { motion: strike, t: at }, condition: arm });
+    expect(Math.abs(turn(nursed.pose, 'shoulderR'))).toBeLessThan(Math.abs(turn(whole.pose, 'shoulderR')) * 0.5);
+    expect(turn(nursed.pose, 'elbowR')).toBeLessThan(-1);
+
+    const leg = hurt((i) => { i.wounds = { rightLeg: 3 }; });
+    const knees = (c: Condition | null): { bend: number; low: number } => {
+      const s = newAnim(manner);
+      let bend = 0, low = 0;
+      for (let t = 0; t < 4; t += 1 / 60) {
+        const p = animate(s, ANIM, base({ moved: 1.2 / 60, condition: c })).pose;
+        if (t > 1) { bend = Math.max(bend, turn(p, 'kneeR')); low = Math.min(low, p.lift ?? 0); }
+      }
+      return { bend, low };
+    };
+    expect(knees(leg).bend).toBeLessThan(knees(null).bend * 0.6);
+    expect(knees(leg).low).toBeLessThan(knees(null).low - 0.005);
+    // Standing: the hips stay over the left foot the whole time.
+    const s = newAnim(manner);
+    for (let t = 0; t < 12; t += 1 / 60) {
+      const p = animate(s, ANIM, base({ condition: leg })).pose;
+      if (t > 1) expect(p.shift![0]).toBeGreaterThan(0);
+    }
   });
 });
 
