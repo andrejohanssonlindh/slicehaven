@@ -152,36 +152,17 @@ export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn
   const W = room.x1 - room.x0, D = room.z1 - room.z0;
 
   const inside = (r: RoomRect): boolean => r.x0 >= room.x0 + WALL && r.x1 <= room.x1 - WALL && r.z0 >= room.z0 + WALL && r.z1 <= room.z1 - WALL;
+  const entry = { x: opts.entry?.x ?? doorX, z: opts.entry?.z ?? room.z1 };
   /**
-   * Would the door still reach nearly all the free floor with this piece added? (0.25 m cells, grown by a
-   * walker's radius.) A recipe can then never wall a room in, whatever the room's size.
+   * With this piece added, would the door still reach nearly all the free floor, and a spot beside every piece
+   * standing in the room? A recipe can then never wall a room in, nor a hearth off behind a counter (2026-11-17: a
+   * narrower broom shut the inn's hearth away, and the innkeeper never lit it).
    */
   const connectedWith = (extra: RoomRect): boolean => {
-    // A wider walker than the real one (0.2 m): the nav grid's cells are 0.5 m, so a gap under ~0.7 m is shut to the hero.
-    const cell = 0.2, rad = 0.33;
-    const nx = Math.floor(W / cell), nz = Math.floor(D / cell);
     const rects = [...solid.map((s) => s.r), extra];
-    const free = (i: number, j: number): boolean => {
-      if (i < 0 || j < 0 || i >= nx || j >= nz) return false;
-      const x = room.x0 + (i + 0.5) * cell, z = room.z0 + (j + 0.5) * cell;
-      return !rects.some((r) => x > r.x0 - rad && x < r.x1 + rad && z > r.z0 - rad && z < r.z1 + rad);
-    };
-    const ex = opts.entry?.x ?? doorX, ez = opts.entry?.z ?? room.z1;
-    const si = Math.min(nx - 1, Math.max(0, Math.floor((ex - room.x0) / cell))), sj = Math.min(nz - 1, Math.max(0, Math.floor((ez - room.z0) / cell)));
-    if (!free(si, sj)) return false;
-    const seen = new Uint8Array(nx * nz);
-    const stack = [si, sj];
-    let reached = 0;
-    while (stack.length) {
-      const j = stack.pop()!, i = stack.pop()!;
-      if (!free(i, j) || seen[j * nx + i]) continue;
-      seen[j * nx + i] = 1;
-      reached++;
-      stack.push(i + 1, j, i - 1, j, i, j + 1, i, j - 1);
-    }
-    let total = 0;
-    for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) if (free(i, j)) total++;
-    return reached >= total * 0.92;
+    const r = reachFrom(room, entry, rects);
+    if (!r || r.reached < r.free * 0.92) return false;
+    return solid.filter((s) => !s.id.startsWith('reserved#')).every((s) => r.beside(s.r)) && r.beside(extra);
   };
   let standing = true; // is the piece being placed a floor piece (which must keep the room connected)?
   const fits = (r: RoomRect): boolean => inside(r) && !zones.some((z) => overlap(r, z)) && !solid.some((s) => overlap(r, s.r, GAP)) && (!standing || connectedWith(r));
@@ -312,6 +293,53 @@ export function planRoom(room: RoomRect, doorX: number, pieces: readonly PieceIn
     take(p, spot.x, spot.z, turn.rot);
   }
   return { pieces: placed, unplaced };
+}
+
+/** The grid the reach is worked out on, metres, and the walker's radius: wider than the real one (0.2 m), as the nav grid's 0.5 m cells shut a gap under ~0.7 m. */
+const REACH_CELL = 0.2, REACH_RAD = 0.33;
+
+/**
+ * The floor a walker coming in at `entry` can reach among `rects` (flood fill on 0.2 m cells): how many free cells
+ * it reached of how many there are, and whether a reached spot is beside a rect (within a step of its edge). Null when
+ * the entry itself is shut.
+ */
+export function reachFrom(room: RoomRect, entry: { x: number; z: number }, rects: readonly RoomRect[]): { reached: number; free: number; beside(r: RoomRect): boolean } | null {
+  const cell = REACH_CELL, rad = REACH_RAD;
+  const nx = Math.floor((room.x1 - room.x0) / cell), nz = Math.floor((room.z1 - room.z0) / cell);
+  const at = (i: number, j: number) => ({ x: room.x0 + (i + 0.5) * cell, z: room.z0 + (j + 0.5) * cell });
+  const free = (i: number, j: number): boolean => {
+    if (i < 0 || j < 0 || i >= nx || j >= nz) return false;
+    const { x, z } = at(i, j);
+    return !rects.some((r) => x > r.x0 - rad && x < r.x1 + rad && z > r.z0 - rad && z < r.z1 + rad);
+  };
+  const si = Math.min(nx - 1, Math.max(0, Math.floor((entry.x - room.x0) / cell))), sj = Math.min(nz - 1, Math.max(0, Math.floor((entry.z - room.z0) / cell)));
+  if (!free(si, sj)) return null;
+  const seen = new Uint8Array(nx * nz);
+  const stack = [si, sj];
+  let reached = 0;
+  while (stack.length) {
+    const j = stack.pop()!, i = stack.pop()!;
+    if (!free(i, j) || seen[j * nx + i]) continue;
+    seen[j * nx + i] = 1;
+    reached++;
+    stack.push(i + 1, j, i - 1, j, i, j + 1, i, j - 1);
+  }
+  let total = 0;
+  for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) if (free(i, j)) total++;
+  // Beside: a reached cell within the walker's radius and a step more of the rect's edge.
+  const near = rad + cell * 1.6;
+  const beside = (r: RoomRect): boolean => {
+    for (let j = Math.max(0, Math.floor((r.z0 - near - room.z0) / cell)); j <= Math.min(nz - 1, Math.floor((r.z1 + near - room.z0) / cell)); j++) {
+      for (let i = Math.max(0, Math.floor((r.x0 - near - room.x0) / cell)); i <= Math.min(nx - 1, Math.floor((r.x1 + near - room.x0) / cell)); i++) {
+        if (!seen[j * nx + i]) continue;
+        const { x, z } = at(i, j);
+        const dx = Math.max(r.x0 - x, 0, x - r.x1), dz = Math.max(r.z0 - z, 0, z - r.z1);
+        if (Math.hypot(dx, dz) <= near) return true;
+      }
+    }
+    return false;
+  };
+  return { reached, free: total, beside };
 }
 
 /** The floor footprints of a plan, as rects in the house's frame (for collision). */

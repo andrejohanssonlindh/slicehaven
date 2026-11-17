@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ROOM_KINDS, furnish } from '../src/content/furnish';
 import { buildHouse } from '../src/content/buildhouse';
 import { THINGS } from '../src/content/things';
-import { DOOR_CLEAR, type PieceIn, type RoomRect, footprints, planRoom } from '../src/core/world3d/roomplan';
+import { DOOR_CLEAR, type PieceIn, type RoomRect, footprints, planRoom, reachFrom } from '../src/core/world3d/roomplan';
 
 /** Rooms of the bigger buildings are tested in their own buildings (`buildings.test.ts`), not in a cottage. */
 const BIG = Object.values(THINGS.get('building').rooms!);
@@ -67,6 +67,10 @@ describe('furnishing by rules', () => {
         if (set !== 'smithy') {
           const r = reach(m.room, m.door[0], fps);
           expect(r.reached / r.free, `${set} ${w}x${d}: reachable floor`).toBeGreaterThan(0.85);
+          // Every standing piece can be walked up to from the door (a hearth walled off behind a counter is never lit).
+          const rects = fps.map((f) => ({ x0: f.x - f.hw, x1: f.x + f.hw, z0: f.z - f.hd, z1: f.z + f.hd }));
+          const rf = reachFrom(m.room, { x: m.door[0], z: m.room.z1 }, rects)!;
+          for (let i = 0; i < fps.length; i++) expect(rf.beside(rects[i]), `${set} ${w}x${d}: ${fps[i].id} can't be reached`).toBe(true);
         }
       });
     }

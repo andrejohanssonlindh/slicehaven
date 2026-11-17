@@ -83,4 +83,4 @@ Each needs a short design, agreed with the director, before any feature that res
 - When a feature is built outside every pattern (it should not happen, but if the director asks for a quick test): list it here under "debts" so it is not forgotten.
 
 ## Debts
-- **The room solver doesn't check that what it places can be reached** (found 2026-11-17): a broom 0.2 m narrower laid out the inn's taproom so the hearth was walled off and the innkeeper's dawn fire never got lit (`e2e/spike3d-act.e2e.ts` caught it). The broom keeps its old footprint for now. The fix is a check in `core/world3d/roomplan.ts` that every piece someone uses (a hearth, a bed, a seat) stays reachable from the door, reported as a problem like any other.
+*(none open.)* Paid: **the room solver now keeps every standing piece reachable** (found 2026-11-17, when a narrower broom walled off the inn's hearth): a piece is placed only where the door still reaches a spot beside every piece in the room (`reachFrom` in `core/world3d/roomplan.ts`; `tests/furnish.test.ts` checks every recipe at every size).
