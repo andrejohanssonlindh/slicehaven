@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { THINGS } from '../../content/things';
-import { BURNING } from '../../content/effects/burning';
+import { BURNING, FIRE_REACTION } from '../../content/effects/burning';
+import { PERSON_KINDS } from '../../content/people';
+import { temperOf } from '../../content/people/temper';
 import { type Burnable, type FireSource, type PersonFireRound, burnRound, personFireRound, weatherWet } from '../../core/world3d/effects';
 import { type Injuries, unhurt } from '../../core/damage';
 import { WOUND_TABLES } from '../../content/wounds';
@@ -100,10 +102,33 @@ export class Effects {
     // A flame whose thing is no longer standing (streamed out, picked up) goes too.
     for (const id of [...this.flames.keys()]) if (!groups.has(id) && !this.people.has(id)) this.show(id, 0, null);
     this.weatherRound(warm);
+    const ablaze = things.filter((t) => Number(states.get(t.id, t.kind, 'burning')) > 0);
+    this.noticeFires(ablaze);
     // People in fire, or alight (a fight runs its own rounds).
     if (w.fights.inFight) return;
-    const fires: FireSource[] = [...sources, ...things.filter((t) => Number(states.get(t.id, t.kind, 'burning')) > 0).map((t) => ({ id: t.id, x: t.x, z: t.z, house: t.house, level: t.level, dice: Number(states.get(t.id, t.kind, 'burning')) }))];
+    const fires: FireSource[] = [...sources, ...ablaze.map((t) => ({ id: t.id, x: t.x, z: t.z, house: t.house, level: t.level, dice: Number(states.get(t.id, t.kind, 'burning')) }))];
     this.peopleRound(fires);
+  }
+
+  /** The map's people near something burning react to it (the line `fire` → `firefight`): theirs or they're bold, they fight it; else they keep away. */
+  private noticeFires(ablaze: Burnable[]): void {
+    for (const c of this.w.cast) {
+      const a = c.mind.actor;
+      let near: Burnable | null = null, best = FIRE_REACTION.notice;
+      for (const t of ablaze) {
+        if (t.house !== a.house || t.level !== a.level) continue;
+        const d = Math.hypot(t.x - a.x, t.z - a.z);
+        if (d < best) { best = d; near = t; }
+      }
+      if (!near) {
+        delete c.mind.fire;
+        continue;
+      }
+      if (c.mind.fire?.thing.id === near.id) continue;
+      const theirs = !!near.house && near.house === c.mind.home;
+      const bold = temperOf(PERSON_KINDS.resolve(c.who).chain) >= FIRE_REACTION.fightAt;
+      c.mind.fire = { thing: { id: near.id, kind: near.kind, x: near.x, z: near.z, level: near.level, house: near.house }, fight: theirs || bold };
+    }
   }
 
   /** How soaked each person's clothes are, in dice against fire (0..2: the rules' soaked clothes −1D6, soaked through −2D6). Not saved. */

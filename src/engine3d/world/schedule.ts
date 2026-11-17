@@ -59,7 +59,8 @@ export class Schedule {
     const w = this.w;
     // Everyone answers what the hero does wrong as the place's culture says: its lines go at the top of every day (B3c).
     // (Answering a wrong comes first; then bringing a found thing home, B3b; then their own day.)
-    const answering = [...answerLines(w.culture), { when: { tidying: true }, do: 'tidy' }];
+    // (A fire near them comes before all of it, plan B7.)
+    const answering = [{ when: { fire: true }, do: 'firefight' }, ...answerLines(w.culture), { when: { tidying: true }, do: 'tidy' }];
     for (const one of cast) {
       const who = { ...one, does: [...answering, ...one.does] };
       const fig = personFigure(who, w.yaw), blob = blobShadow(0.32);

@@ -55,6 +55,11 @@ export interface Mind {
   answer?: { id: string; left: number };
   /** A found thing they are bringing home (plan B3b, a loose thing's id): the condition `tidying` asks it; the world sets it. */
   tidy?: { thing: string };
+  /**
+   * Something burning near them (plan B7): what, and whether they go to put it out (it's their household's, or
+   * they're bold) or keep away. The condition `fire` asks it; the world sets it while the fire lasts.
+   */
+  fire?: { thing: ActTarget; fight: boolean };
 }
 
 /** Let `dt` seconds pass on an answer: it ends when its time is up. */
@@ -77,6 +82,8 @@ export interface Acts {
   fireOf(house: string): ActTarget | null;
   /** Is it burning? */
   lit(t: ActTarget): boolean;
+  /** Is something on fire (plan B7: the state `burning`)? */
+  ablaze?(t: ActTarget): boolean;
   /** Try an offer (`verb:light`) as this person. */
   act(mind: Mind, offer: string, t: ActTarget): ActResult;
   /** Where a loose thing is now (lying, or in someone's arms), and where it belongs (plan B3b); null if there is no such thing. */

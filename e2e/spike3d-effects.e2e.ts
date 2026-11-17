@@ -76,6 +76,24 @@ describe('spike3d effects', () => {
     expect(errors).toEqual([]);
   });
 
+  it('the innkeeper sees a stool burning in the inn and goes to put it out', async () => {
+    const { page, errors } = await openPage(env, '/spike3d/?nogov&map=hamlet', { storage: quick });
+    await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 60_000 });
+    const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; return ${fn}; })()`);
+    const stool = (await w(`(() => {
+      const hs = w.standingOf('inn');
+      const g = hs.furniture.find((f) => f.userData.thing && f.userData.thing.kind === 'stool');
+      return w.acting.targetOf(g);
+    })()`)) as { id: string; kind: string; x: number; z: number };
+    // The keeper on the taproom floor, a few metres off; the stool alight.
+    await w(`(() => { const a = w.cast.find((c) => c.who.id === 'keeper').mind.actor; a.legs = []; a.stair = null; a.foot = null; a.x = ${stool.x + 2.5}; a.z = ${stool.z + 1.5}; a.house = 'inn'; a.level = 0; return 0; })()`);
+    await w(`(w.states.set(${JSON.stringify(stool.id)}, 'stool', 'burning', 2), 0)`);
+    await w('(w.effects.round(), 0)');
+    expect(await w("w.schedule.minds.find((m) => m.id === 'keeper').doing")).toBe('firefight');
+    await page.waitForFunction(`window.spike.world.acting.recentActs.some((a) => a.who === 'keeper' && a.offer === 'verb:douse')`, undefined, { timeout: 40_000 });
+    expect(errors).toEqual([]);
+  });
+
   it('out in a storm you get soaked, and stay wet a while under a roof', async () => {
     const { page, errors } = await openPage(env, '/spike3d/?nogov&map=hamlet', { storage: quick });
     await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 60_000 });

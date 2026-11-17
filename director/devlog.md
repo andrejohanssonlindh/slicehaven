@@ -2,6 +2,15 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-17 — Effects (B7), fifth slice: people meet a fire
+
+- Anyone of the map within 10 m of something burning, on the same floor, drops what they're doing.
+- **The household it belongs to, and the bold** (dwarves, tiraks, guards) go up to it and beat at the flames every round, rolling with their own sheet, until it's out. **The rest keep about 8 m off** and watch it. Then back to their day.
+- It's a new line at the top of everyone's day (`fire` → `firefight`), like answering a wrong, so maps don't need to say it.
+- **Try it:** in the inn, set a stool alight with the innkeeper downstairs.
+- **Not yet:** fetching a bucket first, calling for help, blaming whoever set it unless they saw it.
+- Tests: a new browser test (the innkeeper beats out a burning stool); acting, senses, owners and talking browser tests, since everyone's day has a new first line.
+
 ## 2026-11-17 — Effects (B7), fourth slice: things that break
 
 *Your playtest note: stools stacked in a doorway make a wall; Divinity lets you break things.*

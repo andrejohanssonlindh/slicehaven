@@ -40,7 +40,12 @@ The rules already have most of this **for people**, from the fight rules: *ignit
 - **Broken**, it lies as wreckage (flattened, askew), stops no one's feet, and can't be sat on or picked up. It can still burn.
 - **Not yet:** outdoor props (fences, carts, barrels: they stop feet through another index, which knows no ids), smashing in a fight with a weapon (damage against toughness), mending.
 
+## People meeting a fire (fifth slice, built 2026-11-17)
+- Anyone of the map within 10 m of something burning, on the same floor, drops what they're doing (a line at the top of everyone's day, as answering a wrong is).
+- **Whose it is, and the bold** (temper 1 or more: dwarves, tiraks, guards) walk up to a metre from it and beat at the flames every round with their own sheet until it's out. The rest keep about 8 m off, facing it.
+- When it's out, back to their day. The numbers (10 m, temper 1) are in `content/effects/burning.ts`.
+- **Not yet:** fetching a bucket first, calling others to help, fleeing a fire that spreads toward them, blaming whoever set it (it's a wrong already when *seen*).
+
 ## Next slices (not built)
 1. **Fear and other effects on the mind** with B8f and magic (B9): a spell is an ability that applies effects.
-2. **People fleeing fire and fetching water** (behaviours).
-3. **Houses burning** (thatch catches, a house fire is 3D6–5D6), grass and trees.
+2. **Houses burning** (thatch catches, a house fire is 3D6–5D6), grass and trees.

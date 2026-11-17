@@ -234,6 +234,7 @@ export class Acting {
   readonly acts: Acts = {
     fireOf: (house) => this.w.housing.fireOf(house),
     lit: (t) => this.w.lights.fireLit(t),
+    ablaze: (t) => this.w.states.has(t.kind, 'burning') && Number(this.w.states.get(t.id, t.kind, 'burning')) > 0,
     act: (mind, offer, t) => this.act(offer, t, this.doerOf(mind.id)),
     // Bringing found things home (the behaviour `tidy`, plan B3b).
     thingAt: (id) => this.w.carrying.whereLoose(id),

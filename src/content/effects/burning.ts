@@ -18,5 +18,12 @@ export const BURNING: BurnRules = {
   perDie: 0.25,
 };
 
+/**
+ * How the map's people meet a fire (plan B7): within `notice` metres on the same floor they react; those whose
+ * household it belongs to, and anyone of temper `fightAt` or more (`content/people/temper.ts`: a dwarf, a tirak, a
+ * guard), go to put it out; the rest keep away.
+ */
+export const FIRE_REACTION = { notice: 10, fightAt: 1 };
+
 /** The dice of an open fire by its size (the rules: a torch 1D6, a campfire 2D6), for kinds that are fires. */
 export const FIRE_DICE = { torch: 1, campfire: 2 } as const;
