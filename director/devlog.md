@@ -10,7 +10,8 @@
 - **Blood:** the wounded part reddens; whoever bleeds drips, and the drops stain the ground: a pool where they stand or lie, a trail where they walk. Stains dry away in four minutes.
 - **See it:** `/models/` → new buttons *Fatigue*, *Hurt*, *Bleeding* (with Standing, Walking, On guard). In play: the arena.
 - **Not yet:** stains aren't saved, rain doesn't wash them (effects, B7), a lost limb is still drawn.
-- Tests: 4 new unit tests (the bands, reading the limbs, spent, hurt arm and leg); fight, save, walk and models browser tests.
+- Tests: 4 new unit tests (the bands, reading the limbs, spent, hurt arm and leg); fight, save, walk and models browser tests pass.
+- **A test problem that was there before:** in `e2e/spike3d.e2e.ts` the last two or three tests (entering a house, the layout pictures, sometimes the filaments) time out waiting for the page to start. The same happens on the commit from before today, and the page itself starts in about a second when opened alone, so it looks like the file's earlier pages being left open and starving the later ones. Not fixed here; worth a look before the next change to the page's start-up.
 
 ## 2026-11-17 — How bodies move: the animator
 
