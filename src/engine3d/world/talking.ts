@@ -66,7 +66,7 @@ export class Talking {
     // reaches far above the head); from the way the body really faces.
     f.place.updateMatrixWorld(true);
     const J = f.rig.model.joints, H = f.rig.model.height;
-    const shoulders = J.root.at[1] + J.spine.at[1] + J.neck.at[1];
+    const shoulders = J.root.at[1] + J.spine.at[1] + J.chest.at[1] + J.neck.at[1];
     const at = f.place.getWorldPosition(new THREE.Vector3());
     const headH = Math.max(0.15, (H - shoulders) * 0.8);
     const aim = new THREE.Vector3(at.x, at.y + shoulders + (H - shoulders) * 0.4, at.z);

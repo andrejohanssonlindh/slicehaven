@@ -1,12 +1,11 @@
 import * as THREE from 'three';
 import { PERSON_KINDS } from '../content/people';
 import { bodySpecOf } from '../content/people/bodies';
-import { IDLE, IDLE_SECONDS, WALK, wielding } from '../content/people/poses';
+import { ANIM, GAITS, HOLDS, READY, STAND } from '../content/people/poses';
 import { MOTIONS } from '../content/motions';
-import { overPose, sampleMotion } from '../core/world3d/motion';
 import type { PersonSpec } from '../core/persons';
+import { type AnimState, type Manner, animate, mannerOf, newAnim } from '../core/world3d/animate';
 import { buildBody } from '../core/world3d/body';
-import { cyclePose } from '../core/world3d/pose';
 import { BODY_SHELLS, type BodyRig, holdOnRig, makeBodyRig, placeRoot } from '../engine3d/body';
 import { WORLD, lit } from '../engine3d/materials';
 import { Pipeline } from '../engine3d/pipeline';
@@ -59,8 +58,11 @@ scene.add(ground);
 const COLS = 4;
 const spot = (i: number): { x: number; z: number } => ({ x: ((i % COLS) - (COLS - 1) / 2) * 1.5, z: -Math.floor(i / COLS) * 2.2 + 1.1 });
 
-let rigs: { rig: BodyRig; x: number; z: number }[] = [];
-const state = { turning: true, walking: false, shells: 2, angle: 0, phase: 0, zoom: 1 };
+let rigs: { rig: BodyRig; x: number; z: number; manner: Manner; anim: AnimState }[] = [];
+/** What the people on the stands do: stand at ease, walk, run, or stand on guard. */
+type Doing = 'stand' | 'walk' | 'run' | 'guard';
+const DOINGS: Doing[] = ['stand', 'walk', 'run', 'guard'];
+const state = { turning: true, doing: 'stand' as Doing, shells: 2, angle: 0, zoom: 1 };
 const ZOOMS = [24, 32, 48, 64];
 const list = document.getElementById('cast')!;
 
@@ -78,7 +80,8 @@ function build(): void {
     rig.group.position.set(at.x, 0, at.z);
     rig.setShells(state.shells);
     scene.add(rig.group);
-    rigs.push({ rig, ...at });
+    const manner = mannerOf(c.who.seed ?? 1);
+    rigs.push({ rig, ...at, manner, anim: newAnim(manner) });
     peopleList.push(`${c.label}: ${model.height.toFixed(2)} m`);
   });
 }
@@ -218,7 +221,13 @@ toggle(() => SHOW_NAMES[show](), () => true, () => {
   fillList();
 });
 toggle(() => t('models.turn', 'Turning'), () => state.turning, () => { state.turning = !state.turning; });
-toggle(() => (state.walking ? t('models.walk', 'Walking') : t('models.stand', 'Standing')), () => state.walking, () => { state.walking = !state.walking; });
+const DOING_NAMES: Record<Doing, () => string> = {
+  stand: () => t('models.stand', 'Standing'),
+  walk: () => t('models.walk', 'Walking'),
+  run: () => t('models.run', 'Running'),
+  guard: () => t('models.guard', 'On guard'),
+};
+toggle(() => DOING_NAMES[state.doing](), () => state.doing !== 'stand', () => { state.doing = DOINGS[(DOINGS.indexOf(state.doing) + 1) % DOINGS.length]; });
 toggle(() => t('models.shells', 'Shells {n}', { n: state.shells }), () => state.shells > 0, () => {
   state.shells = (state.shells + 1) % 3;
   rigs.forEach((r) => r.rig.setShells(state.shells));
@@ -235,6 +244,7 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('#zoom button')) {
 /** What the motion viewer shows: whose body, what they hold, which motion, how fast, looping, from which side. */
 const view = { who: 0, held: 'arming-sword', motion: 'strike', speed: 1, loop: true, side: true, t: 0, rest: 0 };
 let actor: BodyRig | null = null;
+let actorManner = mannerOf(1), actorAnim = newAnim(actorManner);
 const HELD = THINGS.placeable.filter((id) => THINGS.get(id).weapon || THINGS.get(id).shield).sort();
 
 function buildActor(): void {
@@ -242,6 +252,8 @@ function buildActor(): void {
   const c = CAST[view.who];
   actor = makeBodyRig(buildBody(bodySpecOf(PERSON_KINDS.resolve(c.who), c.who.seed ?? 1)));
   actor.setShells(state.shells);
+  actorManner = mannerOf(c.who.seed ?? 1);
+  actorAnim = newAnim(actorManner);
   if (view.held) {
     const kind = THINGS.get(view.held), model = modelOf(kind)!;
     holdOnRig(actor, thingGroup(model.draw(1)), { grip: model.grip, shield: !!kind.shield });
@@ -310,25 +322,36 @@ function select(label: string, options: [value: string, text: string][], get: ()
   motionRows.push(picks, play);
 }
 
-/** Move the motion on and pose the body: base standing (holding the weapon up), the motion over it, the root placed. */
+/**
+ * Move the motion on and pose the body as the world does (`animate`): on guard, holding the weapon up, the motion over
+ * it, the small movements of someone alive, the root placed.
+ */
 function stepMotion(dt: number): void {
   if (!actor) return;
   actor.group.visible = show === 'motions';
   if (show !== 'motions') return;
   const m = MOTIONS[view.motion];
   actor.group.rotation.y = state.angle;
-  const base = cyclePose(IDLE, time / IDLE_SECONDS);
-  const legs = view.held && !THINGS.get(view.held).shield ? wielding(base) : base;
-  if (!m) return actor.pose(legs);
-  view.t += dt * view.speed;
-  // After its end it holds a moment, then starts again (looping).
-  if (view.t >= m.seconds) {
-    view.rest += dt;
-    if (view.loop && view.rest > 0.8) { view.t = 0; view.rest = 0; }
+  if (m) {
+    view.t += dt * view.speed;
+    // After its end it holds a moment, then starts again (looping).
+    if (view.t >= m.seconds) {
+      view.rest += dt;
+      if (view.loop && view.rest > 0.8) { view.t = 0; view.rest = 0; }
+    }
   }
-  const f = sampleMotion(m, Math.min(view.t, m.seconds));
-  actor.pose(overPose(legs, f, m.part));
-  placeRoot(actor, f.root, state.angle);
+  const shown = animate(actorAnim, ANIM, {
+    dt,
+    moved: 0,
+    hip: actor.model.joints.root.at[1],
+    stance: READY,
+    hold: view.held && !THINGS.get(view.held).shield ? HOLDS.wield : null,
+    motion: m ? { motion: m, t: Math.min(view.t, m.seconds) } : null,
+    manner: actorManner,
+  });
+  actor.pose(shown.pose);
+  placeRoot(actor, shown.root, state.angle);
+  if (!m) return;
   const k = m.seconds > 0 ? Math.min(1, view.t / m.seconds) : 1;
   const hit = Object.entries(m.marks ?? {}).filter(([, at]) => Math.abs(at - k) < 0.06).map(([n]) => n);
   nowLine.textContent = `${(Math.min(view.t, m.seconds)).toFixed(2)} s${hit.length ? ` · ${hit.join(', ').toUpperCase()}` : ''}`;
@@ -344,19 +367,27 @@ function loop(now: number): void {
   time += dt;
   WORLD.uTime.value = time;
   if (state.turning) state.angle += dt * 0.6;
-  const speed = 1.6;
   furn.visible = show === 'furniture';
   for (const f of furnItems) {
     f.model.rotation.y = state.angle;
   }
   stepMotion(dt);
+  // The people on the stands move as they do in the world: each gait at the speed it is made for, on the spot.
+  const pace = state.doing === 'walk' ? GAITS[0].pace : state.doing === 'run' ? GAITS[GAITS.length - 1].pace : 0;
   for (const r of rigs) {
     r.rig.group.visible = show === 'people';
     r.rig.group.rotation.y = state.angle;
-    if (state.walking) r.rig.pose(cyclePose(WALK, state.phase * (rigs[0].rig.model.stride / r.rig.model.stride)));
-    else r.rig.pose(cyclePose(IDLE, time / IDLE_SECONDS));
+    if (show !== 'people') continue;
+    const shown = animate(r.anim, ANIM, {
+      dt,
+      moved: pace * dt,
+      hip: r.rig.model.joints.root.at[1],
+      stance: state.doing === 'guard' ? READY : STAND,
+      motion: state.doing === 'guard' ? { motion: MOTIONS.guard, t: 0 } : null,
+      manner: r.manner,
+    });
+    r.rig.pose(shown.pose);
   }
-  if (state.walking) state.phase += (speed * dt) / rigs[0].rig.model.stride;
   pipeline.render(scene, camera, new THREE.Vector2(0, 0), 1 / ZOOMS[state.zoom]);
   requestAnimationFrame(loop);
 }

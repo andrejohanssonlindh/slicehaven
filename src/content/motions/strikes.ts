@@ -16,7 +16,7 @@ export default [
     keys: [
       { at: 0, joints: GUARD_ARMS },
       { at: 0.4, joints: { shoulderR: [-2.9, 0, -0.1], elbowR: [-0.6, 0, 0], shoulderL: [-2.6, 0, -0.15], elbowL: [-0.9, 0, 0], spine: [-0.15, -0.3, 0] } },
-      { at: 0.58, joints: { shoulderR: [-0.8, 0, -0.05], elbowR: [-0.2, 0, 0], shoulderL: [-0.9, 0, -0.1], elbowL: [-0.3, 0, 0], spine: [0.35, 0.3, 0] } },
+      { at: 0.58, ease: 'in', joints: { shoulderR: [-0.8, 0, -0.05], elbowR: [-0.2, 0, 0], shoulderL: [-0.9, 0, -0.1], elbowL: [-0.3, 0, 0], spine: [0.35, 0.3, 0] } },
       { at: 0.75, joints: { shoulderR: [-0.8, 0, -0.05], elbowR: [-0.2, 0, 0], shoulderL: [-0.9, 0, -0.1], elbowL: [-0.3, 0, 0], spine: [0.3, 0.25, 0] } },
       { at: 1, joints: GUARD_ARMS },
     ],
@@ -27,7 +27,7 @@ export default [
     keys: [
       { at: 0, joints: GUARD_ARMS },
       { at: 0.35, joints: { shoulderR: [-1.3, 0, -0.5], elbowR: [-0.7, 0, 0], shoulderL: [-1.1, 0, -0.3], elbowL: [-0.6, 0, 0], spine: [0.05, -0.55, 0] } },
-      { at: 0.55, joints: { shoulderR: [-1.1, 0, 0.3], elbowR: [-0.3, 0, 0], shoulderL: [-1.0, 0, 0.1], elbowL: [-0.5, 0, 0], spine: [0.08, 0.5, 0] } },
+      { at: 0.55, ease: 'in', joints: { shoulderR: [-1.1, 0, 0.3], elbowR: [-0.3, 0, 0], shoulderL: [-1.0, 0, 0.1], elbowL: [-0.5, 0, 0], spine: [0.08, 0.5, 0] } },
       { at: 0.75, joints: { shoulderR: [-1.0, 0, 0.35], elbowR: [-0.3, 0, 0], shoulderL: [-0.9, 0, 0.1], elbowL: [-0.5, 0, 0], spine: [0.05, 0.4, 0] } },
       { at: 1, joints: GUARD_ARMS },
     ],
@@ -38,7 +38,7 @@ export default [
     keys: [
       { at: 0, joints: GUARD_ARMS },
       { at: 0.3, joints: { shoulderR: [-0.2, 0, -0.1], elbowR: [-1.6, 0, 0], shoulderL: [-1.1, 0, 0.1], elbowL: [-0.5, 0, 0], spine: [-0.05, -0.3, 0] } },
-      { at: 0.5, joints: { shoulderR: [-1.45, 0, 0.05], elbowR: [-0.1, 0, 0], shoulderL: [-1.2, 0, 0.1], elbowL: [-0.5, 0, 0], spine: [0.18, 0.2, 0] } },
+      { at: 0.5, ease: 'in', joints: { shoulderR: [-1.45, 0, 0.05], elbowR: [-0.1, 0, 0], shoulderL: [-1.2, 0, 0.1], elbowL: [-0.5, 0, 0], spine: [0.18, 0.2, 0] } },
       { at: 0.7, joints: { shoulderR: [-1.4, 0, 0.05], elbowR: [-0.15, 0, 0], shoulderL: [-1.2, 0, 0.1], elbowL: [-0.5, 0, 0], spine: [0.15, 0.15, 0] } },
       { at: 1, joints: GUARD_ARMS },
     ],
@@ -48,9 +48,9 @@ export default [
     id: 'strike-axe-mace', act: 'strike', way: 'axe-mace', seconds: 0.9, part: 'upper', then: 'guard', marks: { contact: 0.62 },
     keys: [
       { at: 0, joints: GUARD_ARMS },
-      { at: 0.4, joints: { ...L, shoulderR: [-2.9, 0, -0.2], elbowR: [-0.5, 0, 0], spine: [-0.25, -0.35, 0] } },
-      { at: 0.62, joints: { ...L, shoulderR: [-0.8, 0, 0.1], elbowR: [-0.1, 0, 0], spine: [0.4, 0.35, 0] } },
-      { at: 0.78, joints: { ...L, shoulderR: [-0.8, 0, 0.1], elbowR: [-0.1, 0, 0], spine: [0.35, 0.3, 0] } },
+      { at: 0.4, joints: { ...L, shoulderR: [-2.9, 0, -0.2], elbowR: [-0.5, 0, 0], wristR: [-0.5, 0, 0], spine: [-0.25, -0.35, 0] } },
+      { at: 0.62, ease: 'in', joints: { ...L, shoulderR: [-0.8, 0, 0.1], elbowR: [-0.1, 0, 0], wristR: [0.5, 0, 0], spine: [0.4, 0.35, 0] } },
+      { at: 0.78, joints: { ...L, shoulderR: [-0.8, 0, 0.1], elbowR: [-0.1, 0, 0], wristR: [0.45, 0, 0], spine: [0.35, 0.3, 0] } },
       { at: 1, joints: GUARD_ARMS },
     ],
   },
@@ -60,7 +60,7 @@ export default [
     keys: [
       { at: 0, joints: GUARD_ARMS },
       { at: 0.25, joints: { shoulderR: [-0.5, 0, -0.1], elbowR: [-2.0, 0, 0], shoulderL: [-0.3, 0, 0.25], elbowL: [-1.1, 0, 0], spine: [0, -0.3, 0] } },
-      { at: 0.5, joints: { shoulderR: [-1.5, 0, -0.05], elbowR: [-0.05, 0, 0], shoulderL: [-0.3, 0, 0.25], elbowL: [-1.2, 0, 0], spine: [0.08, 0.35, 0] } },
+      { at: 0.5, ease: 'in', joints: { shoulderR: [-1.5, 0, -0.05], elbowR: [-0.05, 0, 0], shoulderL: [-0.3, 0, 0.25], elbowL: [-1.2, 0, 0], spine: [0.08, 0.35, 0] } },
       { at: 0.7, joints: { shoulderR: [-1.4, 0, -0.05], elbowR: [-0.1, 0, 0], shoulderL: [-0.3, 0, 0.25], elbowL: [-1.1, 0, 0], spine: [0.06, 0.3, 0] } },
       { at: 1, joints: GUARD_ARMS },
     ],

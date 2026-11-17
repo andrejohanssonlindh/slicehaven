@@ -3,12 +3,12 @@ import type { PersonSpec } from '../../core/persons';
 import { PERSON_KINDS } from '../../content/people';
 import { THINGS } from '../../content/things';
 import { bodySpecOf } from '../../content/people/bodies';
-import { IDLE, IDLE_SECONDS, SIT, WALK, carrying, wielding } from '../../content/people/poses';
+import { ANIM, HOLDS, READY, SIT, STAND } from '../../content/people/poses';
 import { MOTIONS } from '../../content/motions';
 import { styleFor } from '../../content/combat';
-import { LYING_ACTS, type Motion, type MotionAct, type Playing, type WayOfMoving, advance, findMotion, overPose, sampleMotion } from '../../core/world3d/motion';
+import { LYING_ACTS, type Motion, type MotionAct, type Playing, type WayOfMoving, advance, findMotion } from '../../core/world3d/motion';
+import { animate, mannerOf, newAnim } from '../../core/world3d/animate';
 import { buildBody } from '../../core/world3d/body';
-import { cyclePose } from '../../core/world3d/pose';
 import { wrapAngle } from '../../core/world3d/view';
 import { makeBodyRig, placeRoot } from '../body';
 import type { Figure } from './types';
@@ -25,8 +25,12 @@ export function personFigure(p: PersonSpec, yaw: number): Figure {
   const rig = makeBodyRig(buildBody(bodySpecOf(PERSON_KINDS.resolve(p), p.seed ?? 1)));
   const place = new THREE.Group();
   place.add(rig.group);
-  return { place, rig, yaw, want: yaw, moving: false, phase: 0, still: 1, lastX: 0, lastZ: 0 };
+  const manner = mannerOf(p.seed ?? 1);
+  return { place, rig, yaw, want: yaw, moving: false, lastX: 0, lastZ: 0, manner, anim: newAnim(manner) };
 }
+
+/** Someone this near, in front, draws a glance (metres). */
+const NOTICE = 3;
 
 export class Figures {
   /** The motion each person plays, and since when (`time`): on guard, a strike, lying down (`content/motions/`, B8g). */
@@ -127,7 +131,44 @@ export class Figures {
     return findMotion(MOTIONS, act, this.wayOf(id), this.styleOf(id));
   }
 
-  /** Each person's body turns the way they go and walks while they move (the walk's loop follows the ground covered). */
+  /**
+   * Who someone's head turns to, if anyone: in a fight the nearest fighter still standing; in a talk the other one;
+   * else the hero passing close in front of them. As a direction from the way their body faces (`AnimInput.look`).
+   */
+  private lookOf(id: string, f: Figure): { yaw: number; pitch: number } | null {
+    const w = this.w;
+    let to: Figure | null = null, reach = Infinity;
+    const fighting = w.fights.fighting;
+    if (fighting?.has(id)) {
+      let best = Infinity;
+      for (const other of fighting) {
+        const o = other === id ? null : this.figureOf(other);
+        if (!o || !o.place.visible) continue;
+        const d = o.place.position.distanceTo(f.place.position) + (this.isLying(other) ? 100 : 0);
+        if (d < best) { best = d; to = o; }
+      }
+    } else if (w.talking.talkingWith && (id === 'hero' || id === w.talking.talkingWith)) {
+      to = this.figureOf(id === 'hero' ? w.talking.talkingWith : 'hero');
+    } else if (id !== 'hero') {
+      to = w.heroFig;
+      reach = NOTICE;
+    }
+    if (!to || !to.place.visible) return null;
+    const a = f.place.position, b = to.place.position;
+    const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz);
+    if (d < 0.05 || d > reach) return null;
+    const yaw = wrapAngle(Math.atan2(dx, dz) - f.yaw);
+    // A passer-by behind or far to the side isn't turned to.
+    if (reach < Infinity && Math.abs(yaw) > 1.4) return null;
+    const eyes = (x: Figure): number => x.place.position.y + x.rig.model.height * 0.93;
+    return { yaw, pitch: Math.atan2(eyes(to) - eyes(f), d) };
+  }
+
+  /**
+   * Each person's body turns the way they go, and shows what the animator makes of what they are doing
+   * (`core/world3d/animate.ts`): standing, walking or running by the ground covered, what they hold, a motion playing,
+   * and the small movements of someone alive.
+   */
   step(dt: number): void {
     const w = this.w, time = w.time;
     for (const p of w.people) {
@@ -137,11 +178,8 @@ export class Figures {
       f.lastX = at.x;
       f.lastZ = at.z;
       // A jump (a load, a teleport) is not a step.
-      if (d > 0.001 && d < 1) {
-        f.want = Math.atan2(dx, dz);
-        f.phase += d / f.rig.model.stride;
-        f.still = 0;
-      } else f.still += dt;
+      const stepped = d > 0.001 && d < 1;
+      if (stepped) f.want = Math.atan2(dx, dz);
       // The hero on a seat: set down so the hips rest on it, facing the way it faces.
       const seat = p.id === 'hero' ? w.seated : null;
       if (seat) {
@@ -149,14 +187,11 @@ export class Figures {
         f.lastX = seat.x;
         f.lastZ = seat.z;
         f.want = seat.yaw;
-        f.still = 1;
         w.heroBlob.position.set(seat.x, seat.floor + 0.03, seat.z);
       }
-      f.yaw += wrapAngle(f.want - f.yaw) * (1 - Math.exp(-dt / 0.08));
+      const turning = wrapAngle(f.want - f.yaw);
+      f.yaw += turning * (1 - Math.exp(-dt / 0.11));
       f.rig.group.rotation.y = f.yaw;
-      const legs = seat ? cyclePose(SIT, time / IDLE_SECONDS) : f.still < 0.15 ? cyclePose(WALK, f.phase) : cyclePose(IDLE, time / IDLE_SECONDS);
-      // Holding something: the arms carry it, or the right hand holds it up (a sword), whatever the legs do (B3b, B8a).
-      const pose = this.inHand.has(p.id) ? wielding(legs) : this.inArms.has(p.id) ? carrying(legs) : legs;
       // A motion playing (in a fight, or left lying after one: `content/motions/`): over what the legs do, or the whole
       // body with its root moved (tipped onto its back, a step back).
       let pl = this.motions.get(p.id);
@@ -165,9 +200,21 @@ export class Figures {
         if (next !== pl) this.motions.set(p.id, (pl = next));
       }
       const m = pl ? MOTIONS[pl.motion] : undefined;
-      const fr = m && pl ? sampleMotion(m, time - pl.since) : null;
-      placeRoot(f.rig, fr?.root ?? null, f.yaw);
-      f.rig.pose(fr && m ? overPose(pose, fr, m.part) : pose);
+      const shown = animate(f.anim, ANIM, {
+        dt,
+        moved: stepped && !seat ? d : 0,
+        hip: f.rig.model.joints.root.at[1],
+        // Seated; on guard while a fight's motions play; else at ease.
+        stance: seat ? SIT : pl ? READY : STAND,
+        // Holding something: the arms carry it, or the right hand holds it up (a sword), whatever the legs do (B3b, B8a).
+        hold: this.inHand.has(p.id) ? HOLDS.wield : this.inArms.has(p.id) ? HOLDS.carry : null,
+        motion: m && pl ? { motion: m, t: time - pl.since } : null,
+        turning,
+        look: this.lookOf(p.id, f),
+        manner: f.manner,
+      });
+      placeRoot(f.rig, shown.root, f.yaw);
+      f.rig.pose(shown.pose);
       f.rig.setShells(Math.min(2, w.settings.shells));
     }
   }

@@ -2,6 +2,19 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-17 — How bodies move: the animator
+
+- **Your ask:** movement was robotic; a better framework with a skeleton, slight movement standing still and in combat, something to build on. **The framework held** (a skeleton, movement as data), so it's built on, not replaced. What was missing sat between the data and the screen. [The design, and how to add to it](design/animation.md).
+- **A fuller skeleton:** 17 joints instead of 11. New: a chest over the waist, a head on the neck, wrists and ankles. The trunk bends and twists in the middle, a foot rolls from heel to toe, a weapon turns in the hand.
+- **Nobody stands quite still.** Breath, weight shifting from foot to foot, arms that drift, a head that glances about. Everyone has their own tempo and posture, so a crowd no longer breathes in step.
+- **Nothing snaps.** The legs ease into a walk and out of it; picking something up, sitting, a motion starting or ending all ease out of the last pose. Getting up off the ground takes a moment.
+- **A run that is a run.** The hero's double speed was the walk played twice as fast (nearly five steps a second). Now gaits are blended by speed: short steps when slow, a walk, a run with its own poses.
+- **In a fight:** a stance (one foot forward, knees bent, side-on, a slow bounce, the weapon wandering, harder breath). Blows speed up all the way into the hit and stop dead; the wrist snaps the blade through in the overhead strikes. The senseless breathe, the dead don't.
+- **Heads turn** to the foe, to whoever you talk to, to you when you pass close in front; turning round, the head goes first.
+- **See it:** `/models/` → People, the second button: *Standing, Walking, Running, On guard*. Or walk about the Hamlet and stand near someone; or the arena.
+- **Left for later** (listed in the design): feet pinned to the ground, the fight motions re-keyed from the new stance and joints, fidgets, faces.
+- Tests: 12 new unit tests for the animator and the motion curves; the walk, fight, carry, talk, act and models browser tests.
+
 ## 2026-11-11 — The map maker, first slice (C5)
 
 - **`/mapmaker/`** (the hub → Map maker): a map seen from above, drawn from what the game builds: ground, lake, roads, houses with their doors, every tree and thing, where people start, named places, the hero's star.

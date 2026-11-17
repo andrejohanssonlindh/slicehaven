@@ -71,7 +71,7 @@ export interface BodyRig {
   /** Place and turn this; the feet are at its origin, the body faces its +z. */
   group: THREE.Group;
   model: BodyModel;
-  /** The right hand: something held there (a sword) is added to this, at the grip, in the forearm's space. */
+  /** The right hand: something held there (a sword) is added to this, at the grip, in the hand's space (it turns with the wrist). */
   hand: THREE.Object3D;
   /** The left forearm: a shield is worn on it (plan B8a), at the middle of the forearm, in the forearm's space. */
   left: THREE.Object3D;
@@ -112,11 +112,12 @@ export function makeBodyRig(model: BodyModel): BodyRig {
   const fuzzy = model.parts.filter((p) => p.shell);
   const shellGeo = fuzzy.length ? geometry(fuzzy, rest) : null;
   const shellMeshes = shellGeo ? shells.map((mat) => { const s = skinned(shellGeo, mat); s.receiveShadow = true; return s; }) : [];
+  // What the right hand holds turns with the wrist; a shield sits on the left forearm.
   const hand = new THREE.Object3D();
   hand.position.set(...model.grip);
-  bones[JOINTS.indexOf('elbowR')].add(hand);
+  bones[JOINTS.indexOf('wristR')].add(hand);
   const left = new THREE.Object3D();
-  left.position.set(model.grip[0], model.grip[1] * 0.6, model.grip[2]);
+  left.position.set(model.grip[0], (model.joints.wristL.at[1] + model.grip[1]) * 0.6, model.grip[2]);
   bones[JOINTS.indexOf('elbowL')].add(left);
   return {
     group,
@@ -128,7 +129,7 @@ export function makeBodyRig(model: BodyModel): BodyRig {
         const t = p.joints[j];
         bones[i].rotation.set(t?.[0] ?? 0, t?.[1] ?? 0, t?.[2] ?? 0);
       });
-      root.position.y = rootY + (p.lift ?? 0) * model.height;
+      root.position.set((p.shift?.[0] ?? 0) * model.height, rootY + (p.lift ?? 0) * model.height, (p.shift?.[1] ?? 0) * model.height);
     },
     setShells(n: number) {
       shellMeshes.forEach((m, i) => { m.visible = i < n; });

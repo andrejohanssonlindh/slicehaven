@@ -40,10 +40,23 @@ export type WayOfMoving = (typeof WAYS_OF_MOVING)[number];
  */
 export type MotionPart = 'arms' | 'upper' | 'whole';
 export const PART_JOINTS: Record<MotionPart, readonly Joint[]> = {
-  arms: ['shoulderL', 'elbowL', 'shoulderR', 'elbowR'],
-  upper: ['spine', 'neck', 'shoulderL', 'elbowL', 'shoulderR', 'elbowR'],
+  arms: ['shoulderL', 'elbowL', 'wristL', 'shoulderR', 'elbowR', 'wristR'],
+  upper: ['spine', 'chest', 'neck', 'head', 'shoulderL', 'elbowL', 'wristL', 'shoulderR', 'elbowR', 'wristR'],
   whole: JOINTS,
 };
+
+/**
+ * How a key is come to from the one before. Left out, the movement flows through the keys in a smooth curve, slowing
+ * only where it turns round or rests. `in` speeds up all the way into the key and stops dead there (a blow landing),
+ * `out` leaves fast and settles, `linear` goes straight across.
+ */
+export type KeyEase = 'in' | 'out' | 'linear';
+
+/**
+ * How much of a body's own small movements (`animate.ts`: breathing, shifting weight, looking about) plays over a
+ * motion: all of it (`full`, the default), only the breath (`breath`: lying senseless) or none (`none`: dead).
+ */
+export type MotionLife = 'full' | 'breath' | 'none';
 
 /**
  * Where the whole body is, against where it stands: a step back or aside (a dodge), down towards the ground, tipped
@@ -66,6 +79,8 @@ export interface MotionKey {
   joints: Partial<Record<Joint, Turn>>;
   lift?: number;
   root?: MotionRoot;
+  /** How this key is come to (`KeyEase`); left out, in a smooth curve through it. */
+  ease?: KeyEase;
 }
 
 export interface Motion {
@@ -79,10 +94,16 @@ export interface Motion {
   seconds: number;
   part: MotionPart;
   /**
-   * The keys, `at` rising from 0. Between keys the turns ease straight across; a joint a key leaves out is at rest (0)
-   * there, as a pose's are.
+   * The keys, `at` rising from 0. The turns flow through them in a smooth curve (or as a key's `ease` says); a joint
+   * a key leaves out is at rest (0) there, as a pose's are.
    */
   keys: readonly MotionKey[];
+  /** Seconds the body takes to ease into this motion from whatever it was doing (`DEFAULT_BLEND` if left out). */
+  blend?: number;
+  /** Seconds the body takes to ease out of it into what comes next, when that is longer (getting up from lying). */
+  leave?: number;
+  /** How much of the body's own small movements plays over it (`MotionLife`; `full` if left out). */
+  life?: MotionLife;
   /** What follows: another act (looked up the same way, usually `guard`), or `hold` the last key. */
   then: MotionAct | 'hold';
   /** Named moments, as a share of the length: `contact` where the blow meets. */
@@ -98,8 +119,6 @@ export interface MotionFrame {
   done: boolean;
 }
 
-const ZERO: Turn = [0, 0, 0];
-const NO_ROOT: Required<MotionRoot> = { tilt: 0, up: 0, back: 0, side: 0 };
 
 /** The joints a motion names in any key: it drives these (and every joint, if it drives the whole body). */
 export function motionJoints(m: Motion): Joint[] {
@@ -107,6 +126,38 @@ export function motionJoints(m: Motion): Joint[] {
   const out = new Set<Joint>();
   for (const k of m.keys) for (const j of Object.keys(k.joints) as Joint[]) out.add(j);
   return JOINTS.filter((j) => out.has(j));
+}
+
+/** Seconds a body takes to ease into a motion that doesn't say (`blend`). */
+export const DEFAULT_BLEND = 0.12;
+
+const EASES: Record<KeyEase, (u: number) => number> = {
+  in: (u) => u * u,
+  out: (u) => 1 - (1 - u) * (1 - u),
+  linear: (u) => u,
+};
+
+/**
+ * How fast a value passes through key `i` (per share of the motion's length): nothing where it turns round, rests, or
+ * at either end; else the mean of the slopes either side, held back so it never swings past a key.
+ */
+function slopeAt(keys: readonly MotionKey[], get: (k: MotionKey) => number, i: number): number {
+  if (i <= 0 || i >= keys.length - 1) return 0;
+  const d0 = (get(keys[i]) - get(keys[i - 1])) / (keys[i].at - keys[i - 1].at);
+  const d1 = (get(keys[i + 1]) - get(keys[i])) / (keys[i + 1].at - keys[i].at);
+  if (d0 * d1 <= 0) return 0;
+  const m = (d0 + d1) / 2, cap = 3 * Math.min(Math.abs(d0), Math.abs(d1));
+  return Math.sign(m) * Math.min(Math.abs(m), cap);
+}
+
+/** One value of a motion between keys `i` and `i + 1`, `u` of the way: a smooth curve, or as the later key's `ease` says. */
+function between(keys: readonly MotionKey[], get: (k: MotionKey) => number, i: number, u: number): number {
+  const a = keys[i], b = keys[Math.min(i + 1, keys.length - 1)];
+  const p = get(a), q = get(b);
+  if (b === a || u <= 0 || p === q) return p;
+  if (b.ease) return p + (q - p) * EASES[b.ease](u);
+  const h = b.at - a.at, u2 = u * u, u3 = u2 * u;
+  return (2 * u3 - 3 * u2 + 1) * p + (u3 - 2 * u2 + u) * h * slopeAt(keys, get, i) + (-2 * u3 + 3 * u2) * q + (u3 - u2) * h * slopeAt(keys, get, i + 1);
 }
 
 /** A motion `t` seconds after it began. */
@@ -121,14 +172,12 @@ export function sampleMotion(m: Motion, t: number): MotionFrame {
   const u = b === a || b.at <= a.at ? 0 : (x - a.at) / (b.at - a.at);
   const joints: Partial<Record<Joint, Turn>> = {};
   for (const j of motionJoints(m)) {
-    const p = a.joints[j] ?? ZERO, q = b.joints[j] ?? ZERO;
-    joints[j] = [p[0] + (q[0] - p[0]) * u, p[1] + (q[1] - p[1]) * u, p[2] + (q[2] - p[2]) * u];
+    joints[j] = [0, 1, 2].map((c) => between(keys, (key) => key.joints[j]?.[c] ?? 0, i, u)) as unknown as Turn;
   }
-  const ra = { ...NO_ROOT, ...a.root }, rb = { ...NO_ROOT, ...b.root };
-  const mix = (f: keyof MotionRoot): number => ra[f] + (rb[f] - ra[f]) * u;
+  const mix = (f: keyof MotionRoot): number => between(keys, (key) => key.root?.[f] ?? 0, i, u);
   return {
     joints,
-    lift: (a.lift ?? 0) + ((b.lift ?? 0) - (a.lift ?? 0)) * u,
+    lift: between(keys, (key) => key.lift ?? 0, i, u),
     root: { tilt: mix('tilt'), up: mix('up'), back: mix('back'), side: mix('side') },
     done,
   };
@@ -137,7 +186,7 @@ export function sampleMotion(m: Motion, t: number): MotionFrame {
 /** A frame laid over a body's pose (what the legs and hands do): over it for arms and upper body, instead of it for the whole. */
 export function overPose(base: Pose, f: MotionFrame, part: MotionPart): Pose {
   if (part === 'whole') return { joints: f.joints, lift: f.lift };
-  return { joints: { ...base.joints, ...f.joints }, lift: (base.lift ?? 0) + f.lift };
+  return { joints: { ...base.joints, ...f.joints }, lift: (base.lift ?? 0) + f.lift, shift: base.shift };
 }
 
 /**
@@ -190,7 +239,11 @@ export function motionProblems(m: Motion): string[] {
       if (!Array.isArray(v) || v.length !== 3 || v.some((n) => !Number.isFinite(n))) bad(`key ${i}: ${j} is not three numbers`);
     }
     if (k.root && m.part !== 'whole') bad(`key ${i}: only a whole-body motion moves the root`);
+    if (k.ease && !EASES[k.ease]) bad(`key ${i}: unknown ease ${k.ease}`);
   });
+  if (m.blend !== undefined && !(m.blend >= 0)) bad('blend must be 0 or more seconds');
+  if (m.leave !== undefined && !(m.leave >= 0)) bad('leave must be 0 or more seconds');
+  if (m.life && !['full', 'breath', 'none'].includes(m.life)) bad(`unknown life ${m.life}`);
   for (const need of MARKS_NEEDED[m.act] ?? []) if (m.marks?.[need] === undefined) bad(`needs a ${need} mark`);
   for (const [name, at] of Object.entries(m.marks ?? {})) if (!(at >= 0 && at <= 1)) bad(`mark ${name} at ${at}, outside 0–1`);
   return out;

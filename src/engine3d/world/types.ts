@@ -1,6 +1,7 @@
 import type * as THREE from 'three';
 import type { PersonSpec } from '../../core/persons';
 import type { CastMember } from '../../core/world3d/mapgen';
+import type { AnimState, Manner } from '../../core/world3d/animate';
 import type { Mind } from '../../core/world3d/behave';
 import type { ChunkTerrain } from '../../core/world3d/chunks';
 import type { BuiltHouse } from '../../core/world3d/layout';
@@ -137,13 +138,14 @@ export interface Figure {
   /** The way the body faces (as `rotation.y`), and the way it is turning toward. */
   yaw: number;
   want: number;
-  /** Walking now, how far through the walk's loop, and how long since the last step (seconds). */
+  /** Walking now (as the rules say). */
   moving: boolean;
-  phase: number;
-  still: number;
-  /** Where the anchor was last frame (the walk's loop follows the ground covered). */
+  /** Where the anchor was last frame (the steps follow the ground covered). */
   lastX: number;
   lastZ: number;
+  /** Their own way of moving, and their animation between frames (`core/world3d/animate.ts`). */
+  manner: Manner;
+  anim: AnimState;
 }
 
 export interface Person {

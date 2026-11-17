@@ -11,6 +11,7 @@ const lying: MotionKey = {
 };
 
 export default [
-  { id: 'down', act: 'down', seconds: 0, part: 'whole', keys: [lying], then: 'hold' },
-  { id: 'dead', act: 'dead', seconds: 0, part: 'whole', keys: [lying], then: 'hold' },
+  // Senseless, the chest still rises and falls; getting up from it takes a moment (`leave`). The dead lie quite still.
+  { id: 'down', act: 'down', seconds: 0, part: 'whole', keys: [lying], then: 'hold', life: 'breath', leave: 0.7 },
+  { id: 'dead', act: 'dead', seconds: 0, part: 'whole', keys: [lying], then: 'hold', life: 'none', blend: 0.6 },
 ] satisfies Motion[];

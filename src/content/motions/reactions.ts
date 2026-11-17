@@ -8,10 +8,11 @@ import { GUARD_ARMS } from './guard';
  */
 export default [
   {
-    id: 'flinch', act: 'flinch', seconds: 0.4, part: 'upper', then: 'guard',
+    id: 'flinch', act: 'flinch', seconds: 0.4, part: 'upper', then: 'guard', blend: 0.04,
     keys: [
       { at: 0, joints: GUARD_ARMS },
-      { at: 0.2, joints: { shoulderR: [-0.3, 0, -0.35], elbowR: [-0.9, 0, 0], shoulderL: [-0.1, 0, 0.45], elbowL: [-0.6, 0, 0], spine: [-0.14, -0.1, 0], neck: [-0.2, 0, 0] } },
+      // The jolt comes at once (`out`), the recovery is slow.
+      { at: 0.2, ease: 'out', joints: { shoulderR: [-0.3, 0, -0.35], elbowR: [-0.9, 0, 0], shoulderL: [-0.1, 0, 0.45], elbowL: [-0.6, 0, 0], spine: [-0.14, -0.1, 0], neck: [-0.2, 0, 0] } },
       { at: 1, joints: GUARD_ARMS },
     ],
   },
@@ -34,7 +35,7 @@ export default [
   },
   {
     // Knees go, the body tips onto its back and lands where `down` holds it.
-    id: 'fall', act: 'fall', seconds: 1.1, part: 'whole', then: 'down',
+    id: 'fall', act: 'fall', seconds: 1.1, part: 'whole', then: 'down', life: 'breath', leave: 0.7,
     keys: [
       { at: 0, joints: GUARD_ARMS, root: {} },
       {
@@ -61,8 +62,8 @@ export default [
       { at: 0, joints: GUARD_ARMS },
       { at: 0.3, joints: { shoulderL: GUARD_ARMS.shoulderL, elbowL: GUARD_ARMS.elbowL, shoulderR: [-2.9, 0, -0.1], elbowR: [-0.5, 0, 0], spine: [-0.3, -0.3, 0] } },
       { at: 0.45, joints: { shoulderL: GUARD_ARMS.shoulderL, elbowL: GUARD_ARMS.elbowL, shoulderR: [-3.0, 0, -0.1], elbowR: [-0.5, 0, 0], spine: [-0.32, -0.32, 0] } },
-      { at: 0.7, joints: { shoulderL: GUARD_ARMS.shoulderL, elbowL: GUARD_ARMS.elbowL, shoulderR: [-0.6, 0, 0.1], elbowR: [-0.1, 0, 0], spine: [0.5, 0.3, 0] }, lift: -0.03 },
-      { at: 0.85, joints: { shoulderL: GUARD_ARMS.shoulderL, elbowL: GUARD_ARMS.elbowL, shoulderR: [-0.6, 0, 0.1], elbowR: [-0.1, 0, 0], spine: [0.5, 0.3, 0] }, lift: -0.03 },
+      { at: 0.7, ease: 'in', joints: { shoulderL: GUARD_ARMS.shoulderL, elbowL: GUARD_ARMS.elbowL, shoulderR: [-0.6, 0, 0.1], elbowR: [-0.1, 0, 0], wristR: [0.55, 0, 0], spine: [0.5, 0.3, 0] }, lift: -0.03 },
+      { at: 0.85, joints: { shoulderL: GUARD_ARMS.shoulderL, elbowL: GUARD_ARMS.elbowL, shoulderR: [-0.6, 0, 0.1], elbowR: [-0.1, 0, 0], wristR: [0.55, 0, 0], spine: [0.5, 0.3, 0] }, lift: -0.03 },
       { at: 1, joints: GUARD_ARMS },
     ],
   },

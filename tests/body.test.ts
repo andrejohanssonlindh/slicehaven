@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PERSON_KINDS } from '../src/content/people';
 import { BODY_PLANS, bodySpecOf } from '../src/content/people/bodies';
-import { WALK } from '../src/content/people/poses';
+import { WALK_LOOP as WALK } from '../src/content/people/poses';
 import type { PersonSpec } from '../src/core/persons';
 import { buildBody, type BodyModel } from '../src/core/world3d/body';
 import { JOINTS, type Joint, cyclePose, mirrorPose } from '../src/core/world3d/pose';
