@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { BURNING } from '../src/content/effects/burning';
 import { THINGS } from '../src/content/things';
-import { type Burnable, type FireSource, burnRound } from '../src/core/world3d/effects';
+import { type Burnable, type FireSource, type PersonInFire, burnRound, personFireRound } from '../src/core/world3d/effects';
+import { unhurt } from '../src/core/damage';
+import { WOUND_TABLES } from '../src/content/wounds';
 import { Rng } from '../src/core/rng';
 
 const thing = (id: string, x: number, material: Burnable['material'] = 'straw', more: Partial<Burnable> = {}): Burnable =>
@@ -59,6 +61,32 @@ describe('effects: burning (B7)', () => {
     }
     expect(straw).toBeGreaterThan(55);
     expect(wood).toBeLessThan(straw / 2);
+  });
+
+  it('someone standing in a fire is burned, more each round they stay; out of it, nothing', () => {
+    const rng = Rng.fromSeed(3);
+    const p = (x: number, exposed = 0): PersonInFire => ({ x, z: 0, house: null, level: 0, injuries: unhurt(), vitality: { n: 3, mod: 0 }, speed: { n: 3, mod: 0 }, wet: 0, water: 0, exposed });
+    const big: FireSource = { ...campfire, dice: 4 };
+    const inIt = personFireRound(p(0.2), [big], WOUND_TABLES, rng);
+    expect(inIt.hit).not.toBeNull();
+    expect(inIt.hit!.damageRoll.dice.n).toBe(4);
+    expect(inIt.exposed).toBe(1);
+    expect(personFireRound(p(0.2, 2), [big], WOUND_TABLES, rng).hit!.damageRoll.dice.n).toBe(6);
+    const away = personFireRound(p(1.5), [big], WOUND_TABLES, rng);
+    expect(away).toMatchObject({ hit: null, putOut: null, exposed: 0 });
+  });
+
+  it('someone alight tries to put it out (Speed, with water at hand), and burns at the end of the round if not', () => {
+    let out = 0, outWet = 0;
+    for (let seed = 0; seed < 40; seed++) {
+      const alight = { ...unhurt(), ignited: { heat: 2, diff: 12 } };
+      const base: PersonInFire = { x: 9, z: 9, house: null, level: 0, injuries: alight, vitality: { n: 3, mod: 0 }, speed: { n: 2, mod: 0 }, wet: 0, water: 0, exposed: 0 };
+      const dry = personFireRound(base, [], WOUND_TABLES, Rng.fromSeed(seed));
+      if (!dry.injuries.ignited) out++;
+      else expect(dry.injuries.fatigue).toBeGreaterThanOrEqual(2);
+      if (!personFireRound({ ...base, water: 3 }, [], WOUND_TABLES, Rng.fromSeed(seed)).injuries.ignited) outWet++;
+    }
+    expect(outWet).toBeGreaterThan(out);
   });
 
   it('what has a material can be burning and burnt; what has none (stone, iron, a hearth) cannot', () => {

@@ -22,9 +22,15 @@ The rules already have most of this **for people**, from the fight rules: *ignit
 - **Setting fire to something:** *Set fire to the …* on anything with a material, with your tinderbox (Survival, easy, ten seconds), or by putting it on a hearth. It's a wrong to its owner (harm).
 - **Shown:** the pixel fire and a light on it, sized by its dice; burnt things go black.
 
+## People and fire (second slice, built 2026-11-17)
+- **Standing in a fire** (within about half a metre of something burning, or of a campfire) burns you every round, by the rules: its dice less the wet, **+1D6 for each round you stay**, on the burn table, so it may set your clothes alight (*ignited*). Indoors and out, anyone of the map too. Not in a fight (a fight runs its own rounds).
+- **Alight**, you try to put it out each round: Speed against its difficulty, **+3D6 with a bucket in your hands** (the rules' big bucket). What isn't put out burns at the end of the round (the fire's fatigue, a shock roll), and someone senseless and still burning makes a death roll.
+- A flame follows whoever is alight. The hero is told: *The fire burns you*, *Your clothes catch fire!*, *You beat out the flames on you.*
+- **Not yet:** a choice to put yourself out (it's done for you, as anyone would), rolling on the ground, others helping; the map's people fleeing a fire or fetching water (a behaviour under `sees`).
+
 ## Next slices (not built)
-1. **People and fire outside fights:** standing in or next to something burning ignites you (the rules' *ignited*, already in `Injuries`), with fatigue every round; *Put yourself out*; your wet clothes protect you. The map's people flee a fire, or fetch water.
-2. **Wet people:** rain soaks you through the hours, a fire dries you; shown on the *You* sheet; protection against fire.
-3. **Things that break** (the director's playtest note: a wall of stools in a doorway): damage and toughness on kinds, *broken* as a state, smashed in a fight with a weapon.
-4. **Fear and other effects on the mind** with B8f and magic (B9): a spell is an ability that applies effects.
+1. **Wet people:** rain soaks you through the hours, a fire dries you; shown on the *You* sheet; protection against fire.
+2. **Things that break** (the director's playtest note: a wall of stools in a doorway): damage and toughness on kinds, *broken* as a state, smashed in a fight with a weapon.
+3. **Fear and other effects on the mind** with B8f and magic (B9): a spell is an ability that applies effects.
+4. **People fleeing fire and fetching water** (behaviours).
 5. **Houses burning** (thatch catches, a house fire is 3D6–5D6), grass and trees.

@@ -2,6 +2,14 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-17 — Effects (B7), second slice: people and fire
+
+- **Standing in a fire burns you**, outside a fight, by the fight rules. Each round of 4 seconds you take a burn: the fire's dice, less any wet, **+1D6 for each round you've already stood in it**. It can set your clothes alight. This holds for you and for the map's people, indoors and out.
+- **Alight, you try to put it out** each round: Speed against the fire's difficulty, **+3D6 with a bucket in your hands**. If it's not out, it burns at the end of the round: its fatigue, then a shock roll. Senseless and still burning, it's a death roll.
+- A flame follows whoever is alight. You're told when it burns you, when your clothes catch and when you beat it out.
+- **Not yet:** choosing to put yourself out (it happens by itself, as anyone would), others helping, people running from fire.
+- Tests: 958 unit tests (2 new: burned more the longer you stand in it; water helps put yourself out); the effects browser test now walks into the burning stool.
+
 ## 2026-11-17 — Effects (B7), first slice: things burn
 
 *B7 was agreed as next on 2026-11-10. [The design](design/effects.md) is new; say if its shape is wrong before more is built on it.*

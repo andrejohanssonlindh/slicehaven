@@ -38,6 +38,11 @@ describe('spike3d effects', () => {
     for (let i = 0; i < 2; i++) await page.click('#zoom button[data-zoom="1"]');
     await page.waitForTimeout(1500);
     await page.screenshot({ path: `${OUT}spike3d-effects-burning.png` });
+    // Standing in it burns you (outside a fight, the rules' burn each round).
+    await w(`(w.placeHeroAt(${s.x}, ${s.z + 0.3}), 0)`);
+    for (let i = 0; i < 2; i++) await w('(w.effects.round(), 0)');
+    expect(await w("w.fights.injuriesOf('hero') !== null")).toBe(true);
+    await w(`(w.placeHeroAt(${s.x + 1.5}, ${s.z + 1.5}), 0)`);
     // Put out (with a strong Speed it takes).
     const d = (await w(`w.acting.act('verb:douse', ${t}, ${strong})`)) as { done: boolean; success?: boolean };
     expect(d.done).toBe(true);

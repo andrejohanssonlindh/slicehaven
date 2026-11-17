@@ -1,4 +1,6 @@
-import { rollTest } from '../dice';
+import { type Roll, rollTest } from '../dice';
+import type { Dice } from '../chargen/tables';
+import { type DamageType, type HitResult, type Injuries, type PhaseEnd, type WoundTableDef, burnPool, endOfPhase, rollHit } from '../damage';
 import type { Rng } from '../rng';
 import type { StateDef } from './state';
 
@@ -109,6 +111,76 @@ export function burnRound(things: Burnable[], sources: readonly FireSource[], ru
     if (rollTest({ n: dice, mod: 0 }, m.catches, rng).success) out.push({ id: t.id, kind: t.kind, burning: 1, burnt: false, why: 'caught', from: best.id });
   }
   return out;
+}
+
+// ── People and fire, outside a fight (the second slice) ─────────────────────────────────────────────────────────
+
+/** Someone near the fires, as the rules need them for a round. */
+export interface PersonInFire {
+  x: number;
+  z: number;
+  house: string | null;
+  level: number;
+  injuries: Injuries;
+  vitality: Dice;
+  /** Their Speed, to put fire on them out (the rules: `Förflyttning` against its difficulty). */
+  speed: Dice;
+  /** Dice of wet on them, taken off a fire's dice. */
+  wet: number;
+  /** Dice of water at hand (a bucket held: 3). */
+  water: number;
+  /** Rounds in a row they have stood in fire (the rules: lasting exposure +1D6 a round). */
+  exposed: number;
+}
+
+export interface PersonFireRound {
+  injuries: Injuries;
+  /** The burn, if they stood in fire. */
+  hit: HitResult | null;
+  /** Their try at putting out the fire on them, if they were alight. */
+  putOut: Roll | null;
+  end: PhaseEnd | null;
+  exposed: number;
+}
+
+/** How close counts as standing in a fire, metres: half a metre and a bit for each of its dice. */
+export const inFireReach = (dice: number): number => 0.45 + 0.08 * dice;
+
+/**
+ * A round for someone near fire, outside a fight. Standing in one (the strongest that touches them), they take a
+ * burn from the rules (its dice less their wet, +1D6 for each round already in it), which may set them alight. Alight,
+ * they try to put it out (Speed, with any water at hand, against its difficulty). Then the end of the phase: fire's
+ * fatigue, the shock roll, a death roll for the senseless still burning.
+ */
+export function personFireRound(p: PersonInFire, fires: readonly FireSource[], tables: Record<DamageType, WoundTableDef>, rng: Rng): PersonFireRound {
+  let injuries = p.injuries;
+  if (injuries.dead) return { injuries, hit: null, putOut: null, end: null, exposed: 0 };
+  let touching: FireSource | null = null;
+  for (const f of fires) {
+    if (f.house !== p.house || f.level !== p.level) continue;
+    if (Math.hypot(f.x - p.x, f.z - p.z) > inFireReach(f.dice)) continue;
+    if (!touching || f.dice > touching.dice) touching = f;
+  }
+  let hit: HitResult | null = null;
+  const exposed = touching ? p.exposed + 1 : 0;
+  if (touching) {
+    const damage = burnPool(touching.dice, -p.wet, p.exposed);
+    if (damage.n > 0) {
+      hit = rollHit({ type: 'burn', damage, armour: 0, vitality: p.vitality, victim: injuries, burn: 'fire' }, tables, rng);
+      injuries = hit.after;
+    }
+  }
+  let putOut: Roll | null = null;
+  if (injuries.ignited && !injuries.out && !injuries.dead) {
+    putOut = rollTest({ n: p.speed.n + p.water, mod: p.speed.mod }, injuries.ignited.diff, rng, 'Put out the fire');
+    if (putOut.success) injuries = { ...injuries, ignited: null };
+  }
+  let end: PhaseEnd | null = null;
+  if (injuries.ignited || injuries.shockDue) {
+    end = endOfPhase(injuries, p.vitality, rng);
+    injuries = end.injuries;
+  }
+  return { injuries, hit, putOut, end, exposed };
 }
 
 /** Dice of wet on things out of doors, from the weather: soaked through in a storm, wet in rain, damp for a while after. */
