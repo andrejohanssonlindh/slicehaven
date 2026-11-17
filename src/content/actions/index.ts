@@ -1,5 +1,6 @@
 import type { ActionLibrary, FactDef, GateDef, VerbDef } from '../../core/world3d/actions';
 import { FACTS } from './facts';
+import { rollableName } from '../rollables';
 
 /**
  * What the action frame runs on (`core/world3d/actions.ts`, design: director/design/actions.md): plain verbs in
@@ -27,4 +28,5 @@ export const ACTIONS: ActionLibrary = {
   verbs: byId(all(verbFiles), 'verbs'),
   gates: byId(all(gateFiles), 'gates'),
   facts: byId<FactDef>(FACTS, 'facts'),
+  skillName: rollableName,
 };

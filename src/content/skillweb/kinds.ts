@@ -29,6 +29,8 @@ export const KIND_PARENTS: Library['parents'] = {
   lock: 'structure',
   fire: 'feature',
   water: 'feature',
+  // Water you can fish and swim in (a lake, a stream), not water drawn from a well or standing in a tub.
+  'open-water': 'water',
   gap: 'feature',
   trail: 'feature',
   item: 'thing',

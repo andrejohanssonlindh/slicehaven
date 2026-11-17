@@ -285,6 +285,8 @@ export interface ActionLibrary {
   verbs: Record<string, VerbDef>;
   gates: Record<string, GateDef>;
   facts: Record<string, FactDef>;
+  /** A skill's or attribute's name in lines ("Survival" for `Vildmarksvana`); left out, the id. */
+  skillName?: (id: string) => string;
 }
 
 /** How a thing is called in lines: its kind's `name`, else its id with spaces ("torchpost" stays one word). */
@@ -459,7 +461,12 @@ export function perform(offer: string, target: ActTarget | null, at: Spot, doer:
       skill = use.skill;
       roll = rollTest(use.dice, difficulty, world.rng);
       success = !!roll.success;
-      if (fallback) events.push({ kind: 'say', line: { text: 'No fitting skill: an attribute instead, at −2D6.', tone: 'info' } });
+      if (fallback) {
+        // Say which skill was missing and what stood in (the director wondered why making a fire wasn't Survival: it is).
+        const nm = lib.skillName ?? ((id: string) => id);
+        const want = v.roll.skills.map(nm).join(' or ');
+        events.push({ kind: 'say', line: { text: `You don't have ${want || 'a fitting skill'}: ${nm(fallback.skill)} instead, at −2D6.`, tone: 'info' } });
+      }
       if (easier.length) events.push({ kind: 'say', line: { text: `Easier: ${easier.join(', ')}.`, tone: 'info' } });
       if (harder.length) events.push({ kind: 'say', line: { text: `Harder: ${harder.join(', ')}.`, tone: 'info' } });
     } else {

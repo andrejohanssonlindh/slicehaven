@@ -76,11 +76,124 @@ export function makeOrb(size = 1, count = 14): Flame {
   return { object: mesh, tick, dispose: disposer(mesh) };
 }
 
+/** The pixel fire's 37 heats, 0 (nothing) to 36 (white-hot): dark red at the tip, through orange, to pale yellow at the root. */
+const FIRE_HEATS = 37;
+const FIRE_STOPS: [number, number][] = [[0, 0x1c0604], [6, 0x5a1206], [12, 0xa02408], [18, 0xd8480c], [24, 0xf08a1c], [30, 0xffc848], [36, 0xfff4c8]];
+const FIRE_PALETTE: number[][] = Array.from({ length: FIRE_HEATS }, (_, v) => {
+  let i = 0;
+  while (i < FIRE_STOPS.length - 2 && FIRE_STOPS[i + 1][0] < v) i++;
+  const [v0, c0] = FIRE_STOPS[i], [v1, c1] = FIRE_STOPS[i + 1];
+  const f = Math.min(1, Math.max(0, (v - v0) / (v1 - v0)));
+  const ch = (c: number, s: number): number => (c >> s) & 255;
+  return [16, 8, 0].map((s) => Math.round(ch(c0, s) + (ch(c1, s) - ch(c0, s)) * f));
+});
+
 /**
+ * A pixel fire (the director's rule, the old demo fire): a grid of heats 0–36; each step every cell takes the heat of
+ * the cell below it, less a random 0–2, and lands that same 0–2 cells over toward the wind (still air: jitters either
+ * way). The bottom row is the fuel: hot in the middle, cooler toward the edges, so it burns as a tongue and not a wall.
+ * Drawn on a card that turns to face the camera (it reads the same from every side), the wind taken across the card.
+ * @param size 1 = a campfire (about 0.8 m tall); a post torch is about 0.4.
+ */
+export function makeFlame(size = 1, _count = 18, seed = 0): Flame {
+  const W = 14, H = 24;
+  const heat = new Uint8Array(W * H);
+  const rgba = new Uint8Array(W * H * 4);
+  const tex = new THREE.DataTexture(rgba, W, H, THREE.RGBAFormat);
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.flipY = false;
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.5, side: THREE.DoubleSide, fog: false, depthWrite: false });
+  const geo = new THREE.PlaneGeometry(0.62 * size, 1.06 * size);
+  geo.translate(0, 0.5 * 1.06 * size - 0.04 * size, 0);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.frustumCulled = false;
+  // A small generator of its own, so each fire burns differently (the engine's look, not a rule: no seeded game rng).
+  let s = (seed * 2654435761 + 12345) >>> 0 || 1;
+  const rnd = (): number => {
+    s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0;
+    return s / 4294967296;
+  };
+  // How the wind lies across the card, from the camera each frame: -1 (to the card's left) .. 1 (right).
+  let across = 0;
+  let windNow = { x: 0, z: 0 };
+  const p = new THREE.Vector3();
+  mesh.onBeforeRender = (_r, _s, camera) => {
+    mesh.getWorldPosition(p);
+    const yaw = Math.atan2(camera.position.x - p.x, camera.position.z - p.z);
+    mesh.rotation.y = yaw;
+    // The card's right in the world is (cos yaw, 0, -sin yaw).
+    across = windNow.x * Math.cos(yaw) - windNow.z * Math.sin(yaw);
+  };
+  const fuel = (): void => {
+    const row = (H - 1) * W;
+    for (let x = 0; x < W; x++) {
+      const edge = Math.abs(x - (W - 1) / 2) / (W / 2); // 0 in the middle, 1 at the edge
+      const top = edge < 0.35 ? 36 : edge < 0.6 ? 30 : edge < 0.8 ? 18 : 0;
+      heat[row + x] = top ? Math.max(0, top - Math.floor(rnd() * 6)) : 0;
+    }
+  };
+  const step = (): void => {
+    fuel();
+    const dir = across > 0.2 ? 1 : across < -0.2 ? -1 : 0;
+    for (let y = 0; y < H - 1; y++) {
+      for (let x = 0; x < W; x++) {
+        const below = heat[(y + 1) * W + x];
+        const r = Math.floor(rnd() * 3); // 0, 1 or 2
+        // Toward the wind by the same amount it cooled; in still air a jitter either way.
+        const dx = dir !== 0 ? dir * r : r - 1;
+        const tx = x + dx;
+        if (tx < 0 || tx >= W) continue;
+        heat[y * W + tx] = Math.max(0, below - r);
+      }
+    }
+  };
+  const paint = (): void => {
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        // (Row 0 of the texture is the bottom of the card: the grid's last row, the fuel.)
+        const v = heat[(H - 1 - y) * W + x];
+        const o = (y * W + x) * 4;
+        const c = FIRE_PALETTE[v];
+        rgba[o] = c[0]; rgba[o + 1] = c[1]; rgba[o + 2] = c[2];
+        // The coolest heats are gone: no dark box round the flame.
+        rgba[o + 3] = v > 7 ? 255 : 0;
+      }
+    }
+    tex.needsUpdate = true;
+  };
+  // Steps at a steady rate whatever the frame rate (the old demo ran at 35 a second); a long pause doesn't catch up.
+  const RATE = 24;
+  let last = -1;
+  for (let i = 0; i < H * 2; i++) step();
+  paint();
+  const tick = (t: number, wind = { x: 0, z: 0 }): void => {
+    windNow = wind;
+    if (last < 0) last = t;
+    let n = Math.min(3, Math.floor((t - last) * RATE));
+    if (n <= 0) return;
+    last += n / RATE;
+    if (t - last > 0.5) last = t;
+    while (n-- > 0) step();
+    paint();
+  };
+  return {
+    object: mesh,
+    tick,
+    dispose: () => {
+      geo.dispose();
+      mat.dispose();
+      tex.dispose();
+    },
+  };
+}
+
+/**
+ * The old boil of cubes, kept for comparison until the director has seen the pixel fire (`makeFlame`).
  * @param size 1 = a campfire (about 0.8 m tall); a post torch is about 0.4.
  * @param count how many flame bits (sparks come on top, a quarter as many)
  */
-export function makeFlame(size = 1, count = 18, seed = 0): Flame {
+export function makeCubeFlame(size = 1, count = 18, seed = 0): Flame {
   const sparks = Math.max(2, Math.round(count / 4));
   const n = count + sparks;
   const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ fog: false }), n);

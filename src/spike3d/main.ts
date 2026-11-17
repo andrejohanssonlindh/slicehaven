@@ -1,6 +1,7 @@
 import { type Sky, WIND_DIRS, clockText } from '../core/environment';
 import { ASPECTS, LEVEL_NAMES } from '../core/filaments';
 import { gearKinds, packageKinds } from '../content/things/gear';
+import { heroPerson } from '../content/spike3d';
 import { MAPS, compile, mapNamed } from '../content/maps';
 import { loadDraft } from '../mapmaker/drafts';
 import { clearWorld, loadWorld, saveWorld } from '../core/world3d/save';
@@ -398,6 +399,11 @@ function buildAdmin(): void {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'å' || e.key === 'Å') { e.preventDefault(); toggle(); }
     else if (e.key === 'Escape' && !ring.hidden) close();
+    // Space stops the hero where they are (not in a fight, not while typing, not on a focused button).
+    else if (e.key === ' ' && world.walking && !fight.on && !(e.target as HTMLElement)?.closest?.('input, textarea, select, button')) {
+      e.preventDefault();
+      world.stopHero();
+    }
   });
   ring.addEventListener('click', (e) => { if (e.target === ring) close(); });
   let saved = '0';
@@ -546,6 +552,8 @@ function bindInput(): void {
       }
       if (hit) {
         talk.close();
+        // A tap on yourself stops you where you are: what you can do here is for this spot.
+        if (hit === 'hero') world.stopHero();
         sheet.open(hit === 'hero' ? null : hit);
         down = null;
         return;
@@ -695,7 +703,7 @@ setTimeout(() => {
   mapName = map.name;
   if (map.problems.length) console.warn(`spike3d: map ${map.name} has problems:\n${map.problems.join('\n')}`);
   const size = Number(params.get('world')) || map.ground.size;
-  world = new SpikeWorld({ shells: Math.min(2, tier.shells), lights: Math.min(3, tier.lights), shadowMap: tier.shadowMap }, TIERS.high.grass, { ...map, ground: { ...map.ground, size } });
+  world = new SpikeWorld({ shells: Math.min(2, tier.shells), lights: Math.min(3, tier.lights), shadowMap: tier.shadowMap }, TIERS.high.grass, { ...map, ground: { ...map.ground, size } }, heroPerson(hero));
   world.grass.setCount(tier.grass);
   // Perception (B5): the hero sees with their own Alertness (and a tirak's darkvision); sight is rolled against 8,
   // shown on easy (the dice, and how sharp it is), rolled unseen otherwise.

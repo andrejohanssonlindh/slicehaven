@@ -73,7 +73,10 @@ describe('hooks on things', () => {
     expect(intents('door')).toEqual(expect.arrayContaining(['force', 'search']));
     expect(intents('tree')).toEqual(expect.arrayContaining(['climb', 'forage']));
     expect(intents('plant')).not.toContain('climb');
-    expect(intents('water')).toEqual(expect.arrayContaining(['swim', 'forage']));
+    expect(intents('open-water')).toEqual(expect.arrayContaining(['swim', 'forage']));
+    // A well is water, but not to fish or swim in (the director).
+    expect(intents('water')).not.toEqual(expect.arrayContaining(['swim']));
+    expect(intents('water')).not.toEqual(expect.arrayContaining(['forage']));
     expect(intents('gap')).toEqual(['jump']);
     expect(intents('trail')).toEqual(['track']);
     expect(intents('animal')).toEqual(expect.arrayContaining(['tame', 'forage']));
@@ -90,7 +93,7 @@ describe('hooks on things', () => {
       hooksFor({ kind, tags }, LIBRARY).find((h) => h.intention === intention)!.skills;
     expect(skills('tree', 'climb')).toContain('Klättra');
     expect(skills('gap', 'jump')).toContain('Hoppa');
-    expect(skills('water', 'swim')).toContain('Simma');
+    expect(skills('open-water', 'swim')).toContain('Simma');
     expect(skills('lock', 'pick')).toContain('E:Låsdyrkning');
     expect(skills('trail', 'track')).toContain('Spåra');
     expect(skills('human', 'heal', ['ill'])).toContain('Läkekonst');

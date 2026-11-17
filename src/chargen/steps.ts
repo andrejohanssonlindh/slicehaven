@@ -11,6 +11,9 @@ import { DRIVE_REWARDS, DRIVES } from '../content/chargen/drives';
 import { languageEn, SCRIPTS, SPOKEN } from '../content/chargen/languages';
 import { DWARF_HOUSES, nameCultureOf } from '../content/chargen/names';
 import { SKILLS } from '../content/chargen/skills';
+import { ATTR_ABOUT } from '../content/chargen/attributes';
+import { TAG_INFO, tagsOf } from '../content/skillweb/tags';
+import { t } from '../i18n';
 import { armouryHtml, armouryView, slotSummary } from './armoury';
 import { itemEn, PACKAGES, packageEn } from '../content/chargen/equipment';
 import { die, esc, grants, pendingHtml, pickHtml, sourceHtml } from './ui';
@@ -220,8 +223,9 @@ function environment(s: CharState, d: Derived): string {
 // ——— Event tables ———
 function events(s: CharState, d: Derived): string {
   const toStrike = d.sources.flatMap((x) => x.effects).reduce((n, e) => (e.k === 'stryk' ? n + e.n : n), 0);
-  const rows = d.slots
-    .map((slot, i) => {
+  // Grouped by table (the director: more logical than the order they came in); each still says where it came from.
+  const boxes = d.slots
+    .map((slot) => {
       const t = slot.table ? CONTENT.tables[baseTable(slot.table)] : undefined;
       const tablePick = d.pending.find((p) => p.key === `${slot.key}.t`);
       const vals = slot.rec?.values ?? [];
@@ -246,8 +250,8 @@ function events(s: CharState, d: Derived): string {
         : '';
       const rerollTaken = !!s.rerollUsed && d.slots.some((x) => x.key === s.rerollUsed && x.results.length > 0);
       const canReroll = !rerollTaken && slot.results.length > 0;
-      return `<div class="box ${slot.needsRoll || tablePick ? 'todo' : ''}">
-        <div class="row spread"><strong>${i + 1}. ${t ? esc(t.en) : 'Any table'}</strong><span class="small muted">from ${esc(slot.from)}</span></div>
+      const html = `<div class="box ${slot.needsRoll || tablePick ? 'todo' : ''}">
+        <div class="row spread"><span class="small muted">from ${esc(slot.from)}</span></div>
         ${slot.struck ? `<p class="muted">Given up. <button type="button" class="link small" data-act="strike" data-key="${esc(slot.key)}">take it back</button></p>` : `
         ${tablePick ? pendingHtml(tablePick) : slot.table && s.choices[`${slot.key}.t`] ? `<button type="button" class="link small" data-act="unchooseKey" data-key="${esc(slot.key)}.t">change table</button>` : ''}
         ${results}${offerHtml}
@@ -258,6 +262,16 @@ function events(s: CharState, d: Derived): string {
           ${toStrike ? `<button type="button" class="link small" data-act="strike" data-key="${esc(slot.key)}">give up this roll</button>` : ''}
         </div>`}
       </div>`;
+      return { group: t ? t.en : '', html };
+    });
+  // The tables in the order they first come up; rolls whose table is still to pick last.
+  const groups: string[] = [];
+  for (const b of boxes) if (!groups.includes(b.group)) groups.push(b.group);
+  groups.sort((a, b) => (a === '' ? 1 : 0) - (b === '' ? 1 : 0));
+  const rows = groups
+    .map((g) => {
+      const mine = boxes.filter((b) => b.group === g);
+      return `<h3>${g ? esc(g) : 'Any table: pick one'} <span class="small muted">· ${mine.length} ${mine.length === 1 ? 'roll' : 'rolls'}</span></h3>${mine.map((b) => b.html).join('')}`;
     })
     .join('');
   const empty = !CONTENT.tables.fa?.entries.length;
@@ -290,7 +304,7 @@ function attributes(s: CharState, d: Derived): string {
             .join('')}</select>`
         : '';
       const ex = s.attrExtra[a.attr] ?? 0;
-      return `<tr><td>${esc(ATTR_EN[a.attr])}</td>
+      return `<tr><td>${esc(ATTR_EN[a.attr])}<span class="sub">${esc(t(`attr.about.${a.attr}`, ATTR_ABOUT[a.attr]))}</span></td>
         <td class="n">${a.base + a.mods}${a.mods ? `<span class="sub">${a.base}${sgn(a.mods)}</span>` : ''}</td>
         ${lumps.length ? `<td class="n">${sel}</td>` : ''}
         ${showExtra ? `<td class="n"><span class="stepper"><button type="button" data-act="extra" data-attr="${a.attr}" data-d="-1">−</button><span class="v">${ex}</span><button type="button" data-act="extra" data-attr="${a.attr}" data-d="1" ${extraSpent >= extraBudget ? 'disabled' : ''}>+</button></span></td>` : ''}
@@ -321,6 +335,12 @@ function attributes(s: CharState, d: Derived): string {
 }
 
 // ——— Skills ———
+/** What a skill is used for, from the skill library's tags ("Used to: climb · search"); nothing for an untagged one. */
+function usedFor(id: string): string {
+  const uses = tagsOf(id).map((tag) => TAG_INFO[tag]?.label).filter((x): x is string => !!x);
+  return uses.length ? `<span class="sub">${esc(t('chargen.usedFor', 'Used to: {uses}', { uses: uses.map((u) => u.toLowerCase()).join(' · ') }))}</span>` : '';
+}
+
 const GROUP_ORDER = ['kunskap', 'mystik', 'rorelse', 'social', 'strid', 'vildmark', 'E', 'F', 'H', 'K'] as const;
 const GROUP_TITLE: Record<string, string> = { kunskap: 'Knowledge', mystik: 'Mystic', rorelse: 'Movement', social: 'Social', strid: 'Combat', vildmark: 'Wilderness', E: 'Expertises', F: 'Abilities', H: 'Crafts', K: 'Marks' };
 
@@ -377,7 +397,7 @@ function skills(s: CharState, d: Derived): string {
       ${visible
         .map((r) => {
           const can = pool && poolAllows(pool, r.id, CONTENT.skill);
-          return `<tr><td>${esc(r.en)}${r.talent ? '<span class="tag t">T</span>' : ''}${r.incompetent ? '<span class="tag i">I</span>' : ''}${r.blocked ? '<span class="tag i">B</span>' : ''}${from(r) ? `<span class="sub">${from(r)}</span>` : ''}</td>
+          return `<tr><td>${esc(r.en)}${r.talent ? '<span class="tag t">T</span>' : ''}${r.incompetent ? '<span class="tag i">I</span>' : ''}${r.blocked ? '<span class="tag i">B</span>' : ''}${from(r) ? `<span class="sub">${from(r)}</span>` : ''}${usedFor(r.id)}</td>
           <td class="n"><b>${r.value}</b><span class="sub">${esc(diceText(r.dice))}</span></td>
           ${buyable || specialist ? `<td class="n">${can ? stepper(r.id) : ''}</td>` : ''}</tr>`;
         })
@@ -456,14 +476,25 @@ function drives(s: CharState, d: Derived): string {
     return `<div class="box hi"><div class="row spread"><h3 style="margin:0">${label}: ${esc(dr?.en ?? sv)}</h3><button type="button" class="link small" data-act="dropDrive" data-val="${esc(sv)}">remove</button></div>
       ${dr ? `<p class="small muted">${esc(dr.blurb)}</p><ol class="small">${dr.levels.map((l) => `<li>${esc(l)}</li>`).join('')}</ol>` : ''}</div>`;
   };
+  // What each requirement names ("Aggression, Strife or the like"), as drives; met once one of them is taken. While
+  // one is unmet, the drives it doesn't name are greyed (the director), still tappable: "or the like" leaves room.
+  const picked = [s.drives.primary, s.drives.secondary].filter((x): x is string => !!x);
+  const needs = locked.map((r) => {
+    const names = /take (.+?) \(?(?:toward[^)]*\)? )?as (?:one of your drives|a drive)/.exec(r.text)?.[1] ?? '';
+    const words = names.replace(/\([^)]*\)/g, '').split(/,\s*|\s+or\s+/).map((w) => w.trim().toLowerCase()).filter((w) => w && w !== 'the like');
+    const fits = DRIVES.filter((x) => words.includes(x.en.toLowerCase())).map((x) => x.sv);
+    return { r, fits, met: fits.some((sv) => picked.includes(sv)) };
+  });
+  const wanted = new Set(needs.filter((n) => !n.met).flatMap((n) => n.fits));
   const cards = DRIVES.map((x) => {
     const on = s.drives.primary === x.sv || s.drives.secondary === x.sv;
     const rolled = rolls.some((r) => r >= x.lo && r <= x.hi);
-    return `<button type="button" class="card ${on ? 'on' : ''} ${rolled ? 'rolled' : ''}" data-act="drive" data-val="${esc(x.sv)}"><span class="name"><span class="num">${x.lo}–${x.hi}</span>${esc(x.en)}</span><span class="what">${esc(x.blurb)}</span></button>`;
+    const dim = wanted.size > 0 && !on && !wanted.has(x.sv);
+    return `<button type="button" class="card ${on ? 'on' : ''} ${rolled ? 'rolled' : ''} ${dim ? 'dim' : ''}" data-act="drive" data-val="${esc(x.sv)}"><span class="name"><span class="num">${x.lo}–${x.hi}</span>${esc(x.en)}</span><span class="what">${esc(x.blurb)}</span></button>`;
   }).join('');
   return `<h2>Drives</h2>
   ${intro('Your primary drive is the core of who you are; the secondary one is easier to give up. Each has three levels of deeds, and fulfilling them restores Focus and Wellbeing and heals the mind. Choose freely, or roll four times and keep two.')}
-  ${locked.length ? `<div class="box todo"><h3>Required by your past</h3>${locked.map((r) => `<p class="small">${esc(r.text)} <span class="muted">(${esc(r.from)})</span></p>`).join('')}</div>` : ''}
+  ${locked.length ? `<div class="box ${needs.every((n) => n.met) ? '' : 'todo'}"><h3>Required by your past</h3>${needs.map(({ r, met }) => `<p class="small">${met ? '✓ ' : ''}${esc(r.text)} <span class="muted">(${esc(r.from)})</span></p>`).join('')}${wanted.size ? '<p class="small muted">The drives that fit are lit below; the rest are greyed.</p>' : ''}</div>` : ''}
   ${box('Primary', s.drives.primary)}${box('Secondary', s.drives.secondary)}
   <div class="box"><p class="small">${DRIVE_REWARDS.map(esc).join('<br>')}</p></div>
   <div class="row"><button type="button" data-act="rollDrives">🎲 Roll 4 × d100</button>${rolls.length ? `<span class="dice">${rolls.map((r) => die(r, 'small')).join('')}</span>` : ''}</div>

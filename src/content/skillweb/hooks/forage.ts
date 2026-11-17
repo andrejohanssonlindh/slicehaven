@@ -12,6 +12,6 @@ export const FORAGE: HookDef[] = [
   forage.forKind('animal', 'Set a snare for the {name}',
     [say('A good snare, set where it runs. You will know by morning.', 'good'), flag('snared')],
     [say('You set it, but not well; the {name} is unlikely to oblige.')], { difficulty: DIFFICULTY.hard }),
-  forage.forKind('water', 'Fish in the {name}',
+  forage.forKind('open-water', 'Fish in the {name}',
     [say('A fair catch from the {name}.', 'good'), flag('foraged')], [say('The {name} gives you nothing.')]),
 ];

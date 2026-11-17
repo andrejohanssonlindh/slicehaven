@@ -33,7 +33,8 @@ const PIECES: Record<string, Piece> = {
   footlocker: floor('container', 'A footlocker bound with iron.'),
   table: floor(F, 'A plain trestle table.'),
   stool: floor(F, 'A three-legged stool.'),
-  broom: floor(F, 'A bucket and a broom.'),
+  broom: floor(F, 'A broom of birch twigs.'),
+  bucket: floor('container', 'A wooden bucket of water.'),
   keg: floor('container', 'A small keg.'),
   sacks: floor('container', 'Sacks of grain.'),
   basket: floor('container', 'A wicker basket.'),
@@ -80,6 +81,7 @@ const SEATS: Record<string, number> = { stool: 0.45, innbench: 0.45, bed: 0.5 };
 const TAKE: Record<string, { size: Size; weight: number; value?: number; importance?: number; shape?: ShapeDef }> = {
   stool: { size: 'hands', weight: 3, value: 2 },
   broom: { size: 'hands', weight: 1, value: 1 },
+  bucket: { size: 'hands', weight: 8, value: 1 },
   keg: { size: 'hands', weight: 16, value: 6 },
   sacks: { size: 'hands', weight: 20, value: 4 },
   basket: { size: 'bag', weight: 1, value: 1, shape: [3, 3] },

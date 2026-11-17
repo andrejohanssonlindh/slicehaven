@@ -45,6 +45,7 @@ const things: ThingDef[] = [
     { piece: 'keg', rule: side('right', 0.55) },
     { piece: 'sacks', rule: corner('frontRight') },
     { piece: 'broom', rule: side('left', 0.9) },
+    { piece: 'bucket', rule: side('left', 0.78) },
     { piece: 'basket', rule: free },
   ]),
   {
@@ -127,7 +128,8 @@ const things: ThingDef[] = [
   room('horsestall', 'room', 'A horse’s stall, on straw.', [
     { piece: 'straw', rule: center(0, 0.1) },
     { piece: 'hayRack', rule: back(0.5), lift: 22 },
-    { piece: 'broom', rule: corner('backRight') },
+    { piece: 'bucket', rule: corner('backRight') },
+    { piece: 'broom', rule: corner('backLeft') },
   ]),
   // The aisle: hay, tack, a water barrel, a chest of gear.
   room('aisle', 'room', 'A stable’s aisle: hay, tack, a chest of gear.', [

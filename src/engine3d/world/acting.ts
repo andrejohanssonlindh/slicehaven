@@ -171,9 +171,11 @@ export class Acting {
    */
   act(offer: string, target: ActTarget | null, doer: Doer, at: Spot = target ?? this.w.heroSpot()): ActResult {
     const w = this.w;
+    const hero = doer.id === 'hero';
+    // Whatever the hero tries, they stand still for it (the director: a fire was made while walking on).
+    if (hero) w.stopHero();
     const r = perform(offer, target, at, doer, this.world, ACTIONS);
     if (r.done) this.remember({ who: doer.id, offer, target: target?.id ?? null, skill: r.skill ?? null, success: r.success ?? true });
-    const hero = doer.id === 'hero';
     for (const e of r.events) {
       if (e.kind === 'time' && hero && w.weather.hour !== null) w.weather.advance(e.minutes / 60);
       else if (e.kind === 'make' && e.thing === 'campfire') w.lights.lightFire();

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { type FurnishedRoom, furnishHouse } from '../../content/furnish';
 import { mapNamed } from '../../content/maps';
 import { HERO_PERSON, streamingFilamentWorld } from '../../content/spike3d';
+import type { PersonSpec } from '../../core/persons';
 import { THINGS } from '../../content/things';
 import type { CompiledMap } from '../../core/world3d/mapgen';
 import { type FSource, FilamentField, HEARTH_FIRE } from '../../core/world3d/filaments3d';
@@ -247,7 +248,7 @@ export class SpikeWorld {
   private seeOrder: Person[] = [];
   private seeV = new THREE.Vector3();
 
-  constructor(settings: WorldSettings, grassCount: number, map: Pick<CompiledMap, 'ground' | 'layout' | 'hero' | 'cast' | 'places' | 'events'> & Partial<Pick<CompiledMap, 'placed' | 'culture'>> = mapNamed('spike')) {
+  constructor(settings: WorldSettings, grassCount: number, map: Pick<CompiledMap, 'ground' | 'layout' | 'hero' | 'cast' | 'places' | 'events'> & Partial<Pick<CompiledMap, 'placed' | 'culture'>> = mapNamed('spike'), heroSpec: PersonSpec = HERO_PERSON) {
     this.settings = settings;
     const { ground, layout } = map;
     const g = ground;
@@ -316,8 +317,8 @@ export class SpikeWorld {
     this.schedule = new Schedule(this, map.places, map.events);
     this.schedule.addCast(map.cast);
     // The hero. Tap the ground and they walk there.
-    this.heroFig = personFigure(HERO_PERSON, this.yaw);
-    this.people.push({ id: 'hero', spec: HERO_PERSON, fig: this.heroFig, reveals: true });
+    this.heroFig = personFigure(heroSpec, this.yaw);
+    this.people.push({ id: 'hero', spec: heroSpec, fig: this.heroFig, reveals: true });
     this.heroBlob = blobShadow(0.32);
     this.placeHero();
     this.scene.add(this.heroFig.place, this.heroBlob);

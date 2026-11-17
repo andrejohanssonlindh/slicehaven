@@ -143,7 +143,8 @@ export async function showRolls(rolls: Roll[], opts: ShowOpts = {}): Promise<voi
     }
     root.append(lines);
     if ((opts.close ?? set.diceClose) === 'ok') {
-      // Stays until the player presses OK (floating at the right, above the result); a tap elsewhere does nothing.
+      // Stays until the player moves on: OK, a tap anywhere, Enter or Space (the director). A tap in the first moment
+      // after the result shows is ignored, so a quick double tap meant to skip the throw doesn't close it unseen.
       const ok = document.createElement('button');
       ok.className = 'dice-ok';
       ok.type = 'button';
@@ -152,7 +153,20 @@ export async function showRolls(rolls: Roll[], opts: ShowOpts = {}): Promise<voi
       ok.addEventListener('pointerdown', (e) => e.stopPropagation());
       root.append(ok);
       ok.focus({ preventScroll: true });
-      await new Promise<void>((r) => ok.addEventListener('click', () => r(), { once: true }));
+      const shownAt = performance.now();
+      await new Promise<void>((r) => {
+        const done = (): void => { window.removeEventListener('keydown', onKey, true); r(); };
+        const onKey = (e: KeyboardEvent): void => {
+          if (e.key !== 'Enter' && e.key !== ' ') return;
+          // Ours alone: the page under the dice must not also see it (Space stops the hero there).
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          if (!e.repeat) done();
+        };
+        window.addEventListener('keydown', onKey, true);
+        ok.addEventListener('click', done, { once: true });
+        waiting.push(() => { if (performance.now() - shownAt > 250) done(); else waiting.push(() => done()); });
+      });
     } else {
       // A tap during the throw lands the dice; the next one closes the result.
       await wait(level === 'result' ? 2200 : 1600, nextTap());

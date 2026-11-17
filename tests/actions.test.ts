@@ -102,7 +102,8 @@ describe('the action frame', () => {
     const r = perform('verb:light', hearth, hearth, plain, w, ACTIONS);
     expect(r.skill).toBe('attr:Förflyttning');
     expect(r.roll?.dice).toEqual({ n: 1, mod: 0 });
-    expect(r.events.some((e) => e.kind === 'say' && /attribute/.test(e.line.text))).toBe(true);
+    // It names what was missing and what stood in ("You don't have Survival: Speed instead, at −2D6").
+    expect(r.events.some((e) => e.kind === 'say' && /You don't have .+ instead, at −2D6/.test(e.line.text))).toBe(true);
   });
 
   it('refuses a requirement with its reason and changes nothing: no fire indoors or among the houses', () => {

@@ -33,6 +33,7 @@ export function pageHero(): Hero {
     if (s) {
       const d = derive(s, CONTENT);
       const h = heroFromChar(s.details?.name ?? '', d);
+      h.gender = s.details?.gender || undefined;
       // What they own from the creator: every weapon and shield chosen or bought (several are possible).
       const owned = [...Object.values(s.equipment.weapons), ...s.equipment.bought.flatMap((b) => Array<string>(Math.max(1, b.qty)).fill(b.name))];
       h.gear = owned.filter((n) => WEAPONS.some((w) => w.sv === n) || SHIELDS.some((w) => w.sv === n));

@@ -26,8 +26,24 @@ export const SPIKE_WALK = SPIKE.places.lane?.kind === 'path' ? SPIKE.places.lane
 /** Where the hero starts: by the first door, on the mud. */
 export const SPIKE_HERO = SPIKE.hero;
 
-/** Who the hero is, until they are the player's own character from the creator: a farmer, as the spike always had. */
+/** Who the hero is when no character comes from the creator: a farmer, as the spike always had (the shepherd). */
 export const HERO_PERSON: PersonSpec = { is: ['human', 'job-farmer'], seed: 1, look: { build: 'avg', skin: 'tan', hair: 'brown', beard: 'stubble' } };
+
+/**
+ * The hero's body from the creator (the director: "the character looks the same regardless of people"): their
+ * people's body and look, drawn from a seed of their name so it stays the same, their sex if the creator's gender
+ * field reads as one, a tirak's size from their people (`bazirk-trukher`). Clothes are still the farmer's until
+ * clothes and armour are things. Without a people from the creator: the shepherd.
+ */
+export function heroPerson(h: { name: string; from?: string; kind?: string; people?: string; gender?: string }): PersonSpec {
+  if (!h.kind || h.from === 'Default shepherd') return HERO_PERSON;
+  let seed = 7;
+  for (const c of h.name) seed = (seed * 31 + c.charCodeAt(0)) >>> 0;
+  const g = (h.gender ?? '').trim().toLowerCase();
+  const sex = /^(f|w|k|she|hon|kvinna|woman|female|girl)/.test(g) ? 'f' : /^(m|he|han|man|male|boy)/.test(g) ? 'm' : undefined;
+  const size = h.kind === 'tirak' ? /-(gurder|tiraker|trukher)$/.exec(h.people ?? '')?.[1] : undefined;
+  return { is: [h.kind, 'job-farmer'], seed, look: { ...(sex ? { sex } : {}), ...(size ? { size } : {}) } };
+}
 
 /** How near a house a place is still among homes, metres. */
 const SETTLED = 8;

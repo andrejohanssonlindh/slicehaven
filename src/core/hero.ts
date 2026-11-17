@@ -14,6 +14,8 @@ export interface Hero {
   kind?: string;
   /** The specific people (creator id, e.g. 'asharier'). */
   people?: string;
+  /** What the creator's gender field says, as written (free text): read for the body's look. */
+  gender?: string;
   /** Own facets (people library): homeland, faith, calling, people. Sharing one with someone can help. */
   tags?: string[];
   /** Load points from the build (a dwarf's −8): each taken off is a kilogram more carried (plan B6). */

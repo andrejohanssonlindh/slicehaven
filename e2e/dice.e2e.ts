@@ -74,11 +74,18 @@ describe('dice', () => {
     });
     await page.waitForSelector('.dice-ok', { timeout: 20_000 });
     await page.screenshot({ path: `${OUT}dice-glass-wide-many.png` });
-    // A tap elsewhere doesn't close it, nor does waiting.
-    await page.mouse.click(300, 150);
+    // Waiting doesn't close it; a tap anywhere does (the director: anywhere, Enter or Space moves on).
     await page.waitForTimeout(2500);
     expect(await page.locator('.dice-show').count()).toBe(1);
-    await page.locator('.dice-ok').click();
+    await page.mouse.click(300, 150);
+    await page.waitForSelector('.dice-show', { state: 'detached', timeout: 3_000 });
+    // Enter does too.
+    await page.evaluate(() => {
+      [...document.querySelectorAll<HTMLButtonElement>('#row-game button')].find((b) => b.textContent === 'Roll 10D6+2')!.click();
+    });
+    await page.waitForSelector('.dice-ok', { timeout: 20_000 });
+    await page.waitForTimeout(400);
+    await page.keyboard.press('Enter');
     await page.waitForSelector('.dice-show', { state: 'detached', timeout: 3_000 });
     expect(errors).toEqual([]);
   });

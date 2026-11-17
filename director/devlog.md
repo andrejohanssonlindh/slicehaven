@@ -2,6 +2,22 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-17 — Your playtest notes outside combat: fixes, and the rest on the plan
+
+*Your notes from the last week or two of play. Everything is sorted [on the plan](todo.md) (the list under "Next up"), with what was fixed and where the rest went.*
+
+- **The well** is water you draw, not water you fish or swim in: those two tries are now on a new kind, *open water* (lakes and streams, which can't be tapped yet). Drinking and filling skins wait for B14.
+- **The broom and the bucket** were one model, so picking up the broom took the bucket too. Now they're two things; the bucket stands by the broom in homes and in the stall's corner.
+- **Standing still to act:** whatever you try, you stop walking first (the fire made while walking). Tapping yourself stops you; **Space** stops you.
+- **Dice:** the result moves on with a tap anywhere, Enter or Space, not only OK. A tap in the first quarter second is ignored, so a double tap meant to skip the throw doesn't close the result unseen.
+- **The fire roll** was Survival all along; without it the rules let you try with Speed at −2D6. The line now names both.
+- **Your character's body** follows the creator: a dwarf, elf, tirak (in their size) or missla looks like one, and the gender field sets the sex when it reads as one. Same name, same look. The shepherd is unchanged.
+- **Pixel fire, your rule:** a grid of 37 heats; every step each cell takes the heat below it less 0–2 and lands 0–2 cells toward the wind (in still air it jitters either way). The fuel row is hot in the middle and cool at the edges, so it burns as a tongue. It's drawn on a card that turns to the camera, with the wind taken across it. Torches, hearths and campfires all use it. The old cube flame is kept in the code (`makeCubeFlame`) until you've seen this one.
+- **Creator:** event rolls are grouped by table with a count; each still says "from …". Each attribute has a line on what it does (our words). Each skill says what it's used for, from the skill library's tags. Many weapon and expertise skills have no tags yet, so they show nothing. A drive your past requires greys the drives that don't fit until one is taken, then gets a tick.
+- **On "Combat units (2) · With one hand free…":** the first part is two skill units for the combat group; the rule after it is only text today, like about 130 such rules in the event tables. That's the new plan item B15.
+- **A trap found:** with a narrower broom, the room solver laid out the inn's taproom so the hearth was walled off and the innkeeper couldn't reach it. The broom keeps the old 0.5 m footprint. The solver doesn't check that a room's pieces can still be reached; noted on [how we build things](design/architecture.md#debts).
+- Tests: 946 unit tests (1 new: the hero's body from the creator; 2 changed: water hooks, the fallback line); browser tests for dice (now tap anywhere and Enter), acting, rooms, carrying, fire and the creator pages.
+
 ## 2026-11-17 — Two-handed hammers, shields with a back, the edge or the point, a killing blow per weapon
 
 *From your second review.* [Details](design/animation.md#your-second-review-2026-11-17-done).
