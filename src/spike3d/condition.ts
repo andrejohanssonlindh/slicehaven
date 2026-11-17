@@ -264,6 +264,16 @@ export function makeCondition(world: () => SpikeWorld, hero: Hero): ConditionShe
     titleEl.textContent = title ?? t('cond.title', 'Your condition');
     const inj = i ?? world().fights.injuriesOf('hero');
     renderCondition(body, inj ?? unhurt(), vitality ?? vit(), exact ?? (own ? rules.ownExact : rules.foeExact), rules.restMinutes, seen, own || (exact ?? rules.foeExact));
+    // Wet (plan B7): soaked clothes or the rain itself, dice off any fire's.
+    const wet = own ? world().effects.wetOf('hero') : 0;
+    if (wet > 0) {
+      const p = document.createElement('p');
+      p.className = 'small';
+      p.textContent = wet >= 4 ? t('cond.wet4', 'Out in a downpour: −4D6 against fire.')
+        : wet >= 2 ? t('cond.wet2', 'Soaked through: −2D6 against fire.')
+          : t('cond.wet1', 'Wet clothes: −1D6 against fire.');
+      body.append(p);
+    }
     el.hidden = false;
   }
   openBtn.addEventListener('click', () => (el.hidden ? open() : (el.hidden = true)));

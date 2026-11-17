@@ -28,9 +28,13 @@ The rules already have most of this **for people**, from the fight rules: *ignit
 - A flame follows whoever is alight. The hero is told: *The fire burns you*, *Your clothes catch fire!*, *You beat out the flames on you.*
 - **Not yet:** a choice to put yourself out (it's done for you, as anyone would), rolling on the ground, others helping; the map's people fleeing a fire or fetching water (a behaviour under `sees`).
 
+## Wet people (third slice, built 2026-11-17)
+- Out in the rain your clothes soak: wet (−1D6 against fire) in about two and a half minutes of play, soaked through (−2D6) in five, twice as fast in a storm. Standing out in a downpour is −4D6 while you're in it (the rules' numbers).
+- Under a roof you dry in about ten minutes, by a lit fire (a hearth too) in two; out of doors when the rain stops, slower.
+- The *You* sheet says how wet you are. Everyone of the map gets wet the same way. Not saved yet (a reload dries you).
+
 ## Next slices (not built)
-1. **Wet people:** rain soaks you through the hours, a fire dries you; shown on the *You* sheet; protection against fire.
-2. **Things that break** (the director's playtest note: a wall of stools in a doorway): damage and toughness on kinds, *broken* as a state, smashed in a fight with a weapon.
-3. **Fear and other effects on the mind** with B8f and magic (B9): a spell is an ability that applies effects.
-4. **People fleeing fire and fetching water** (behaviours).
-5. **Houses burning** (thatch catches, a house fire is 3D6–5D6), grass and trees.
+1. **Things that break** (the director's playtest note: a wall of stools in a doorway): damage and toughness on kinds, *broken* as a state, smashed in a fight with a weapon.
+2. **Fear and other effects on the mind** with B8f and magic (B9): a spell is an ability that applies effects.
+3. **People fleeing fire and fetching water** (behaviours).
+4. **Houses burning** (thatch catches, a house fire is 3D6–5D6), grass and trees.

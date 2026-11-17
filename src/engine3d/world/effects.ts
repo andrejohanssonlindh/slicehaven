@@ -62,11 +62,14 @@ export class Effects {
     const things: Burnable[] = [];
     const sources: FireSource[] = [];
     const groups = new Map<string, THREE.Object3D>();
+    const warm: { x: number; z: number; house: string | null }[] = [];
     const v = new THREE.Vector3();
     for (const { g, tag } of this.standing()) {
       if (!THINGS.has(tag.kind) || groups.has(tag.id)) continue;
       const k = THINGS.get(tag.kind);
       g.getWorldPosition(v);
+      // Any lit fire warms and dries whoever is near it (a hearth too, which sets nothing alight).
+      if (k.chain.includes('fire') && w.lights.fireLit({ id: tag.id, kind: tag.kind })) warm.push({ x: v.x, z: v.z, house: tag.house });
       if (k.spreads && w.lights.fireLit({ id: tag.id, kind: tag.kind })) {
         sources.push({ id: tag.id, x: v.x, z: v.z, house: tag.house, level: tag.level, dice: k.spreads });
       }
@@ -95,10 +98,42 @@ export class Effects {
     }
     // A flame whose thing is no longer standing (streamed out, picked up) goes too.
     for (const id of [...this.flames.keys()]) if (!groups.has(id) && !this.people.has(id)) this.show(id, 0, null);
+    this.weatherRound(warm);
     // People in fire, or alight (a fight runs its own rounds).
     if (w.fights.inFight) return;
     const fires: FireSource[] = [...sources, ...things.filter((t) => Number(states.get(t.id, t.kind, 'burning')) > 0).map((t) => ({ id: t.id, x: t.x, z: t.z, house: t.house, level: t.level, dice: Number(states.get(t.id, t.kind, 'burning')) }))];
-    this.peopleRound(fires, wetOut);
+    this.peopleRound(fires);
+  }
+
+  /** How soaked each person's clothes are, in dice against fire (0..2: the rules' soaked clothes −1D6, soaked through −2D6). Not saved. */
+  private readonly soaked = new Map<string, number>();
+
+  /**
+   * Dice of wet on someone now: their soaked clothes, or the rain itself if they stand out in it and it's worse (a
+   * downpour −4D6).
+   */
+  wetOf(id: string): number {
+    const w = this.w;
+    const a = id === 'hero' ? w.hero : w.cast.find((c) => c.who.id === id)?.mind.actor;
+    const raining = w.weather.rain > 0.3;
+    const now = a && !a.house && raining ? weatherWet(w.weather.rain, w.weather.sky === 'storm', 1) : 0;
+    return Math.floor(Math.max(this.soaked.get(id) ?? 0, now));
+  }
+
+  /** A round of rain and drying: out in the rain clothes soak (through in about five minutes); under a roof they dry, by a lit fire fast. */
+  private weatherRound(warm: { x: number; z: number; house: string | null }[]): void {
+    const w = this.w, raining = w.weather.rain > 0.3, r = BURNING.round;
+    const who = [{ id: 'hero', a: w.hero }, ...w.cast.map((c) => ({ id: c.who.id, a: c.mind.actor }))];
+    for (const { id, a } of who) {
+      let s = this.soaked.get(id) ?? 0;
+      if (!a.house && raining) s = Math.min(2, s + (r / 150) * (w.weather.sky === 'storm' ? 2 : 1));
+      else {
+        const byFire = warm.some((f) => f.house === a.house && Math.hypot(f.x - a.x, f.z - a.z) < 2.5);
+        s = Math.max(0, s - r / (byFire ? 60 : a.house ? 300 : 600));
+      }
+      if (s > 0) this.soaked.set(id, s);
+      else this.soaked.delete(id);
+    }
   }
 
   /** Rounds in a row each person has stood in fire. */
@@ -106,7 +141,7 @@ export class Effects {
   /** The flames on people alight, by id. */
   private readonly people = new Map<string, Torch>();
 
-  private peopleRound(fires: FireSource[], wetOut: number): void {
+  private peopleRound(fires: FireSource[]): void {
     const w = this.w;
     const who = [{ id: 'hero', a: w.hero }, ...w.cast.map((c) => ({ id: c.who.id, a: c.mind.actor }))];
     for (const { id, a } of who) {
@@ -122,7 +157,7 @@ export class Effects {
       const water = held && THINGS.has(held) ? THINGS.get(held).douses ?? 0 : 0;
       const r = personFireRound({
         x: a.x, z: a.z, house: a.house, level: a.level, injuries: before ?? unhurt(), vitality: doer.dice('attr:Livskraft'),
-        speed: doer.dice('attr:Förflyttning'), wet: a.house ? 0 : wetOut, water, exposed: this.exposed.get(id) ?? 0,
+        speed: doer.dice('attr:Förflyttning'), wet: this.wetOf(id), water, exposed: this.exposed.get(id) ?? 0,
       }, fires, WOUND_TABLES, this.rng);
       if (r.exposed) this.exposed.set(id, r.exposed);
       else this.exposed.delete(id);

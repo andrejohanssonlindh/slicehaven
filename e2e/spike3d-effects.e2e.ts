@@ -51,4 +51,18 @@ describe('spike3d effects', () => {
     }
     expect(errors).toEqual([]);
   });
+
+  it('out in a storm you get soaked, and stay wet a while under a roof', async () => {
+    const { page, errors } = await openPage(env, '/spike3d/?nogov&map=hamlet', { storage: quick });
+    await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 60_000 });
+    const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; return ${fn}; })()`);
+    await w("(w.weather.set('storm'), w.weather.rain = 1, 0)");
+    expect(await w("w.hero.house")).toBeNull();
+    expect(await w("w.effects.wetOf('hero')")).toBe(4);
+    for (let i = 0; i < 40; i++) await w('(w.effects.round(), 0)');
+    await w("(w.walkIn('inn'), 0)");
+    await page.waitForFunction(() => !(window as any).spike.world.walking, undefined, { timeout: 30_000 });
+    expect(await w("w.effects.wetOf('hero')")).toBe(2);
+    expect(errors).toEqual([]);
+  });
 });

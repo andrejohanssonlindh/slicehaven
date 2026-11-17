@@ -2,6 +2,14 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-17 — Effects (B7), third slice: getting wet
+
+- **Rain soaks you:** out in it, your clothes are wet (−1D6 against fire) after about two and a half minutes of play and soaked through (−2D6) after five. A storm is twice as fast, and standing out in a downpour counts −4D6 while you're in it, as the rules give.
+- **You dry** under a roof in about ten minutes, by any lit fire (a hearth too) in two.
+- The *You* sheet says how wet you are; the fire rules use it for you and for everyone of the map.
+- **Not yet:** saved (a reload dries you); shown on the body.
+- Tests: a new browser test (out in a storm, then in the inn).
+
 ## 2026-11-17 — Effects (B7), second slice: people and fire
 
 - **Standing in a fire burns you**, outside a fight, by the fight rules. Each round of 4 seconds you take a burn: the fire's dice, less any wet, **+1D6 for each round you've already stood in it**. It can set your clothes alight. This holds for you and for the map's people, indoors and out.
