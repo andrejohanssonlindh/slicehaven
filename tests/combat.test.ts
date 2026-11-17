@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   type Fight, type Fighter, type LogLine, DEMAND_EXTRA, acceptYield, attackPool, demandDifficulty, attackWhy, beaten, bestDamage, moreDamage, refuseYield, bonusDice, damageDice, defenceOptions, defencePool, dropFrom, fists, parseProps, pleaDifficulty,
-  resolveRound, roleOf, seizeInitiative, startFight, tacticFatigue, weaponFromRow, weaponOf,
+  resolveRound, roleOf, seizeInitiative, startFight, tacticFatigue, weaponFromRow, weaponOf, strikeWays, damageWith,
 } from '../src/core/combat';
 import { type Injuries, recoverFatigue, unhurt } from '../src/core/damage';
 import { Rng } from '../src/core/rng';
@@ -98,6 +98,37 @@ describe('weapons in hand', () => {
     const why = attackWhy(hurt, 'quick');
     expect(why.mods).toEqual([{ why: 'quick', n: 1 }, { why: 'drew', n: -1 }, { why: 'pain', n: -1 }, { why: 'rightArm', n: -1 }]);
     expect(why.dice).toEqual({ n: 2, mod: 0 });
+  });
+});
+
+describe('the edge or the point', () => {
+  const w = (sv: string) => weaponFromRow(row(sv), BASE, { n: 6, mod: 0 });
+
+  it('a weapon is worth striking with every way near its best: a rapier with point and edge, not its pommel', () => {
+    expect(strikeWays(w('Värja')).map((x) => x.type)).toEqual(['thrust', 'cut']);
+    expect(strikeWays(w('Stridssvärd')).map((x) => x.type)).toContain('thrust');
+    expect(strikeWays(w('Värja')).map((x) => x.type)).not.toContain('crush');
+    // A staff only bashes: nothing to choose.
+    expect(strikeWays(w('Stridsstav')).map((x) => x.type)).toEqual(['crush']);
+    for (const r of WEAPONS.filter((x) => x.melee)) expect(strikeWays(weaponFromRow(r, BASE, PHYS))[0]?.type ?? 'brawl', r.sv).toBe(bestDamage(weaponFromRow(r, BASE, PHYS)).type);
+  });
+
+  it('the blow is dealt the way chosen, and the best way when none is, or when the weapon can\'t', () => {
+    const rapier = w('Värja');
+    expect(damageWith(rapier, 'cut').type).toBe('cut');
+    expect(damageWith(rapier).type).toBe('thrust');
+    expect(damageWith(rapier, 'crush').type).toBe('thrust');
+    const blow = (strikeWith?: 'cut' | 'thrust') => {
+      const f = startFight([fighter('a', 0, 0, { weapon: { id: 'r', weapon: row('Värja') }, pools: { Svärd: { n: 12, mod: 0 } } }), fighter('b', 1, 1.5)]);
+      f.melee = { attacker: 0, opened: 0 };
+      const r = resolveRound(f, { a: { attack: 'standard', ...(strikeWith ? { strikeWith } : {}) }, b: { defend: 'standard' } }, RULES, Rng.fromSeed(5));
+      return r.log.find((l): l is Extract<LogLine, { k: 'attack' }> => l.k === 'attack')!;
+    };
+    expect(blow('cut')).toMatchObject({ hit: true, with: 'cut', type: 'cut' });
+    expect(blow('thrust')).toMatchObject({ with: 'thrust', type: 'thrust' });
+    expect(blow().with).toBe('thrust');
+    // The same dice were thrown either way: only the damage differs.
+    expect(blow('cut').attack.total).toBe(blow('thrust').attack.total);
   });
 });
 

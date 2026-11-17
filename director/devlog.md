@@ -2,6 +2,17 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-17 — Two-handed hammers, shields with a back, the edge or the point, a killing blow per weapon
+
+*From your second review.* [Details](design/animation.md#your-second-review-2026-11-17-done).
+
+- **The Binderakk hammer is held in both hands**, and so is any weapon too heavy for one (no one-handed use in its row, or 5D6 Physique or more for it). It was a club by its skill, so it had been swung like a mace. It has its own long model now.
+- **Shields no longer look see-through from behind:** round shields had no back face.
+- **Cut or thrust:** with a rapier, a sword, anything worth striking with more than one way, you pick how above the tactics (*Thrust 4D6+3 · Cut 3D6+2*), and it stays picked. The damage and the armour it meets follow the way chosen; the log says *You thrust*; a thrust has its own motion (a lunge). This is a small rules addition: before, a weapon always dealt its best kind of damage. Others still do.
+- **The killing stroke** is now one per kind of weapon, all aimed down at someone lying at your feet: a sword driven point down, an axe or mace brought down from behind, a great weapon in both hands from over the head, a spear or staff thrust down upright, a fist dropped.
+- **Try it:** arena, take the rapier from the rack: the two buttons are above Standard / Quick / Powerful. `/models/` → Motions: *Right hand* binderakk hammer; *Act* thrust or finish with any weapon.
+- Tests: 942 unit tests (7 new: ways to strike, the choice in a round, thrust and finish found per weapon, heavy weapons); a new browser test (cut, then thrust, with a rapier); fight, models, pages, carry and save browser tests.
+
 ## 2026-11-17 — Weapons held as they should be, feet on the ground, a gallery that works
 
 *From your review: "everything is held one-handed", "spears are not pointed with but are just moved forward", the test page "has to be coaxed"; plus the list I had left undone.* [The design](design/animation.md#weapons-in-the-hands-your-review-of-2026-11-17).

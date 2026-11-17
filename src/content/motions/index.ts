@@ -3,7 +3,8 @@ import { type Motion, libraryProblems } from '../../core/world3d/motion';
 /**
  * Every motion (plan B8g; rules `core/world3d/motion.ts`), one file each in this folder, found by itself. A file's
  * default export is a motion or a small family of them (an array). Its id is the file's name, or for a family its
- * own. A new motion: a new file; check it on `/models/` (Motions).
+ * own. A new motion: a new file; check it on `/models/` (Motions). (A vitest run that misses a brand-new file has a
+ * stale glob: change this file once and it sees it.)
  */
 const files = import.meta.glob<{ default: Motion | Motion[] }>('./*.ts', { eager: true });
 

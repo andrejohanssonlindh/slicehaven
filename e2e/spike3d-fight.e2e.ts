@@ -332,4 +332,46 @@ describe('spike3d fight', () => {
     await page.waitForFunction((h) => document.querySelector('#fight .head')?.textContent !== h, head, { timeout: 30_000 });
     expect(errors).toEqual([]);
   }, 200_000);
+
+  it('the edge or the point: with a rapier you pick how to strike, and the blow is told and shown that way', async () => {
+    const { page, errors } = await openPage(env, '/spike3d/?map=arena&nogov', { storage: quick });
+    await page.waitForFunction(() => !!(window as unknown as { spike?: unknown }).spike, undefined, { timeout: 90_000 });
+    const w = (fn: string) => page.evaluate(`(() => { const w = window.spike.world; const fight = window.spike.fight; return ${fn}; })()`);
+    await page.waitForTimeout(1500);
+    const rack = (await w(`(() => {
+      for (const lc of w.chunks.values()) for (const g of lc.standing.objects) if (g.userData.thing?.kind === 'weapon-rack') return w.acting.targetOf(g);
+      return null;
+    })()`)) as { id: string; x: number; z: number };
+    await w(`(w.placeHeroAt(${rack.x}, ${rack.z - 1.4}), window.spike.sheet.open(${JSON.stringify(rack)}), 0)`);
+    await page.click('#act .offers button:has-text("Take something")');
+    await page.click('#act .offers button:has-text("Rapier")');
+    expect(await w('w.carrying.holding')).toBe('rapier');
+    await w(`(window.spike.hero.dice['attr:Reaktion'] = { n: 9, mod: 0 }, 0)`);
+    await w(`(fight.start('gladiator'), 0)`);
+    const logHas = (text: string) => page.evaluate((x) => [...document.querySelectorAll('#fight .log p')].some((p) => (p.textContent ?? '').startsWith(x)), text);
+    // Close in, then strike: first with the edge, then with the point.
+    for (const [how, said] of [['cut', 'You strike'], ['thrust', 'You thrust']] as const) {
+      for (let rounds = 0; rounds < 25 && !(await logHas(said)); rounds++) {
+        await page.waitForSelector('#fight .mine button:not([disabled])', { state: 'attached', timeout: 90_000 });
+        const can = await page.$$eval('#fight .mine button:not([disabled])', (bs) => bs.map((b) => (b as HTMLElement).dataset.move ?? ''));
+        if (can.includes('atk:standard')) {
+          // The two ways show with their damage; the one picked stays lit.
+          expect(await page.$$eval('#fight .mine .strikes button', (bs) => bs.map((b) => (b as HTMLElement).dataset.strike))).toEqual(['thrust', 'cut']);
+          await tapMove(page, `#fight .mine .strikes button[data-strike="${how}"]`);
+          expect(await page.getAttribute(`#fight .mine .strikes button[data-strike="${how}"]`, 'class')).toContain('on');
+          if (how === 'thrust') await page.screenshot({ path: `${OUT}/fight-thrust.png` });
+          await tapMove(page, '#fight .mine button[data-move="atk:standard"]');
+        } else {
+          const pick = can.find((m) => m === 'def:parry:standard') ?? 'closein';
+          if (pick === 'closein' && !can.includes('closein') && can.includes('side:move')) await tapMove(page, '#fight .mine button[data-move="side:move"]');
+          await tapMove(page, `#fight .mine button[data-move="${pick}"]`);
+        }
+        await page.waitForTimeout(150);
+        const labels = await page.$$eval('#fight .mine .group.other button', (bs) => bs.map((b) => b.textContent ?? ''));
+        if (labels.some((l) => /^OK$|New game/.test(l))) break;
+      }
+      expect(await logHas(said), said).toBe(true);
+    }
+    expect(errors).toEqual([]);
+  }, 240_000);
 });

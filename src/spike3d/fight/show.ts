@@ -141,8 +141,10 @@ export function makePlayback(ctx: FightCtx): Playback {
    */
   async function exchange(l: Attack, landed: boolean): Promise<void> {
     const w = ctx.world();
-    const hitAt = w.figures.motionTiming(l.who, 'strike')?.contact ?? 0.35;
-    w.figures.play(l.who, 'strike');
+    // The point or the edge: a thrust has its own motion (a weapon with none thrusts as it strikes).
+    const blow: MotionAct = l.with === 'thrust' ? 'thrust' : 'strike';
+    const hitAt = w.figures.motionTiming(l.who, blow)?.contact ?? 0.35;
+    w.figures.play(l.who, blow);
     const meet: MotionAct | null = !l.hit && l.how !== 'none' ? l.how : null;
     if (meet) {
       const lead = Math.max(0, hitAt - (w.figures.motionTiming(l.target, meet)?.contact ?? 0));
@@ -197,7 +199,11 @@ export function makePlayback(ctx: FightCtx): Playback {
     const verdict = l.hit
       ? l.defend && l.attack.total === l.defend.total ? t('fight.tie', 'a tie: the attacker wins it') : t('fight.hits', 'it hits')
       : t(`fight.verdict.${l.how}`, VERDICT[l.how]);
-    const line = `${of(l.who, ['fight.strike.you', 'You strike{tactic}'], ['fight.strikes', '{who} strikes{tactic}'], { tactic })}: ${atkText} ${t('fight.against', 'against {whose}', { whose: whose(l.target) })} ${defText}: ${verdict}.`;
+    // (A thrust is said as one: the point, not the edge.)
+    const verb = l.with === 'thrust'
+      ? of(l.who, ['fight.thrust.you', 'You thrust{tactic}'], ['fight.thrusts', '{who} thrusts{tactic}'], { tactic })
+      : of(l.who, ['fight.strike.you', 'You strike{tactic}'], ['fight.strikes', '{who} strikes{tactic}'], { tactic });
+    const line = `${verb}: ${atkText} ${t('fight.against', 'against {whose}', { whose: whose(l.target) })} ${defText}: ${verdict}.`;
 
     // 1. Who hits: the attack, the defence written beside it.
     const rolls: Roll[] = [{ ...l.attack, label: t('fight.attackroll', '{who}: attack', { who: ctx.Name(l.who) }) }];

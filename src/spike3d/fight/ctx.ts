@@ -1,5 +1,6 @@
 import type { Dice } from '../../core/chargen/tables';
 import type { Choice, Fight, Fighter } from '../../core/combat';
+import type { DamageType } from '../../core/damage';
 import { DIFFICULTY_RULES } from '../../core/difficulty';
 import type { Hero } from '../../core/hero';
 import type { Rng } from '../../core/rng';
@@ -43,6 +44,11 @@ export interface FightState {
    * `look`: looking round for what lies about (the page's own, an Alertness roll), not a choice for the rules.
    */
   side: { key: string; label: string; choice: Choice; look?: boolean } | null;
+  /**
+   * How you strike with a weapon that can be struck with more than one way (the director: the point as well as the
+   * edge): kept from round to round until you change it. Null: the weapon's best.
+   */
+  strike: DamageType | null;
   /** Which side-action list is unfolded (the director: Draw ▸ your sword, your cudgel). */
   open: 'move' | 'draw' | 'pickUp' | null;
 }

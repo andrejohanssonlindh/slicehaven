@@ -97,7 +97,9 @@ export function mace(len: number, head: number, hammer = false): FurnitureModel 
   return {
     w: len,
     d: hammer ? head * 1.6 : head,
+    // A long one is held in both hands: the right near the end of the haft, the left well up it.
     grip: x0 + 0.1,
+    ...(len > 1.1 ? { grip2: x0 + Math.min(0.65, len * 0.45) } : {}),
     draw() {
       const m = new ModelBuilder();
       const wood = m.mesh('plank'), iron = m.mesh('iron'), fit = m.mesh('iron', BRASS);

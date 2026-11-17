@@ -9,7 +9,7 @@ import { JOINTS, type Joint, type Pose, type Turn } from './pose';
  */
 
 /** What a motion shows happening. The page asks for an act; the rules decided it. */
-export const MOTION_ACTS = ['guard', 'strike', 'parry', 'block', 'dodge', 'flinch', 'stagger', 'fall', 'finish', 'down', 'dead'] as const;
+export const MOTION_ACTS = ['guard', 'strike', 'thrust', 'parry', 'block', 'dodge', 'flinch', 'stagger', 'fall', 'finish', 'down', 'dead'] as const;
 export type MotionAct = (typeof MOTION_ACTS)[number];
 
 /** Acts that end on the ground: they play for someone who can't stand, and someone showing them is lying. */
@@ -19,11 +19,11 @@ export const LYING_ACTS: ReadonlySet<MotionAct> = new Set<MotionAct>(['fall', 'd
  * An act with no motion for this weapon or style plays the one it falls back to (a killing stroke is a strike until it
  * has its own), so the page can ask for the act that happened before the library has it.
  */
-export const FALLS_BACK: Partial<Record<MotionAct, MotionAct>> = { finish: 'strike', stagger: 'flinch', fall: 'down' };
+export const FALLS_BACK: Partial<Record<MotionAct, MotionAct>> = { finish: 'strike', thrust: 'strike', stagger: 'flinch', fall: 'down' };
 
 /** The marks each act must have (time 0–1): `contact` is the moment the blow lands or is met. */
 export const MARKS_NEEDED: Record<MotionAct, readonly string[]> = {
-  guard: [], strike: ['contact'], parry: ['contact'], block: ['contact'], dodge: ['contact'],
+  guard: [], strike: ['contact'], thrust: ['contact'], parry: ['contact'], block: ['contact'], dodge: ['contact'],
   flinch: [], stagger: [], fall: [], finish: ['contact'], down: [], dead: [],
 };
 

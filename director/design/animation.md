@@ -56,7 +56,7 @@ The engine only says what the person is doing (how far they moved, seated or fig
 | Axe and mace | hanging by the leg | cocked back by the shoulder | lifted high behind, the weight dropped on the blow |
 | **Spear** | upright, like a walking staff | **couched low by the hip in both hands, point at the foe** | **a thrust: drawn back level, driven out along its own line**, the shaft running through the front hand |
 | Staff | upright | slanted across the body in both hands | wound back over the shoulder, swept round |
-| Two-hander (greatsword, great axe) | resting back on the shoulder | both hands low in front, blade up and forward | both hands overhead, chopped down |
+| Two-hander (greatsword, great axe, long hammer: anything too heavy for one hand) | resting back on the shoulder | both hands low in front, blade up and forward | both hands overhead, chopped down |
 | Bare hands | arms free | both fists up | a punch |
 | A shield on the left arm | hanging | up in front of the body, with any of the above in the right hand | (block: thrust up and forward) |
 
@@ -66,7 +66,18 @@ How it holds together:
 - **The guard is now a hold, not a motion.** Every motion starts and ends on `base: 1`, "wherever this body stands with whatever it holds", so one parry works from a sword's guard and a spear's. Flinch, stagger and dodge are **added** on top of stance and guard, so they are the same jolt for everyone.
 - **Feet stay on the ground.** The stance says where the feet stand; breath, weight shift, sagging when spent and the fighting stance's bounce move the hips, and the knees give to keep the feet there. Outdoors each foot follows the ground under it (a slope).
 
-Still rough, and worth your eye in the Motions view: the killing stroke (`finish`) is one overhead blow for every weapon, spear included; a shield is held up but small bucklers barely show; parries for axe and mace use the sword's.
+Still rough, and worth your eye in the Motions view: a shield is held up but small bucklers barely show; parries for axe and mace use the sword's.
+
+### Your second review (2026-11-17), done
+- **Weapons too heavy for one hand are held in both, whatever their family.** A Binderakk hammer is a club by its skill, so it was swung like a mace. Now a weapon moves as a two-hander when its row has no one-handed use, or one only the very strong manage (5D6 Physique or more; the hammer needs 7D6, a greatsword 6D6). The hammer has its own long model, which also stands in for the other two-handed clubs.
+- **Shields are closed at the back.** Round shields had no underside (lying on the ground it never showed), so on an arm you saw through them from behind.
+- **The edge or the point.** With a weapon worth striking with more than one way, you pick how, above the tactics: *Thrust 4D6+3 · Cut 3D6+2* for a rapier. It stays picked from round to round. A way is offered when its damage is within about two dice of the weapon's best, so a sword offers edge and point but not its pommel. Armour differs by kind of damage, so the weaker way can be the better blow. The log says *You thrust*, and **a thrust has its own motion**: a sword's lunge, a long blade run forward in both hands, an axe's or hammer's spike jabbed; a spear's thrust is its strike. Others still deal their weapon's best way.
+- **A killing stroke for each kind of weapon**, all aimed down at someone lying at your feet, with a held breath before the blow and the body going down with it:
+  - a sword is turned point down, raised, and driven down;
+  - an axe or mace is swung up from behind and brought down;
+  - a greatsword, great axe or long hammer goes back over the head in both hands, then down;
+  - a spear or staff is lifted upright in both hands, point down, and thrust down;
+  - with bare hands, a fist is dropped from over the shoulder.
 
 ## Injuries you can see (your follow-up, built the same day)
 *"Is it possible to wire in so that injuries, for example to an arm or a leg, are visible in the animations? Could we add states for the resting movement in combat based on exhaustion, perhaps 0–10, 11–20, 30+? Could we add visual bleeding?"* Yes to all three. Nothing in the rules changed: the rules already keep fatigue, wounds per body part, breaks, lost parts and bleeding for everyone. A small pure step (`core/world3d/condition.ts`) turns that into **the shape a body is in**, and the animator and the engine show it.

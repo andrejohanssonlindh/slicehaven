@@ -81,7 +81,7 @@ export function makeFight(world: () => SpikeWorld, hero: Hero, notify: (text: st
   const headText = document.createElement('span');
   headText.className = 'txt';
   el.head.appendChild(headText);
-  const s: FightState = { fight: null, foeId: '', busy: false, pending: null, plan: null, roleWhy: 'quicker', seen: {}, armed: null, avail: new Map(), lastMove: null, timer: null, side: null, open: null };
+  const s: FightState = { fight: null, foeId: '', busy: false, pending: null, plan: null, roleWhy: 'quicker', seen: {}, armed: null, avail: new Map(), lastMove: null, timer: null, side: null, strike: null, open: null };
   const names = new Map<string, string>();
   const nameOf = (id: string) => names.get(id) ?? id;
   /** `?taps=2` or `?taps=1` forces two taps to act, or one (for testing on a computer). */

@@ -262,6 +262,10 @@ body.fighting #stats { display: none; }
 #fight .grid .none { text-align: center; opacity: 0.4; }
 #fight .moves button { min-height: 38px; padding: 3px 5px; font-size: 13px; line-height: 1.15; text-align: center; }
 #fight .moves button small { display: block; font-size: 10px; opacity: 0.75; }
+/* How to strike (cut, thrust), above the tactics: one is always picked. */
+#fight .strikes { display: flex; gap: 4px; margin-bottom: 4px; }
+#fight .moves .strikes button { flex: 1; min-height: 30px; font-size: 12px; }
+#fight .moves .strikes button.on { background: var(--accent, #c8a444); color: #1a1420; }
 #fight .moves button:disabled { cursor: default; }
 #fight .moves button.nope { opacity: 0.4; text-decoration: line-through; }
 #fight .moves button.nope small { text-decoration: none; }

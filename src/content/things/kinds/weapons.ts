@@ -35,7 +35,21 @@ const ROWS: Record<string, { moves: WayOfMoving; row: string; look: string; spot
   'morning-star': { moves: 'axe-mace', row: 'Morgonstjärna', look: 'A morning star, its head set with studs.' },
   'steel-mace': { moves: 'axe-mace', row: 'Stålklubba', look: 'A short mace of steel.' },
   flail: { moves: 'axe-mace', row: 'Stridsgissel', look: 'A flail: an iron ball on a short chain.' },
+  'binderakk-hammer': { moves: 'two-hander', row: 'Binderakkhammare', look: 'A Binderakk hammer: a great iron head on a haft as long as a tirak is tall.', spot: 6 },
 };
+
+/**
+ * Is a weapon one for both hands, as it is held and swung: its row has no one-handed use, or one only the very strong
+ * manage (5D6 Physique or more: a Binderakk hammer at 7D6, a greatsword at 6D6)?
+ */
+const HEAVY_DICE = 5;
+const bothHands = (h1: string): boolean => h1 === '–' || Number(/^(\d+)T6/.exec(h1)?.[1] ?? 0) >= HEAVY_DICE;
+
+/**
+ * How a weapon moves, given how many hands it takes: one for both hands moves as a two-hander, whatever its family
+ * (a long hammer is swung like a great axe, not like a mace).
+ */
+const movesAs = (moves: WayOfMoving, twoHanded: boolean): WayOfMoving => (twoHanded && (moves === 'blade' || moves === 'axe-mace') ? 'two-hander' : moves);
 
 const kg = (s: string): number => Number(/[\d.]+/.exec(s)?.[0] ?? 1);
 const cm = (s: string): number => Number(/[\d.]+/.exec(s)?.[0] ?? 80);
@@ -53,7 +67,7 @@ function lookAlike(skill: string, twoHanded: boolean, length: number): string | 
     case 'Dolk': return 'dagger';
     case 'Spjut': return 'hunting-spear';
     case 'Stav': return 'quarterstaff';
-    case 'Klubba': return twoHanded ? 'war-hammer' : length < 70 ? 'cudgel' : 'steel-mace';
+    case 'Klubba': return twoHanded ? 'binderakk-hammer' : length < 70 ? 'cudgel' : 'steel-mace';
     case 'Kedjevapen': return 'flail';
     default: return null; // brawling weapons, and ranged ones (B8d), wait
   }
@@ -65,13 +79,14 @@ const modelled = new Set(Object.values(ROWS).map((w) => w.row));
 const standIns: ThingDef[] = WEAPONS.flatMap((row): ThingDef[] => {
   if (!row.melee || modelled.has(row.sv)) return [];
   const twoHanded = row.h1 === '–';
-  const like = lookAlike(row.skill, twoHanded, cm(row.length));
+  const heavy = bothHands(row.h1);
+  const like = lookAlike(row.skill, heavy, cm(row.length));
   const id = slug(row.en);
   if (!like || ROWS[id]) return [];
   const model = MODELS[like];
   return [{
     id, is: 'weapon', standIn: true, look: `${row.en}.`, name: row.en.toLowerCase(), weapon: row.sv, hands: twoHanded ? 2 : 1,
-    moves: ROWS[like].moves, model, weight: kg(row.weight), value: row.price, ...(ROWS[like].spot ? { spot: ROWS[like].spot } : {}), draw: (p) => model.draw(p.seed),
+    moves: movesAs(ROWS[like].moves, heavy), model, weight: kg(row.weight), value: row.price, ...(ROWS[like].spot ? { spot: ROWS[like].spot } : {}), draw: (p) => model.draw(p.seed),
   }];
 });
 
@@ -82,7 +97,7 @@ export default [
     if (!row) throw new Error(`weapon ${id}: no row ${w.row} in the weapon table`);
     const model = MODELS[id];
     if (!model) throw new Error(`weapon ${id} has no model in content/things/models/${id}.ts`);
-    return { id, is: 'weapon', look: w.look, name: row.en.toLowerCase(), weapon: row.sv, hands: row.h1 === '–' ? 2 : 1, moves: w.moves, model, weight: kg(row.weight), value: row.price, ...(w.spot ? { spot: w.spot } : {}), draw: (p) => model.draw(p.seed) };
+    return { id, is: 'weapon', look: w.look, name: row.en.toLowerCase(), weapon: row.sv, hands: row.h1 === '–' ? 2 : 1, moves: movesAs(w.moves, bothHands(row.h1)), model, weight: kg(row.weight), value: row.price, ...(w.spot ? { spot: w.spot } : {}), draw: (p) => model.draw(p.seed) };
   }),
   ...standIns,
 ] satisfies ThingDef[];

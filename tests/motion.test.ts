@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MOTIONS, motionLibraryProblems } from '../src/content/motions';
 import { THINGS } from '../src/content/things';
+import { modelOf } from '../src/core/world3d/things';
 import { type Motion, advance, findMotion, motionProblems, overPose, sampleMotion } from '../src/core/world3d/motion';
 
 const swing: Motion = {
@@ -88,6 +89,29 @@ describe('motions, the rules', () => {
 describe('the motion library', () => {
   it('has no problems', () => {
     expect(motionLibraryProblems()).toEqual([]);
+  });
+
+  it('a thrust and a killing stroke are found for the weapon in hand; one with none thrusts as it strikes', () => {
+    expect(findMotion(MOTIONS, 'thrust', 'blade')!.id).toBe('thrust');
+    expect(findMotion(MOTIONS, 'thrust', 'spear')!.id).toBe('thrust-spear');
+    expect(findMotion(MOTIONS, 'thrust', 'two-hander')!.id).toBe('thrust-two-hander');
+    expect(findMotion(MOTIONS, 'thrust', 'staff')!.id).toBe('strike-staff');
+    expect(findMotion(MOTIONS, 'thrust', 'hands')!.id).toBe('strike-hands');
+    for (const way of ['axe-mace', 'two-hander', 'spear', 'staff', 'hands'] as const) expect(findMotion(MOTIONS, 'finish', way)!.id).toBe(`finish-${way}`);
+    expect(findMotion(MOTIONS, 'finish', 'blade')!.id).toBe('finish');
+    expect(findMotion(MOTIONS, 'finish', 'shield')!.id).toBe('finish');
+  });
+
+  it('a weapon that takes both hands moves as a two-hander, whatever its family', () => {
+    // (Its row lets the very strong use it in one hand; it is still swung in both.)
+    expect(THINGS.get('binderakk-hammer').moves).toBe('two-hander');
+    expect(THINGS.get('war-hammer').moves).toBe('axe-mace');
+    for (const id of THINGS.placeable) {
+      const k = THINGS.get(id);
+      if (k.weapon && k.hands === 2) expect(['two-hander', 'staff', 'spear'], id).toContain(k.moves);
+    }
+    // Held in both hands, it says where the second hand goes.
+    expect(modelOf(THINGS.get('binderakk-hammer'))!.grip2).toBeGreaterThan(modelOf(THINGS.get('binderakk-hammer'))!.grip!);
   });
 
   it('every weapon and shield says how it moves', () => {

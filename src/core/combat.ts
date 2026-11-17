@@ -147,6 +147,28 @@ export function bestDamage(w: WeaponStats): { type: DamageType; dice: Dice } {
   return best ?? { type: 'brawl', dice: { n: 1, mod: 0 } };
 }
 
+/**
+ * A way of striking is worth offering when its damage is within this of the weapon's best (about two dice): a
+ * rapier's point and edge, a sword's edge and point; not a sword's pommel.
+ */
+export const STRIKE_WORTH = 7;
+
+/**
+ * The ways a weapon can deal a blow that are worth choosing between (the director, 2026-11-17: "attack with the pointy
+ * end as well as cut"): with the edge (`cut`), the point (`thrust`) or the head (`crush`), each with its dice, the
+ * best first. Armour differs by type, so the weaker way can be the better blow.
+ */
+export function strikeWays(w: WeaponStats): { type: DamageType; dice: Dice }[] {
+  const best = poolMean(bestDamage(w).dice);
+  const ways = (Object.entries(w.damage) as [DamageType, Dice][]).map(([type, dice]) => ({ type, dice })).filter((x) => poolMean(x.dice) >= best - STRIKE_WORTH);
+  return ways.sort((a, b) => poolMean(b.dice) - poolMean(a.dice));
+}
+
+/** The damage a blow deals: the way asked for, if the weapon is worth striking with that way; else its best. */
+export function damageWith(w: WeaponStats, how?: DamageType): { type: DamageType; dice: Dice } {
+  return (how && strikeWays(w).find((x) => x.type === how)) || bestDamage(w);
+}
+
 // ── The fight ───────────────────────────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -228,6 +250,11 @@ export interface Choice {
   stow?: 'weapon' | 'shield';
   /** The main action, as the attacker in a melee: attack with a tactic, retreat, or (on someone knocked out) the mercy stroke. */
   attack?: AttackTactic;
+  /**
+   * How the blow is dealt, with a weapon that can deal it more than one way (`strikeWays`): the edge (`cut`), the
+   * point (`thrust`) or the head (`crush`). Left out, or not a way this weapon is worth striking with, its best.
+   */
+  strikeWith?: DamageType;
   retreat?: boolean;
   /** As the defender. */
   defend?: DefenceTactic;
@@ -273,6 +300,8 @@ export type LogLine =
     attack: Roll; attackWhy: PoolWhy; defend: Roll | null; defendWhy?: PoolWhy; hit: boolean; advantages: number;
     /** On a hit: the D10 for where, the part, the type, the damage pool's parts (weapon, tactic dice, extra, armour), and the result. */
     whereRoll?: Roll; part?: BodyPart; result?: HitResult; type?: DamageType;
+    /** How the blow was dealt, hit or miss: with the edge, the point, the head, a fist (the motion shown follows it). */
+    with: DamageType;
     damage?: { weapon: Dice; tactic: number; extra: Dice; armour: number };
   }
   | { k: 'drop'; who: string; item: string; at: { x: number; z: number } }
@@ -566,8 +595,9 @@ export function moreDamage(adv: number, dangerous: boolean): Dice {
 }
 
 /** One blow, attack against defence, and the damage if it lands. */
-function strike(fight: Fight, a: Fighter, d: Fighter, tactic: AttackTactic, defence: DefenceTactic, rules: FightRules, rng: Rng, log: LogLine[], defendWith?: Defence): { hit: boolean; margin: number } {
+function strike(fight: Fight, a: Fighter, d: Fighter, tactic: AttackTactic, defence: DefenceTactic, rules: FightRules, rng: Rng, log: LogLine[], defendWith?: Defence, strikeWith?: DamageType): { hit: boolean; margin: number } {
   const w = weaponOf(a);
+  const { type, dice } = damageWith(w, strikeWith);
   const atkWhy = attackWhy(a, tactic);
   const atk = rollOpen(atkWhy.dice, rng, 'Attack');
   const whereRoll = rollTable(10, rng, 'Where');
@@ -579,10 +609,9 @@ function strike(fight: Fight, a: Fighter, d: Fighter, tactic: AttackTactic, defe
   const adv = hit ? advantages(margin) : 0;
   const line: Extract<LogLine, { k: 'attack' }> = {
     k: 'attack', who: a.id, target: d.id, tactic, defence, how: def ? dp.how : 'none', attack: atk, attackWhy: atkWhy, defend: def,
-    ...(def ? { defendWhy: dp.why } : {}), hit, advantages: adv,
+    ...(def ? { defendWhy: dp.why } : {}), hit, advantages: adv, with: type,
   };
   if (hit) {
-    const { type, dice } = bestDamage(w);
     const tacticDice = tactic === 'quick' ? -1 : tactic === 'powerful' ? 2 + (w.props.Kraftfull ? 1 : 0) : 0;
     // Every advantage buys more damage for now: +2 each, +1D6 each with a Dangerous weapon (choosing edges is B8b).
     // Every +4 is a die (the director: 2 advantages are +1D6, 5 are +2D6+2), as pools are always written.
@@ -757,7 +786,7 @@ export function resolveRound(before: Fight, choices: Record<string, Choice>, rul
     const tactic = c.attack && attackTactics(a).includes(c.attack) ? c.attack : 'standard';
     const defence = (choices[d.id] ?? {}).defend ?? 'standard';
     const dTactic: DefenceTactic = canAct(d) ? defence : 'standard';
-    const { hit, margin } = strike(fight, a, d, tactic, dTactic, rules, rng, log, (choices[d.id] ?? {}).defendWith);
+    const { hit, margin } = strike(fight, a, d, tactic, dTactic, rules, rng, log, (choices[d.id] ?? {}).defendWith, (choices[a.id] ?? {}).strikeWith);
     a.injuries = structuredClone(a.injuries);
     if (tactic !== 'standard') addFatigue(a.injuries, tacticFatigue(tactic, null, weaponOf(a)), tactic);
     if (canAct(d)) {

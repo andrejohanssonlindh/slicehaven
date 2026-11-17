@@ -16,7 +16,8 @@ export function round(d: number, allIron = false): FurnitureModel {
     draw() {
       const m = new ModelBuilder();
       const face = allIron ? m.mesh('iron', IRON) : m.mesh('plank', WOOD), rim = m.mesh('cloth', RIM), boss = m.mesh('iron', IRON);
-      addCylinder(rim, 0, 0, 0, 0.02, d / 2, d / 2, 12);
+      // (The back is closed too: on an arm a shield is seen from behind as often as from the front.)
+      addCylinder(rim, 0, 0, 0, 0.02, d / 2, d / 2, 12, { bottom: true });
       addCylinder(face, 0, 0, 0.004, 0.024, d / 2 - 0.02, d / 2 - 0.02, 12);
       addCylinder(boss, 0, 0, 0.02, 0.06, Math.min(0.08, d * 0.18), Math.min(0.05, d * 0.1), 8);
       return m.done();

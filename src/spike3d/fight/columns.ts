@@ -1,7 +1,7 @@
 import { rollableName } from '../../content/rollables';
 import { diceText } from '../../core/chargen/tables';
 import {
-  type AttackTactic, type Choice, type DefenceTactic, type Fighter, UNTRAINED, attackPool, attackTactics, canAct, defenceOptions, defencePool, roleOf, weaponOf,
+  type AttackTactic, type Choice, type DefenceTactic, type Fighter, UNTRAINED, attackPool, attackTactics, canAct, defenceOptions, defencePool, roleOf, strikeWays, weaponOf,
 } from '../../core/combat';
 import { totalFatigue } from '../../core/damage';
 import { t } from '../../i18n';
@@ -9,7 +9,7 @@ import { fatigueShare, fatigueWord, harmBits } from '../condition';
 import { bodyOutline } from '../outline';
 import { type FightCtx, type Go, cap, press } from './ctx';
 import { afterSide, otherMoves, sideEntries, sideWhy, withSide } from './others';
-import { ATTACKS, DEFENCES, WAYS, intentOf } from './words';
+import { ATTACKS, DEFENCES, STRIKES, WAYS, intentOf } from './words';
 
 /**
  * The two columns (B8g F2): each side's card (name, weapon, body outline, how they are) and their moves, always all
@@ -229,12 +229,32 @@ export function moves(ctx: FightCtx, box: HTMLElement, f0: Fighter, other: Fight
   const atkOn = !offWhy(ctx, f, 'attack', mine);
   const ag = group('attack', t('fight.g.attack', 'Offensive'));
   const can = attackTactics(f);
+  // A weapon worth striking with more than one way (a rapier's point and edge): pick which, above the tactics. It
+  // stays picked from round to round; the damage each would do shows, and armour differs by kind.
+  const ways = strikeWays(weaponOf(f));
+  const how = mine && ways.some((w) => w.type === ctx.s.strike) ? ctx.s.strike! : ways[0]?.type;
+  if (mine && ways.length > 1) {
+    const row = document.createElement('div');
+    row.className = 'strikes';
+    for (const w of ways) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.strike = w.type;
+      b.textContent = `${STRIKES[w.type] ?? w.type} ${diceText(w.dice)}`;
+      b.classList.toggle('on', w.type === how);
+      b.disabled = cant || !atkOn;
+      b.addEventListener('click', () => { ctx.s.strike = w.type; ctx.refresh(); });
+      row.appendChild(b);
+    }
+    ag.parentElement!.insertBefore(row, ag);
+  }
+  const dealt = mine && ways.length > 1 ? { strikeWith: how } : {};
   for (const tac of ['standard', 'quick', 'powerful'] as AttackTactic[]) {
     const [name, does] = ATTACKS[tac];
     const dice = open ? ` ${diceText(attackPool(f, tac))}` : '';
     // (A tactic the weapon doesn't allow is greyed and says why: an unwieldy weapon can't strike quickly, p. 89.)
     const allowed = can.includes(tac);
-    const b = button(`${name}${dice}`, allowed ? does : t('fight.tac.unwieldy', 'not with an unwieldy weapon'), `atk:${tac}`, atkOn && allowed ? () => ctx.play(withSide(ctx, { attack: tac })) : null);
+    const b = button(`${name}${dice}`, allowed ? does : t('fight.tac.unwieldy', 'not with an unwieldy weapon'), `atk:${tac}`, atkOn && allowed ? () => ctx.play(withSide(ctx, { attack: tac, ...dealt })) : null);
     b.classList.toggle('nope', !allowed);
     ag.appendChild(b);
   }

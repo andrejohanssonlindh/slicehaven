@@ -13,6 +13,12 @@ export const ATTACKS: Record<AttackTactic, [name: string, does: string]> = {
   quick: [t('fight.tac.quickN', 'Quick'), t('fight.tac.quickD', '+1D6, −1D6 dmg, +1 fatigue')],
   powerful: [t('fight.tac.powerN', 'Powerful'), t('fight.tac.powerD', '−1D6, +2D6 dmg, +2 fatigue')],
 };
+/** How a blow is dealt, by the kind of damage: on the buttons, and in the log's line for the blow. */
+export const STRIKES: Partial<Record<DamageType, string>> = {
+  cut: t('fight.with.cut', 'Cut'),
+  thrust: t('fight.with.thrust', 'Thrust'),
+  crush: t('fight.with.crush', 'Bash'),
+};
 export const DEFENCES: Record<DefenceTactic, [name: string, does: string]> = {
   standard: [t('fight.tac.std', 'Standard'), ''],
   defensive: [t('fight.tac.careN', 'Careful'), t('fight.tac.careD', '+1D6, +1 fatigue; attack back only if it holds by 10')],

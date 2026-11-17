@@ -104,6 +104,8 @@ Always at least 1 advantage, even if a weapon lowers the cost to 0.
 ## 6. Damage (pp. 100–101)
 **Damage types**: cut (`Hugg`), crush (`Kross`), thrust (`Stick`), **brawl** (unarmed; crush armour counts against it), **fall**, **burn**.
 
+**Which type a weapon deals (ours, 2026-11-17):** the attacker picks, among the weapon's types worth striking with: those within 7 (about two dice) of its best (`strikeWays` in `core/combat.ts`). A rapier offers thrust and cut; a staff only crush. Unpicked, and for anyone nobody steers, it deals its best. The worn armour met is the one against the type dealt.
+
 **Steps when a blow lands:**
 1. **Body part** from the attack's D10 (or chosen by *precision*): 1 head · 2–4 torso · 5–6 left arm · 7–8 right arm · 9 left leg · 10 right leg.
 2. **Damage roll**: the weapon's dice, which usually include your **base damage** (G, from Physique), plus tactic and *more damage*. Roll **a D10 with it** that isn't added: it picks the serious wound if there is one. All D6 rolls are open (sixes split), damage too.
