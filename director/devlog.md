@@ -2,6 +2,21 @@
 
 *Newest first. Everything up to the start of 2026-11-02 is in the [archive](archive/devlog-to-2026-11-02.md).*
 
+## 2026-11-17 — Weapons held as they should be, feet on the ground, a gallery that works
+
+*From your review: "everything is held one-handed", "spears are not pointed with but are just moved forward", the test page "has to be coaxed"; plus the list I had left undone.* [The design](design/animation.md#weapons-in-the-hands-your-review-of-2026-11-17).
+
+- **Each kind of weapon is held its own way**, at ease and on guard: a sword up in front, an axe cocked by the shoulder, **a spear couched low in both hands with the point at the foe**, a staff slanted across the body, a greatsword in both hands, fists up with nothing. A shield comes up on the left arm.
+- **A spear is thrust:** drawn back level, then driven out along its own line. The wrist joint is what lets a weapon point somewhere.
+- **The second hand finds the weapon by itself.** A new reaching layer turns a limb so its end lands on a point, so the left hand follows the shaft through every strike and parry. Motions only say what the weapon arm does.
+- **Every fight motion re-keyed** to start and end on "wherever this body stands with whatever it holds", so one parry works from any guard. Flinch, stagger and dodge are laid on top of stance and guard; the fall starts from the stance. That was the "starts from straight legs" item.
+- **Feet stay on the ground.** The same reaching puts the feet back where the stance stands them, flat, whatever breath, weight shift or exhaustion do to the hips: the knees give instead of the feet sliding. Outdoors each foot follows the slope under it.
+- **The model page is rebuilt.** Three tabs on top (People, Motions, Furniture), and it opens on the one you used last. In Motions you pick what is in the hands and an **act**, and it plays what the game would play for that weapon, naming the file (`strike → strike-spear`). In People, everyone can be given any weapon and shield.
+- **A part cut off is gone from the body** (hand, forearm, arm, foot, leg; a stump where the rules cut mid-bone). **Blood stains are saved** and **rain washes them away** outdoors. Save version 13: saves from before are dropped.
+- **The start-up browser test that timed out is fixed:** its pages were left open and starved the later ones.
+- **Still rough:** the killing stroke is one overhead blow for every weapon; feet glide rather than step when the stance changes; someone who lost a leg still stands on it; all motions were judged from still pictures, so timing needs your eye at ¼ speed.
+- Tests: 935 unit tests (21 new: the reach solver, holds per weapon, the spear's line, the second hand, feet, lost parts, motion keys); nine browser test files (start-up, models, pages, fight, walk, save, carry, talk, act).
+
 ## 2026-11-17 — Injuries you can see: exhaustion, hurt limbs, blood
 
 - **Your three questions, all yes, and built** ([how](design/animation.md#injuries-you-can-see-your-follow-up-built-the-same-day)). The rules didn't change: they already kept fatigue, wounds per part and bleeding. Now it shows.
@@ -11,7 +26,7 @@
 - **See it:** `/models/` → new buttons *Fatigue*, *Hurt*, *Bleeding* (with Standing, Walking, On guard). In play: the arena.
 - **Not yet:** stains aren't saved, rain doesn't wash them (effects, B7), a lost limb is still drawn.
 - Tests: 4 new unit tests (the bands, reading the limbs, spent, hurt arm and leg); fight, save, walk and models browser tests pass.
-- **A test problem that was there before:** in `e2e/spike3d.e2e.ts` the last two or three tests (entering a house, the layout pictures, sometimes the filaments) time out waiting for the page to start. The same happens on the commit from before today, and the page itself starts in about a second when opened alone, so it looks like the file's earlier pages being left open and starving the later ones. Not fixed here; worth a look before the next change to the page's start-up.
+- **A test problem that was there before:** in `e2e/spike3d.e2e.ts` the last two or three tests timed out waiting for the page to start (also on the commit from before that day). *Fixed in the entry above: the file's pages were left open.*
 
 ## 2026-11-17 — How bodies move: the animator
 

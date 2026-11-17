@@ -21,7 +21,26 @@ export interface Condition {
   bleedFrom: Joint;
   /** How bloodied each part is, 0–1 (its wounds; more while bleeding from it). */
   stains: Partial<Record<BodyPart, number>>;
+  /**
+   * What is gone for good, by joint: how much of the bone hanging from it is left (0 none: it and everything further
+   * out is gone; 0.5 a stump of half the bone). A joint left out is whole.
+   */
+  gone: Partial<Record<Joint, number>>;
 }
+
+/** What a cut takes, down the limb from the body (`L`/`R` added for the side): the joint cut at, and how much of its bone stays. */
+const CUTS: Record<string, readonly [joint: string, left: number][]> = {
+  hand: [['wrist', 0]],
+  forearm: [['elbow', 0.5], ['wrist', 0]],
+  elbow: [['elbow', 0]],
+  upperarm: [['shoulder', 0.5], ['elbow', 0]],
+  shoulder: [['shoulder', 0]],
+  foot: [['ankle', 0]],
+  calf: [['knee', 0.5], ['ankle', 0]],
+  knee: [['knee', 0]],
+  thigh: [['hip', 0.5], ['knee', 0]],
+  hip: [['hip', 0]],
+};
 
 /** A band of fatigue: from this much fatigue on, a body is this tired (0–1). Data: `content/people/condition.ts`. */
 export interface TiredBand {
@@ -46,7 +65,7 @@ const CUT_LIMB: Record<string, 'Arm' | 'Leg' | undefined> = {
   foot: 'Leg', calf: 'Leg', knee: 'Leg', thigh: 'Leg', hip: 'Leg',
 };
 
-export const FIT: Condition = { tired: 0, band: '', armL: 0, armR: 0, legL: 0, legR: 0, bleed: 0, bleedFrom: 'chest', stains: {} };
+export const FIT: Condition = { tired: 0, band: '', armL: 0, armR: 0, legL: 0, legR: 0, bleed: 0, bleedFrom: 'chest', stains: {}, gone: {} };
 
 /** The band a fatigue falls in (bands sorted by `from`; the first is for none). */
 export function bandOf(fatigue: number, bands: readonly TiredBand[]): TiredBand {
@@ -74,7 +93,17 @@ export function conditionOf(i: Injuries | null | undefined, bands: readonly Tire
   }
   const bleed = i.bleed?.rate ?? 0;
   if (bleed > 0) stains[worst] = Math.min(1, (stains[worst] ?? 0) + 0.5);
+  // Parts cut off (a limb needs a side; a neck or body cut is death, and nothing is taken away).
+  const gone: Partial<Record<Joint, number>> = {};
+  for (const l of i.lost) {
+    if (!l.side) continue;
+    for (const [joint, left] of CUTS[l.area] ?? []) {
+      const j = `${joint}${l.side === 'left' ? 'L' : 'R'}` as Joint;
+      gone[j] = Math.min(gone[j] ?? 1, left);
+    }
+  }
   return {
+    gone,
     tired: band.tired, band: band.name,
     armL: limb('leftArm'), armR: limb('rightArm'), legL: limb('leftLeg'), legR: limb('rightLeg'),
     bleed, bleedFrom: PART_JOINTS[worst][PART_JOINTS[worst].length - 1], stains,

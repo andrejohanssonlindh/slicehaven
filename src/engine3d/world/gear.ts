@@ -272,12 +272,19 @@ export class Gear {
     this.heldGs.length = 0;
     figs.inHand.clear();
     figs.inArms.clear();
+    figs.wields.clear();
     for (const [who, l] of this.holds()) {
-      const model = modelOf(THINGS.get(l.kind)), fig = figs.figureOf(who);
+      const kind = THINGS.get(l.kind);
+      const model = modelOf(kind), fig = figs.figureOf(who);
       if (!model || !fig) continue;
       const g = thingGroup(model.draw(l.seed, l.variant));
-      const shield = !!THINGS.get(l.kind).shield;
+      const shield = !!kind.shield;
       if (holdOnRig(fig.rig, g, { grip: model.grip, shield })) {
+        // How it is held and moved comes from the kind's way of moving; a second hand's place from the model.
+        const w = figs.wields.get(who) ?? {};
+        figs.wields.set(who, shield
+          ? { ...w, shield: true }
+          : { ...w, way: kind.moves, second: model.grip2 !== undefined && model.grip !== undefined ? model.grip2 - model.grip : undefined });
         if (!shield) figs.inHand.add(who);
       } else {
         const s = Math.min(1, HELD_SIZE / Math.max(model.w, model.d)), H = fig.rig.model.height;

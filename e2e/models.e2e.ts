@@ -45,18 +45,19 @@ describe('motions', () => {
   for (const id of Object.keys(MOTIONS).sort()) {
     it(`${id} plays in the motion viewer`, async () => {
       const { page, errors } = await openPage(env, `/models/?show=motions`);
-      type V = { models?: { actor: unknown; state: { angle: number }; view: { motion: string; speed: number; loop: boolean; t: number; rest: number } } };
+      type V = { models?: { actor: unknown; showMotion(id: string): void; state: { angle: number }; view: { motion: string; speed: number; loop: boolean; t: number; rest: number } } };
       await page.waitForFunction(() => !!(window as unknown as V).models?.actor);
       const m = MOTIONS[id];
-      // Stopped where the blow meets (or at the end), still.
+      // Stopped where the blow meets (or at the end), still, with a weapon that moves the motion's way in hand.
       const at = (m.marks?.contact ?? 1) * m.seconds;
       for (const [side, angle] of [['side', Math.PI / 2], ['front', 0.35]] as const) {
         await page.evaluate(([id, at, angle]) => {
           const x = (window as unknown as V).models!;
-          Object.assign(x.view, { motion: id, speed: 0, loop: false, t: at, rest: 0 });
+          x.showMotion(id);
+          Object.assign(x.view, { speed: 0, loop: false, t: at, rest: 0 });
           x.state.angle = angle;
         }, [id, at, angle] as const);
-        await page.waitForTimeout(250);
+        await page.waitForTimeout(400);
         await page.locator('#stage').screenshot({ path: `${OUT}motion-${id}-${side}.png` });
       }
       expect(errors).toEqual([]);

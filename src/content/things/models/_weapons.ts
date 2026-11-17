@@ -16,7 +16,9 @@ export function sword(len: number, blade: number, guard: number): FurnitureModel
   return {
     w: len,
     d: guard,
-    grip: x0 + hilt * 0.5,
+    // One hand in the middle of the hilt; in two hands, the right up under the guard and the left at the pommel.
+    grip: x0 + hilt * (len > 1.3 ? 0.72 : 0.5),
+    grip2: x0 + hilt * 0.2,
     draw() {
       const m = new ModelBuilder();
       const steel = m.mesh('iron', STEEL), grip = m.mesh('cloth', LEATHER), fit = m.mesh('iron', BRASS);
@@ -55,7 +57,9 @@ export function bigAxe(len: number, head: number, double = false): FurnitureMode
   return {
     w: len,
     d: head * (double ? 2 : 1),
+    // In two hands: the right near the end of the haft, the left well up it.
     grip: x0 + 0.12,
+    grip2: x0 + Math.min(0.6, len * 0.45),
     draw() {
       const m = new ModelBuilder();
       const wood = m.mesh('plank'), iron = m.mesh('iron');
@@ -73,7 +77,9 @@ export function spear(len: number, head: number): FurnitureModel {
   return {
     w: len,
     d: 0.06,
-    grip: x0 + len * 0.35,
+    // The right hand a third of the way up the shaft, the left a forearm further toward the head.
+    grip: x0 + len * 0.32,
+    grip2: x0 + len * 0.32 + 0.32,
     draw() {
       const m = new ModelBuilder();
       const wood = m.mesh('plank'), iron = m.mesh('iron', STEEL);

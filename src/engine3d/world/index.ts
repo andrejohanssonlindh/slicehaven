@@ -34,6 +34,7 @@ import { Acting } from './acting';
 import { Carrying } from './carrying';
 import { Pack } from './pack';
 import { Fights } from './fights';
+import type { SavedStain } from '../blood';
 import { Bleeding } from './bleeding';
 import { Figures, personFigure } from './figures';
 import { Filaments } from './filaments';
@@ -93,6 +94,8 @@ export interface WorldState {
   carry: CarryState;
   hurt: Record<string, Injuries>;
   noticed: { seen: string[]; tried: Record<string, number> };
+  /** Blood on the ground (`engine3d/blood.ts`). */
+  blood: SavedStain[];
 }
 
 export class SpikeWorld {
@@ -719,6 +722,7 @@ export class SpikeWorld {
       hour: this.weather.hour ?? 12, hero: { x: h.x, z: h.z, level: h.stair ? 0 : h.level }, explored: this.explored.toJSON(), things: this.states.toJSON(), flags: { ...this.flags },
       talk: structuredClone(this.talkMemory), leads: structuredClone(this.leads), standing: structuredClone(this.standing), carry: structuredClone(this.carry), hurt: structuredClone(this.hurt),
       noticed: { seen: [...this.noticed], tried: { ...this.noticeTried } },
+      blood: this.bleeding.blood.toJSON(),
     };
   }
 
@@ -729,7 +733,7 @@ export class SpikeWorld {
     this.noticeTried = { ...s.noticed?.tried };
     // What fights left: those knocked out or killed lie where they fell (B8a).
     this.hurt = s.hurt ? structuredClone(s.hurt) : {};
-    this.bleeding.blood.clear();
+    this.bleeding.blood.fromJSON(s.blood ?? []);
     this.fights.layDown();
     this.carry = s.carry ? structuredClone(s.carry) : newCarry();
     this.standing = s.standing ? structuredClone(s.standing) : newStanding();

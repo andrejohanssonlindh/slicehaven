@@ -81,6 +81,12 @@ export interface MotionKey {
   root?: MotionRoot;
   /** How this key is come to (`KeyEase`); left out, in a smooth curve through it. */
   ease?: KeyEase;
+  /**
+   * How much of the body's own pose (its stance, what it holds: its guard) shows through at this key, 0–1. A motion
+   * that starts and ends on `base: 1` starts and ends wherever the body was, whatever weapon it holds or however it
+   * stands; in between, the keys say where the joints are.
+   */
+  base?: number;
 }
 
 export interface Motion {
@@ -104,6 +110,11 @@ export interface Motion {
   leave?: number;
   /** How much of the body's own small movements plays over it (`MotionLife`; `full` if left out). */
   life?: MotionLife;
+  /**
+   * The keys' turns are **added** to the body's own pose instead of replacing it (a flinch, a stagger: the same jolt
+   * whatever the guard and stance). The root still moves as the keys say.
+   */
+  add?: boolean;
   /** What follows: another act (looked up the same way, usually `guard`), or `hold` the last key. */
   then: MotionAct | 'hold';
   /** Named moments, as a share of the length: `contact` where the blow meets. */
@@ -115,6 +126,8 @@ export interface MotionFrame {
   joints: Partial<Record<Joint, Turn>>;
   lift: number;
   root: Required<MotionRoot>;
+  /** How much of the body's own pose shows through now (the keys' `base`). */
+  base: number;
   /** Past its end. */
   done: boolean;
 }
@@ -178,16 +191,27 @@ export function sampleMotion(m: Motion, t: number): MotionFrame {
   return {
     joints,
     lift: between(keys, (key) => key.lift ?? 0, i, u),
+    base: Math.max(0, Math.min(1, between(keys, (key) => key.base ?? 0, i, u))),
     root: { tilt: mix('tilt'), up: mix('up'), back: mix('back'), side: mix('side') },
     done,
   };
 }
 
 /** A frame laid over a body's pose (what the legs and hands do): over it for arms and upper body, instead of it for the whole. */
-export function overPose(base: Pose, f: MotionFrame, part: MotionPart): Pose {
-  if (part === 'whole') return { joints: f.joints, lift: f.lift };
-  return { joints: { ...base.joints, ...f.joints }, lift: (base.lift ?? 0) + f.lift, shift: base.shift };
+export function overPose(base: Pose, f: MotionFrame, m: Pick<Motion, 'part' | 'add'>): Pose {
+  const joints: Partial<Record<Joint, Turn>> = { ...base.joints };
+  // How much of the body's own pose shows through: all of it under an added motion, as the keys say under one that replaces.
+  const own = m.add ? 1 : f.base, mine = m.add ? 1 : 1 - f.base;
+  for (const [j, v] of Object.entries(f.joints) as [Joint, Turn][]) {
+    const b = base.joints[j] ?? ZERO_TURN;
+    joints[j] = [b[0] * own + v[0] * mine, b[1] * own + v[1] * mine, b[2] * own + v[2] * mine];
+  }
+  // A motion of part of the body rides on the body's own lift; one of the whole body sets it.
+  const whole = m.part === 'whole' && !m.add, bl = base.lift ?? 0, bs = base.shift ?? [0, 0];
+  return { joints, lift: whole ? bl * own + f.lift * mine : bl + f.lift, shift: whole ? [bs[0] * own, bs[1] * own] : base.shift };
 }
+
+const ZERO_TURN: Turn = [0, 0, 0];
 
 /**
  * The motion for an act: the most specific that fits (the style counts more than the way of moving), else one for any
@@ -240,6 +264,8 @@ export function motionProblems(m: Motion): string[] {
     }
     if (k.root && m.part !== 'whole') bad(`key ${i}: only a whole-body motion moves the root`);
     if (k.ease && !EASES[k.ease]) bad(`key ${i}: unknown ease ${k.ease}`);
+    if (k.base !== undefined && !(k.base >= 0 && k.base <= 1)) bad(`key ${i}: base ${k.base}, outside 0–1`);
+    if (k.base !== undefined && m.add) bad(`key ${i}: an added motion has no base (it is all added to the body's own pose)`);
   });
   if (m.blend !== undefined && !(m.blend >= 0)) bad('blend must be 0 or more seconds');
   if (m.leave !== undefined && !(m.leave >= 0)) bad('leave must be 0 or more seconds');

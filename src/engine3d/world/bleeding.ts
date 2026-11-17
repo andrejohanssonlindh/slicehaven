@@ -27,7 +27,10 @@ export class Bleeding {
   conditionOf(id: string, fig: Figure): Condition | null {
     const inj = this.w.hurt[id];
     if (!inj) {
-      if (this.seen.delete(id)) fig.rig.stain({});
+      if (this.seen.delete(id)) {
+        fig.rig.stain({});
+        fig.rig.lose({});
+      }
       return null;
     }
     const from = `${inj.fatigue + inj.baseFatigue}|${JSON.stringify(inj.wounds)}|${inj.broken}|${inj.lost.length}|${inj.bleed?.rate ?? 0}|${inj.infection?.level ?? 0}`;
@@ -38,6 +41,7 @@ export class Bleeding {
       const marks: Partial<Record<Joint, number>> = {};
       for (const [part, k] of Object.entries(c.is.stains) as [BodyPart, number][]) for (const j of PART_JOINTS[part]) marks[j] = k;
       fig.rig.stain(marks);
+      fig.rig.lose(c.is.gone);
     }
     return c.is;
   }
@@ -49,8 +53,9 @@ export class Bleeding {
       const c = this.seen.get(p.id)?.is;
       if (!c || c.bleed <= 0 || !p.fig.place.visible || w.hurt[p.id]?.dead) continue;
       p.fig.place.updateWorldMatrix(true, true);
-      this.blood.bleed(p.id, p.fig.rig.jointWorld(c.bleedFrom, this.at), p.fig.place.position.y, c.bleed, dt);
+      this.blood.bleed(p.id, p.fig.rig.jointWorld(c.bleedFrom, this.at), p.fig.place.position.y, c.bleed, dt, !w.figures.indoors(p.id));
     }
-    this.blood.step(dt);
+    // Rain washes away what lies under the open sky.
+    this.blood.step(dt, w.weather.rain);
   }
 }

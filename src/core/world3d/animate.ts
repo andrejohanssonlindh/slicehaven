@@ -1,6 +1,9 @@
+import type { BodyModel } from './body';
 import type { Condition } from './condition';
+import type { Vec3 } from './mesh';
 import { DEFAULT_BLEND, type Motion, type MotionRoot, overPose, sampleMotion } from './motion';
 import { type Cycle, type Joint, type Pose, type Turn, type Turns, addPose, blendPose, cyclePose, mirrorPose, scalePose } from './pose';
+import { LIMBS, aim, apply, frames, reach, turned, yawMat } from './skeleton';
 
 /**
  * The animator: what a body shows each frame, put together in layers from data. Pure: the engine keeps one `AnimState`
@@ -12,7 +15,10 @@ import { type Cycle, type Joint, type Pose, type Turn, type Turns, addPose, blen
  *   3. a **motion** over that (`motion.ts`: a strike, a fall), eased into from whatever showed before;
  *   4. **life**: the small movements nobody steers: breath (deeper and faster after effort), weight shifting from foot
  *      to foot, arms that never hang quite still, a head that looks about, turns to what it attends to and leads the
- *      body into a turn. Each person has their own tempo, size of movement and posture (`Manner`, from their seed).
+ *      body into a turn. Each person has their own tempo, size of movement and posture (`Manner`, from their seed);
+ *   5. **reaching** (`skeleton.ts`): the feet are put back where the stance stands them, flat on the ground, whatever
+ *      the layers above did to the hips (so knees give as the body sinks or shifts); and a second hand takes hold of a
+ *      weapon held in both, wherever the first hand carries it.
  *
  * A change of stance, hold or motion never snaps: the last shown pose is kept and eased out of. New movement is data:
  * a stance or gait in `content/people/poses.ts`, a motion in `content/motions/`; a new kind of layer is added here.
@@ -32,6 +38,14 @@ export interface Stance {
   arms: number;
   /** How hard it is to keep up (0 at ease, 1 a sprint): the breath follows. */
   effort: number;
+  /** The feet stand on the ground (1) or hang free (0, sitting). */
+  planted: number;
+}
+
+/** What the arms do with something in them: the turns laid over the pose, named so a change is eased. */
+export interface Hold {
+  id: string;
+  joints: Turns;
 }
 
 /** A way of moving over the ground: a loop of poses, two steps to a loop. */
@@ -49,7 +63,7 @@ export interface Gait {
 /** The sizes of the small movements (data: `LIFE` in `content/people/poses.ts`). Turns in radians, moves as shares of the body's height. */
 export interface Life {
   breath: { seconds: number; chest: number; shoulders: number; lift: number };
-  sway: { seconds: number; shift: number; roll: number; knee: number };
+  sway: { seconds: number; shift: number; roll: number };
   arms: { seconds: number; swing: number; elbow: number; wrist: number };
   look: { seconds: number; yaw: number; pitch: number; reach: number; lead: number; settle: number };
 }
@@ -135,11 +149,15 @@ export interface AnimState {
   since: number;
   blend: number;
   last: Shown | null;
+  /** Where the stance stands the feet (body space, and the way each points), worked out once a stance. */
+  feet: { stance: string; L: Foot; R: Foot } | null;
 }
+
+interface Foot { x: number; y: number; z: number; yaw: number }
 
 export const newAnim = (manner: Manner): AnimState => ({
   phase: manner.phase, speed: 0, going: 0, effort: 0, tired: -1, breath: manner.phase * 7, clock: manner.phase * 50,
-  lookYaw: 0, lookPitch: 0, key: '', leave: 0, from: null, since: 0, blend: 0, last: null,
+  lookYaw: 0, lookPitch: 0, key: '', leave: 0, from: null, since: 0, blend: 0, last: null, feet: null,
 });
 
 export interface AnimLib {
@@ -154,11 +172,15 @@ export interface AnimInput {
   dt: number;
   /** Metres covered over the ground since the last frame. */
   moved: number;
-  /** The body's hip height, metres (a stride is counted in these). */
-  hip: number;
+  /** The body: its joints at rest, its height, and where its hand holds (a stride is counted in its hip height). */
+  body: Pick<BodyModel, 'joints' | 'height' | 'grip'>;
   stance: Stance;
-  /** Something held, laid over the arms (`id` names it, so a change is eased). */
-  hold?: { id: string; joints: Turns } | null;
+  /** Something held, laid over the arms. */
+  hold?: Hold | null;
+  /** A weapon held in both hands: the point, in the right hand's space, where the left hand takes hold. */
+  grasp?: Vec3 | null;
+  /** The ground under each foot against the ground the body stands on (metres): a slope, a step. */
+  ground?: { L: number; R: number } | null;
   /** A motion playing, `t` seconds in. */
   motion?: { motion: Motion; t: number } | null;
   /** How far the body still has to turn to face where it is going (radians, positive to its left): the head goes first. */
@@ -236,27 +258,17 @@ function lifePose(s: AnimState, lib: AnimLib, inp: AnimInput, full: number): Pos
     add('neck', m.stoop * 0.5 * full);
     add('head', -m.stoop * 0.8 * full, 0, m.tilt * full);
 
-    // Weight from foot to foot: the hips move over one foot and drop on the other side, the legs lean to keep the
-    // feet where they are, the free knee eases, the shoulders tip the other way and the head stays upright.
+    // Weight from foot to foot: the hips move over one foot and drop on the other side, the shoulders tip the other
+    // way and the head stays upright. (The feet are put back where they stand afterwards, `plant`: the free knee gives.)
     // The spent rock more; a hurt leg keeps the weight on the other one (unless seated).
     const c = inp.condition, W = lib.wear;
     const favour = c ? clamp((c.legR - c.legL) * W.leg.favour, -1, 1) * Math.min(1, st.sway * 3) : 0;
     const rock = drift(s.clock / L.sway.seconds, m.phase) * st.sway * size * (1 + Math.max(0, s.tired) * (W.sway - 1));
     const w = clamp(rock * (1 - Math.abs(favour) * 0.75) + favour, -1.6, 1.6) * still * full;
     if (w !== 0) {
-      const sx = w * L.sway.shift, lean = Math.asin(clamp(sx / 0.5, -1, 1)), roll = w * L.sway.roll;
+      const sx = w * L.sway.shift, roll = w * L.sway.roll;
       shiftX = sx;
       add('root', 0, 0, roll);
-      for (const side of ['L', 'R'] as const) {
-        add(`hip${side}`, 0, 0, -lean - roll);
-        add(`ankle${side}`, 0, 0, lean);
-      }
-      // Weight to the left (w > 0) frees the right knee, and the other way round.
-      const free = w > 0 ? 'R' : 'L', k = Math.abs(w) * L.sway.knee;
-      add(`hip${free}`, -k * 0.5);
-      add(`knee${free}`, k);
-      add(`ankle${free}`, -k * 0.5);
-      lift -= Math.abs(w) * L.sway.knee * 0.004;
       add('spine', 0, 0, -roll * 0.9);
       add('chest', 0, 0, -roll * 0.5);
       add('head', 0, 0, roll * 0.4);
@@ -322,6 +334,45 @@ function nurse(pose: Pose, c: Condition, W: Wear): Pose {
   return { ...pose, joints };
 }
 
+/** The direction a planted knee points, and an elbow of an arm reaching for a weapon (in the chest's space). */
+const ELBOW_POLE: Vec3 = [0.5, -1, -0.5];
+
+/**
+ * The feet put back where the stance stands them, flat, `k` of the way: whatever the layers did to the hips (a breath,
+ * a shift of weight, sagging when spent, a crouch), the legs give to keep the feet on the ground.
+ */
+function plant(pose: Pose, s: AnimState, inp: AnimInput, k: number): Pose {
+  if (k <= 0.001) return pose;
+  const skel = inp.body.joints, H = inp.body.height;
+  if (!s.feet || s.feet.stance !== inp.stance.id) {
+    // Where the stance's own pose puts the feet; their height is the ankle's at rest (the sole on the ground).
+    const ref = frames(skel, inp.stance.loop.keys[0], H), rest = frames(skel, { joints: {} }, H);
+    const foot = (j: 'ankleL' | 'ankleR'): Foot => {
+      const fwd = apply(ref.rot[j], [0, 0, 1]);
+      return { x: ref.pos[j][0], y: rest.pos[j][1], z: ref.pos[j][2], yaw: Math.atan2(fwd[0], fwd[2]) };
+    };
+    s.feet = { stance: inp.stance.id, L: foot('ankleL'), R: foot('ankleR') };
+  }
+  const f = frames(skel, pose, H);
+  let out = pose;
+  for (const side of ['L', 'R'] as const) {
+    const ft = s.feet[side], up = clamp(inp.ground?.[side] ?? 0, -0.3, 0.3);
+    const r = reach(skel, f, LIMBS[`leg${side}`], [ft.x, ft.y + up, ft.z], [Math.sin(ft.yaw), 0, Math.cos(ft.yaw)]);
+    out = turned(out, { [`hip${side}`]: r.a, [`knee${side}`]: r.b, [`ankle${side}`]: aim(r.lower, yawMat(ft.yaw)) }, k);
+  }
+  return out;
+}
+
+/** The left hand takes hold of what the right hand carries, at `at` in the right hand's space, `k` of the way. */
+function grasp(pose: Pose, inp: AnimInput, at: Vec3, k: number): Pose {
+  if (k <= 0.001) return pose;
+  const skel = inp.body.joints;
+  const f = frames(skel, pose, inp.body.height);
+  const p = apply(f.rot.wristR, at), w = f.pos.wristR;
+  const r = reach(skel, f, LIMBS.armL, [w[0] + p[0], w[1] + p[1], w[2] + p[2]], apply(f.rot.chest, ELBOW_POLE), -inp.body.grip[1]);
+  return turned(pose, { shoulderL: r.a, elbowL: r.b, wristL: [0, 0, 0] }, k);
+}
+
 /**
  * Move one person's animation on by a frame and say what to show. `s` is changed in place (it is working state).
  */
@@ -336,7 +387,7 @@ export function animate(s: AnimState, lib: AnimLib, inp: AnimInput): Shown {
   if (s.going < 0.001) s.going = 0;
 
   const gait = gaitAt(lib.gaits, s.speed, s.phase);
-  s.phase += moved / Math.max(0.05, gait.stride * inp.hip);
+  s.phase += moved / Math.max(0.05, gait.stride * inp.body.joints.root.at[1]);
 
   // Effort comes quickly and goes slowly; the breath runs on its own clock so its speed can change without a jump.
   // How tired they show comes on over a moment (at once the first time: someone met already spent is spent).
@@ -356,7 +407,7 @@ export function animate(s: AnimState, lib: AnimLib, inp: AnimInput): Shown {
   // 3. A motion over it.
   const m = inp.motion?.motion;
   const frame = m ? sampleMotion(m, inp.motion!.t) : null;
-  if (m && frame) pose = overPose(pose, frame, m.part);
+  if (m && frame) pose = overPose(pose, frame, m);
   const root = frame?.root ?? NO_ROOT;
   const life = m?.life ?? 'full';
 
@@ -372,6 +423,11 @@ export function animate(s: AnimState, lib: AnimLib, inp: AnimInput): Shown {
   // Their condition, on someone up and about: a hurt arm nursed, the spent bent over.
   if (full && cond) pose = addPose(nurse(pose, cond, W), W.spent, s.tired);
   if (life !== 'none') pose = addPose(pose, lifePose(s, lib, inp, full));
+
+  // 5. Reaching: the feet back on the ground where the stance stands them (a motion of the whole body has the legs
+  // to itself), and the second hand onto a weapon held in both.
+  pose = plant(pose, s, inp, stance.planted * (1 - smooth(s.going)) * (m?.part === 'whole' ? 0 : 1));
+  if (inp.grasp && life !== 'none') pose = grasp(pose, inp, inp.grasp, cond ? 1 - cond.armL * W.armHold : 1);
 
   // A change never snaps: ease out of what was last shown.
   const key = `${stance.id}|${inp.hold?.id ?? ''}|${m?.id ?? ''}`;

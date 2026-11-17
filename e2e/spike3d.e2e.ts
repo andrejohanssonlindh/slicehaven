@@ -67,6 +67,8 @@ describe('spike3d', () => {
     const stats = await page.textContent('#stats');
     console.info(stats);
     expect(errors).toEqual([]);
+    // (Closed, so its frames don't starve the pages the later tests open: they timed out starting up.)
+    await page.context().close();
   });
 });
 
@@ -89,6 +91,8 @@ describe('spike3d admin menu', () => {
     await page.evaluate(() => (window as any).spike.world.weather.set('clear'));
     expect(await page.evaluate(() => (window as any).spike.world.weather.windForce)).toBe(4);
     expect(errors).toEqual([]);
+    // (Closed, so its frames don't starve the pages the later tests open: they timed out starting up.)
+    await page.context().close();
   });
 });
 
@@ -114,6 +118,8 @@ describe('spike3d streaming', () => {
     expect(await count()).toBeLessThan(16);
     await page.screenshot({ path: `${OUT}spike3d-streamed.png` });
     expect(errors).toEqual([]);
+    // (Closed, so its frames don't starve the pages the later tests open: they timed out starting up.)
+    await page.context().close();
   });
 });
 
@@ -139,6 +145,8 @@ describe('spike3d walking', () => {
     await page.waitForTimeout(300);
     expect(await page.evaluate(() => (window as any).spike.world.walking)).toBe(true);
     expect(errors).toEqual([]);
+    // (Closed, so its frames don't starve the pages the later tests open: they timed out starting up.)
+    await page.context().close();
   });
 });
 
@@ -170,6 +178,8 @@ describe('spike3d filaments', () => {
     for (let k = 0; k < 10; k++) await clickBtn(page, 'Filaments');
     expect(await page.evaluate(() => (window as any).spike.world.filaments.shownAspect)).toBeNull();
     expect(errors).toEqual([]);
+    // (Closed, so its frames don't starve the pages the later tests open: they timed out starting up.)
+    await page.context().close();
   });
 });
 
@@ -191,6 +201,8 @@ describe('spike3d entering', () => {
     expect(await w('w.heroIndoors')).toBe(false);
     expect(await w('w.housing.inside')).toBe(false);
     expect(errors).toEqual([]);
+    // (Closed, so its frames don't starve the pages the later tests open: they timed out starting up.)
+    await page.context().close();
   });
 });
 
@@ -210,5 +222,7 @@ describe('spike3d layout', () => {
     expect(await w('w.heroHouse()')).toBe('east');
     expect(await w('w.houses.filter((h) => h.open).map((h) => h.built.place.id)')).toEqual(['east']);
     expect(errors).toEqual([]);
+    // (Closed, so its frames don't starve the pages the later tests open: they timed out starting up.)
+    await page.context().close();
   });
 });

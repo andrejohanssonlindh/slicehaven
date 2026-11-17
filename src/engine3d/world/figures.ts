@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 import type { PersonSpec } from '../../core/persons';
 import { PERSON_KINDS } from '../../content/people';
-import { THINGS } from '../../content/things';
 import { bodySpecOf } from '../../content/people/bodies';
-import { ANIM, HOLDS, READY, SIT, STAND } from '../../content/people/poses';
+import { ANIM, CARRY, READY, SIT, STAND, WEAPON_HOLDS, weaponHold } from '../../content/people/poses';
 import { MOTIONS } from '../../content/motions';
 import { styleFor } from '../../content/combat';
 import { LYING_ACTS, type Motion, type MotionAct, type Playing, type WayOfMoving, advance, findMotion } from '../../core/world3d/motion';
-import { animate, mannerOf, newAnim } from '../../core/world3d/animate';
+import { type Hold, animate, mannerOf, newAnim } from '../../core/world3d/animate';
+import type { Vec3 } from '../../core/world3d/mesh';
 import { buildBody } from '../../core/world3d/body';
 import { wrapAngle } from '../../core/world3d/view';
-import { makeBodyRig, placeRoot } from '../body';
-import type { Figure } from './types';
+import { type BodyRig, makeBodyRig, placeRoot } from '../body';
+import type { Figure, Person } from './types';
 import type { SpikeWorld } from './index';
 
 /**
@@ -38,6 +38,11 @@ export class Figures {
   /** Who carries something in both arms (the carrying pose); who holds something in the right hand (a sword). Set by `Gear.showHeld`. */
   readonly inArms = new Set<string>();
   readonly inHand = new Set<string>();
+  /**
+   * What each person wields (set by `Gear.showHeld`): the way the weapon in the right hand moves, how far along it a
+   * second hand holds (the model's, if it says), and whether a shield is on the left arm.
+   */
+  readonly wields = new Map<string, { way?: WayOfMoving; second?: number; shield?: boolean }>();
 
   constructor(private readonly w: SpikeWorld) {}
 
@@ -109,15 +114,40 @@ export class Figures {
 
   /** How what someone holds in the right hand moves (their weapon kind's `moves`), else bare hands. */
   private wayOf(id: string): WayOfMoving {
-    let way: WayOfMoving | undefined;
-    for (const [who, l] of this.w.gear.holds()) {
-      if (who !== id) continue;
-      const k = THINGS.get(l.kind);
-      if (k.shield) way ??= k.moves;
-      else if (k.moves) way = k.moves;
-    }
-    return way ?? 'hands';
+    const w = this.wields.get(id);
+    return w?.way ?? (w?.shield ? 'shield' : 'hands');
   }
+
+  /**
+   * What someone's arms do with what they hold, and where a second hand takes hold: carrying in both arms; else their
+   * weapon's guard in a fight (bare fists with none) or its carry at ease; a weapon held in both hands on guard gets
+   * the left hand on it, unless a shield is on that arm.
+   */
+  private holdOf(id: string, onGuard: boolean, rig: BodyRig): { hold: Hold | null; grasp: Vec3 | null } {
+    if (this.inArms.has(id)) return { hold: CARRY, grasp: null };
+    const w = this.wields.get(id), way = this.wayOf(id);
+    const hold = weaponHold(way, onGuard, !!w?.shield);
+    const second = onGuard && w?.way && !w.shield && WEAPON_HOLDS[way].second !== undefined ? w.second ?? WEAPON_HOLDS[way].second! : null;
+    const g = rig.model.grip;
+    return { hold, grasp: second === null ? null : [g[0], g[1], g[2] + second] };
+  }
+
+  /** Is someone inside a house (under a roof, on a floor)? */
+  indoors(id: string): boolean {
+    return id === 'hero' ? this.w.heroIndoors : !!this.w.cast.find((c) => c.who.id === id)?.mind.actor.house;
+  }
+
+  /** The ground under each foot against the ground they stand on (outdoors: a slope; indoors the floor is flat). */
+  private groundOf(p: Person): { L: number; R: number } | null {
+    const w = this.w, f = p.fig;
+    if (this.indoors(p.id)) return null;
+    const at = (j: 'ankleL' | 'ankleR'): number => {
+      const v = f.rig.jointWorld(j, this.spot);
+      return w.store.heightAt(v.x, v.z) - f.place.position.y;
+    };
+    return { L: at('ankleL'), R: at('ankleR') };
+  }
+  private readonly spot = new THREE.Vector3();
 
   /** The fighting style someone fights by (their own, their kind's, the default); the hero has none yet. */
   private styleOf(id: string): string | undefined {
@@ -200,14 +230,17 @@ export class Figures {
         if (next !== pl) this.motions.set(p.id, (pl = next));
       }
       const m = pl ? MOTIONS[pl.motion] : undefined;
+      // Holding something: the arms carry it, or hold the weapon as its kind is held, whatever the legs do (B3b, B8a).
+      const { hold, grasp } = this.holdOf(p.id, !!pl, f.rig);
       const shown = animate(f.anim, ANIM, {
         dt,
         moved: stepped && !seat ? d : 0,
-        hip: f.rig.model.joints.root.at[1],
+        body: f.rig.model,
         // Seated; on guard while a fight's motions play; else at ease.
         stance: seat ? SIT : pl ? READY : STAND,
-        // Holding something: the arms carry it, or the right hand holds it up (a sword), whatever the legs do (B3b, B8a).
-        hold: this.inHand.has(p.id) ? HOLDS.wield : this.inArms.has(p.id) ? HOLDS.carry : null,
+        hold,
+        grasp,
+        ground: this.groundOf(p),
         motion: m && pl ? { motion: m, t: time - pl.since } : null,
         turning,
         look: this.lookOf(p.id, f),

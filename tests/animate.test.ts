@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { MOTIONS } from '../src/content/motions';
 import { TIRED_BANDS } from '../src/content/people/condition';
-import { ANIM, GAITS, HOLDS, READY, SIT, STAND } from '../src/content/people/poses';
+import { PERSON_KINDS } from '../src/content/people';
+import { bodySpecOf } from '../src/content/people/bodies';
+import { ANIM, CARRY, GAITS, READY, SIT, STAND, WEAPON_HOLDS, weaponHold } from '../src/content/people/poses';
+import { buildBody } from '../src/core/world3d/body';
+import { type Frames, apply, frames } from '../src/core/world3d/skeleton';
+import { WAYS_OF_MOVING } from '../src/core/world3d/motion';
 import { type Injuries, unhurt } from '../src/core/damage';
 import { type Condition, conditionOf } from '../src/core/world3d/condition';
 import { type AnimInput, type AnimState, type Shown, animate, mannerOf, newAnim } from '../src/core/world3d/animate';
@@ -9,7 +14,9 @@ import { type Motion, sampleMotion } from '../src/core/world3d/motion';
 import { JOINTS, type Joint, type Pose, addPose, blendPose, mirrorPose } from '../src/core/world3d/pose';
 
 const manner = mannerOf(7);
-const base = (more: Partial<AnimInput> = {}): AnimInput => ({ dt: 1 / 60, moved: 0, hip: 0.85, stance: STAND, manner, ...more });
+const body = buildBody(bodySpecOf(PERSON_KINDS.resolve({ is: ['human', 'job-farmer'], seed: 1, look: { sex: 'm' } }), 1));
+const base = (more: Partial<AnimInput> = {}): AnimInput => ({ dt: 1 / 60, moved: 0, body, stance: STAND, manner, ...more });
+const at = (p: Pose): Frames => frames(body.joints, p, body.height);
 /** Run the animator for some seconds; the last frame shown. */
 const run = (s: AnimState, seconds: number, more: Partial<AnimInput> | ((t: number) => Partial<AnimInput>) = {}): Shown => {
   let out!: Shown;
@@ -56,8 +63,17 @@ describe('the animator', () => {
     expect(range((p) => turn(p, 'head', 1))).toBeGreaterThan(0.1);
     // From one frame to the next it only ever moves a little (no snaps).
     for (let i = 1; i < seen.length; i++) expect(apart(seen[i - 1].pose, seen[i].pose)).toBeLessThan(0.06);
-    // The legs lean against the hips' shift, the ankles undo the lean: the feet stay flat where they are.
-    for (const x of seen) expect(turn(x.pose, 'hipL', 2) + turn(x.pose, 'ankleL', 2) + turn(x.pose, 'root', 2)).toBeCloseTo(0, 5);
+    // Whatever the hips do, the feet are put back where the stance stands them, flat on the ground.
+    const first = at(seen[0].pose);
+    for (const x of seen) {
+      const f = at(x.pose);
+      for (const j of ['ankleL', 'ankleR'] as const) {
+        // (To within a finger: a leg at full stretch can't quite follow the hips at the top of a breath.)
+        for (let i = 0; i < 3; i++) expect(Math.abs(f.pos[j][i] - first.pos[j][i])).toBeLessThan(0.015);
+        expect(apply(f.rot[j], [0, 1, 0])[1]).toBeCloseTo(1, 3);
+      }
+    }
+    expect(first.pos.ankleL[1]).toBeCloseTo(0.04 * body.height, 2);
   });
 
   it('eases from standing into a walk and back, with no snap', () => {
@@ -143,9 +159,76 @@ describe('the animator', () => {
 
   it('a hold lies over the arms whatever the legs do', () => {
     const s = newAnim(manner);
-    const held = run(s, 2, { hold: HOLDS.carry, moved: 1.4 / 60 });
+    const held = run(s, 2, { hold: CARRY, moved: 1.4 / 60 });
     expect(turn(held.pose, 'shoulderL')).toBeLessThan(-0.6);
     expect(Math.abs(turn(held.pose, 'hipL')) + Math.abs(turn(held.pose, 'hipR'))).toBeGreaterThan(0.1);
+  });
+});
+
+describe('weapons in the hands', () => {
+  /** Where the weapon in the right hand points (body space), and where the left hand's hold is. */
+  const weapon = (p: Pose): { dir: readonly number[]; left: number[]; f: Frames } => {
+    const f = at(p);
+    const hold = apply(f.rot.wristL, body.grip);
+    return { dir: apply(f.rot.wristR, [0, 0, 1]), left: [0, 1, 2].map((i) => f.pos.wristL[i] + hold[i]), f };
+  };
+  const guarding = (way: 'spear' | 'staff' | 'two-hander' | 'blade', more: Partial<AnimInput> = {}): Partial<AnimInput> => ({
+    stance: READY, hold: weaponHold(way, true, false), motion: { motion: MOTIONS.guard, t: 0 },
+    grasp: WEAPON_HOLDS[way].second === undefined ? null : [body.grip[0], body.grip[1], body.grip[2] + WEAPON_HOLDS[way].second!],
+    ...more,
+  });
+
+  it('every way of moving has a hold, and each weapon is held its own way on guard', () => {
+    for (const way of WAYS_OF_MOVING) expect(WEAPON_HOLDS[way], way).toBeTruthy();
+    const dirs = (['blade', 'spear', 'staff', 'two-hander'] as const).map((way) => weapon(run(newAnim(manner), 1, guarding(way)).pose).dir);
+    // A sword stands up in front; a spear is levelled at the foe.
+    expect(dirs[0][1]).toBeGreaterThan(0.6);
+    expect(dirs[1][2]).toBeGreaterThan(0.85);
+    expect(Math.abs(dirs[1][1])).toBeLessThan(0.4);
+    // No two are held alike.
+    for (let i = 0; i < dirs.length; i++) for (let j = i + 1; j < dirs.length; j++) expect(Math.hypot(...dirs[i].map((v, k) => v - dirs[j][k]))).toBeGreaterThan(0.2);
+  });
+
+  it('a spear is thrust along its own line: the point goes forward, still pointing at the foe', () => {
+    const strike = MOTIONS['strike-spear'], hit = strike.marks!.contact * strike.seconds;
+    const s = newAnim(manner);
+    const before = weapon(run(s, 1, guarding('spear')).pose);
+    let now = before;
+    for (let t = 0; t <= hit; t += 1 / 60) now = weapon(animate(s, ANIM, base(guarding('spear', { motion: { motion: strike, t } }))).pose);
+    expect(now.dir[2]).toBeGreaterThan(0.85);
+    // The hand, and so the point, has gone well forward along the way the spear points.
+    expect(now.f.pos.wristR[2] - before.f.pos.wristR[2]).toBeGreaterThan(0.35);
+  });
+
+  it('the second hand holds a weapon held in both, on guard and through a blow', () => {
+    for (const way of ['spear', 'staff', 'two-hander'] as const) {
+      const g = guarding(way), s = newAnim(manner);
+      const on = (p: Pose): number => {
+        const w = weapon(p), hold = apply(w.f.rot.wristR, g.grasp!);
+        return Math.hypot(...[0, 1, 2].map((i) => w.left[i] - (w.f.pos.wristR[i] + hold[i])));
+      };
+      expect(on(run(s, 1, g).pose), way).toBeLessThan(0.03);
+      // Through the wind-up of its strike the hand stays on, or the arm is stretched out after the weapon.
+      const strike = MOTIONS[`strike-${way}`];
+      for (let t = 0; t <= strike.seconds; t += 1 / 60) {
+        const p = animate(s, ANIM, base({ ...g, motion: { motion: strike, t } })).pose;
+        if (on(p) > 0.05) expect(Math.abs(turn(p, 'elbowL')), `${way} at ${t.toFixed(2)}`).toBeLessThan(0.15);
+      }
+    }
+    // A shield on the arm, and the hand stays off the weapon.
+    expect(weaponHold('spear', true, true)!.id).toContain('shield');
+    expect(weaponHold('hands', false, false)).toBeNull();
+  });
+
+  it('the legs give when the body sinks: a spent fighter\'s knees bend and the feet stay down', () => {
+    const fresh = run(newAnim(manner), 3, guarding('blade')).pose;
+    const spent = run(newAnim(manner), 3, guarding('blade', { condition: conditionOf({ ...unhurt(), fatigue: 40 }, TIRED_BANDS) })).pose;
+    expect(turn(spent, 'kneeL')).toBeGreaterThan(turn(fresh, 'kneeL') + 0.1);
+    const a = at(fresh), b = at(spent);
+    for (const j of ['ankleL', 'ankleR'] as const) for (let i = 0; i < 3; i++) expect(b.pos[j][i]).toBeCloseTo(a.pos[j][i], 2);
+    // A foot on higher ground is lifted to it.
+    const slope = run(newAnim(manner), 1, { ground: { L: 0.1, R: 0 } }).pose, flat = run(newAnim(manner), 1).pose;
+    expect(at(slope).pos.ankleL[1] - at(flat).pos.ankleL[1]).toBeCloseTo(0.1, 2);
   });
 });
 
@@ -175,6 +258,12 @@ describe('a body\'s condition', () => {
     expect(c.bleedFrom).toBe('kneeR');
     expect(c.stains.rightLeg).toBeGreaterThan(c.stains.leftArm!);
     expect(hurt(() => {}).bleed).toBe(0);
+  });
+
+  it('a part cut off is gone from its joint down; a stump keeps half the bone', () => {
+    const c = hurt((i) => { i.lost = [{ area: 'hand', side: 'left' }, { area: 'calf', side: 'right' }, { area: 'neck' }]; });
+    expect(c.gone).toEqual({ wristL: 0, kneeR: 0.5, ankleR: 0 });
+    expect(hurt(() => {}).gone).toEqual({});
   });
 
   it('the spent stand bent over with the guard sunk, and breathe hard', () => {

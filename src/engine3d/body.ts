@@ -84,6 +84,11 @@ export interface BodyRig {
   jointWorld(j: Joint, out: THREE.Vector3): THREE.Vector3;
   /** Blood on the body: each joint's parts reddened by this much (0 clean … 1 soaked); joints left out are clean. */
   stain(marks: Partial<Record<Joint, number>>): void;
+  /**
+   * Parts lost for good (`Condition.gone`): each joint's bone cut to this much of its length, 0 taking it and
+   * everything further out away (what the hand held too). Joints left out are whole.
+   */
+  lose(gone: Partial<Record<Joint, number>>): void;
   /** Show 0, 1 or 2 shell layers. */
   setShells(n: number): void;
   dispose(): void;
@@ -157,6 +162,13 @@ export function makeBodyRig(model: BodyModel): BodyRig {
         }
         col.needsUpdate = true;
       }
+    },
+    lose(gone) {
+      JOINTS.forEach((j, i) => {
+        const k = gone[j] ?? 1;
+        if (k <= 0) bones[i].scale.setScalar(1e-4);
+        else bones[i].scale.set(1, k, 1);
+      });
     },
     setShells(n: number) {
       shellMeshes.forEach((m, i) => { m.visible = i < n; });

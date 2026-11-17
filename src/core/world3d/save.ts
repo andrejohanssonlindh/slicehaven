@@ -13,7 +13,7 @@ import type { Injuries } from '../damage';
  * No migrations while the design moves: a save of another version is dropped. Bump `WORLD_SAVE_VERSION` whenever
  * the shape changes or the maps change in a way that moves things (ids are where things stand).
  */
-export const WORLD_SAVE_VERSION = 12;
+export const WORLD_SAVE_VERSION = 13;
 
 export interface WorldSave {
   v: number;
@@ -42,6 +42,8 @@ export interface WorldSave {
    * hard they were when last tried (tried again only once nearer makes them easier).
    */
   noticed: { seen: string[]; tried: Record<string, number> };
+  /** Blood on the ground, a stain each: x, y, z, size, age in seconds, under the open sky (1) or a roof (0). Looks only. */
+  blood: [number, number, number, number, number, number][];
 }
 
 const key = (map: string): string => `slicehaven.world.${map}`;

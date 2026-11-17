@@ -1,17 +1,15 @@
 import type { Motion } from '../../core/world3d/motion';
-import { WIELD_ARM } from '../people/poses';
 
 /**
- * On guard, for any weapon: the weapon arm held up in front, the left arm forward and bent. Laid over what the legs do,
- * so a fighter walks on guard. Held until something else plays.
+ * On guard: nothing of its own. The body's stance (`READY`) and the guard of whatever it holds (`WEAPON_HOLDS` in
+ * `content/people/poses.ts`: a spear couched, a sword up, fists) are the pose; this only says "in a fight, between
+ * motions". Every other motion starts and ends on `base: 1`, which is that pose. Held until something else plays.
  */
-export const GUARD_ARMS = { ...WIELD_ARM, shoulderL: [-0.3, 0, 0.25], elbowL: [-0.9, 0, 0] } as const;
-
 export default {
   id: 'guard',
   act: 'guard',
   seconds: 0,
   part: 'upper',
-  keys: [{ at: 0, joints: GUARD_ARMS }],
+  keys: [{ at: 0, base: 1, joints: {} }],
   then: 'hold',
 } satisfies Motion;

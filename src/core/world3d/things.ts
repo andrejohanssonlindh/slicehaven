@@ -39,6 +39,11 @@ export interface FurnitureModel {
   draw(seed: number, variant?: string): ThingParts;
   /** Something held in one hand (a sword): where along x the hand holds it. Drawn in the right hand, not in both arms. */
   grip?: number;
+  /**
+   * Where along x a second hand takes hold when the weapon is held in both (a spear's shaft further up, a greatsword's
+   * pommel). Left out, the way it is held says how far from the first hand (`WeaponHold.second`).
+   */
+  grip2?: number;
 }
 
 /** The 3D model of a kind, if it has one: a piece of furniture's, or a loose item's own (a sword). */

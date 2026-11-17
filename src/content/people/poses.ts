@@ -1,4 +1,5 @@
-import type { AnimLib, Gait, Life, Stance } from '../../core/world3d/animate';
+import type { AnimLib, Gait, Hold, Life, Stance } from '../../core/world3d/animate';
+import type { WayOfMoving } from '../../core/world3d/motion';
 import { type Cycle, type Pose, type Turns, mirrorPose } from '../../core/world3d/pose';
 import { WEAR } from './condition';
 
@@ -91,7 +92,7 @@ const atEase: Pose = {
     hipL: [-0.03, 0, 0.02], hipR: [-0.03, 0, -0.02], kneeL: [0.06, 0, 0], kneeR: [0.06, 0, 0], ankleL: [-0.03, 0, -0.02], ankleR: [-0.03, 0, 0.02],
   },
 };
-export const STAND: Stance = { id: 'stand', loop: { keys: [atEase] }, seconds: 4, sway: 1, look: 1, arms: 1, effort: 0 };
+export const STAND: Stance = { id: 'stand', loop: { keys: [atEase] }, seconds: 4, sway: 1, look: 1, arms: 1, effort: 0, planted: 1 };
 
 /**
  * On guard (in a fight): the left foot forward and the right back, knees bent, the body turned a little side-on and
@@ -105,7 +106,7 @@ const ready = (deep: number): Pose => ({
   },
   lift: -0.02 - deep * 0.11,
 });
-export const READY: Stance = { id: 'ready', loop: { keys: [ready(0), ready(0.035)] }, seconds: 1.5, sway: 0.35, look: 0, arms: 1.6, effort: 0.45 };
+export const READY: Stance = { id: 'ready', loop: { keys: [ready(0), ready(0.035)] }, seconds: 1.5, sway: 0.35, look: 0, arms: 1.2, effort: 0.45, planted: 1 };
 
 /**
  * Sitting (the verb `sit`): thighs level and forward, shins straight down, leaning a little forward with the hands on
@@ -117,7 +118,7 @@ const seated: Pose = {
     spine: [0.06, 0, 0], shoulderL: [-0.55, 0, 0.1], shoulderR: [-0.55, 0, -0.1], elbowL: [-0.5, 0, 0], elbowR: [-0.5, 0, 0],
   },
 };
-export const SIT: Stance = { id: 'sit', loop: { keys: [seated] }, seconds: 4, sway: 0, look: 0.8, arms: 0.3, effort: 0 };
+export const SIT: Stance = { id: 'sit', loop: { keys: [seated] }, seconds: 4, sway: 0, look: 0.8, arms: 0.3, effort: 0, planted: 0 };
 
 // --- holds ---
 
@@ -130,16 +131,79 @@ export const CARRY_ARMS: Turns = {
   shoulderR: [-0.85, 0, 0.18], elbowR: [-0.75, 0, 0], wristR: [0, 0, 0],
 };
 
-/**
- * Holding a weapon in the right hand (plan B8a): the forearm forward and up, so the blade stands out in front. Laid
- * over the legs like carrying; the left arm keeps its swing.
- */
-export const WIELD_ARM: Turns = { shoulderR: [-0.45, 0, -0.12], elbowR: [-1.15, 0, 0], wristR: [0, 0, 0] };
+/** Something carried in both arms. */
+export const CARRY: Hold = { id: 'carry', joints: CARRY_ARMS };
 
-export const HOLDS = {
-  carry: { id: 'carry', joints: CARRY_ARMS },
-  wield: { id: 'wield', joints: WIELD_ARM },
-} as const;
+/**
+ * How a weapon is held, by its way of moving (`moves` on the weapon kind): **at ease** (walking about with it drawn)
+ * and **on guard** (in a fight). The weapon lies in the right hand square to the forearm, its tip out to the front;
+ * the wrist's turn about x tips it: 0 square, +1.5 straight on along the forearm (a spear couched), negative laid
+ * back. `second` puts the left hand on it too, that many metres from the right toward the tip (a weapon model can say
+ * exactly where: `grip2`); the left arm then follows the weapon by itself in every motion.
+ * Every fight motion starts and ends on the guard of whatever is held (`base: 1` in its keys), so a new way of holding
+ * is one entry here.
+ */
+export interface WeaponHold {
+  ease: Turns;
+  guard: Turns;
+  second?: number;
+}
+
+/** The free left arm on guard: forward and bent, out of the way. */
+const LEFT_UP: Turns = { shoulderL: [-0.3, 0, 0.25], elbowL: [-0.9, 0, 0], wristL: [0, 0, 0] };
+/** A shield on the left forearm on guard: up in front of the body. Laid over any guard. */
+export const SHIELD_ARM: Turns = { shoulderL: [-0.8, 0.35, 0.1], elbowL: [-1.3, 0, 0], wristL: [0, 0, 0] };
+
+export const WEAPON_HOLDS: Record<WayOfMoving, WeaponHold> = {
+  // A sword: at ease low at the side, point forward and down; on guard up in front, the point toward the foe's face.
+  blade: {
+    ease: { shoulderR: [-0.1, 0, -0.1], elbowR: [-0.45, 0, 0], wristR: [0.9, 0, 0] },
+    guard: { shoulderR: [-0.45, 0, -0.12], elbowR: [-1.15, 0, 0], wristR: [0.45, 0, 0], ...LEFT_UP },
+  },
+  // An axe, a mace: at ease hanging by the leg; on guard cocked back by the shoulder, ready to fall.
+  'axe-mace': {
+    ease: { shoulderR: [0, 0, -0.1], elbowR: [-0.3, 0, 0], wristR: [0.7, 0, 0] },
+    guard: { shoulderR: [-0.55, 0, -0.2], elbowR: [-1.5, 0, 0], wristR: [-0.2, 0, 0], ...LEFT_UP },
+  },
+  // A spear: at ease upright like a walking staff; on guard couched low by the hip in both hands, the point at the foe.
+  spear: {
+    ease: { shoulderR: [-0.2, 0, -0.12], elbowR: [-0.55, 0, 0], wristR: [-0.82, 0, 0] },
+    guard: { shoulderR: [0.2, 0, 0.04], elbowR: [-1.15, 0, 0], wristR: [0.75, 0.5, 0] },
+    second: 0.32,
+  },
+  // A staff: upright at ease; on guard slanted across the body in both hands, the far end up toward the foe.
+  staff: {
+    ease: { shoulderR: [-0.2, 0, -0.12], elbowR: [-0.55, 0, 0], wristR: [-0.82, 0, 0] },
+    guard: { shoulderR: [0.15, 0, -0.15], elbowR: [-1.05, 0, 0], wristR: [0.2, 0.4, 0] },
+    second: 0.5,
+  },
+  // A greatsword, a great axe: at ease resting back on the shoulder; on guard both hands low in front, the blade up and forward.
+  'two-hander': {
+    ease: { shoulderR: [-0.35, 0, -0.05], elbowR: [-1.95, 0, 0], wristR: [0.35, 0, 0] },
+    guard: { shoulderR: [-0.3, 0.25, 0.1], elbowR: [-1.05, 0, 0], wristR: [0.4, 0.15, 0] },
+    second: -0.1,
+  },
+  // Bare hands: nothing at ease; on guard both fists up.
+  hands: {
+    ease: {},
+    guard: { shoulderR: [-0.55, 0, -0.1], elbowR: [-1.9, 0, 0], wristR: [0, 0, 0], shoulderL: [-0.65, 0, 0.12], elbowL: [-1.8, 0, 0], wristL: [0, 0, 0] },
+  },
+  // Only a shield: the right fist up behind it.
+  shield: {
+    ease: {},
+    guard: { shoulderR: [-0.55, 0, -0.1], elbowR: [-1.9, 0, 0], wristR: [0, 0, 0], ...LEFT_UP },
+  },
+};
+
+/**
+ * What the arms do with what someone holds: the way their weapon moves (bare `hands` with none), on guard or at ease,
+ * a shield up on the left arm on guard. Null when the arms just hang.
+ */
+export function weaponHold(way: WayOfMoving, onGuard: boolean, shield: boolean): Hold | null {
+  const h = WEAPON_HOLDS[way];
+  const joints = onGuard ? { ...h.guard, ...(shield ? SHIELD_ARM : {}) } : h.ease;
+  return Object.keys(joints).length ? { id: `${way}:${onGuard ? 'guard' : 'ease'}${onGuard && shield ? ':shield' : ''}`, joints } : null;
+}
 
 // --- life ---
 
@@ -147,8 +211,8 @@ export const HOLDS = {
 export const LIFE: Life = {
   // One breath: the chest tips back and rises, the shoulders open.
   breath: { seconds: 4.2, chest: 0.03, shoulders: 0.018, lift: 0.0025 },
-  // Weight from foot to foot: how far the hips move, how much they drop on the free side, how much the free knee eases.
-  sway: { seconds: 9, shift: 0.022, roll: 0.045, knee: 0.16 },
+  // Weight from foot to foot: how far the hips move, how much they drop on the free side, (the free knee gives as the hip drops).
+  sway: { seconds: 9, shift: 0.022, roll: 0.05 },
   arms: { seconds: 6, swing: 0.035, elbow: 0.05, wrist: 0.06 },
   // Looking about: a new glance every `seconds` or so; `reach` is as far as a head turns toward something, `lead` how
   // much of a turn of the body the head takes first, `settle` how quickly it gets there.
