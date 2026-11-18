@@ -22,7 +22,8 @@ Backstage for Slicehaven: what's planned, what I need from you, what's been deci
 - **People:** [kinds of person and sheets](design/people-kinds.md) · [what people do](design/behaviours.md)
 - **Skills:** [skill map handover](design/skill-map-handover.md) (deeper: [skill web](design/skill-web.md), [people library](design/people-library.md), [ways of use](design/ways-of-use.md))
 - **Character creator:** [plan and status](design/character-creator.md) · [next design pass](design/creator-next.md)
-- **Magic:** [filaments](design/magic-filaments.md) · [on the map](design/magic-on-map.md)
+- **Effects:** [fire, wet, breaking](design/effects.md)
+- **Magic:** **[the proposal (Q53)](design/magic.md)** · [filaments](design/magic-filaments.md) · [on the map](design/magic-on-map.md)
 - **World:** [notes on the setting](world/eon-notes.md)
 
 ## Archive
